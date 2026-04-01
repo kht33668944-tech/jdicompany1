@@ -1,17 +1,12 @@
 import type { VacationType } from "@/lib/attendance/types";
 
-const VACATION_LABELS = new Map<string, string>([
-  ["?곗감", "연차"],
-  ["?怨쀪컧", "연차"],
-  ["諛섏감-?ㅼ쟾", "반차 (오전)"],
-  ["獄쏆꼷媛???쇱읈", "반차 (오전)"],
-  ["諛섏감-?ㅽ썑", "반차 (오후)"],
-  ["獄쏆꼷媛???쎌뜎", "반차 (오후)"],
-  ["蹂묎?", "병가"],
-  ["癰귣쵌?", "병가"],
-  ["?밸퀎?닿?", "기타 휴가"],
-  ["?諛명???", "기타 휴가"],
-]);
+const VACATION_LABELS: Record<VacationType, string> = {
+  "연차": "연차",
+  "반차-오전": "반차 (오전)",
+  "반차-오후": "반차 (오후)",
+  "병가": "병가",
+  "특별휴가": "특별휴가",
+};
 
 export function calculateVacationDays(hireDate: string, year: number): number {
   const hire = new Date(hireDate);
@@ -30,19 +25,11 @@ export function calculateVacationDays(hireDate: string, year: number): number {
 }
 
 export function getVacationTypeLabel(type: VacationType): string {
-  return VACATION_LABELS.get(type) ?? "휴가";
+  return VACATION_LABELS[type] ?? "휴가";
 }
 
 export function getVacationDaysCount(type: VacationType, startDate: string, endDate: string): number {
-  if (
-    type === ("諛섏감-?ㅼ쟾" as VacationType) ||
-    type === ("諛섏감-?ㅽ썑" as VacationType) ||
-    type === ("獄쏆꼷媛???쇱읈" as VacationType) ||
-    type === ("獄쏆꼷媛???쎌뜎" as VacationType)
-  ) {
-    return 0.5;
-  }
-
+  if (type === "반차-오전" || type === "반차-오후") return 0.5;
   const start = new Date(`${startDate}T00:00:00`);
   const end = new Date(`${endDate}T00:00:00`);
   const diffTime = end.getTime() - start.getTime();

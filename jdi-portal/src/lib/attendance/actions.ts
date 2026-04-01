@@ -79,7 +79,7 @@ export async function cancelVacationRequest(requestId: string) {
     .from("vacation_requests")
     .delete()
     .eq("id", requestId)
-    .eq("status", "?湲곗쨷");
+    .eq("status", "대기중");
   if (error) throw error;
 }
 
@@ -128,14 +128,14 @@ export async function rejectVacationRequest(
   const { error } = await supabase
     .from("vacation_requests")
     .update({
-      status: "諛섎젮",
+      status: "반려",
       reviewed_by: adminId,
       reviewed_at: new Date().toISOString(),
       reject_reason: rejectReason,
       updated_at: new Date().toISOString(),
     })
     .eq("id", requestId)
-    .eq("status", "?湲곗쨷");
+    .eq("status", "대기중");
   if (error) throw error;
 }
 
@@ -149,22 +149,22 @@ export async function approveCorrectionRequest(
     .from("correction_requests")
     .select("*")
     .eq("id", requestId)
-    .eq("status", "?湲곗쨷")
+    .eq("status", "대기중")
     .single();
   if (fetchError) throw fetchError;
 
   const { error: updateError } = await supabase
     .from("correction_requests")
     .update({
-      status: "?뱀씤",
+      status: "승인",
       reviewed_by: adminId,
       reviewed_at: new Date().toISOString(),
     })
     .eq("id", requestId)
-    .eq("status", "?湲곗쨷");
+    .eq("status", "대기중");
   if (updateError) throw updateError;
 
-  if (correction.request_type === "湲곕줉?꾨씫") {
+  if (correction.request_type === "기록누락") {
     await supabase.from("attendance_records").upsert(
       {
         user_id: correction.user_id,
@@ -200,11 +200,11 @@ export async function rejectCorrectionRequest(
   const { error } = await supabase
     .from("correction_requests")
     .update({
-      status: "諛섎젮",
+      status: "반려",
       reviewed_by: adminId,
       reviewed_at: new Date().toISOString(),
     })
     .eq("id", requestId)
-    .eq("status", "?湲곗쨷");
+    .eq("status", "대기중");
   if (error) throw error;
 }

@@ -12,18 +12,12 @@ interface VacationRequestFormProps {
   balance: VacationBalance | null;
 }
 
-const ANNUAL_LEAVE = "?怨쀪컧" as VacationType;
-const HALF_DAY_AM = "獄쏆꼷媛???쇱읈" as VacationType;
-const HALF_DAY_PM = "獄쏆꼷媛???쎌뜎" as VacationType;
-const SICK_LEAVE = "癰귣쵌?" as VacationType;
-const OTHER_LEAVE = "?諛명???" as VacationType;
-
 const vacationTypes: { value: VacationType; label: string }[] = [
-  { value: ANNUAL_LEAVE, label: "연차" },
-  { value: HALF_DAY_AM, label: "반차 (오전)" },
-  { value: HALF_DAY_PM, label: "반차 (오후)" },
-  { value: SICK_LEAVE, label: "병가" },
-  { value: OTHER_LEAVE, label: "기타 휴가" },
+  { value: "연차", label: "연차" },
+  { value: "반차-오전", label: "반차 (오전)" },
+  { value: "반차-오후", label: "반차 (오후)" },
+  { value: "병가", label: "병가" },
+  { value: "특별휴가", label: "특별휴가" },
 ];
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -35,7 +29,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function VacationRequestForm({ userId, balance }: VacationRequestFormProps) {
   const router = useRouter();
-  const [type, setType] = useState<VacationType>(ANNUAL_LEAVE);
+  const [type, setType] = useState<VacationType>("연차");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
@@ -43,7 +37,7 @@ export default function VacationRequestForm({ userId, balance }: VacationRequest
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const remainingDays = balance?.remaining_days ?? 0;
-  const isHalfDay = type === HALF_DAY_AM || type === HALF_DAY_PM;
+  const isHalfDay = type === "반차-오전" || type === "반차-오후";
   const effectiveEndDate = isHalfDay ? startDate : endDate;
   const daysCount = startDate && effectiveEndDate ? getVacationDaysCount(type, startDate, effectiveEndDate) : 0;
   const exceedsBalance = daysCount > remainingDays;
@@ -52,7 +46,7 @@ export default function VacationRequestForm({ userId, balance }: VacationRequest
   const handleTypeChange = (newType: VacationType) => {
     setType(newType);
     setFeedback(null);
-    if (newType === HALF_DAY_AM || newType === HALF_DAY_PM) {
+    if (newType === "반차-오전" || newType === "반차-오후") {
       if (startDate) setEndDate(startDate);
     }
   };
@@ -73,7 +67,7 @@ export default function VacationRequestForm({ userId, balance }: VacationRequest
         reason,
       });
       setFeedback({ type: "success", message: "휴가 신청이 접수되었습니다." });
-      setType(ANNUAL_LEAVE);
+      setType("연차");
       setStartDate("");
       setEndDate("");
       setReason("");

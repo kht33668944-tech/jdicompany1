@@ -11,13 +11,11 @@ interface VacationHistoryListProps {
   requests: VacationRequest[];
 }
 
-const statusConfig: Record<string, { bg: string; text: string }> = {
-  "?湲곗쨷": { bg: "bg-amber-50", text: "text-amber-600" },
-  "?뱀씤": { bg: "bg-emerald-50", text: "text-emerald-600" },
-  "諛섎젮": { bg: "bg-red-50", text: "text-red-600" },
+const statusConfig: Record<RequestStatus, { bg: string; text: string }> = {
+  "대기중": { bg: "bg-amber-50", text: "text-amber-600" },
+  "승인": { bg: "bg-emerald-50", text: "text-emerald-600" },
+  "반려": { bg: "bg-red-50", text: "text-red-600" },
 };
-const REQUEST_STATUSES = Object.keys(statusConfig) as RequestStatus[];
-const PENDING_STATUS = REQUEST_STATUSES[0];
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
@@ -59,7 +57,7 @@ export default function VacationHistoryList({ requests }: VacationHistoryListPro
       ) : (
         <ul className="space-y-3">
           {requests.slice(0, 10).map((req) => {
-            const config = statusConfig[req.status] ?? statusConfig["?湲곗쨷"];
+            const config = statusConfig[req.status] ?? statusConfig["대기중"];
             return (
               <li key={req.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                 <div className="min-w-0">
@@ -78,7 +76,7 @@ export default function VacationHistoryList({ requests }: VacationHistoryListPro
                     <p className="text-xs text-red-400 mt-0.5">사유: {req.reject_reason}</p>
                   )}
                 </div>
-                {req.status === PENDING_STATUS && (
+                {req.status === "대기중" && (
                   <button
                     onClick={() => handleCancel(req.id)}
                     className="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0 ml-2"
