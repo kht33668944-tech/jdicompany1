@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 type ValidationState = "" | "error" | "success";
@@ -228,9 +229,9 @@ export default function LoginCard() {
                 로그인 상태 유지
               </label>
             </div>
-            <a href="#" className="text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline underline-offset-4 transition-colors">
+            <Link href="/forgot-password" className="text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline underline-offset-4 transition-colors">
               비밀번호를 잊으셨나요?
-            </a>
+            </Link>
           </div>
 
           {/* Submit */}
@@ -266,12 +267,12 @@ export default function LoginCard() {
         {/* Sign up */}
         <div className="mt-6 pt-6 border-t border-slate-200/50 text-center relative z-10">
           <p className="text-sm text-slate-500 mb-3">계정이 없으신가요?</p>
-          <a
+          <Link
             href="/signup"
             className="block w-full py-3.5 px-4 rounded-xl text-base font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 transition-all duration-200"
           >
             회원가입
-          </a>
+          </Link>
         </div>
       </div>
 
