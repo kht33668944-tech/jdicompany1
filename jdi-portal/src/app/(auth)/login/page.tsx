@@ -13,7 +13,7 @@ export default function LoginPage() {
     <div className="relative min-h-screen w-full selection:bg-brand-200 selection:text-brand-900">
       <DotBackground />
       <Aurora />
-      <main className="relative z-10 flex min-h-screen w-full items-center justify-center lg:justify-between px-6 py-12 lg:px-24 xl:px-32">
+      <main className="relative z-10 flex min-h-screen w-full items-center justify-center xl:justify-between px-6 py-12 xl:pl-48 xl:pr-48 2xl:pl-56 2xl:pr-56 gap-8 xl:gap-12">
         <HeroSection />
         <LoginCard />
       </main>

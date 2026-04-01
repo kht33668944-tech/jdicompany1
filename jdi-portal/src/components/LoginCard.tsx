@@ -89,40 +89,40 @@ export default function LoginCard() {
   };
 
   const inputClass = (state: ValidationState) =>
-    `glass-input block w-full pl-11 pr-4 py-3.5 text-slate-900 text-sm rounded-xl outline-none transition-all duration-300 placeholder:text-slate-400 ${
+    `glass-input block w-full pl-12 pr-4 py-4 text-slate-900 text-base rounded-xl outline-none transition-all duration-300 placeholder:text-slate-400 ${
       state === "error" ? "error" : state === "success" ? "success" : ""
     }`;
 
   return (
     <div
-      className="w-full max-w-lg lg:ml-auto animate-fade-in-up"
+      className="w-full max-w-xl xl:max-w-2xl xl:ml-auto shrink-0 animate-fade-in-up"
       style={{ animationDelay: "0.2s" }}
     >
       <div
         ref={cardRef}
-        className={`glass-card rounded-[2rem] p-7 sm:p-8 relative overflow-hidden group ${
+        className={`glass-card rounded-[2rem] p-8 sm:p-10 lg:p-12 relative overflow-hidden group ${
           shaking ? "animate-shake" : ""
         }`}
       >
         <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
 
         {/* Header */}
-        <div className="text-center mb-6 relative z-10">
-          <div className="flex justify-center mb-3">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-brand-500/30">
+        <div className="text-center mb-8 relative z-10">
+          <div className="flex justify-center mb-4">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-brand-500/30">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 256 256">
                 <path d="M223.68,66.15,135.68,15a15.88,15.88,0,0,0-15.36,0l-88,51.12A16,16,0,0,0,24,80v96a16,16,0,0,0,8.32,14l88,51.12a15.88,15.88,0,0,0,15.36,0l88-51.12A16,16,0,0,0,232,176V80A16,16,0,0,0,223.68,66.15ZM128,29.09,207.39,75.1,128,120.91,48.61,75.1ZM40,90l80,45.51V223.56L40,176ZM136,223.56V135.56L216,90v86Z"/>
               </svg>
             </div>
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700 mb-2">
+          <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700 mb-2">
             JDICOMPANY
           </h2>
-          <p className="text-sm font-medium text-slate-500">내부 시스템 로그인</p>
+          <p className="text-base font-medium text-slate-500">내부 시스템 로그인</p>
         </div>
 
         {/* Form */}
-        <form className="space-y-2 relative z-10" onSubmit={handleSubmit}>
+        <form className="space-y-4 relative z-10" onSubmit={handleSubmit}>
           {errorMessage && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">
               {errorMessage}
@@ -131,7 +131,7 @@ export default function LoginCard() {
 
           {/* Username */}
           <div className="space-y-1.5">
-            <label htmlFor="username" className="block text-sm font-semibold text-slate-700 ml-1">
+            <label htmlFor="username" className="block text-base font-semibold text-slate-700 ml-1">
               아이디
             </label>
             <div className={`relative transition-transform ${focusedField === "username" ? "scale-[1.01]" : ""}`}>
@@ -159,7 +159,7 @@ export default function LoginCard() {
 
           {/* Password */}
           <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-sm font-semibold text-slate-700 ml-1">
+            <label htmlFor="password" className="block text-base font-semibold text-slate-700 ml-1">
               비밀번호
             </label>
             <div className={`relative transition-transform ${focusedField === "password" ? "scale-[1.01]" : ""}`}>
@@ -238,7 +238,7 @@ export default function LoginCard() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-base font-bold rounded-xl text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               <span className="absolute inset-0 w-full h-full rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
               <span className="relative flex items-center gap-2">
@@ -264,11 +264,11 @@ export default function LoginCard() {
         </form>
 
         {/* Sign up */}
-        <div className="mt-5 pt-5 border-t border-slate-200/50 text-center relative z-10">
-          <p className="text-xs text-slate-500 mb-3">계정이 없으신가요?</p>
+        <div className="mt-6 pt-6 border-t border-slate-200/50 text-center relative z-10">
+          <p className="text-sm text-slate-500 mb-3">계정이 없으신가요?</p>
           <a
             href="/signup"
-            className="block w-full py-3 px-4 rounded-xl text-sm font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 transition-all duration-200"
+            className="block w-full py-3.5 px-4 rounded-xl text-base font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 transition-all duration-200"
           >
             회원가입
           </a>
