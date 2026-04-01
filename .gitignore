@@ -1,0 +1,4 @@
+.bkit/
+.claude/
+node_modules/
+.env
