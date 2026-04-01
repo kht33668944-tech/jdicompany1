@@ -1,8 +1,31 @@
-export default function TasksPage() {
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import TasksPageClient from "@/components/dashboard/tasks/TasksPageClient";
+import { getAllTasks, getMyTasks } from "@/lib/tasks/queries";
+import { getAllProfiles } from "@/lib/attendance/queries";
+
+export default async function TasksPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const [allTasks, myTasks, profiles] = await Promise.all([
+    getAllTasks(supabase),
+    getMyTasks(supabase, user.id),
+    getAllProfiles(supabase),
+  ]);
+
   return (
-    <div className="glass-card rounded-2xl p-8">
-      <h1 className="text-xl font-bold text-slate-900 mb-2">할일</h1>
-      <p className="text-slate-500">할일 관리 상세 기능이 곧 추가됩니다.</p>
-    </div>
+    <TasksPageClient
+      allTasks={allTasks}
+      myTasks={myTasks}
+      profiles={profiles}
+      userId={user.id}
+    />
   );
 }
