@@ -123,7 +123,7 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
   return (
     <div className="bg-white rounded-[24px] shadow-sm overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-slate-50">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-4 md:p-6 border-b border-slate-50">
         {/* Scale toggle */}
         <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
           {(["weekly", "monthly"] as Scale[]).map((s) => (
@@ -142,7 +142,7 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 text-sm font-bold text-slate-400">
+        <div className="flex items-center flex-wrap gap-2 md:gap-4 text-xs md:text-sm font-bold text-slate-400">
           {(["대기", "진행중", "완료"] as const).map((status) => (
             <span key={status} className="flex items-center gap-1.5">
               <span className={`w-2.5 h-2.5 rounded-full ${STATUS_CONFIG[status].dot}`} />
@@ -178,11 +178,11 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden" style={{ maxHeight: "600px" }}>
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden" style={{ maxHeight: "500px" }}>
         {/* Left sidebar */}
-        <div className="w-80 flex-shrink-0 border-r border-slate-50 flex flex-col overflow-hidden">
+        <div className="w-full md:w-64 lg:w-80 flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-50 flex flex-col overflow-hidden">
           {/* Sidebar header */}
-          <div className="h-12 flex-shrink-0 border-b border-slate-50 flex items-center px-6">
+          <div className="h-12 flex-shrink-0 border-b border-slate-50 flex items-center px-4 md:px-6">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
               할일명
             </span>
@@ -190,11 +190,11 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
           {/* Sidebar rows */}
           <div
             ref={sidebarRef}
-            className="overflow-y-auto flex-1 scrollbar-hide"
+            className="overflow-y-auto flex-1 scrollbar-hide max-h-[200px] md:max-h-none"
             onScroll={syncSidebarScroll}
           >
             {parentTasks.length === 0 ? (
-              <div className="h-16 flex items-center px-6 text-sm text-slate-400">
+              <div className="h-16 flex items-center px-4 md:px-6 text-sm text-slate-400">
                 할일이 없습니다
               </div>
             ) : (
@@ -202,7 +202,7 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
                 <button
                   key={task.id}
                   onClick={() => onTaskClick(task.id)}
-                  className="w-full h-16 flex flex-col justify-center px-6 border-b border-slate-50 hover:bg-slate-50/60 transition-colors text-left"
+                  className="w-full h-16 flex flex-col justify-center px-4 md:px-6 border-b border-slate-50 hover:bg-slate-50/60 transition-colors text-left"
                 >
                   <span className="text-sm font-bold text-slate-700 truncate leading-tight">
                     {task.title}

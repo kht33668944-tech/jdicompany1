@@ -62,7 +62,7 @@ export default function ListRow({ task, children, onTaskClick, isSubtask }: Prop
         className="hover:bg-slate-50 transition-all cursor-pointer group"
       >
         {/* 할일명 */}
-        <td className={`px-6 py-4 ${isSubtask ? "pl-12" : ""}`}>
+        <td className={`px-4 py-3 ${isSubtask ? "pl-10" : ""}`}>
           <div className="flex items-center gap-3">
             {isSubtask && (
               <ArrowBendDownRight size={16} className="text-slate-300" />
@@ -85,7 +85,7 @@ export default function ListRow({ task, children, onTaskClick, isSubtask }: Prop
         </td>
 
         {/* 우선순위 */}
-        <td className="px-6 py-4">
+        <td className="px-4 py-3">
           <span
             className={`px-2 py-1 ${priorityConfig.bg} ${priorityConfig.text} text-[11px] font-bold rounded-md border ${priorityConfig.border} uppercase`}
           >
@@ -94,7 +94,7 @@ export default function ListRow({ task, children, onTaskClick, isSubtask }: Prop
         </td>
 
         {/* 카테고리 */}
-        <td className="px-6 py-4">
+        <td className="px-4 py-3">
           {task.category && (
             <span className="px-2 py-1 bg-slate-100 text-slate-500 text-[11px] font-bold rounded-md uppercase">
               {task.category}
@@ -103,7 +103,7 @@ export default function ListRow({ task, children, onTaskClick, isSubtask }: Prop
         </td>
 
         {/* 담당자 */}
-        <td className="px-6 py-4">
+        <td className="px-4 py-3">
           <div className="flex -space-x-2">
             {task.assignees.slice(0, 3).map((assignee) => {
               const color = getAvatarColor(assignee.full_name);
@@ -126,12 +126,12 @@ export default function ListRow({ task, children, onTaskClick, isSubtask }: Prop
         </td>
 
         {/* 마감일 */}
-        <td className="px-6 py-4">
+        <td className="px-4 py-3">
           <span className={`text-sm ${dueInfo.className}`}>{dueInfo.text}</span>
         </td>
 
         {/* 진행률 */}
-        <td className="px-6 py-4">
+        <td className="px-4 py-3">
           {task.checklist_total > 0 ? (
             <div className="flex items-center gap-3">
               <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">

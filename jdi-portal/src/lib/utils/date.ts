@@ -128,3 +128,18 @@ export function getHourFromTimestamp(isoString: string): number {
 export function getFirstDayOfMonth(year: number, month: number): number {
   return getWeekdayIndex(`${year}-${String(month).padStart(2, "0")}-01`);
 }
+
+export function formatTimeAgo(isoString: string): string {
+  const now = new Date();
+  const created = new Date(isoString);
+  const diffMs = now.getTime() - created.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffMin < 1) return "방금 전";
+  if (diffHour < 1) return `${diffMin}분 전`;
+  if (diffDay < 1) return `${diffHour}시간 전`;
+  if (diffDay < 7) return `${diffDay}일 전`;
+  return formatDate(toDateString(created));
+}

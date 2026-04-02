@@ -87,8 +87,8 @@ export default function TasksPageClient({ allTasks, profiles, userId }: Props) {
   return (
     <div className="space-y-8">
       {/* 검색 바 + 할일 추가 버튼 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center flex-1 max-w-xl">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center flex-1 sm:max-w-xl">
           <div className="relative w-full">
             <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -102,7 +102,7 @@ export default function TasksPageClient({ allTasks, profiles, userId }: Props) {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all"
+          className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all w-full sm:w-auto"
           style={{ background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" }}
         >
           <Plus size={16} weight="bold" />
@@ -114,7 +114,7 @@ export default function TasksPageClient({ allTasks, profiles, userId }: Props) {
 
       {/* 뷰 탭 + 필터 */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="bg-white p-1 rounded-2xl shadow-sm flex gap-1">
             {(Object.keys(TASK_VIEWS) as TaskViewId[]).map((viewId) => {
               const view = TASK_VIEWS[viewId];

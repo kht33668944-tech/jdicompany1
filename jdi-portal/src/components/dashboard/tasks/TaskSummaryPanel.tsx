@@ -57,17 +57,17 @@ const cards = [
 
 export default function TaskSummaryPanel({ summary }: Props) {
   return (
-    <div className="grid grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
       {cards.map((card) => {
         const Icon = card.icon;
         const value = card.getValue(summary);
         return (
           <div
             key={card.key}
-            className={`bg-white p-6 rounded-3xl shadow-sm flex items-center gap-5 ${card.border}`}
+            className={`bg-white p-4 lg:p-6 rounded-3xl shadow-sm flex items-center gap-3 lg:gap-5 ${card.border}`}
           >
             <div
-              className={`w-12 h-12 ${card.iconBg} ${card.iconColor} rounded-2xl flex items-center justify-center`}
+              className={`w-10 h-10 lg:w-12 lg:h-12 ${card.iconBg} ${card.iconColor} rounded-2xl flex items-center justify-center`}
             >
               <Icon size={24} />
             </div>
@@ -75,7 +75,7 @@ export default function TaskSummaryPanel({ summary }: Props) {
               <p className={`text-sm font-medium ${card.textColor ? "text-red-400" : "text-slate-400"}`}>
                 {card.label}
               </p>
-              <p className={`text-2xl font-bold ${card.textColor}`}>{value}</p>
+              <p className={`text-xl lg:text-2xl font-bold ${card.textColor}`}>{value}</p>
             </div>
           </div>
         );

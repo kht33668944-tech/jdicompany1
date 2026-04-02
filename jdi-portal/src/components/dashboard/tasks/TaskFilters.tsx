@@ -49,7 +49,7 @@ function Dropdown({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm cursor-pointer transition-all ${
+        className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs md:text-sm whitespace-nowrap cursor-pointer transition-all ${
           value
             ? "bg-indigo-50 text-indigo-600 font-bold shadow-sm"
             : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
@@ -99,7 +99,7 @@ export default function TaskFilters({ profiles, filters, onFilterChange }: Props
 
   return (
     <div className="flex items-center justify-end">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center flex-wrap gap-2 md:gap-3">
         <Dropdown
           label="담당자"
           icon={User}
@@ -122,7 +122,7 @@ export default function TaskFilters({ profiles, filters, onFilterChange }: Props
           onChange={(v) => update({ status: v as TaskStatus | null })}
         />
 
-        <div className="w-px h-6 bg-slate-200" />
+        <div className="w-px h-6 bg-slate-200 hidden md:block" />
 
         <Dropdown
           label={`그룹: ${GROUP_BY_OPTIONS[filters.groupBy]}`}

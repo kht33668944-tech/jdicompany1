@@ -128,10 +128,10 @@ export default function CalendarView({ tasks, onTaskClick }: Props) {
   const monthLabel = `${year}년 ${month}월`;
 
   return (
-    <div className="bg-white rounded-[24px] shadow-sm p-8">
+    <div className="bg-white rounded-[24px] shadow-sm p-3 md:p-8">
       {/* Month navigation header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-slate-800">{monthLabel}</h2>
+        <h2 className="text-lg md:text-xl font-bold text-slate-800">{monthLabel}</h2>
         <div className="flex items-center gap-1">
           <button
             onClick={goToPrevMonth}
@@ -162,7 +162,7 @@ export default function CalendarView({ tasks, onTaskClick }: Props) {
         {WEEKDAYS.map((day, idx) => (
           <div
             key={day}
-            className={`bg-slate-50 p-4 text-center text-xs font-bold uppercase ${
+            className={`bg-slate-50 p-2 md:p-4 text-center text-[10px] md:text-xs font-bold uppercase ${
               idx === 0
                 ? "text-red-400"
                 : idx === 6
@@ -202,7 +202,7 @@ export default function CalendarView({ tasks, onTaskClick }: Props) {
           return (
             <div
               key={cell.dateStr}
-              className={`bg-white min-h-[140px] p-4 ${
+              className={`bg-white min-h-[72px] md:min-h-[140px] p-1.5 md:p-4 ${
                 isToday
                   ? "ring-2 ring-inset ring-indigo-500/20 bg-indigo-50/30"
                   : ""
@@ -210,9 +210,9 @@ export default function CalendarView({ tasks, onTaskClick }: Props) {
             >
               {/* Date number */}
               <div
-                className={`text-sm font-bold mb-2 ${dateNumberClass} ${
+                className={`text-xs md:text-sm font-bold mb-1 md:mb-2 ${dateNumberClass} ${
                   isToday
-                    ? "w-7 h-7 flex items-center justify-center rounded-full bg-indigo-500 text-white"
+                    ? "w-5 h-5 md:w-7 md:h-7 flex items-center justify-center rounded-full bg-indigo-500 text-white"
                     : ""
                 }`}
               >
@@ -227,10 +227,10 @@ export default function CalendarView({ tasks, onTaskClick }: Props) {
                     <button
                       key={task.id}
                       onClick={() => onTaskClick(task.id)}
-                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold truncate w-full text-left ${config.bg} ${config.text} hover:opacity-80 transition-opacity`}
+                      className={`flex items-center gap-1 px-1 py-0.5 md:px-2 md:py-1 rounded md:rounded-lg text-[8px] md:text-[10px] font-bold truncate w-full text-left ${config.bg} ${config.text} hover:opacity-80 transition-opacity`}
                     >
                       <span
-                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${config.dot}`}
+                        className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full flex-shrink-0 ${config.dot}`}
                       />
                       <span className="truncate">{task.title}</span>
                     </button>
