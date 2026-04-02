@@ -55,8 +55,8 @@ export default function CorrectionRequestModal({ userId, record, targetDate: ini
         attendanceRecordId: record?.id ?? null,
         targetDate: workDate,
         requestType,
-        requestedCheckIn: checkInTime ? `${workDate}T${checkInTime}:00` : null,
-        requestedCheckOut: checkOutTime ? `${workDate}T${checkOutTime}:00` : null,
+        requestedCheckIn: checkInTime ? `${workDate}T${checkInTime}:00+09:00` : null,
+        requestedCheckOut: checkOutTime ? `${workDate}T${checkOutTime}:00+09:00` : null,
         reason,
       });
       router.refresh();
