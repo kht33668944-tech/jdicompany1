@@ -11,6 +11,7 @@ import type { TaskStatus, TaskWithProfile } from "@/lib/tasks/types";
 interface TaskBoardProps {
   tasks: TaskWithProfile[];
   onCardClick: (task: TaskWithProfile) => void;
+  dragDisabled?: boolean;
 }
 
 function reorderTasks(
@@ -60,7 +61,7 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export default function TaskBoard({ tasks: initialTasks, onCardClick }: TaskBoardProps) {
+export default function TaskBoard({ tasks: initialTasks, onCardClick, dragDisabled = false }: TaskBoardProps) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [isSaving, setIsSaving] = useState(false);
@@ -78,6 +79,7 @@ export default function TaskBoard({ tasks: initialTasks, onCardClick }: TaskBoar
   }, {} as Record<TaskStatus, TaskWithProfile[]>);
 
   const handleDragEnd = useCallback(async (result: DropResult) => {
+    if (dragDisabled) return;
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
@@ -95,10 +97,15 @@ export default function TaskBoard({ tasks: initialTasks, onCardClick }: TaskBoar
     } finally {
       setIsSaving(false);
     }
-  }, [initialTasks, router]);
+  }, [dragDisabled, initialTasks, router]);
 
   return (
     <div className="space-y-3">
+      {dragDisabled && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          필터가 적용된 상태에서는 카드 순서를 변경할 수 없습니다. 필터를 해제하면 드래그가 가능합니다.
+        </div>
+      )}
       {feedback && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {feedback}

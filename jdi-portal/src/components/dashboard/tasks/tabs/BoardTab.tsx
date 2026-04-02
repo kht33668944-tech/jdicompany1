@@ -21,6 +21,8 @@ export default function BoardTab({ tasks, profiles, userId }: BoardTabProps) {
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [filterPriority, setFilterPriority] = useState<TaskPriority | null>(null);
 
+  const isFiltered = !!(filterAssignee || filterCategory || filterPriority);
+
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       if (filterAssignee && t.assigned_to !== filterAssignee) return false;
@@ -43,7 +45,7 @@ export default function BoardTab({ tasks, profiles, userId }: BoardTabProps) {
         onCreateClick={() => setShowCreate(true)}
       />
 
-      <TaskBoard tasks={filteredTasks} onCardClick={setSelectedTask} />
+      <TaskBoard tasks={filteredTasks} onCardClick={setSelectedTask} dragDisabled={isFiltered} />
 
       {showCreate && (
         <TaskCreateModal userId={userId} profiles={profiles} onClose={() => setShowCreate(false)} />

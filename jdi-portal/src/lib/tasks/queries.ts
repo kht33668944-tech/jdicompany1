@@ -28,6 +28,8 @@ export async function getAllTasks(supabase: SupabaseClient): Promise<TaskWithPro
       .gte("updated_at", getCompletedCutoff())
       .order("position", { ascending: true }),
   ]);
+  if (activeResult.error) throw activeResult.error;
+  if (completedResult.error) throw completedResult.error;
   return [
     ...((activeResult.data as TaskWithProfile[]) ?? []),
     ...((completedResult.data as TaskWithProfile[]) ?? []),
@@ -50,6 +52,8 @@ export async function getMyTasks(supabase: SupabaseClient, userId: string): Prom
       .gte("updated_at", getCompletedCutoff())
       .order("position", { ascending: true }),
   ]);
+  if (activeResult.error) throw activeResult.error;
+  if (completedResult.error) throw completedResult.error;
   return [
     ...((activeResult.data as TaskWithProfile[]) ?? []),
     ...((completedResult.data as TaskWithProfile[]) ?? []),
@@ -57,11 +61,12 @@ export async function getMyTasks(supabase: SupabaseClient, userId: string): Prom
 }
 
 export async function getTaskComments(supabase: SupabaseClient, taskId: string): Promise<TaskComment[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("task_comments")
     .select("*, profiles(full_name)")
     .eq("task_id", taskId)
     .order("created_at", { ascending: true });
+  if (error) throw error;
   return (data as TaskComment[]) ?? [];
 }
 

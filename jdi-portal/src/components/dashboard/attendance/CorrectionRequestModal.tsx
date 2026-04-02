@@ -33,6 +33,11 @@ export default function CorrectionRequestModal({ userId, record, onClose }: Corr
 
   if (!record) return null;
 
+  const isTimeValid =
+    requestType === "출근시간수정" ? !!checkInTime :
+    requestType === "퇴근시간수정" ? !!checkOutTime :
+    !!checkInTime; // 기록누락: 최소 출근시간 필수
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
@@ -104,24 +109,30 @@ export default function CorrectionRequestModal({ userId, record, onClose }: Corr
 
           {(requestType === "출근시간수정" || requestType === "기록누락") && (
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">출근 시간</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                출근 시간 <span className="text-red-500">*</span>
+              </label>
               <input
                 type="time"
                 value={checkInTime}
                 onChange={(event) => setCheckInTime(event.target.value)}
                 className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                required
               />
             </div>
           )}
 
           {(requestType === "퇴근시간수정" || requestType === "기록누락") && (
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">퇴근 시간</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                퇴근 시간 {requestType === "퇴근시간수정" && <span className="text-red-500">*</span>}
+              </label>
               <input
                 type="time"
                 value={checkOutTime}
                 onChange={(event) => setCheckOutTime(event.target.value)}
                 className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                required={requestType === "퇴근시간수정"}
               />
             </div>
           )}
@@ -139,7 +150,7 @@ export default function CorrectionRequestModal({ userId, record, onClose }: Corr
 
           <button
             type="submit"
-            disabled={loading || !reason}
+            disabled={loading || !reason || !isTimeValid}
             className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/20 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? "요청 중..." : "정정 요청하기"}

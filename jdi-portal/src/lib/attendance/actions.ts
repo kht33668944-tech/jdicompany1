@@ -165,7 +165,7 @@ export async function approveCorrectionRequest(
   if (updateError) throw updateError;
 
   if (correction.request_type === "기록누락") {
-    await supabase.from("attendance_records").upsert(
+    const { error: upsertError } = await supabase.from("attendance_records").upsert(
       {
         user_id: correction.user_id,
         work_date: correction.target_date,
@@ -175,6 +175,7 @@ export async function approveCorrectionRequest(
       },
       { onConflict: "user_id,work_date" }
     );
+    if (upsertError) throw upsertError;
   } else {
     const updateData: Record<string, string | null> = {};
     if (correction.requested_check_in) updateData.check_in = correction.requested_check_in;
@@ -183,11 +184,12 @@ export async function approveCorrectionRequest(
       updateData.status = CHECKED_OUT_STATUS;
     }
     if (Object.keys(updateData).length > 0) {
-      await supabase
+      const { error: attendanceError } = await supabase
         .from("attendance_records")
         .update(updateData)
         .eq("user_id", correction.user_id)
         .eq("work_date", correction.target_date);
+      if (attendanceError) throw attendanceError;
     }
   }
 }
