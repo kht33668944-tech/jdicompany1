@@ -30,6 +30,7 @@ interface AttendancePageClientProps {
   allTodayAttendance: AttendanceWithProfile[] | null;
   allProfiles: Profile[] | null;
   pendingVacationRequests: VacationRequest[] | null;
+  cancelVacationRequests: VacationRequest[] | null;
   pendingCorrectionRequests: CorrectionRequest[] | null;
 }
 
@@ -97,6 +98,7 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
           allTodayAttendance={props.allTodayAttendance ?? []}
           allProfiles={props.allProfiles ?? []}
           pendingVacationRequests={props.pendingVacationRequests ?? []}
+          cancelVacationRequests={props.cancelVacationRequests ?? []}
           pendingCorrectionRequests={props.pendingCorrectionRequests ?? []}
         />
       )}

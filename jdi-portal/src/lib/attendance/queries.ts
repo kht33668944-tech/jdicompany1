@@ -148,6 +148,18 @@ export async function getPendingVacationRequests(
   return (data as VacationRequest[]) ?? [];
 }
 
+export async function getCancelVacationRequests(
+  supabase: SupabaseClient
+): Promise<VacationRequest[]> {
+  const { data, error } = await supabase
+    .from("vacation_requests")
+    .select("*, profiles:user_id(full_name)")
+    .eq("status", "취소요청")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data as VacationRequest[]) ?? [];
+}
+
 export async function getPendingCorrectionRequests(
   supabase: SupabaseClient
 ): Promise<CorrectionRequest[]> {

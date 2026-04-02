@@ -3,6 +3,7 @@ import AttendancePageClient from "@/components/dashboard/attendance/AttendancePa
 import {
   getAllProfiles,
   getAllTodayAttendance,
+  getCancelVacationRequests,
   getCorrectionRequests,
   getMonthRecords,
   getPendingCorrectionRequests,
@@ -85,15 +86,17 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
   let allTodayAttendance = null;
   let allProfiles = null;
   let pendingVacationRequests = null;
+  let cancelVacationRequests = null;
   let pendingCorrectionRequests = null;
 
   if (profile.role === "admin") {
     try {
-      [allTodayAttendance, allProfiles, pendingVacationRequests, pendingCorrectionRequests] =
+      [allTodayAttendance, allProfiles, pendingVacationRequests, cancelVacationRequests, pendingCorrectionRequests] =
         await Promise.all([
           getAllTodayAttendance(supabase),
           getAllProfiles(supabase),
           getPendingVacationRequests(supabase),
+          getCancelVacationRequests(supabase),
           getPendingCorrectionRequests(supabase),
         ]);
     } catch {
@@ -116,6 +119,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
       allTodayAttendance={allTodayAttendance}
       allProfiles={allProfiles}
       pendingVacationRequests={pendingVacationRequests}
+      cancelVacationRequests={cancelVacationRequests}
       pendingCorrectionRequests={pendingCorrectionRequests}
     />
   );

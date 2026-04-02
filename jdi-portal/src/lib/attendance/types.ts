@@ -19,7 +19,7 @@ export interface AttendanceRecord {
 }
 
 export type VacationType = "연차" | "반차-오전" | "반차-오후" | "병가" | "특별휴가";
-export type RequestStatus = "대기중" | "승인" | "반려";
+export type RequestStatus = "대기중" | "승인" | "반려" | "취소요청" | "취소";
 
 export interface VacationBalance {
   id: string;

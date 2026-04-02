@@ -83,6 +83,23 @@ export async function cancelVacationRequest(requestId: string) {
   if (error) throw error;
 }
 
+export async function requestVacationCancel(requestId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc("request_vacation_cancel", {
+    p_request_id: requestId,
+  });
+  if (error) throw error;
+}
+
+export async function cancelApprovedVacation(requestId: string, adminId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc("cancel_approved_vacation", {
+    p_request_id: requestId,
+    p_admin_id: adminId,
+  });
+  if (error) throw error;
+}
+
 export async function submitCorrectionRequest(params: {
   userId: string;
   attendanceRecordId: string | null;

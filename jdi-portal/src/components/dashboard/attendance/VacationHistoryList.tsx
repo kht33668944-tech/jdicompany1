@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ClockCounterClockwise } from "phosphor-react";
-import { cancelVacationRequest } from "@/lib/attendance/actions";
+import { cancelVacationRequest, requestVacationCancel } from "@/lib/attendance/actions";
 import { getVacationTypeLabel } from "@/lib/utils/vacation";
 import type { RequestStatus, VacationRequest } from "@/lib/attendance/types";
 
@@ -15,6 +15,8 @@ const statusConfig: Record<RequestStatus, { bg: string; text: string }> = {
   "대기중": { bg: "bg-amber-50", text: "text-amber-600" },
   "승인": { bg: "bg-emerald-50", text: "text-emerald-600" },
   "반려": { bg: "bg-red-50", text: "text-red-600" },
+  "취소요청": { bg: "bg-orange-50", text: "text-orange-600" },
+  "취소": { bg: "bg-slate-50", text: "text-slate-500" },
 };
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -36,6 +38,17 @@ export default function VacationHistoryList({ requests }: VacationHistoryListPro
       router.refresh();
     } catch (error) {
       setFeedback(getErrorMessage(error, "휴가 신청 취소에 실패했습니다."));
+    }
+  };
+
+  const handleRequestCancel = async (id: string) => {
+    if (!confirm("승인된 휴가의 취소를 요청하시겠습니까? 관리자 승인 후 취소됩니다.")) return;
+    setFeedback(null);
+    try {
+      await requestVacationCancel(id);
+      router.refresh();
+    } catch (error) {
+      setFeedback(getErrorMessage(error, "취소 요청에 실패했습니다."));
     }
   };
 
@@ -82,6 +95,14 @@ export default function VacationHistoryList({ requests }: VacationHistoryListPro
                     className="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0 ml-2"
                   >
                     취소
+                  </button>
+                )}
+                {req.status === "승인" && (
+                  <button
+                    onClick={() => handleRequestCancel(req.id)}
+                    className="text-xs text-slate-400 hover:text-orange-500 transition-colors shrink-0 ml-2"
+                  >
+                    취소 요청
                   </button>
                 )}
               </li>

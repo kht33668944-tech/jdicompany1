@@ -106,6 +106,12 @@ export function toDateString(date: Date = new Date()): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+export function toDateStringFromTimestamp(isoString: string): string {
+  const date = new Date(isoString);
+  const { year, month, day } = getDateParts(date);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }

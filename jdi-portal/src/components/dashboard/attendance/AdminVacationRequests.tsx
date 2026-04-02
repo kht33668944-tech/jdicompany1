@@ -6,6 +6,7 @@ import { HourglassHigh } from "phosphor-react";
 import {
   approveCorrectionRequest,
   approveVacationRequest,
+  cancelApprovedVacation,
   rejectCorrectionRequest,
   rejectVacationRequest,
 } from "@/lib/attendance/actions";
@@ -16,6 +17,7 @@ import type { CorrectionRequest, VacationRequest } from "@/lib/attendance/types"
 interface AdminVacationRequestsProps {
   adminId: string;
   vacationRequests: VacationRequest[];
+  cancelRequests: VacationRequest[];
   correctionRequests: CorrectionRequest[];
 }
 
@@ -29,6 +31,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 export default function AdminVacationRequests({
   adminId,
   vacationRequests,
+  cancelRequests,
   correctionRequests,
 }: AdminVacationRequestsProps) {
   const router = useRouter();
@@ -66,6 +69,20 @@ export default function AdminVacationRequests({
     }
   };
 
+  const handleCancelVacation = async (id: string) => {
+    if (!confirm("이 휴가를 취소하시겠습니까? 연차가 복원되고 스케줄에서 삭제됩니다.")) return;
+    setLoading(true);
+    setFeedback(null);
+    try {
+      await cancelApprovedVacation(id, adminId);
+      router.refresh();
+    } catch (error) {
+      setFeedback(getErrorMessage(error, "휴가 취소에 실패했습니다."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApproveCorrection = async (id: string) => {
     setLoading(true);
     setFeedback(null);
@@ -92,7 +109,7 @@ export default function AdminVacationRequests({
     }
   };
 
-  const totalPending = vacationRequests.length + correctionRequests.length;
+  const totalPending = vacationRequests.length + cancelRequests.length + correctionRequests.length;
 
   return (
     <div className="glass-card rounded-2xl p-6">
@@ -163,6 +180,59 @@ export default function AdminVacationRequests({
               </ul>
             )}
           </section>
+
+          {/* 휴가 취소 요청 */}
+          {cancelRequests.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-orange-600">휴가 취소 요청</h4>
+                <span className="text-xs text-slate-400">{cancelRequests.length}건</span>
+              </div>
+              <ul className="space-y-3">
+                {cancelRequests.map((req) => (
+                  <li key={req.id} className="p-3 rounded-xl bg-orange-50/50 border border-orange-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="text-sm font-medium text-slate-700">{req.profiles?.full_name}</span>
+                        <span className="text-xs text-slate-400 ml-2">{getVacationTypeLabel(req.vacation_type)}</span>
+                      </div>
+                      <span className="text-xs text-slate-400">{req.days_count}일</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-2">
+                      {req.start_date} ~ {req.end_date}
+                    </p>
+                    {req.reason && <p className="text-xs text-slate-500 mb-3">사유: {req.reason}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleCancelVacation(req.id)}
+                        disabled={loading}
+                        className="flex-1 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-40"
+                      >
+                        취소 승인
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setLoading(true);
+                          try {
+                            await rejectVacationRequest(req.id, adminId, "취소 요청 거부");
+                            router.refresh();
+                          } catch {
+                            setFeedback("처리에 실패했습니다.");
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        disabled={loading}
+                        className="flex-1 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors disabled:opacity-40"
+                      >
+                        거부
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section>
             <div className="flex items-center justify-between mb-3">
