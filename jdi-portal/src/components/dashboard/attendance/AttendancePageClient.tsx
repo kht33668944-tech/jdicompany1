@@ -77,6 +77,7 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
         <RecordsTab
           userId={props.profile.id}
           monthRecords={props.monthRecords}
+          correctionRequests={props.correctionRequests}
           currentYear={props.currentYear}
           currentMonth={props.currentMonth}
         />
