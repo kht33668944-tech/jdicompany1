@@ -6,6 +6,7 @@ import { toDateString, getWeekRange, addDays } from "@/lib/utils/date";
 import { getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
 import { getTasksWithDetails } from "@/lib/tasks/queries";
 import { getTodaySchedules } from "@/lib/schedule/queries";
+import { sortTasks } from "@/lib/tasks/utils";
 
 export interface RecentActivity {
   id: string;
@@ -53,8 +54,11 @@ export async function getDashboardData(
     (t) => t.assignees.some((a) => a.user_id === userId)
   );
 
-  // 미완료만
-  const myTasks = allTasksForUser.filter((t) => t.status !== "완료");
+  // 미완료만, 마감일순 정렬 (기존 sortTasks 유틸 활용)
+  const myTasks = sortTasks(
+    allTasksForUser.filter((t) => t.status !== "완료"),
+    "due_date"
+  );
 
   // 주간 근무시간 합산
   const weeklyMinutes = weekRecords.reduce(

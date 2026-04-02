@@ -91,9 +91,9 @@ export async function updateUserRole(
   role: "employee" | "admin"
 ) {
   const supabase = getSupabase();
-  const { error } = await supabase
-    .from("profiles")
-    .update({ role, updated_at: new Date().toISOString() })
-    .eq("id", userId);
+  const { error } = await supabase.rpc("admin_update_user_role", {
+    target_user_id: userId,
+    new_role: role,
+  });
   if (error) throw error;
 }
