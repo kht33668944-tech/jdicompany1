@@ -14,7 +14,7 @@ import {
 } from "phosphor-react";
 
 interface SidebarProps {
-  user: { email: string; name: string };
+  user: { email: string; name: string; avatarUrl?: string | null };
   collapsed: boolean;
   mobileOpen: boolean;
   onMobileClose: () => void;
@@ -75,9 +75,13 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose }: 
       {/* User Section */}
       <div className="px-3 py-4 border-t border-slate-200/50">
         <div className={`flex items-center gap-3 px-3 py-2 ${collapsed ? "justify-center" : ""}`}>
-          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+          )}
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-700 truncate">{user.name}</p>

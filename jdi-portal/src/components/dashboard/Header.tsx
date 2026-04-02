@@ -13,7 +13,7 @@ import {
 } from "phosphor-react";
 
 interface HeaderProps {
-  user: { email: string; name: string };
+  user: { email: string; name: string; avatarUrl?: string | null };
   onMenuClick: () => void;
   onCollapseToggle: () => void;
   collapsed: boolean;
@@ -85,9 +85,13 @@ export default function Header({ user, onMenuClick, onCollapseToggle, collapsed 
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-100 transition-colors"
             >
-              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+              )}
               <span className="hidden sm:block text-sm font-medium text-slate-700">{user.name}</span>
             </button>
 

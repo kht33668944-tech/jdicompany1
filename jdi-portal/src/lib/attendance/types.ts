@@ -5,6 +5,9 @@ export interface Profile {
   role: "employee" | "admin";
   department: string;
   hire_date: string;
+  avatar_url?: string | null;
+  phone?: string | null;
+  bio?: string | null;
 }
 
 export interface AttendanceRecord {

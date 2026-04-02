@@ -5,7 +5,7 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 
 interface DashboardShellProps {
-  user: { email: string; name: string };
+  user: { email: string; name: string; avatarUrl?: string | null };
   children: React.ReactNode;
 }
 

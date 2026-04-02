@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getProfile } from "@/lib/attendance/queries";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 
 export default async function DashboardLayout({
@@ -16,13 +17,12 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const profile = await getProfile(supabase, user.id);
+
   const userData = {
-    email: user.email ?? "",
-    name:
-      (user.user_metadata?.full_name as string) ??
-      (user.user_metadata?.name as string) ??
-      user.email?.split("@")[0] ??
-      "사용자",
+    email: profile?.email ?? user.email ?? "",
+    name: profile?.full_name ?? user.email?.split("@")[0] ?? "사용자",
+    avatarUrl: profile?.avatar_url ?? null,
   };
 
   return <DashboardShell user={userData}>{children}</DashboardShell>;
