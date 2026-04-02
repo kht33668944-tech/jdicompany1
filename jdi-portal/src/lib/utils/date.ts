@@ -117,9 +117,12 @@ export function getDaysInMonth(year: number, month: number): number {
 }
 
 export function getHourFromTimestamp(isoString: string): number {
-  const date = new Date(isoString);
-  const kstMs = date.getTime() + 9 * 60 * 60 * 1000;
-  return new Date(kstMs).getUTCHours();
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
+    hour: "numeric",
+    hour12: false,
+  }).format(new Date(isoString));
+  return Number(hour);
 }
 
 export function getFirstDayOfMonth(year: number, month: number): number {

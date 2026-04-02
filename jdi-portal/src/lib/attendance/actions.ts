@@ -211,6 +211,28 @@ export async function approveCorrectionRequest(
   }
 }
 
+export async function rejectVacationCancel(
+  requestId: string,
+  adminId: string
+) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("vacation_requests")
+    .update({
+      status: "승인",
+      reviewed_by: adminId,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", requestId)
+    .eq("status", "취소요청")
+    .select();
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("취소 요청 거부에 실패했습니다. 해당 요청을 찾을 수 없습니다.");
+  }
+}
+
 export async function rejectCorrectionRequest(
   requestId: string,
   adminId: string

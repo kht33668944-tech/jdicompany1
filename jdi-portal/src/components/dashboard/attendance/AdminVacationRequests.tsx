@@ -8,6 +8,7 @@ import {
   approveVacationRequest,
   cancelApprovedVacation,
   rejectCorrectionRequest,
+  rejectVacationCancel,
   rejectVacationRequest,
 } from "@/lib/attendance/actions";
 import { formatTime } from "@/lib/utils/date";
@@ -87,10 +88,10 @@ export default function AdminVacationRequests({
     setLoading(true);
     setFeedback(null);
     try {
-      await rejectVacationRequest(id, adminId, "취소 요청 거부");
+      await rejectVacationCancel(id, adminId);
       router.refresh();
     } catch (error) {
-      setFeedback(getErrorMessage(error, "처리에 실패했습니다."));
+      setFeedback(getErrorMessage(error, "취소 요청 거부에 실패했습니다."));
     } finally {
       setLoading(false);
     }
