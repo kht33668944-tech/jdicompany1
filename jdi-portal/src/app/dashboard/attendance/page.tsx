@@ -61,15 +61,26 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
     redirect("/login");
   }
 
-  const [todayRecord, weekRecords, monthRecords, vacationBalance, vacationRequests, correctionRequests] =
-    await Promise.all([
-      getTodayRecord(supabase, user.id),
-      getWeekRecords(supabase, user.id, weekStart, weekEnd),
-      getMonthRecords(supabase, user.id, currentYear, currentMonth),
-      getVacationBalance(supabase, user.id),
-      getVacationRequests(supabase, user.id),
-      getCorrectionRequests(supabase, user.id),
-    ]);
+  let todayRecord = null;
+  let weekRecords: Awaited<ReturnType<typeof getWeekRecords>> = [];
+  let monthRecords: Awaited<ReturnType<typeof getMonthRecords>> = [];
+  let vacationBalance = null;
+  let vacationRequests: Awaited<ReturnType<typeof getVacationRequests>> = [];
+  let correctionRequests: Awaited<ReturnType<typeof getCorrectionRequests>> = [];
+
+  try {
+    [todayRecord, weekRecords, monthRecords, vacationBalance, vacationRequests, correctionRequests] =
+      await Promise.all([
+        getTodayRecord(supabase, user.id),
+        getWeekRecords(supabase, user.id, weekStart, weekEnd),
+        getMonthRecords(supabase, user.id, currentYear, currentMonth),
+        getVacationBalance(supabase, user.id),
+        getVacationRequests(supabase, user.id),
+        getCorrectionRequests(supabase, user.id),
+      ]);
+  } catch {
+    // DB 오류 시 빈 데이터로 페이지 렌더링
+  }
 
   let allTodayAttendance = null;
   let allProfiles = null;
@@ -77,13 +88,17 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
   let pendingCorrectionRequests = null;
 
   if (profile.role === "admin") {
-    [allTodayAttendance, allProfiles, pendingVacationRequests, pendingCorrectionRequests] =
-      await Promise.all([
-        getAllTodayAttendance(supabase),
-        getAllProfiles(supabase),
-        getPendingVacationRequests(supabase),
-        getPendingCorrectionRequests(supabase),
-      ]);
+    try {
+      [allTodayAttendance, allProfiles, pendingVacationRequests, pendingCorrectionRequests] =
+        await Promise.all([
+          getAllTodayAttendance(supabase),
+          getAllProfiles(supabase),
+          getPendingVacationRequests(supabase),
+          getPendingCorrectionRequests(supabase),
+        ]);
+    } catch {
+      // DB 오류 시 빈 데이터로 페이지 렌더링
+    }
   }
 
   return (

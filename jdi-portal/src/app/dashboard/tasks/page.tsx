@@ -14,11 +14,19 @@ export default async function TasksPage() {
     redirect("/login");
   }
 
-  const [allTasks, myTasks, profiles] = await Promise.all([
-    getAllTasks(supabase),
-    getMyTasks(supabase, user.id),
-    getAllProfiles(supabase),
-  ]);
+  let allTasks: Awaited<ReturnType<typeof getAllTasks>> = [];
+  let myTasks: Awaited<ReturnType<typeof getMyTasks>> = [];
+  let profiles: Awaited<ReturnType<typeof getAllProfiles>> = [];
+
+  try {
+    [allTasks, myTasks, profiles] = await Promise.all([
+      getAllTasks(supabase),
+      getMyTasks(supabase, user.id),
+      getAllProfiles(supabase),
+    ]);
+  } catch {
+    // DB 오류 시 빈 데이터로 페이지 렌더링
+  }
 
   return (
     <TasksPageClient
