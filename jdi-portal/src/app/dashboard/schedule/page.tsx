@@ -4,6 +4,7 @@ import { getMonthSchedules } from "@/lib/schedule/queries";
 import { getAllProfiles } from "@/lib/attendance/queries";
 import { createClient } from "@/lib/supabase/server";
 import { toDateString } from "@/lib/utils/date";
+import { getSingleValue, parseYearParam, parseMonthParam } from "@/lib/utils/params";
 import type { Profile } from "@/lib/attendance/types";
 
 type SchedulePageProps = {
@@ -12,20 +13,6 @@ type SchedulePageProps = {
     month?: string | string[];
   }>;
 };
-
-function getSingleValue(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function parseYearParam(value: string | undefined, fallback: number) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 2000 && parsed <= 2100 ? parsed : fallback;
-}
-
-function parseMonthParam(value: string | undefined, fallback: number) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 12 ? parsed : fallback;
-}
 
 export default async function SchedulePage({ searchParams }: SchedulePageProps) {
   const supabase = await createClient();

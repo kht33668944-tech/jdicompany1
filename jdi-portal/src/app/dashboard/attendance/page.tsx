@@ -16,6 +16,7 @@ import {
 } from "@/lib/attendance/queries";
 import { createClient } from "@/lib/supabase/server";
 import { getWeekRange, toDateString } from "@/lib/utils/date";
+import { getSingleValue, parseYearParam, parseMonthParam } from "@/lib/utils/params";
 
 type AttendancePageProps = {
   searchParams: Promise<{
@@ -23,20 +24,6 @@ type AttendancePageProps = {
     month?: string | string[];
   }>;
 };
-
-function getSingleValue(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function parseYearParam(value: string | undefined, fallback: number) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 2000 && parsed <= 2100 ? parsed : fallback;
-}
-
-function parseMonthParam(value: string | undefined, fallback: number) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 12 ? parsed : fallback;
-}
 
 export default async function AttendancePage({ searchParams }: AttendancePageProps) {
   const supabase = await createClient();

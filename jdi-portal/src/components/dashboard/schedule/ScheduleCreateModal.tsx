@@ -53,13 +53,14 @@ export default function ScheduleCreateModal({
       return;
     }
 
-    setLoading(true);
-    setFeedback(null);
     const finalCategory = category === "__CUSTOM__" ? customCategory.trim() : category;
     if (!finalCategory) {
       setFeedback("카테고리를 입력해주세요.");
       return;
     }
+
+    setLoading(true);
+    setFeedback(null);
 
     try {
       await createSchedule({

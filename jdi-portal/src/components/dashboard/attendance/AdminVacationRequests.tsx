@@ -83,6 +83,19 @@ export default function AdminVacationRequests({
     }
   };
 
+  const handleRejectCancelRequest = async (id: string) => {
+    setLoading(true);
+    setFeedback(null);
+    try {
+      await rejectVacationRequest(id, adminId, "취소 요청 거부");
+      router.refresh();
+    } catch (error) {
+      setFeedback(getErrorMessage(error, "처리에 실패했습니다."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApproveCorrection = async (id: string) => {
     setLoading(true);
     setFeedback(null);
@@ -211,17 +224,7 @@ export default function AdminVacationRequests({
                         취소 승인
                       </button>
                       <button
-                        onClick={async () => {
-                          setLoading(true);
-                          try {
-                            await rejectVacationRequest(req.id, adminId, "취소 요청 거부");
-                            router.refresh();
-                          } catch {
-                            setFeedback("처리에 실패했습니다.");
-                          } finally {
-                            setLoading(false);
-                          }
-                        }}
+                        onClick={() => handleRejectCancelRequest(req.id)}
                         disabled={loading}
                         className="flex-1 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors disabled:opacity-40"
                       >

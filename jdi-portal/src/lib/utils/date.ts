@@ -116,6 +116,12 @@ export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+export function getHourFromTimestamp(isoString: string): number {
+  const date = new Date(isoString);
+  const kstMs = date.getTime() + 9 * 60 * 60 * 1000;
+  return new Date(kstMs).getUTCHours();
+}
+
 export function getFirstDayOfMonth(year: number, month: number): number {
   return getWeekdayIndex(`${year}-${String(month).padStart(2, "0")}-01`);
 }

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CaretLeft, CaretRight, MapPin, Monitor, Lock } from "phosphor-react";
-import { addDays, toDateString, toDateStringFromTimestamp, formatTime } from "@/lib/utils/date";
+import { addDays, toDateString, toDateStringFromTimestamp, formatTime, getHourFromTimestamp } from "@/lib/utils/date";
 import { getCategoryStyle } from "@/lib/schedule/constants";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 
@@ -14,13 +14,6 @@ interface DailyViewProps {
 }
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 07:00 ~ 20:00
-
-function getHour(isoString: string): number {
-  const date = new Date(isoString);
-  return Number(
-    date.toLocaleTimeString("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", hour12: false })
-  );
-}
 
 function formatDateHeader(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
@@ -53,7 +46,7 @@ export default function DailyView({
       if (schedule.is_all_day) {
         allDay.push(schedule);
       } else {
-        const hour = getHour(schedule.start_time);
+        const hour = getHourFromTimestamp(schedule.start_time);
         const arr = timed.get(hour) ?? [];
         arr.push(schedule);
         timed.set(hour, arr);

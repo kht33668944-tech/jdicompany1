@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CaretLeft, CaretRight, Lock } from "phosphor-react";
-import { addDays, toDateString, toDateStringFromTimestamp, formatTime } from "@/lib/utils/date";
+import { addDays, toDateString, toDateStringFromTimestamp, formatTime, getHourFromTimestamp } from "@/lib/utils/date";
 import { getCategoryStyle } from "@/lib/schedule/constants";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 
@@ -23,13 +23,6 @@ function getWeekStart(dateStr: string): string {
   return addDays(dateStr, -day);
 }
 
-function getHour(isoString: string): number {
-  const date = new Date(isoString);
-  return Number(
-    date.toLocaleTimeString("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", hour12: false })
-  );
-}
-
 export default function WeeklyView({
   schedules,
   selectedDate,
@@ -39,7 +32,7 @@ export default function WeeklyView({
 }: WeeklyViewProps) {
   const todayStr = toDateString();
   const weekStart = getWeekStart(selectedDate);
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const eventsByDayAndHour = useMemo(() => {
     const map = new Map<string, ScheduleWithProfile[]>();
@@ -58,7 +51,7 @@ export default function WeeklyView({
         continue;
       }
       const startDate = toDateStringFromTimestamp(schedule.start_time);
-      const hour = getHour(schedule.start_time);
+      const hour = getHourFromTimestamp(schedule.start_time);
       if (weekDays.includes(startDate)) {
         const key = `${startDate}-${hour}`;
         const arr = map.get(key) ?? [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarBlank, List, CalendarCheck, Calendar, Plus, Buildings, User, FunnelSimple } from "phosphor-react";
 import MonthlyCalendar from "./MonthlyCalendar";
@@ -59,14 +59,13 @@ export default function SchedulePageClient({
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleWithProfile | null>(null);
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
 
-  const filteredSchedules = schedules.filter((s) => {
+  const filteredSchedules = useMemo(() => schedules.filter((s) => {
     if (visibilityFilter === "all") return true;
     if (visibilityFilter === "company") return s.visibility === "company";
-    // "mine": 내가 만든 일정 + 내가 참여자인 일정
     const isCreator = s.created_by === userId;
     const isParticipant = s.schedule_participants?.some((p) => p.user_id === userId) ?? false;
     return isCreator || isParticipant;
-  });
+  }), [schedules, visibilityFilter, userId]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, activeTab);
