@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import TasksPageClient from "@/components/dashboard/tasks/TasksPageClient";
-import { getAllTasks, getMyTasks } from "@/lib/tasks/queries";
+import { getTasksWithDetails } from "@/lib/tasks/queries";
 import { getAllProfiles } from "@/lib/attendance/queries";
 
 export default async function TasksPage() {
@@ -14,14 +14,12 @@ export default async function TasksPage() {
     redirect("/login");
   }
 
-  let allTasks: Awaited<ReturnType<typeof getAllTasks>> = [];
-  let myTasks: Awaited<ReturnType<typeof getMyTasks>> = [];
+  let allTasks: Awaited<ReturnType<typeof getTasksWithDetails>> = [];
   let profiles: Awaited<ReturnType<typeof getAllProfiles>> = [];
 
   try {
-    [allTasks, myTasks, profiles] = await Promise.all([
-      getAllTasks(supabase),
-      getMyTasks(supabase, user.id),
+    [allTasks, profiles] = await Promise.all([
+      getTasksWithDetails(supabase),
       getAllProfiles(supabase),
     ]);
   } catch {
@@ -31,7 +29,6 @@ export default async function TasksPage() {
   return (
     <TasksPageClient
       allTasks={allTasks}
-      myTasks={myTasks}
       profiles={profiles}
       userId={user.id}
     />

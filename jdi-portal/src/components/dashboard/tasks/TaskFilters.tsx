@@ -1,75 +1,144 @@
 "use client";
 
-import { FunnelSimple, Plus } from "phosphor-react";
-import { CATEGORIES, TASK_PRIORITIES } from "@/lib/tasks/constants";
+import { useState, useRef, useEffect } from "react";
+import {
+  User,
+  Tag,
+  Funnel,
+  CaretDown,
+  StackSimple,
+  SortAscending,
+} from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
-import type { TaskPriority } from "@/lib/tasks/types";
+import type { TaskFilterState, TaskGroupBy, TaskSortBy, TaskStatus } from "@/lib/tasks/types";
+import { CATEGORIES, TASK_STATUSES, GROUP_BY_OPTIONS, SORT_BY_OPTIONS } from "@/lib/tasks/constants";
 
-interface TaskFiltersProps {
+interface Props {
   profiles: Profile[];
-  filterAssignee: string | null;
-  filterCategory: string | null;
-  filterPriority: TaskPriority | null;
-  onFilterAssignee: (id: string | null) => void;
-  onFilterCategory: (cat: string | null) => void;
-  onFilterPriority: (p: TaskPriority | null) => void;
-  onCreateClick: () => void;
+  filters: TaskFilterState;
+  onFilterChange: (filters: TaskFilterState) => void;
 }
 
-export default function TaskFilters({
-  profiles,
-  filterAssignee,
-  filterCategory,
-  filterPriority,
-  onFilterAssignee,
-  onFilterCategory,
-  onFilterPriority,
-  onCreateClick,
-}: TaskFiltersProps) {
+function Dropdown({
+  label,
+  icon: Icon,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  value: string | null;
+  options: { value: string; label: string }[];
+  onChange: (value: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const displayLabel = value ? options.find((o) => o.value === value)?.label ?? label : label;
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <FunnelSimple size={16} className="text-slate-400" />
-
-      <select
-        value={filterAssignee ?? ""}
-        onChange={(e) => onFilterAssignee(e.target.value || null)}
-        className="glass-input px-3 py-1.5 rounded-lg text-xs outline-none"
-      >
-        <option value="">담당자 전체</option>
-        {profiles.map((p) => (
-          <option key={p.id} value={p.id}>{p.full_name}</option>
-        ))}
-      </select>
-
-      <select
-        value={filterCategory ?? ""}
-        onChange={(e) => onFilterCategory(e.target.value || null)}
-        className="glass-input px-3 py-1.5 rounded-lg text-xs outline-none"
-      >
-        <option value="">카테고리 전체</option>
-        {CATEGORIES.map((c) => (
-          <option key={c} value={c}>{c}</option>
-        ))}
-      </select>
-
-      <select
-        value={filterPriority ?? ""}
-        onChange={(e) => onFilterPriority((e.target.value as TaskPriority) || null)}
-        className="glass-input px-3 py-1.5 rounded-lg text-xs outline-none"
-      >
-        <option value="">우선순위 전체</option>
-        {TASK_PRIORITIES.map((p) => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
-
+    <div ref={ref} className="relative">
       <button
-        onClick={onCreateClick}
-        className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-md shadow-brand-500/20 transition-all duration-200"
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm cursor-pointer transition-all ${
+          value
+            ? "bg-indigo-50 text-indigo-600 font-bold shadow-sm"
+            : "bg-white text-slate-500 shadow-sm hover:bg-slate-50"
+        }`}
       >
-        <Plus size={16} weight="bold" />
-        할일 추가
+        <Icon size={16} />
+        <span>{displayLabel}</span>
+        <CaretDown size={12} />
       </button>
+      {open && (
+        <div className="absolute top-full mt-2 right-0 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 min-w-[160px]">
+          <button
+            onClick={() => {
+              onChange(null);
+              setOpen(false);
+            }}
+            className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${
+              !value ? "text-indigo-600 font-bold" : "text-slate-500"
+            }`}
+          >
+            전체
+          </button>
+          {options.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${
+                value === option.value ? "text-indigo-600 font-bold" : "text-slate-600"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TaskFilters({ profiles, filters, onFilterChange }: Props) {
+  const update = (partial: Partial<TaskFilterState>) => {
+    onFilterChange({ ...filters, ...partial });
+  };
+
+  return (
+    <div className="flex items-center justify-end">
+      <div className="flex items-center gap-3">
+        <Dropdown
+          label="담당자"
+          icon={User}
+          value={filters.assignee}
+          options={profiles.map((p) => ({ value: p.id, label: p.full_name }))}
+          onChange={(v) => update({ assignee: v })}
+        />
+        <Dropdown
+          label="카테고리"
+          icon={Tag}
+          value={filters.category}
+          options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+          onChange={(v) => update({ category: v })}
+        />
+        <Dropdown
+          label="상태"
+          icon={Funnel}
+          value={filters.status}
+          options={TASK_STATUSES.map((s) => ({ value: s, label: s }))}
+          onChange={(v) => update({ status: v as TaskStatus | null })}
+        />
+
+        <div className="w-px h-6 bg-slate-200" />
+
+        <Dropdown
+          label={`그룹: ${GROUP_BY_OPTIONS[filters.groupBy]}`}
+          icon={StackSimple}
+          value={filters.groupBy}
+          options={Object.entries(GROUP_BY_OPTIONS).map(([value, label]) => ({ value, label }))}
+          onChange={(v) => update({ groupBy: (v as TaskGroupBy) ?? "status" })}
+        />
+        <Dropdown
+          label={`정렬: ${SORT_BY_OPTIONS[filters.sortBy]}`}
+          icon={SortAscending}
+          value={filters.sortBy}
+          options={Object.entries(SORT_BY_OPTIONS).map(([value, label]) => ({ value, label }))}
+          onChange={(v) => update({ sortBy: (v as TaskSortBy) ?? "due_date" })}
+        />
+      </div>
     </div>
   );
 }
