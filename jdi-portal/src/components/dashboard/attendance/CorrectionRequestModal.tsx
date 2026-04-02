@@ -9,7 +9,8 @@ import type { AttendanceRecord, CorrectionRequest } from "@/lib/attendance/types
 
 interface CorrectionRequestModalProps {
   userId: string;
-  record: AttendanceRecord | null;
+  record?: AttendanceRecord | null;
+  targetDate?: string;
   onClose: () => void;
 }
 
@@ -22,35 +23,40 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export default function CorrectionRequestModal({ userId, record, onClose }: CorrectionRequestModalProps) {
+export default function CorrectionRequestModal({ userId, record, targetDate: initialDate, onClose }: CorrectionRequestModalProps) {
   const router = useRouter();
-  const [requestType, setRequestType] = useState<RequestType>("출근시간수정");
+  const isMissingMode = !record;
+  const [requestType, setRequestType] = useState<RequestType>(isMissingMode ? "기록누락" : "출근시간수정");
+  const [selectedDate, setSelectedDate] = useState(initialDate ?? "");
   const [checkInTime, setCheckInTime] = useState("");
   const [checkOutTime, setCheckOutTime] = useState("");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  if (!record) return null;
+  const workDate = record?.work_date ?? selectedDate;
 
   const isTimeValid =
     requestType === "출근시간수정" ? !!checkInTime :
     requestType === "퇴근시간수정" ? !!checkOutTime :
     !!checkInTime; // 기록누락: 최소 출근시간 필수
 
+  const isFormValid = !!reason && isTimeValid && !!workDate;
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!isFormValid) return;
     setLoading(true);
     setFeedback(null);
 
     try {
       await submitCorrectionRequest({
         userId,
-        attendanceRecordId: record.id,
-        targetDate: record.work_date,
+        attendanceRecordId: record?.id ?? null,
+        targetDate: workDate,
         requestType,
-        requestedCheckIn: checkInTime ? `${record.work_date}T${checkInTime}:00` : null,
-        requestedCheckOut: checkOutTime ? `${record.work_date}T${checkOutTime}:00` : null,
+        requestedCheckIn: checkInTime ? `${workDate}T${checkInTime}:00` : null,
+        requestedCheckOut: checkOutTime ? `${workDate}T${checkOutTime}:00` : null,
         reason,
       });
       router.refresh();
@@ -67,25 +73,43 @@ export default function CorrectionRequestModal({ userId, record, onClose }: Corr
       <div className="fixed inset-0 bg-black/30" onClick={onClose} />
       <div className="relative glass-card rounded-2xl p-6 w-full max-w-md animate-fade-in-up">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800">출퇴근 정정 요청</h3>
+          <h3 className="text-lg font-bold text-slate-800">
+            {isMissingMode ? "기록 누락 신청" : "출퇴근 정정 요청"}
+          </h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
             <X size={20} />
           </button>
         </div>
 
-        <p className="text-sm text-slate-500 mb-4">{formatDate(record.work_date)}</p>
-
-        <div className="mb-4 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <p className="font-semibold text-slate-800 mb-2">현재 기록</p>
-          <div className="flex items-center justify-between">
-            <span>출근</span>
-            <span>{formatTime(record.check_in)}</span>
+        {record ? (
+          <>
+            <p className="text-sm text-slate-500 mb-4">{formatDate(record.work_date)}</p>
+            <div className="mb-4 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">
+              <p className="font-semibold text-slate-800 mb-2">현재 기록</p>
+              <div className="flex items-center justify-between">
+                <span>출근</span>
+                <span>{formatTime(record.check_in)}</span>
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <span>퇴근</span>
+                <span>{formatTime(record.check_out)}</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-slate-700 mb-1">
+              날짜 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+              required
+            />
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <span>퇴근</span>
-            <span>{formatTime(record.check_out)}</span>
-          </div>
-        </div>
+        )}
 
         {feedback && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -94,18 +118,22 @@ export default function CorrectionRequestModal({ userId, record, onClose }: Corr
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">요청 유형</label>
-            <select
-              value={requestType}
-              onChange={(event) => setRequestType(event.target.value as RequestType)}
-              className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-            >
-              <option value="출근시간수정">출근시간 수정</option>
-              <option value="퇴근시간수정">퇴근시간 수정</option>
-              <option value="기록누락">기록 누락</option>
-            </select>
-          </div>
+          {isMissingMode ? (
+            <input type="hidden" value="기록누락" />
+          ) : (
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">요청 유형</label>
+              <select
+                value={requestType}
+                onChange={(event) => setRequestType(event.target.value as RequestType)}
+                className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+              >
+                <option value="출근시간수정">출근시간 수정</option>
+                <option value="퇴근시간수정">퇴근시간 수정</option>
+                <option value="기록누락">기록 누락</option>
+              </select>
+            </div>
+          )}
 
           {(requestType === "출근시간수정" || requestType === "기록누락") && (
             <div>
@@ -150,7 +178,7 @@ export default function CorrectionRequestModal({ userId, record, onClose }: Corr
 
           <button
             type="submit"
-            disabled={loading || !reason || !isTimeValid}
+            disabled={loading || !isFormValid}
             className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/20 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? "요청 중..." : "정정 요청하기"}
