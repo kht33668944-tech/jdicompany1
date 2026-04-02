@@ -141,7 +141,7 @@ export async function getPendingVacationRequests(
 ): Promise<VacationRequest[]> {
   const { data, error } = await supabase
     .from("vacation_requests")
-    .select("*, profiles(full_name)")
+    .select("*, profiles:user_id(full_name)")
     .eq("status", "대기중")
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -153,7 +153,7 @@ export async function getPendingCorrectionRequests(
 ): Promise<CorrectionRequest[]> {
   const { data, error } = await supabase
     .from("correction_requests")
-    .select("*, profiles(full_name)")
+    .select("*, profiles:user_id(full_name)")
     .eq("status", "대기중")
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -168,7 +168,7 @@ export async function getApprovedVacationsForMonth(
   const { start, end } = getMonthRange(year, month);
   const { data, error } = await supabase
     .from("vacation_requests")
-    .select("*, profiles(full_name)")
+    .select("*, profiles:user_id(full_name)")
     .eq("status", "승인")
     .lte("start_date", end)
     .gte("end_date", start)
