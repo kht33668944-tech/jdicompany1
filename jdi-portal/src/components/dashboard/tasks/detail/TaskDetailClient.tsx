@@ -225,9 +225,9 @@ export default function TaskDetailClient({
       )}
 
       {/* 본문 + 사이드바 */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* 좌측: 본문 */}
-        <div className="col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* 제목 */}
           <div className="bg-white rounded-3xl shadow-sm p-6">
             {canEdit ? (

@@ -58,7 +58,7 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
   const handleDelete = async (attachment: TaskAttachment) => {
     if (!confirm(`"${attachment.file_name}" 파일을 삭제하시겠습니까?`)) return;
     try {
-      await deleteAttachment(attachment.id, attachment.file_path);
+      await deleteAttachment(attachment.id, attachment.file_path, taskId, userId);
       router.refresh();
     } catch (error) {
       console.error("첨부파일 삭제 실패:", error);

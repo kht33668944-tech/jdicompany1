@@ -304,6 +304,7 @@ export async function reorderChecklist(taskId: string, itemIds: string[]) {
   const updates = itemIds.map((id, index) =>
     supabase.from("task_checklist_items").update({ position: index }).eq("id", id)
   );
+  // 체크리스트 항목은 보통 20개 미만이므로 개별 업데이트 허용
   await Promise.all(updates);
 }
 
@@ -349,7 +350,7 @@ export async function uploadAttachment(
   return data as TaskAttachment;
 }
 
-export async function deleteAttachment(attachmentId: string, filePath: string) {
+export async function deleteAttachment(attachmentId: string, filePath: string, taskId: string, userId: string) {
   const supabase = getSupabase();
 
   await supabase.storage.from("task-attachments").remove([filePath]);
@@ -359,6 +360,8 @@ export async function deleteAttachment(attachmentId: string, filePath: string) {
     .delete()
     .eq("id", attachmentId);
   if (error) throw error;
+
+  await logActivity(taskId, userId, "attachment_deleted", null, { attachment_id: attachmentId });
 }
 
 export async function getAttachmentUrl(filePath: string): Promise<string> {
