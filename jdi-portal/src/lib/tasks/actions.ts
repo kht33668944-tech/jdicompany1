@@ -113,10 +113,11 @@ export async function updateTask(
 
   if (fetchError) throw fetchError;
 
-  // 상태 변경 시 position 재배치
-  if (params.status !== undefined && params.status !== currentTask.status) {
-    const nextPosition = await getNextPosition(supabase, params.status);
-    await moveTask(taskId, params.status, nextPosition);
+  // 상태 변경 시 position 재배치 (SECURITY DEFINER RPC로 처리)
+  const statusChanged = params.status !== undefined && params.status !== currentTask.status;
+  if (statusChanged) {
+    const nextPosition = await getNextPosition(supabase, params.status!);
+    await moveTask(taskId, params.status!, nextPosition);
     await logActivity(taskId, userId, "status_change", null, {
       from: currentTask.status,
       to: params.status,
@@ -131,35 +132,35 @@ export async function updateTask(
     });
   }
 
-  const updateData: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  };
+  // 실제 변경된 필드만 수집
+  const updateData: Record<string, unknown> = {};
 
-  if (params.title !== undefined) updateData.title = params.title;
+  if (params.title !== undefined && params.title !== currentTask.title) {
+    updateData.title = params.title;
+    await logActivity(taskId, userId, "edit", null, { field: "title" });
+  }
   if (params.description !== undefined) updateData.description = params.description;
-  if (params.priority !== undefined) updateData.priority = params.priority;
+  if (params.priority !== undefined && params.priority !== currentTask.priority) updateData.priority = params.priority;
   if (params.category !== undefined) updateData.category = params.category;
   if (params.dueDate !== undefined) updateData.due_date = params.dueDate;
   if (params.startDate !== undefined) updateData.start_date = params.startDate;
 
-  if (Object.keys(updateData).length === 1) {
+  // 변경된 필드가 없으면 (상태만 변경된 경우 포함) 바로 리턴
+  if (Object.keys(updateData).length === 0) {
     return currentTask;
   }
 
-  // 제목/설명 변경 로그
-  if (params.title !== undefined && params.title !== currentTask.title) {
-    await logActivity(taskId, userId, "edit", null, { field: "title" });
-  }
+  updateData.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
     .from("tasks")
     .update(updateData)
     .eq("id", taskId)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
-  return data;
+  return data ?? currentTask;
 }
 
 export async function deleteTask(taskId: string) {
