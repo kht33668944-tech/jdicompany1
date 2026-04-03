@@ -8,6 +8,7 @@ export interface Profile {
   avatar_url?: string | null;
   phone?: string | null;
   bio?: string | null;
+  is_approved: boolean;
 }
 
 export interface AttendanceRecord {

@@ -79,8 +79,21 @@ export default function LoginCard() {
         setShaking(true);
         setTimeout(() => setShaking(false), 500);
       } else {
-        router.push("/dashboard");
-        router.refresh();
+        // 승인 여부 확인
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("is_approved")
+          .single();
+
+        if (profile && !profile.is_approved) {
+          await supabase.auth.signOut();
+          setErrorMessage("관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다.");
+          setShaking(true);
+          setTimeout(() => setShaking(false), 500);
+        } else {
+          router.push("/dashboard");
+          router.refresh();
+        }
       }
     } catch {
       setErrorMessage("로그인 중 오류가 발생했습니다.");

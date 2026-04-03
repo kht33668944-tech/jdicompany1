@@ -8,6 +8,7 @@ import DotBackground from "@/components/DotBackground";
 
 export default function SignupPage() {
   const router = useRouter();
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,6 +25,11 @@ export default function SignupPage() {
       return;
     }
 
+    if (!fullName.trim()) {
+      setErrorMessage("이름을 입력해주세요.");
+      return;
+    }
+
     if (password.length < 8) {
       setErrorMessage("비밀번호는 8자 이상이어야 합니다.");
       return;
@@ -36,6 +42,9 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: { full_name: fullName.trim() },
+        },
       });
 
       if (error) {
@@ -64,10 +73,10 @@ export default function SignupPage() {
                 </svg>
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">가입 완료!</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">가입 신청 완료!</h2>
             <p className="text-sm text-slate-500 mb-6">
-              이메일 인증 링크가 발송되었습니다.<br />
-              이메일을 확인해주세요.
+              관리자 승인 후 로그인할 수 있습니다.<br />
+              승인이 완료되면 로그인해주세요.
             </p>
             <a
               href="/login"
@@ -110,6 +119,21 @@ export default function SignupPage() {
                   {errorMessage}
                 </div>
               )}
+
+              <div className="space-y-2">
+                <label htmlFor="full-name" className="block text-sm font-semibold text-slate-700 ml-1">
+                  이름
+                </label>
+                <input
+                  type="text"
+                  id="full-name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="glass-input block w-full px-4 py-3.5 text-slate-900 text-sm rounded-xl outline-none transition-all duration-300 placeholder:text-slate-400"
+                  placeholder="실명을 입력하세요"
+                  required
+                />
+              </div>
 
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-sm font-semibold text-slate-700 ml-1">

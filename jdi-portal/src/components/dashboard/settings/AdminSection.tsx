@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, Plus } from "phosphor-react";
-import { addDepartment, deleteDepartment, updateUserRole } from "@/lib/settings/actions";
+import { addDepartment, deleteDepartment, updateUserRole, approveUser, rejectUser } from "@/lib/settings/actions";
 import type { Profile } from "@/lib/attendance/types";
 import type { Department } from "@/lib/settings/types";
 
@@ -57,6 +57,38 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
       router.refresh();
     } catch {
       setFeedback({ type: "error", message: "권한 변경에 실패했습니다." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pendingProfiles = profiles.filter((p) => !p.is_approved);
+  const approvedProfiles = profiles.filter((p) => p.is_approved);
+
+  const handleApproveUser = async (userId: string) => {
+    setLoading(true);
+    setFeedback(null);
+    try {
+      await approveUser(userId);
+      setFeedback({ type: "success", message: "사용자가 승인되었습니다." });
+      router.refresh();
+    } catch {
+      setFeedback({ type: "error", message: "사용자 승인에 실패했습니다." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectUser = async (userId: string) => {
+    if (!confirm("이 사용자의 가입 신청을 거절하시겠습니까? 계정이 삭제됩니다.")) return;
+    setLoading(true);
+    setFeedback(null);
+    try {
+      await rejectUser(userId);
+      setFeedback({ type: "success", message: "가입 신청이 거절되었습니다." });
+      router.refresh();
+    } catch {
+      setFeedback({ type: "error", message: "가입 거절에 실패했습니다." });
     } finally {
       setLoading(false);
     }
@@ -145,6 +177,49 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
         </div>
       </div>
 
+      {/* Pending Users */}
+      {pendingProfiles.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">
+            승인 대기 ({pendingProfiles.length})
+          </h3>
+          <div className="space-y-2">
+            {pendingProfiles.map((p, i) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between px-4 py-3 rounded-xl bg-amber-50/50 border border-amber-100"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${avatarColors[i % avatarColors.length]}`}>
+                    {p.full_name.charAt(0)}
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-slate-700">{p.full_name}</span>
+                    <p className="text-xs text-slate-400">{p.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleApproveUser(p.id)}
+                    disabled={loading}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+                  >
+                    승인
+                  </button>
+                  <button
+                    onClick={() => handleRejectUser(p.id)}
+                    disabled={loading}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                  >
+                    거절
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Employee Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left">
@@ -157,7 +232,7 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {profiles.map((p, i) => (
+            {approvedProfiles.map((p, i) => (
               <tr key={p.id}>
                 <td className="py-4 px-2">
                   <div className="flex items-center gap-3">

@@ -97,3 +97,19 @@ export async function updateUserRole(
   });
   if (error) throw error;
 }
+
+export async function approveUser(userId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc("admin_approve_user", {
+    p_target_user_id: userId,
+  });
+  if (error) throw error;
+}
+
+export async function rejectUser(userId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc("admin_reject_user", {
+    p_target_user_id: userId,
+  });
+  if (error) throw error;
+}
