@@ -49,10 +49,13 @@ export default function NotificationProvider({
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          console.log("[Notification Realtime] 새 알림 수신:", payload.new);
           handleNewNotification(payload.new as Notification);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[Notification Realtime] 구독 상태:", status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
