@@ -218,7 +218,9 @@ export default function TaskDetailClient({
           {/* 활동 타임라인 */}
           <div className="bg-white rounded-3xl shadow-sm p-6">
             <h3 className="font-bold text-slate-700 mb-4">활동</h3>
-            <TaskActivityTimeline activities={activities} userId={userId} />
+            <div className="max-h-96 overflow-y-auto pr-1">
+              <TaskActivityTimeline activities={activities} userId={userId} />
+            </div>
             <div className="mt-4 pt-4 border-t border-slate-100">
               <TaskCommentInput taskId={task.id} userId={userId} />
             </div>

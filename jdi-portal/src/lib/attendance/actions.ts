@@ -3,6 +3,7 @@ import { ATTENDANCE_STATUS_CONFIG } from "./constants";
 import type { AttendanceRecord, CorrectionRequest } from "./types";
 import { toDateString } from "@/lib/utils/date";
 import type { VacationType } from "./types";
+import { createNotification } from "@/lib/notifications/actions";
 
 function getSupabase() {
   return createClient();
@@ -134,6 +135,22 @@ export async function approveVacationRequest(requestId: string, adminId: string)
     p_admin_id: adminId,
   });
   if (error) throw error;
+
+  // 알림: 신청자에게
+  const { data: req } = await supabase
+    .from("vacation_requests")
+    .select("user_id, vacation_type, start_date, end_date")
+    .eq("id", requestId)
+    .single();
+  if (req) {
+    await createNotification({
+      userId: req.user_id,
+      type: "vacation_approved",
+      title: "휴가가 승인되었습니다",
+      body: `${req.vacation_type} (${req.start_date} ~ ${req.end_date})`,
+      link: "/dashboard/attendance",
+    });
+  }
 }
 
 export async function rejectVacationRequest(
@@ -142,6 +159,14 @@ export async function rejectVacationRequest(
   rejectReason: string
 ) {
   const supabase = getSupabase();
+
+  // 신청자 정보 먼저 조회
+  const { data: req } = await supabase
+    .from("vacation_requests")
+    .select("user_id, vacation_type, start_date, end_date")
+    .eq("id", requestId)
+    .single();
+
   const { error } = await supabase
     .from("vacation_requests")
     .update({
@@ -154,6 +179,17 @@ export async function rejectVacationRequest(
     .eq("id", requestId)
     .eq("status", "대기중");
   if (error) throw error;
+
+  // 알림: 신청자에게
+  if (req) {
+    await createNotification({
+      userId: req.user_id,
+      type: "vacation_rejected",
+      title: "휴가가 반려되었습니다",
+      body: `${req.vacation_type} (${req.start_date} ~ ${req.end_date}) — 사유: ${rejectReason}`,
+      link: "/dashboard/attendance",
+    });
+  }
 }
 
 export async function approveCorrectionRequest(

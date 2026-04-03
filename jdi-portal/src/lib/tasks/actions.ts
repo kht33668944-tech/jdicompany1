@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { TASK_PRIORITIES, TASK_STATUSES } from "./constants";
 import type { TaskPriority, TaskStatus, TaskChecklistItem, TaskAttachment, TaskActivity } from "./types";
+import { createNotification, createNotificationForMany } from "@/lib/notifications/actions";
 
 function getSupabase() {
   return createClient();
@@ -88,6 +89,18 @@ export async function createTask(params: {
 
   if (assigneeError) throw assigneeError;
 
+  // 알림: 배정된 사용자들에게 (본인 제외)
+  const notifyIds = assigneeIds.filter((id) => id !== params.createdBy);
+  if (notifyIds.length > 0) {
+    await createNotificationForMany(notifyIds, {
+      type: "task_assigned",
+      title: "새 할일이 배정되었습니다",
+      body: params.title,
+      link: `/dashboard/tasks/${data.id}`,
+      metadata: { task_id: data.id },
+    });
+  }
+
   return data;
 }
 
@@ -122,6 +135,23 @@ export async function updateTask(
       from: currentTask.status,
       to: params.status,
     });
+
+    // 알림: 할일 생성자에게 (변경자 ≠ 생성자일 때)
+    const { data: taskInfo } = await supabase
+      .from("tasks")
+      .select("created_by, title")
+      .eq("id", taskId)
+      .single();
+    if (taskInfo && taskInfo.created_by !== userId) {
+      await createNotification({
+        userId: taskInfo.created_by,
+        type: "task_status_changed",
+        title: `할일 상태가 "${params.status}"(으)로 변경되었습니다`,
+        body: taskInfo.title,
+        link: `/dashboard/tasks/${taskId}`,
+        metadata: { task_id: taskId, from: currentTask.status, to: params.status },
+      });
+    }
   }
 
   // 우선순위 변경 로그
@@ -193,6 +223,23 @@ export async function addAssignee(taskId: string, userId: string, currentUserId:
   await logActivity(taskId, currentUserId, "assignee_change", null, {
     added: [userId],
   });
+
+  // 알림: 배정된 사용자에게 (본인 제외)
+  if (userId !== currentUserId) {
+    const { data: taskInfo } = await supabase
+      .from("tasks")
+      .select("title")
+      .eq("id", taskId)
+      .single();
+    await createNotification({
+      userId,
+      type: "task_assigned",
+      title: "새 할일이 배정되었습니다",
+      body: taskInfo?.title ?? "",
+      link: `/dashboard/tasks/${taskId}`,
+      metadata: { task_id: taskId },
+    });
+  }
 }
 
 export async function removeAssignee(taskId: string, userId: string, currentUserId: string) {
@@ -347,6 +394,32 @@ export async function addComment(
     .single();
 
   if (error) throw error;
+
+  // 알림: 할일 담당자들에게 (댓글 작성자 제외)
+  const { data: assignees } = await supabase
+    .from("task_assignees")
+    .select("user_id")
+    .eq("task_id", taskId)
+    .neq("user_id", userId);
+
+  if (assignees && assignees.length > 0) {
+    const { data: taskInfo } = await supabase
+      .from("tasks")
+      .select("title")
+      .eq("id", taskId)
+      .single();
+    await createNotificationForMany(
+      assignees.map((a) => a.user_id),
+      {
+        type: "task_comment",
+        title: "할일에 새 댓글이 달렸습니다",
+        body: content.length > 100 ? content.slice(0, 100) + "..." : content,
+        link: `/dashboard/tasks/${taskId}`,
+        metadata: { task_id: taskId, task_title: taskInfo?.title },
+      }
+    );
+  }
+
   return data as TaskActivity;
 }
 

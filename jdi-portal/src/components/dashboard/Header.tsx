@@ -6,17 +6,18 @@ import Link from "next/link";
 import {
   List,
   CaretLeft,
-  Bell,
-  UserCircle,
   GearSix,
   SignOut,
 } from "phosphor-react";
+import NotificationCenter from "./NotificationCenter";
 
 interface HeaderProps {
-  user: { email: string; name: string; avatarUrl?: string | null };
+  user: { id: string; email: string; name: string; avatarUrl?: string | null };
   onMenuClick: () => void;
   onCollapseToggle: () => void;
   collapsed: boolean;
+  unreadCount: number;
+  onUnreadCountChange: (count: number) => void;
 }
 
 const titles: Record<string, string> = {
@@ -27,7 +28,7 @@ const titles: Record<string, string> = {
   "/dashboard/settings": "설정",
 };
 
-export default function Header({ user, onMenuClick, onCollapseToggle, collapsed }: HeaderProps) {
+export default function Header({ user, onMenuClick, onCollapseToggle, collapsed, unreadCount, onUnreadCountChange }: HeaderProps) {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -74,10 +75,11 @@ export default function Header({ user, onMenuClick, onCollapseToggle, collapsed 
         {/* Right */}
         <div className="flex items-center gap-2">
           {/* Notifications */}
-          <button className="relative p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
-            <Bell size={20} />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-          </button>
+          <NotificationCenter
+            userId={user.id}
+            unreadCount={unreadCount}
+            onUnreadCountChange={onUnreadCountChange}
+          />
 
           {/* User dropdown */}
           <div ref={dropdownRef} className="relative">
