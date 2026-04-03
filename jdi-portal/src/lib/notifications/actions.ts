@@ -29,7 +29,7 @@ export async function createNotification(params: {
   }
 }
 
-/** 여러 사용자에게 동일 알림 생성 */
+/** 여러 사용자에게 동일 알림 생성 (배치 INSERT) */
 export async function createNotificationForMany(
   userIds: string[],
   params: {
@@ -40,9 +40,21 @@ export async function createNotificationForMany(
     metadata?: Record<string, unknown>;
   }
 ) {
-  await Promise.all(
-    userIds.map((userId) => createNotification({ userId, ...params }))
-  );
+  if (userIds.length === 0) return;
+  try {
+    const supabase = getSupabase();
+    const rows = userIds.map((userId) => ({
+      user_id: userId,
+      type: params.type,
+      title: params.title,
+      body: params.body || null,
+      link: params.link || null,
+      metadata: params.metadata || {},
+    }));
+    await supabase.from("notifications").insert(rows);
+  } catch {
+    // 알림 실패가 본 기능을 중단시키면 안 됨
+  }
 }
 
 export async function markAsRead(notificationId: string) {

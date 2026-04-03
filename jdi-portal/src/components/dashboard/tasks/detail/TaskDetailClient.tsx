@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -59,11 +59,11 @@ export default function TaskDetailClient({
 }: Props) {
   const router = useRouter();
   const [liveActivities, setLiveActivities] = useState<TaskActivity[]>(activities);
-
-  // 활동 실시간 구독
-  useEffect(() => {
+  const prevActivitiesRef = useRef(activities);
+  if (prevActivitiesRef.current !== activities) {
+    prevActivitiesRef.current = activities;
     setLiveActivities(activities);
-  }, [activities]);
+  }
 
   useEffect(() => {
     const supabase = createClient();

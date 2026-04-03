@@ -120,7 +120,7 @@ export async function updateTask(
   const supabase = getSupabase();
   const { data: currentTask, error: fetchError } = await supabase
     .from("tasks")
-    .select("status, priority, title")
+    .select("status, priority, title, created_by")
     .eq("id", taskId)
     .single();
 
@@ -137,17 +137,12 @@ export async function updateTask(
     });
 
     // 알림: 할일 생성자에게 (변경자 ≠ 생성자일 때)
-    const { data: taskInfo } = await supabase
-      .from("tasks")
-      .select("created_by, title")
-      .eq("id", taskId)
-      .single();
-    if (taskInfo && taskInfo.created_by !== userId) {
+    if (currentTask.created_by && currentTask.created_by !== userId) {
       await createNotification({
-        userId: taskInfo.created_by,
+        userId: currentTask.created_by,
         type: "task_status_changed",
         title: `할일 상태가 "${params.status}"(으)로 변경되었습니다`,
-        body: taskInfo.title,
+        body: currentTask.title,
         link: `/dashboard/tasks/${taskId}`,
         metadata: { task_id: taskId, from: currentTask.status, to: params.status },
       });
@@ -397,17 +392,17 @@ export async function addComment(
 
   // 알림: 할일 담당자들에게 (댓글 작성자 제외) — 백그라운드 처리
   const commentData = data as TaskActivity;
-  sendCommentNotifications(supabase, taskId, userId, content);
+  sendCommentNotifications(taskId, userId, content).catch(() => {});
   return commentData;
 }
 
 async function sendCommentNotifications(
-  supabase: ReturnType<typeof getSupabase>,
   taskId: string,
   userId: string,
   content: string
 ) {
   try {
+    const supabase = getSupabase();
     const { data: assignees } = await supabase
       .from("task_assignees")
       .select("user_id")

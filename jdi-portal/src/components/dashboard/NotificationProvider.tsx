@@ -39,6 +39,7 @@ export default function NotificationProvider({
 
   // 5초마다 새 알림 폴링
   useEffect(() => {
+    let aborted = false;
     const supabase = createClient();
 
     const poll = async () => {
@@ -50,15 +51,16 @@ export default function NotificationProvider({
         .gt("created_at", since)
         .order("created_at", { ascending: true });
 
-      if (data && data.length > 0) {
+      if (!aborted && data && data.length > 0) {
         const notifications = data as Notification[];
         lastCheckedRef.current = notifications[notifications.length - 1].created_at;
         notifications.forEach((n) => showToast(n));
       }
     };
 
+    poll();
     const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
+    return () => { aborted = true; clearInterval(interval); };
   }, [userId, showToast]);
 
   return <>{children}</>;

@@ -17,6 +17,7 @@ import {
 } from "phosphor-react";
 import { createClient } from "@/lib/supabase/client";
 import { markAsRead, markAllAsRead } from "@/lib/notifications/actions";
+import { formatTimeAgo } from "@/lib/utils/date";
 import type { Notification, NotificationType } from "@/lib/notifications/types";
 
 const TYPE_ICONS: Record<NotificationType, React.ElementType> = {
@@ -42,18 +43,6 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   system_announce: "text-blue-600 bg-blue-50",
   signup_pending: "text-orange-500 bg-orange-50",
 };
-
-function formatTimeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diff < 60) return "방금 전";
-  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}일 전`;
-  return date.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
-}
 
 interface NotificationCenterProps {
   userId: string;
