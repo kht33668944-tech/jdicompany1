@@ -32,7 +32,9 @@ export default function TaskChecklist({ taskId, items, canEdit }: Props) {
       await addChecklistItem(taskId, newItem.trim());
       setNewItem("");
       router.refresh();
-    } catch {} finally {
+    } catch (error) {
+      console.error("체크리스트 항목 추가 실패:", error);
+    } finally {
       setAdding(false);
     }
   };
@@ -41,14 +43,18 @@ export default function TaskChecklist({ taskId, items, canEdit }: Props) {
     try {
       await updateChecklistItem(item.id, { is_completed: !item.is_completed });
       router.refresh();
-    } catch {}
+    } catch (error) {
+      console.error("체크리스트 항목 토글 실패:", error);
+    }
   };
 
   const handleDelete = async (itemId: string) => {
     try {
       await deleteChecklistItem(itemId);
       router.refresh();
-    } catch {}
+    } catch (error) {
+      console.error("체크리스트 항목 삭제 실패:", error);
+    }
   };
 
   return (

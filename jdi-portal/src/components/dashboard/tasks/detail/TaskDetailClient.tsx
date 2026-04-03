@@ -165,14 +165,18 @@ export default function TaskDetailClient({
     try {
       await addAssignee(task.id, assigneeUserId, userId);
       router.refresh();
-    } catch {}
+    } catch (error) {
+      console.error("담당자 추가 실패:", error);
+    }
   };
 
   const handleRemoveAssignee = async (assigneeUserId: string) => {
     try {
       await removeAssignee(task.id, assigneeUserId, userId);
       router.refresh();
-    } catch {}
+    } catch (error) {
+      console.error("담당자 제거 실패:", error);
+    }
   };
 
   return (

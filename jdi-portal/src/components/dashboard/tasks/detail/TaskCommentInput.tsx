@@ -22,7 +22,9 @@ export default function TaskCommentInput({ taskId, userId }: Props) {
       await addComment(taskId, userId, content.trim());
       setContent("");
       router.refresh();
-    } catch {} finally {
+    } catch (error) {
+      console.error("댓글 추가 실패:", error);
+    } finally {
       setSending(false);
     }
   };

@@ -83,7 +83,9 @@ export default function TaskActivityTimeline({ activities, userId }: Props) {
     try {
       await deleteActivity(activityId);
       router.refresh();
-    } catch {}
+    } catch (error) {
+      console.error("활동 내역 삭제 실패:", error);
+    }
   };
 
   if (activities.length === 0) {

@@ -33,7 +33,9 @@ function getInitialFilters(): TaskFilterState {
   try {
     const saved = window.localStorage.getItem(FILTER_STORAGE_KEY);
     if (saved) return { ...DEFAULT_FILTER_STATE, ...JSON.parse(saved) };
-  } catch {}
+  } catch {
+    // 로컬스토리지 파싱 실패 무시 — 기본값으로 폴백
+  }
   return DEFAULT_FILTER_STATE;
 }
 

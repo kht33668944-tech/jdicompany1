@@ -32,7 +32,9 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
     try {
       const url = await getAttachmentUrl(filePath);
       window.open(url, "_blank", "noopener,noreferrer");
-    } catch {}
+    } catch (error) {
+      console.error("첨부파일 URL 조회 실패:", error);
+    }
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,7 +47,9 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
         await uploadAttachment(taskId, userId, file);
       }
       router.refresh();
-    } catch {} finally {
+    } catch (error) {
+      console.error("첨부파일 업로드 실패:", error);
+    } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -56,7 +60,9 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
     try {
       await deleteAttachment(attachment.id, attachment.file_path);
       router.refresh();
-    } catch {}
+    } catch (error) {
+      console.error("첨부파일 삭제 실패:", error);
+    }
   };
 
   return (
