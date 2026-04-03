@@ -46,16 +46,16 @@ export default function NotificationProvider({
           event: "INSERT",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log("[Notification Realtime] 새 알림 수신:", payload.new);
-          handleNewNotification(payload.new as Notification);
+          const newRow = payload.new as Notification;
+          // 본인 알림만 처리
+          if (newRow.user_id === userId) {
+            handleNewNotification(newRow);
+          }
         }
       )
-      .subscribe((status) => {
-        console.log("[Notification Realtime] 구독 상태:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
