@@ -1,25 +1,18 @@
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getProfile } from "@/lib/attendance/queries";
+import { getAuthUser } from "@/lib/supabase/auth";
 import { getDashboardData } from "@/lib/dashboard/queries";
 import DashboardClient from "@/components/dashboard/DashboardClient";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthUser();
+  if (!auth) redirect("/login");
 
-  if (!user) redirect("/login");
-
-  const profile = await getProfile(supabase, user.id);
-  const userName = profile?.full_name ?? user.email?.split("@")[0] ?? "사용자";
-
-  const data = await getDashboardData(supabase, user.id, userName);
+  const userName = auth.profile.full_name ?? auth.user.email?.split("@")[0] ?? "사용자";
+  const data = await getDashboardData(auth.supabase, auth.user.id, userName);
 
   return (
     <DashboardClient
-      userId={user.id}
+      userId={auth.user.id}
       userName={userName}
       todayRecord={data.todayRecord}
       weeklyMinutes={data.weeklyMinutes}

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import { toDateString, getMonthRange } from "@/lib/utils/date";
 import type {
   Profile,
@@ -135,6 +136,17 @@ export async function getAllProfiles(
   if (error) throw error;
   return data ?? [];
 }
+
+/** 프로필 목록 5분 캐싱 — 전 유저 동일 데이터 */
+export const getCachedAllProfiles = unstable_cache(
+  async (): Promise<Profile[]> => {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    return getAllProfiles(supabase);
+  },
+  ["all-profiles"],
+  { revalidate: 300, tags: ["profiles"] }
+);
 
 export async function getPendingVacationRequests(
   supabase: SupabaseClient

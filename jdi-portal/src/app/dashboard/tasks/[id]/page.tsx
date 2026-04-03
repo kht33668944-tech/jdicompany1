@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth";
 import {
   getTaskById,
   getChecklistItems,
@@ -7,7 +7,7 @@ import {
   getAttachments,
   getActivities,
 } from "@/lib/tasks/queries";
-import { getAllProfiles } from "@/lib/attendance/queries";
+import { getCachedAllProfiles } from "@/lib/attendance/queries";
 import TaskDetailClient from "@/components/dashboard/tasks/detail/TaskDetailClient";
 
 interface Props {
@@ -16,27 +16,18 @@ interface Props {
 
 export default async function TaskDetailPage({ params }: Props) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthUser();
+  if (!auth) redirect("/login");
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  const task = await getTaskById(supabase, id);
-
-  if (!task) {
-    redirect("/dashboard/tasks");
-  }
+  const task = await getTaskById(auth.supabase, id);
+  if (!task) redirect("/dashboard/tasks");
 
   const [checklist, subtasks, attachments, activities, profiles] = await Promise.all([
-    getChecklistItems(supabase, id),
-    getSubtasks(supabase, id),
-    getAttachments(supabase, id),
-    getActivities(supabase, id),
-    getAllProfiles(supabase),
+    getChecklistItems(auth.supabase, id),
+    getSubtasks(auth.supabase, id),
+    getAttachments(auth.supabase, id),
+    getActivities(auth.supabase, id),
+    getCachedAllProfiles(),
   ]);
 
   return (
@@ -47,7 +38,7 @@ export default async function TaskDetailPage({ params }: Props) {
       attachments={attachments}
       activities={activities}
       profiles={profiles}
-      userId={user.id}
+      userId={auth.user.id}
     />
   );
 }

@@ -4,7 +4,7 @@ import type { TaskWithDetails } from "@/lib/tasks/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import { toDateString, getWeekRange, addDays } from "@/lib/utils/date";
 import { getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
-import { getTasksWithDetails } from "@/lib/tasks/queries";
+import { getCachedTasksWithDetails } from "@/lib/tasks/queries";
 import { getTodaySchedules } from "@/lib/schedule/queries";
 import { sortTasks } from "@/lib/tasks/utils";
 
@@ -44,7 +44,7 @@ export async function getDashboardData(
     await Promise.all([
       getTodayRecord(supabase, userId),
       getWeekRecords(supabase, userId, weekStart, weekEnd),
-      getTasksWithDetails(supabase),
+      getCachedTasksWithDetails(),
       getTodaySchedules(supabase, today),
       fetchRecentActivities(supabase, 15),
     ]);

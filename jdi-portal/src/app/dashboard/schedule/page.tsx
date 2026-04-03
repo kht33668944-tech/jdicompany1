@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
+import { getAuthUser } from "@/lib/supabase/auth";
 import SchedulePageClient from "@/components/dashboard/schedule/SchedulePageClient";
 import { getMonthSchedules } from "@/lib/schedule/queries";
-import { getAllProfiles } from "@/lib/attendance/queries";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedAllProfiles } from "@/lib/attendance/queries";
 import { toDateString } from "@/lib/utils/date";
 import { getSingleValue, parseYearParam, parseMonthParam } from "@/lib/utils/params";
 import type { Profile } from "@/lib/attendance/types";
@@ -15,20 +15,8 @@ type SchedulePageProps = {
 };
 
 export default async function SchedulePage({ searchParams }: SchedulePageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const auth = await getAuthUser();
+  if (!auth) redirect("/login");
 
   const today = toDateString();
   const query = await searchParams;
@@ -42,8 +30,8 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
 
   try {
     [schedules, profiles] = await Promise.all([
-      getMonthSchedules(supabase, currentYear, currentMonth),
-      getAllProfiles(supabase),
+      getMonthSchedules(auth.supabase, currentYear, currentMonth),
+      getCachedAllProfiles(),
     ]);
   } catch {
     // DB 오류 시 빈 데이터로 페이지 렌더링
@@ -55,8 +43,8 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
       profiles={profiles}
       currentYear={currentYear}
       currentMonth={currentMonth}
-      userId={user.id}
-      userRole={profile?.role ?? "employee"}
+      userId={auth.user.id}
+      userRole={auth.profile.role}
     />
   );
 }

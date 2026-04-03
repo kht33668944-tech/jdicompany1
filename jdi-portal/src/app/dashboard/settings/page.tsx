@@ -1,30 +1,29 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getProfile, getAllProfiles } from "@/lib/attendance/queries";
+import { getAuthUser } from "@/lib/supabase/auth";
+import { getCachedAllProfiles } from "@/lib/attendance/queries";
 import { getNotificationSettings, getDepartments } from "@/lib/settings/queries";
 import SettingsPageClient from "@/components/dashboard/settings/SettingsPageClient";
+import type { Profile } from "@/lib/attendance/types";
 
 export default async function SettingsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthUser();
+  if (!auth) redirect("/login");
 
-  if (!user) redirect("/login");
+  const { profile, supabase } = auth;
 
-  const profile = await getProfile(supabase, user.id);
-  if (!profile) redirect("/login");
-
-  const notificationSettings = await getNotificationSettings(supabase, user.id);
-
+  // 알림 설정 + admin 데이터를 병렬 fetch
+  let notificationSettings = null;
   let departments: Awaited<ReturnType<typeof getDepartments>> = [];
-  let allProfiles: Awaited<ReturnType<typeof getAllProfiles>> = [];
+  let allProfiles: Profile[] = [];
 
   if (profile.role === "admin") {
-    [departments, allProfiles] = await Promise.all([
+    [notificationSettings, departments, allProfiles] = await Promise.all([
+      getNotificationSettings(supabase, auth.user.id),
       getDepartments(supabase),
-      getAllProfiles(supabase),
+      getCachedAllProfiles(),
     ]);
+  } else {
+    notificationSettings = await getNotificationSettings(supabase, auth.user.id);
   }
 
   return (

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import type {
   TaskWithDetails,
   TaskChecklistItem,
@@ -246,3 +247,14 @@ export async function getMaxPosition(supabase: SupabaseClient, status: string): 
     .single();
   return data?.position ?? 0;
 }
+
+/** 할일 목록 15초 캐싱 — 네비게이션 속도 개선 */
+export const getCachedTasksWithDetails = unstable_cache(
+  async (): Promise<TaskWithDetails[]> => {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    return getTasksWithDetails(supabase);
+  },
+  ["tasks-with-details"],
+  { revalidate: 15, tags: ["tasks"] }
+);

@@ -1,20 +1,19 @@
 import { redirect } from "next/navigation";
+import { getAuthUser } from "@/lib/supabase/auth";
 import AttendancePageClient from "@/components/dashboard/attendance/AttendancePageClient";
 import {
-  getAllProfiles,
+  getCachedAllProfiles,
   getAllTodayAttendance,
   getCancelVacationRequests,
   getCorrectionRequests,
   getMonthRecords,
   getPendingCorrectionRequests,
   getPendingVacationRequests,
-  getProfile,
   getTodayRecord,
   getVacationBalance,
   getVacationRequests,
   getWeekRecords,
 } from "@/lib/attendance/queries";
-import { createClient } from "@/lib/supabase/server";
 import { getWeekRange, toDateString } from "@/lib/utils/date";
 import { getSingleValue, parseYearParam, parseMonthParam } from "@/lib/utils/params";
 
@@ -26,14 +25,10 @@ type AttendancePageProps = {
 };
 
 export default async function AttendancePage({ searchParams }: AttendancePageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthUser();
+  if (!auth) redirect("/login");
 
-  if (!user) {
-    redirect("/login");
-  }
+  const { user, profile, supabase } = auth;
 
   const now = new Date();
   const today = toDateString(now);
@@ -44,51 +39,55 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
   const currentMonth = parseMonthParam(getSingleValue(query.month), defaultMonth);
   const { start: weekStart, end: weekEnd } = getWeekRange(now);
 
-  const profile = await getProfile(supabase, user.id);
-  if (!profile) {
-    redirect("/login");
-  }
-
   let todayRecord = null;
   let weekRecords: Awaited<ReturnType<typeof getWeekRecords>> = [];
   let monthRecords: Awaited<ReturnType<typeof getMonthRecords>> = [];
   let vacationBalance = null;
   let vacationRequests: Awaited<ReturnType<typeof getVacationRequests>> = [];
   let correctionRequests: Awaited<ReturnType<typeof getCorrectionRequests>> = [];
-
-  try {
-    [todayRecord, weekRecords, monthRecords, vacationBalance, vacationRequests, correctionRequests] =
-      await Promise.all([
-        getTodayRecord(supabase, user.id),
-        getWeekRecords(supabase, user.id, weekStart, weekEnd),
-        getMonthRecords(supabase, user.id, currentYear, currentMonth),
-        getVacationBalance(supabase, user.id),
-        getVacationRequests(supabase, user.id),
-        getCorrectionRequests(supabase, user.id),
-      ]);
-  } catch {
-    // DB 오류 시 빈 데이터로 페이지 렌더링
-  }
-
   let allTodayAttendance = null;
   let allProfiles = null;
   let pendingVacationRequests = null;
   let cancelVacationRequests = null;
   let pendingCorrectionRequests = null;
 
-  if (profile.role === "admin") {
-    try {
-      [allTodayAttendance, allProfiles, pendingVacationRequests, cancelVacationRequests, pendingCorrectionRequests] =
-        await Promise.all([
-          getAllTodayAttendance(supabase),
-          getAllProfiles(supabase),
-          getPendingVacationRequests(supabase),
-          getCancelVacationRequests(supabase),
-          getPendingCorrectionRequests(supabase),
-        ]);
-    } catch {
-      // DB 오류 시 빈 데이터로 페이지 렌더링
+  try {
+    // 유저 데이터 + admin 데이터를 한 번에 병렬 fetch
+    const basePromises = [
+      getTodayRecord(supabase, user.id),
+      getWeekRecords(supabase, user.id, weekStart, weekEnd),
+      getMonthRecords(supabase, user.id, currentYear, currentMonth),
+      getVacationBalance(supabase, user.id),
+      getVacationRequests(supabase, user.id),
+      getCorrectionRequests(supabase, user.id),
+    ] as const;
+
+    if (profile.role === "admin") {
+      const [tr, wr, mr, vb, vr, cr, ata, ap, pvr, cvr, pcr] = await Promise.all([
+        ...basePromises,
+        getAllTodayAttendance(supabase),
+        getCachedAllProfiles(),
+        getPendingVacationRequests(supabase),
+        getCancelVacationRequests(supabase),
+        getPendingCorrectionRequests(supabase),
+      ]);
+      todayRecord = tr;
+      weekRecords = wr;
+      monthRecords = mr;
+      vacationBalance = vb;
+      vacationRequests = vr;
+      correctionRequests = cr;
+      allTodayAttendance = ata;
+      allProfiles = ap;
+      pendingVacationRequests = pvr;
+      cancelVacationRequests = cvr;
+      pendingCorrectionRequests = pcr;
+    } else {
+      [todayRecord, weekRecords, monthRecords, vacationBalance, vacationRequests, correctionRequests] =
+        await Promise.all([...basePromises]);
     }
+  } catch {
+    // DB 오류 시 빈 데이터로 페이지 렌더링
   }
 
   return (

@@ -1,26 +1,22 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth";
 import TasksPageClient from "@/components/dashboard/tasks/TasksPageClient";
-import { getTasksWithDetails } from "@/lib/tasks/queries";
-import { getAllProfiles } from "@/lib/attendance/queries";
+import { getCachedTasksWithDetails } from "@/lib/tasks/queries";
+import { getCachedAllProfiles } from "@/lib/attendance/queries";
+import type { TaskWithDetails } from "@/lib/tasks/types";
+import type { Profile } from "@/lib/attendance/types";
 
 export default async function TasksPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await getAuthUser();
+  if (!auth) redirect("/login");
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  let allTasks: Awaited<ReturnType<typeof getTasksWithDetails>> = [];
-  let profiles: Awaited<ReturnType<typeof getAllProfiles>> = [];
+  let allTasks: TaskWithDetails[] = [];
+  let profiles: Profile[] = [];
 
   try {
     [allTasks, profiles] = await Promise.all([
-      getTasksWithDetails(supabase),
-      getAllProfiles(supabase),
+      getCachedTasksWithDetails(),
+      getCachedAllProfiles(),
     ]);
   } catch {
     // DB 오류 시 빈 데이터로 페이지 렌더링
@@ -30,7 +26,7 @@ export default async function TasksPage() {
     <TasksPageClient
       allTasks={allTasks}
       profiles={profiles}
-      userId={user.id}
+      userId={auth.user.id}
     />
   );
 }
