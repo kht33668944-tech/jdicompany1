@@ -395,33 +395,24 @@ export async function addComment(
 
   if (error) throw error;
 
-  // 알림: 할일 담당자들에게 (댓글 작성자 제외) — fire-and-forget
-  supabase
+  // 알림: 할일 담당자들에게 (댓글 작성자 제외)
+  const { data: assignees } = await supabase
     .from("task_assignees")
     .select("user_id")
     .eq("task_id", taskId)
-    .neq("user_id", userId)
-    .then(({ data: assignees }) => {
-      if (assignees && assignees.length > 0) {
-        supabase
-          .from("tasks")
-          .select("title")
-          .eq("id", taskId)
-          .single()
-          .then(({ data: taskInfo }) => {
-            createNotificationForMany(
-              assignees.map((a) => a.user_id),
-              {
-                type: "task_comment",
-                title: "할일에 새 댓글이 달렸습니다",
-                body: content.length > 100 ? content.slice(0, 100) + "..." : content,
-                link: `/dashboard/tasks/${taskId}`,
-                metadata: { task_id: taskId, task_title: taskInfo?.title },
-              }
-            );
-          });
+    .neq("user_id", userId);
+
+  if (assignees && assignees.length > 0) {
+    await createNotificationForMany(
+      assignees.map((a) => a.user_id),
+      {
+        type: "task_comment",
+        title: "할일에 새 댓글이 달렸습니다",
+        body: content.length > 100 ? content.slice(0, 100) + "..." : content,
+        link: `/dashboard/tasks/${taskId}`,
       }
-    });
+    );
+  }
 
   return data as TaskActivity;
 }
