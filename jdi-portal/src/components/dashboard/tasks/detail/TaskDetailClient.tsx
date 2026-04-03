@@ -6,14 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
   Trash,
-  CircleDashed,
-  Circle,
-  CheckCircle,
-  Flag,
-  CalendarBlank,
-  Tag,
-  User,
-  Plus,
   XCircle,
 } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";

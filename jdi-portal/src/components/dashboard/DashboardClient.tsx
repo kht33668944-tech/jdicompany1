@@ -15,7 +15,6 @@ interface Props {
   userName: string;
   todayRecord: AttendanceRecord | null;
   weeklyMinutes: number;
-  weekdayWorked: boolean[];
   myTasks: TaskWithDetails[];
   allTasksForUser: TaskWithDetails[]; // includes completed for stats
   todaySchedules: ScheduleWithProfile[];
@@ -28,7 +27,6 @@ export default function DashboardClient({
   userName,
   todayRecord,
   weeklyMinutes,
-  weekdayWorked,
   myTasks,
   allTasksForUser,
   todaySchedules,
@@ -83,7 +81,6 @@ export default function DashboardClient({
         todayScheduleCount={todaySchedules.length}
         nextScheduleMinutes={nextScheduleMinutes}
         weeklyMinutes={weeklyMinutes}
-        weekdayWorked={weekdayWorked}
       />
 
       {/* 중단: 2열 위젯 */}

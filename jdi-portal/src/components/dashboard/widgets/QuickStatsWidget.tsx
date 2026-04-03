@@ -17,7 +17,6 @@ interface Props {
   todayScheduleCount: number;
   nextScheduleMinutes: number | null;
   weeklyMinutes: number;
-  weekdayWorked: boolean[];
 }
 
 function formatMinutes(minutes: number): string {
@@ -61,7 +60,6 @@ export default function QuickStatsWidget({
   todayScheduleCount,
   nextScheduleMinutes,
   weeklyMinutes,
-  weekdayWorked,
 }: Props) {
   const router = useRouter();
   const [elapsed, setElapsed] = useState<string>("0h 0m");

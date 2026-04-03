@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   List,
   CaretLeft,
@@ -79,7 +80,7 @@ export default function Header({ user, onMenuClick, onCollapseToggle, collapsed,
               className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-100 transition-colors"
             >
               {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                <Image src={user.avatarUrl} alt="" width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
               ) : (
                 <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
                   {user.name.charAt(0).toUpperCase()}

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Paperclip, Trash, DownloadSimple, Image, File } from "phosphor-react";
+import { Paperclip, Trash, DownloadSimple, Image as ImageIcon, File } from "phosphor-react";
 import { uploadAttachment, deleteAttachment, getAttachmentUrl } from "@/lib/tasks/actions";
 import type { TaskAttachment } from "@/lib/tasks/types";
 
@@ -98,7 +98,7 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 group transition-all"
             >
               {isImage(attachment.mime_type) ? (
-                <Image size={18} className="text-indigo-500 flex-shrink-0" />
+                <ImageIcon size={18} className="text-indigo-500 flex-shrink-0" />
               ) : (
                 <File size={18} className="text-slate-400 flex-shrink-0" />
               )}

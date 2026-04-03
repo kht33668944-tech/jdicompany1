@@ -16,7 +16,6 @@ export default async function DashboardPage() {
       userName={userName}
       todayRecord={data.todayRecord}
       weeklyMinutes={data.weeklyMinutes}
-      weekdayWorked={data.weekdayWorked}
       myTasks={data.myTasks}
       allTasksForUser={data.allTasksForUser}
       todaySchedules={data.todaySchedules}

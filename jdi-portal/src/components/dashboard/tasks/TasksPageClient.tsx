@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MagnifyingGlass, Plus, Bell } from "phosphor-react";
+import { MagnifyingGlass, Plus } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskWithDetails, TaskViewId, TaskFilterState } from "@/lib/tasks/types";
 import { TASK_VIEWS, DEFAULT_FILTER_STATE } from "@/lib/tasks/constants";

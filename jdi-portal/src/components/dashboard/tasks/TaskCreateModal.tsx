@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Plus, XCircle } from "phosphor-react";
+import { X, XCircle } from "phosphor-react";
 import { createTask } from "@/lib/tasks/actions";
 import { CATEGORIES, TASK_PRIORITIES } from "@/lib/tasks/constants";
 import { toDateString } from "@/lib/utils/date";

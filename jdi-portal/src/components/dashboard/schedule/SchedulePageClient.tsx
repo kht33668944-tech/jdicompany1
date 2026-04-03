@@ -10,7 +10,7 @@ import ListView from "./ListView";
 import DaySidebar from "./DaySidebar";
 import ScheduleCreateModal from "./ScheduleCreateModal";
 import ScheduleDetailModal from "./ScheduleDetailModal";
-import { toDateString, addDays } from "@/lib/utils/date";
+import { toDateString } from "@/lib/utils/date";
 import type { ScheduleTabId, ScheduleWithProfile } from "@/lib/schedule/types";
 import type { Profile } from "@/lib/attendance/types";
 

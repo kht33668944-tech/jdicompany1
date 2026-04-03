@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { Camera, CheckCircle } from "phosphor-react";
 import { updateProfile, uploadAvatar } from "@/lib/settings/actions";
 import type { Profile } from "@/lib/attendance/types";
@@ -93,9 +94,11 @@ export default function ProfileSection({ profile, onUpdated }: ProfileSectionPro
           <div className="flex flex-col items-center gap-4">
             <div className="relative group">
               {avatarPreview ? (
-                <img
+                <Image
                   src={avatarPreview}
                   alt="프로필 사진"
+                  width={128}
+                  height={128}
                   className="w-32 h-32 rounded-full object-cover shadow-inner"
                 />
               ) : (

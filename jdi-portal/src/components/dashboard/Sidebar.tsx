@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   SquaresFour,
@@ -10,7 +10,6 @@ import {
   CalendarBlank,
   GearSix,
   SignOut,
-  CaretLeft,
 } from "phosphor-react";
 
 interface SidebarProps {
@@ -77,7 +76,7 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose }: 
       <div className="px-3 py-4 border-t border-slate-200/50">
         <div className={`flex items-center gap-3 px-3 py-2 ${collapsed ? "justify-center" : ""}`}>
           {user.avatarUrl ? (
-            <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />
+            <Image src={user.avatarUrl} alt="" width={32} height={32} className="h-8 w-8 rounded-full object-cover shrink-0" />
           ) : (
             <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
               {user.name.charAt(0).toUpperCase()}

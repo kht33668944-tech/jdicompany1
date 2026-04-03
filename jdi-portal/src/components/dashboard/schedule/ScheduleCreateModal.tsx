@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Buildings, Lock, UserPlus, XCircle } from "phosphor-react";
+import { X, Buildings, Lock, XCircle } from "phosphor-react";
 import ModalContainer from "@/components/shared/ModalContainer";
 import type { ScheduleVisibility } from "@/lib/schedule/types";
 import type { Profile } from "@/lib/attendance/types";

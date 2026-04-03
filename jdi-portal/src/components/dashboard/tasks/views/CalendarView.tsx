@@ -180,15 +180,6 @@ export default function CalendarView({ tasks, onTaskClick }: Props) {
           const cellTasks = tasksByDate.get(cell.dateStr) ?? [];
           const visibleTasks = cellTasks.slice(0, MAX_TASKS_PER_CELL);
           const overflowCount = cellTasks.length - visibleTasks.length;
-          const colIndex = WEEKDAYS.indexOf(
-            WEEKDAYS[
-              ["일", "월", "화", "수", "목", "금", "토"].indexOf(
-                WEEKDAYS[
-                  new Date(`${cell.dateStr}T12:00:00+09:00`).getDay()
-                ]
-              )
-            ]
-          );
           const dayOfWeek = new Date(`${cell.dateStr}T12:00:00+09:00`).getDay();
 
           const dateNumberClass = !cell.isCurrentMonth
