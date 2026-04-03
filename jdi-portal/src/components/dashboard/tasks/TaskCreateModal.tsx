@@ -8,17 +8,14 @@ import { CATEGORIES, TASK_PRIORITIES } from "@/lib/tasks/constants";
 import { toDateString } from "@/lib/utils/date";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskPriority } from "@/lib/tasks/types";
+import { getErrorMessage } from "@/lib/utils/errors";
+import ModalContainer from "@/components/shared/ModalContainer";
 
 interface TaskCreateModalProps {
   userId: string;
   profiles: Profile[];
   onClose: () => void;
   parentId?: string;
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
 }
 
 export default function TaskCreateModal({ userId, profiles, onClose, parentId }: TaskCreateModalProps) {
@@ -71,9 +68,7 @@ export default function TaskCreateModal({ userId, profiles, onClose, parentId }:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative glass-card rounded-2xl p-6 w-full max-w-lg animate-fade-in-up">
+    <ModalContainer onClose={onClose}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-800">
             {parentId ? "서브태스크 추가" : "할일 추가"}
@@ -215,7 +210,6 @@ export default function TaskCreateModal({ userId, profiles, onClose, parentId }:
             {loading ? "추가 중..." : parentId ? "서브태스크 추가" : "할일 추가"}
           </button>
         </form>
-      </div>
-    </div>
+    </ModalContainer>
   );
 }

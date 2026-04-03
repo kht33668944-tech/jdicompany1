@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -10,6 +10,7 @@ import {
   SignOut,
 } from "phosphor-react";
 import NotificationCenter from "./NotificationCenter";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 
 interface HeaderProps {
   user: { id: string; email: string; name: string; avatarUrl?: string | null };
@@ -31,19 +32,9 @@ const titles: Record<string, string> = {
 export default function Header({ user, onMenuClick, onCollapseToggle, collapsed, unreadCount, onUnreadCountChange }: HeaderProps) {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useClickOutside<HTMLDivElement>(() => setDropdownOpen(false));
 
   const pageTitle = titles[pathname] ?? "대시보드";
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   return (
     <header className="sticky top-0 z-20 glass-header">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PaperPlaneTilt } from "phosphor-react";
 import { submitVacationRequest } from "@/lib/attendance/actions";
 import { getVacationDaysCount } from "@/lib/utils/vacation";
+import { getErrorMessage } from "@/lib/utils/errors";
 import type { VacationBalance, VacationType } from "@/lib/attendance/types";
 
 interface VacationRequestFormProps {
@@ -19,13 +20,6 @@ const vacationTypes: { value: VacationType; label: string }[] = [
   { value: "병가", label: "병가" },
   { value: "특별휴가", label: "특별휴가" },
 ];
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return fallback;
-}
 
 export default function VacationRequestForm({ userId, balance }: VacationRequestFormProps) {
   const router = useRouter();

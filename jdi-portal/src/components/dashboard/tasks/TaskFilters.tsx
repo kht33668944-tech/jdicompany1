@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import {
   User,
   Tag,
@@ -9,6 +9,7 @@ import {
   StackSimple,
   SortAscending,
 } from "phosphor-react";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskFilterState, TaskGroupBy, TaskSortBy, TaskStatus } from "@/lib/tasks/types";
 import { CATEGORIES, TASK_STATUSES, GROUP_BY_OPTIONS, SORT_BY_OPTIONS } from "@/lib/tasks/constants";
@@ -33,15 +34,7 @@ function Dropdown({
   onChange: (value: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const ref = useClickOutside<HTMLDivElement>(() => setOpen(false));
 
   const displayLabel = value ? options.find((o) => o.value === value)?.label ?? label : label;
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ClockCounterClockwise } from "phosphor-react";
 import { cancelVacationRequest, requestVacationCancel } from "@/lib/attendance/actions";
 import { getVacationTypeLabel } from "@/lib/utils/vacation";
+import { getErrorMessage } from "@/lib/utils/errors";
 import type { RequestStatus, VacationRequest } from "@/lib/attendance/types";
 
 interface VacationHistoryListProps {
@@ -18,13 +19,6 @@ const statusConfig: Record<RequestStatus, { bg: string; text: string }> = {
   "취소요청": { bg: "bg-orange-50", text: "text-orange-600" },
   "취소": { bg: "bg-slate-50", text: "text-slate-500" },
 };
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return fallback;
-}
 
 export default function VacationHistoryList({ requests }: VacationHistoryListProps) {
   const router = useRouter();

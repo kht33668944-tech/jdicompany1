@@ -43,10 +43,7 @@ interface Props {
   userId: string;
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-}
+import { getErrorMessage } from "@/lib/utils/errors";
 
 export default function TaskDetailClient({
   task,

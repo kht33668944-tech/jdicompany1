@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -16,6 +16,7 @@ import {
   Checks,
 } from "phosphor-react";
 import { createClient } from "@/lib/supabase/client";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import { markAsRead, markAllAsRead } from "@/lib/notifications/actions";
 import { formatTimeAgo } from "@/lib/utils/date";
 import type { Notification, NotificationType } from "@/lib/notifications/types";
@@ -58,19 +59,8 @@ export default function NotificationCenter({
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useClickOutside<HTMLDivElement>(() => setOpen(false));
   const router = useRouter();
-
-  // 외부 클릭 닫기
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // 드롭다운 열릴 때 알림 목록 fetch
   const fetchNotifications = useCallback(async () => {

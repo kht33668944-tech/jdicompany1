@@ -13,6 +13,7 @@ import {
 } from "@/lib/attendance/actions";
 import { formatTime } from "@/lib/utils/date";
 import { getVacationTypeLabel } from "@/lib/utils/vacation";
+import { getErrorMessage } from "@/lib/utils/errors";
 import type { CorrectionRequest, VacationRequest } from "@/lib/attendance/types";
 
 interface AdminVacationRequestsProps {
@@ -20,13 +21,6 @@ interface AdminVacationRequestsProps {
   vacationRequests: VacationRequest[];
   cancelRequests: VacationRequest[];
   correctionRequests: CorrectionRequest[];
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return fallback;
 }
 
 export default function AdminVacationRequests({

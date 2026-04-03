@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, PencilSimple, Trash, MapPin, Monitor, Clock, CalendarBlank, User, Lock, Buildings, Users, XCircle } from "phosphor-react";
+import ModalContainer from "@/components/shared/ModalContainer";
 import { updateSchedule, deleteSchedule, setParticipants } from "@/lib/schedule/actions";
 import { SCHEDULE_CATEGORIES, SCHEDULE_CATEGORY_CONFIG, getCategoryStyle } from "@/lib/schedule/constants";
 import { formatTime } from "@/lib/utils/date";
@@ -131,9 +132,7 @@ export default function ScheduleDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl p-6 w-full max-w-lg animate-fade-in-up max-h-[90vh] overflow-y-auto shadow-xl border border-slate-200">
+    <ModalContainer onClose={onClose} className="bg-white max-h-[90vh] overflow-y-auto shadow-xl border border-slate-200">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-800">
@@ -488,7 +487,6 @@ export default function ScheduleDetailModal({
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </ModalContainer>
   );
 }

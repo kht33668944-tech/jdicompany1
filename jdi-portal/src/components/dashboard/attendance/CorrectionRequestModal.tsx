@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { X } from "phosphor-react";
 import { submitCorrectionRequest } from "@/lib/attendance/actions";
 import { formatDate, formatTime } from "@/lib/utils/date";
+import { getErrorMessage } from "@/lib/utils/errors";
 import type { AttendanceRecord, CorrectionRequest } from "@/lib/attendance/types";
+import ModalContainer from "@/components/shared/ModalContainer";
 
 interface CorrectionRequestModalProps {
   userId: string;
@@ -15,13 +17,6 @@ interface CorrectionRequestModalProps {
 }
 
 type RequestType = CorrectionRequest["request_type"];
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return fallback;
-}
 
 export default function CorrectionRequestModal({ userId, record, targetDate: initialDate, onClose }: CorrectionRequestModalProps) {
   const router = useRouter();
@@ -69,9 +64,7 @@ export default function CorrectionRequestModal({ userId, record, targetDate: ini
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative glass-card rounded-2xl p-6 w-full max-w-md animate-fade-in-up">
+    <ModalContainer onClose={onClose} maxWidth="max-w-md">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-800">
             {isMissingMode ? "기록 누락 신청" : "출퇴근 정정 요청"}
@@ -184,7 +177,6 @@ export default function CorrectionRequestModal({ userId, record, targetDate: ini
             {loading ? "요청 중..." : "정정 요청하기"}
           </button>
         </form>
-      </div>
-    </div>
+    </ModalContainer>
   );
 }

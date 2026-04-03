@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { CaretLeft, CaretRight } from "phosphor-react";
 import type { TaskWithDetails } from "@/lib/tasks/types";
+import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
 import { toDateString, addDays, toDateStringFromTimestamp } from "@/lib/utils/date";
 
 interface Props {
@@ -11,12 +12,6 @@ interface Props {
 }
 
 type Scale = "weekly" | "monthly";
-
-const STATUS_CONFIG = {
-  "대기": { bar: "bg-slate-200 text-slate-500", dot: "bg-slate-300" },
-  "진행중": { bar: "bg-orange-400 text-white", dot: "bg-orange-400" },
-  "완료": { bar: "bg-emerald-400 text-white", dot: "bg-emerald-400" },
-} as const;
 
 const SCALE_DAYS: Record<Scale, number> = {
   weekly: 7,
@@ -145,7 +140,7 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
         <div className="flex items-center flex-wrap gap-2 md:gap-4 text-xs md:text-sm font-bold text-slate-400">
           {(["대기", "진행중", "완료"] as const).map((status) => (
             <span key={status} className="flex items-center gap-1.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${STATUS_CONFIG[status].dot}`} />
+              <span className={`w-2.5 h-2.5 rounded-full ${TASK_STATUS_CONFIG[status].dot}`} />
               {status}
             </span>
           ))}
@@ -268,7 +263,7 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
               ) : (
                 parentTasks.map((task) => {
                   const geo = getBarGeometry(task);
-                  const config = STATUS_CONFIG[task.status];
+                  const config = TASK_STATUS_CONFIG[task.status];
 
                   return (
                     <div
@@ -278,7 +273,7 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
                       {geo && (
                         <button
                           onClick={() => onTaskClick(task.id)}
-                          className={`absolute h-8 rounded-full flex items-center px-3 overflow-hidden transition-opacity hover:opacity-80 ${config.bar}`}
+                          className={`absolute h-8 rounded-full flex items-center px-3 overflow-hidden transition-opacity hover:opacity-80 ${config.bg} ${config.text}`}
                           style={{
                             left: `${geo.left}%`,
                             width: `${geo.width}%`,

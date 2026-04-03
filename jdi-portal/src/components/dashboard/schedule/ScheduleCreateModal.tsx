@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Buildings, Lock, UserPlus, XCircle } from "phosphor-react";
+import ModalContainer from "@/components/shared/ModalContainer";
 import type { ScheduleVisibility } from "@/lib/schedule/types";
 import type { Profile } from "@/lib/attendance/types";
 import { createSchedule } from "@/lib/schedule/actions";
@@ -84,9 +85,7 @@ export default function ScheduleCreateModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl p-6 w-full max-w-lg animate-fade-in-up max-h-[90vh] overflow-y-auto shadow-xl border border-slate-200">
+    <ModalContainer onClose={onClose} className="bg-white max-h-[90vh] overflow-y-auto shadow-xl border border-slate-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-800">새 일정 추가</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
@@ -325,7 +324,6 @@ export default function ScheduleCreateModal({
             {loading ? "추가 중..." : "일정 추가"}
           </button>
         </form>
-      </div>
-    </div>
+    </ModalContainer>
   );
 }

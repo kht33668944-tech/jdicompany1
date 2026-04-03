@@ -6,6 +6,7 @@ import { Clock, SignIn, SignOut } from "phosphor-react";
 import { checkIn, checkOut } from "@/lib/attendance/actions";
 import { ATTENDANCE_STATUS_CONFIG } from "@/lib/attendance/constants";
 import { formatMinutes, formatTime } from "@/lib/utils/date";
+import { getErrorMessage } from "@/lib/utils/errors";
 import type { AttendanceRecord } from "@/lib/attendance/types";
 
 interface CheckInOutCardProps {
@@ -16,13 +17,6 @@ interface CheckInOutCardProps {
 const ATTENDANCE_STATUSES = Object.keys(ATTENDANCE_STATUS_CONFIG) as AttendanceRecord["status"][];
 const ABSENT_STATUS = ATTENDANCE_STATUSES[0];
 const WORKING_STATUS = ATTENDANCE_STATUSES[1];
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return fallback;
-}
 
 export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardProps) {
   const router = useRouter();
