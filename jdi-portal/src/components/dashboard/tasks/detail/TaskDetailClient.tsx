@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
   Trash,
@@ -57,6 +58,59 @@ export default function TaskDetailClient({
   userId,
 }: Props) {
   const router = useRouter();
+  const [liveActivities, setLiveActivities] = useState<TaskActivity[]>(activities);
+
+  // 활동 실시간 구독
+  useEffect(() => {
+    setLiveActivities(activities);
+  }, [activities]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`task-activities:${task.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "task_activities",
+          filter: `task_id=eq.${task.id}`,
+        },
+        async (payload) => {
+          // 프로필 정보 포함하여 조회
+          const { data } = await supabase
+            .from("task_activities")
+            .select("*, user_profile:profiles!task_activities_user_id_fkey(full_name, avatar_url)")
+            .eq("id", payload.new.id)
+            .single();
+          if (data) {
+            setLiveActivities((prev) => {
+              if (prev.some((a) => a.id === data.id)) return prev;
+              return [...prev, data as TaskActivity];
+            });
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "task_activities",
+          filter: `task_id=eq.${task.id}`,
+        },
+        (payload) => {
+          setLiveActivities((prev) => prev.filter((a) => a.id !== payload.old.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [task.id]);
+
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
   const [status, setStatus] = useState<TaskStatus>(task.status);
@@ -218,7 +272,7 @@ export default function TaskDetailClient({
           {/* 활동 타임라인 */}
           <div className="bg-white rounded-3xl shadow-sm p-6">
             <h3 className="font-bold text-slate-700 mb-4">활동</h3>
-            <ActivityScrollArea activities={activities} userId={userId} />
+            <ActivityScrollArea activities={liveActivities} userId={userId} />
             <div className="mt-4 pt-4 border-t border-slate-100">
               <TaskCommentInput taskId={task.id} userId={userId} />
             </div>
