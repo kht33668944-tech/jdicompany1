@@ -39,28 +39,23 @@ export async function createNotification(params: {
 }) {
   try {
     const allowed = await shouldNotify(params.userId, params.type);
-    if (!allowed) {
-      console.log("[createNotification] 설정에 의해 차단:", params.type, params.userId);
-      return;
-    }
+    if (!allowed) return;
 
     const supabase = getSupabase();
-    const { data, error } = await supabase.from("notifications").insert({
+    const { error } = await supabase.from("notifications").insert({
       user_id: params.userId,
       type: params.type,
       title: params.title,
       body: params.body || null,
       link: params.link || null,
       metadata: params.metadata || {},
-    }).select().single();
+    });
 
     if (error) {
       console.error("[createNotification] INSERT 실패:", error);
-    } else {
-      console.log("[createNotification] INSERT 성공:", data);
     }
-  } catch (e) {
-    console.error("[createNotification] 예외 발생:", e);
+  } catch {
+    // 알림 실패가 본 기능을 중단시키면 안 됨
   }
 }
 
