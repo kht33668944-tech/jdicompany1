@@ -119,6 +119,7 @@ export default function TaskDetailClient({
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [startDate, setStartDate] = useState(task.start_date ?? "");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const currentProfile = profiles.find((p) => p.id === userId);
@@ -152,12 +153,14 @@ export default function TaskDetailClient({
 
   const handleDelete = async () => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
+    setDeleting(true);
     try {
       await deleteTask(task.id);
       router.push("/dashboard/tasks");
       router.refresh();
     } catch (error) {
       setFeedback({ type: "error", message: getErrorMessage(error, "삭제에 실패했습니다.") });
+      setDeleting(false);
     }
   };
 
@@ -203,9 +206,10 @@ export default function TaskDetailClient({
           {canDelete && (
             <button
               onClick={handleDelete}
-              className="p-2 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
+              disabled={deleting}
+              className="p-2 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Trash size={18} />
+              {deleting ? <span className="text-xs px-1">삭제 중...</span> : <Trash size={18} />}
             </button>
           )}
         </div>

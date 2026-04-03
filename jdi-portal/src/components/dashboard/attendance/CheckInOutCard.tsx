@@ -30,7 +30,8 @@ export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardPr
   const [checkInTime, setCheckInTime] = useState(todayRecord?.check_in ?? null);
   const [checkOutTime, setCheckOutTime] = useState(todayRecord?.check_out ?? null);
   const [elapsed, setElapsed] = useState(formatMinutes(0));
-  const [loading, setLoading] = useState(false);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkOutLoading, setCheckOutLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardPr
   }, [calcElapsed, status]);
 
   const handleCheckIn = async () => {
-    setLoading(true);
+    setCheckInLoading(true);
     setFeedback(null);
     try {
       const record = await checkIn(userId);
@@ -66,12 +67,12 @@ export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardPr
     } catch (error) {
       setFeedback({ type: "error", message: getErrorMessage(error, "출근 처리에 실패했습니다.") });
     } finally {
-      setLoading(false);
+      setCheckInLoading(false);
     }
   };
 
   const handleCheckOut = async () => {
-    setLoading(true);
+    setCheckOutLoading(true);
     setFeedback(null);
     try {
       const record = await checkOut(userId);
@@ -82,7 +83,7 @@ export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardPr
     } catch (error) {
       setFeedback({ type: "error", message: getErrorMessage(error, "퇴근 처리에 실패했습니다.") });
     } finally {
-      setLoading(false);
+      setCheckOutLoading(false);
     }
   };
 
@@ -124,19 +125,19 @@ export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardPr
       <div className="flex gap-3">
         <button
           onClick={handleCheckIn}
-          disabled={status !== ABSENT_STATUS || loading}
+          disabled={status !== ABSENT_STATUS || checkInLoading}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/20 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <SignIn size={18} />
-          {loading && status === ABSENT_STATUS ? "처리 중..." : "출근하기"}
+          {checkInLoading ? "처리 중..." : "출근하기"}
         </button>
         <button
           onClick={handleCheckOut}
-          disabled={status !== WORKING_STATUS || loading}
+          disabled={status !== WORKING_STATUS || checkOutLoading}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <SignOut size={18} />
-          {loading && status === WORKING_STATUS ? "처리 중..." : "퇴근하기"}
+          {checkOutLoading ? "처리 중..." : "퇴근하기"}
         </button>
       </div>
     </div>

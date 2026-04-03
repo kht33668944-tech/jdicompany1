@@ -29,12 +29,12 @@ const STATUS_ICONS: Record<TaskStatus, React.ComponentType<IconProps>> = {
 
 function MobileTaskCard({
   task,
-  children,
+  subtasks,
   onTaskClick,
   isSubtask,
 }: {
   task: TaskWithDetails;
-  children?: TaskWithDetails[];
+  subtasks?: TaskWithDetails[];
   onTaskClick: (taskId: string) => void;
   isSubtask: boolean;
 }) {
@@ -89,7 +89,7 @@ function MobileTaskCard({
         </div>
       </button>
 
-      {children?.map((child) => (
+      {subtasks?.map((child) => (
         <MobileTaskCard key={child.id} task={child} onTaskClick={onTaskClick} isSubtask={true} />
       ))}
     </>
@@ -163,7 +163,7 @@ export default function ListView({ groupedTasks, allTasks, onTaskClick }: Props)
                       <ListRow
                         key={task.id}
                         task={task}
-                        children={childrenMap.get(task.id)}
+                        subtasks={childrenMap.get(task.id)}
                         onTaskClick={onTaskClick}
                         isSubtask={false}
                       />
@@ -177,7 +177,7 @@ export default function ListView({ groupedTasks, allTasks, onTaskClick }: Props)
                     <MobileTaskCard
                       key={task.id}
                       task={task}
-                      children={childrenMap.get(task.id)}
+                      subtasks={childrenMap.get(task.id)}
                       onTaskClick={onTaskClick}
                       isSubtask={false}
                     />

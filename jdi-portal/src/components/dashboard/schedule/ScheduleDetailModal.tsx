@@ -19,11 +19,20 @@ interface ScheduleDetailModalProps {
 
 function toLocalDatetime(isoString: string) {
   const date = new Date(isoString);
-  const offset = 9 * 60;
-  const local = new Date(date.getTime() + offset * 60 * 1000);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
   return {
-    date: local.toISOString().slice(0, 10),
-    time: local.toISOString().slice(11, 16),
+    date: `${get("year")}-${get("month")}-${get("day")}`,
+    time: `${get("hour")}:${get("minute")}`,
   };
 }
 
@@ -38,7 +47,8 @@ export default function ScheduleDetailModal({
   const canEdit = schedule.created_by === userId || userRole === "admin";
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const startParts = toLocalDatetime(schedule.start_time);
@@ -80,13 +90,13 @@ export default function ScheduleDetailModal({
       return;
     }
 
-    setLoading(true);
+    setSaving(true);
     setFeedback(null);
     try {
       const finalCategory = category === "__CUSTOM__" ? customCategory.trim() : category;
       if (!finalCategory) {
         setFeedback("카테고리를 입력해주세요.");
-        setLoading(false);
+        setSaving(false);
         return;
       }
 
@@ -105,18 +115,18 @@ export default function ScheduleDetailModal({
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "일정 수정에 실패했습니다.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    setLoading(true);
+    setDeleting(true);
     try {
       await deleteSchedule(schedule.id);
       onUpdated();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "일정 삭제에 실패했습니다.");
-      setLoading(false);
+      setDeleting(false);
     }
   };
 
@@ -167,10 +177,10 @@ export default function ScheduleDetailModal({
             <div className="flex gap-2">
               <button
                 onClick={handleDelete}
-                disabled={loading}
+                disabled={deleting}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-40"
               >
-                {loading ? "삭제 중..." : "삭제"}
+                {deleting ? "삭제 중..." : "삭제"}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
@@ -463,10 +473,10 @@ export default function ScheduleDetailModal({
             <div className="flex gap-2">
               <button
                 type="submit"
-                disabled={loading || !title.trim()}
+                disabled={saving || !title.trim()}
                 className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/20 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {loading ? "수정 중..." : "저장"}
+                {saving ? "수정 중..." : "저장"}
               </button>
               <button
                 type="button"

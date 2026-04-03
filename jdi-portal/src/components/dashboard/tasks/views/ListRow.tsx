@@ -13,7 +13,7 @@ import { formatDueDate, calculateProgress } from "@/lib/tasks/utils";
 
 interface Props {
   task: TaskWithDetails;
-  children?: TaskWithDetails[];
+  subtasks?: TaskWithDetails[];
   onTaskClick: (taskId: string) => void;
   isSubtask: boolean;
 }
@@ -47,7 +47,7 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-export default function ListRow({ task, children, onTaskClick, isSubtask }: Props) {
+export default function ListRow({ task, subtasks, onTaskClick, isSubtask }: Props) {
   const StatusIcon = STATUS_ICONS[task.status];
   const priorityConfig = PRIORITY_CONFIG[task.priority];
   const dueInfo = formatDueDate(task.due_date, task.status);
@@ -151,7 +151,7 @@ export default function ListRow({ task, children, onTaskClick, isSubtask }: Prop
       </tr>
 
       {/* 서브태스크 렌더링 */}
-      {children?.map((child) => (
+      {subtasks?.map((child) => (
         <ListRow
           key={child.id}
           task={child}

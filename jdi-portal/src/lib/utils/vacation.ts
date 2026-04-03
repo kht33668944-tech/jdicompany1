@@ -30,8 +30,8 @@ export function getVacationTypeLabel(type: VacationType): string {
 
 export function getVacationDaysCount(type: VacationType, startDate: string, endDate: string): number {
   if (type === "반차-오전" || type === "반차-오후") return 0.5;
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
+  const start = new Date(`${startDate}T00:00:00+09:00`);
+  const end = new Date(`${endDate}T00:00:00+09:00`);
   const diffTime = end.getTime() - start.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
   return Math.max(diffDays, 1);
