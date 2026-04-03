@@ -16,13 +16,13 @@ export async function createNotification(params: {
 }) {
   try {
     const supabase = getSupabase();
-    await supabase.from("notifications").insert({
-      user_id: params.userId,
-      type: params.type,
-      title: params.title,
-      body: params.body || null,
-      link: params.link || null,
-      metadata: params.metadata || {},
+    await supabase.rpc("insert_notification", {
+      p_user_id: params.userId,
+      p_type: params.type,
+      p_title: params.title,
+      p_body: params.body || null,
+      p_link: params.link || null,
+      p_metadata: params.metadata || {},
     });
   } catch {
     // 알림 실패가 본 기능을 중단시키면 안 됨
@@ -43,7 +43,7 @@ export async function createNotificationForMany(
   if (userIds.length === 0) return;
   try {
     const supabase = getSupabase();
-    const rows = userIds.map((userId) => ({
+    const notifications = userIds.map((userId) => ({
       user_id: userId,
       type: params.type,
       title: params.title,
@@ -51,7 +51,9 @@ export async function createNotificationForMany(
       link: params.link || null,
       metadata: params.metadata || {},
     }));
-    await supabase.from("notifications").insert(rows);
+    await supabase.rpc("insert_notifications_batch", {
+      p_notifications: notifications,
+    });
   } catch {
     // 알림 실패가 본 기능을 중단시키면 안 됨
   }

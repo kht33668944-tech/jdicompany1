@@ -9,6 +9,18 @@ function getSupabase() {
   return createClient();
 }
 
+async function verifyAdmin(supabase: ReturnType<typeof getSupabase>, adminId: string) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", adminId)
+    .single();
+
+  if (profile?.role !== "admin") {
+    throw new Error("권한이 없습니다: 관리자만 가능합니다.");
+  }
+}
+
 const ATTENDANCE_STATUSES = Object.keys(ATTENDANCE_STATUS_CONFIG) as AttendanceRecord["status"][];
 const WORKING_STATUS = ATTENDANCE_STATUSES[1];
 const CHECKED_OUT_STATUS = ATTENDANCE_STATUSES[2];
@@ -94,6 +106,7 @@ export async function requestVacationCancel(requestId: string) {
 
 export async function cancelApprovedVacation(requestId: string, adminId: string) {
   const supabase = getSupabase();
+  await verifyAdmin(supabase, adminId);
   const { error } = await supabase.rpc("cancel_approved_vacation", {
     p_request_id: requestId,
     p_admin_id: adminId,
@@ -130,6 +143,7 @@ export async function submitCorrectionRequest(params: {
 
 export async function approveVacationRequest(requestId: string, adminId: string) {
   const supabase = getSupabase();
+  await verifyAdmin(supabase, adminId);
   const { error } = await supabase.rpc("approve_vacation_request", {
     p_request_id: requestId,
     p_admin_id: adminId,
@@ -159,6 +173,7 @@ export async function rejectVacationRequest(
   rejectReason: string
 ) {
   const supabase = getSupabase();
+  await verifyAdmin(supabase, adminId);
 
   // 신청자 정보 먼저 조회
   const { data: req } = await supabase
@@ -197,6 +212,7 @@ export async function approveCorrectionRequest(
   adminId: string
 ) {
   const supabase = getSupabase();
+  await verifyAdmin(supabase, adminId);
 
   const { data: correction, error: fetchError } = await supabase
     .from("correction_requests")
@@ -252,6 +268,7 @@ export async function rejectVacationCancel(
   adminId: string
 ) {
   const supabase = getSupabase();
+  await verifyAdmin(supabase, adminId);
   const { data, error } = await supabase
     .from("vacation_requests")
     .update({
@@ -274,6 +291,7 @@ export async function rejectCorrectionRequest(
   adminId: string
 ) {
   const supabase = getSupabase();
+  await verifyAdmin(supabase, adminId);
   const { error } = await supabase
     .from("correction_requests")
     .update({

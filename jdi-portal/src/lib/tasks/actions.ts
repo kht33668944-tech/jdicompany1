@@ -361,10 +361,13 @@ export async function deleteAttachment(attachmentId: string, filePath: string) {
   if (error) throw error;
 }
 
-export function getAttachmentUrl(filePath: string): string {
+export async function getAttachmentUrl(filePath: string): Promise<string> {
   const supabase = getSupabase();
-  const { data } = supabase.storage.from("task-attachments").getPublicUrl(filePath);
-  return data.publicUrl;
+  const { data, error } = await supabase.storage
+    .from("task-attachments")
+    .createSignedUrl(filePath, 3600);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 // ============================================================

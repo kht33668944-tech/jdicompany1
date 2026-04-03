@@ -28,6 +28,13 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
+  const handleDownload = async (filePath: string) => {
+    try {
+      const url = await getAttachmentUrl(filePath);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {}
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -79,47 +86,42 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
 
       {attachments.length > 0 ? (
         <div className="space-y-2">
-          {attachments.map((attachment) => {
-            const url = getAttachmentUrl(attachment.file_path);
-            return (
-              <div
-                key={attachment.id}
-                className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 group transition-all"
-              >
-                {isImage(attachment.mime_type) ? (
-                  <Image size={18} className="text-indigo-500 flex-shrink-0" />
-                ) : (
-                  <File size={18} className="text-slate-400 flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-700 truncate">
-                    {attachment.file_name}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {formatFileSize(attachment.file_size)} · {attachment.uploader_profile.full_name}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
-                  >
-                    <DownloadSimple size={14} />
-                  </a>
-                  {(canEdit || attachment.user_id === userId) && (
-                    <button
-                      onClick={() => handleDelete(attachment)}
-                      className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                    >
-                      <Trash size={14} />
-                    </button>
-                  )}
-                </div>
+          {attachments.map((attachment) => (
+            <div
+              key={attachment.id}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 group transition-all"
+            >
+              {isImage(attachment.mime_type) ? (
+                <Image size={18} className="text-indigo-500 flex-shrink-0" />
+              ) : (
+                <File size={18} className="text-slate-400 flex-shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-700 truncate">
+                  {attachment.file_name}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {formatFileSize(attachment.file_size)} · {attachment.uploader_profile.full_name}
+                </p>
               </div>
-            );
-          })}
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button
+                  onClick={() => handleDownload(attachment.file_path)}
+                  className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                >
+                  <DownloadSimple size={14} />
+                </button>
+                {(canEdit || attachment.user_id === userId) && (
+                  <button
+                    onClick={() => handleDelete(attachment)}
+                    className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                  >
+                    <Trash size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <p className="text-sm text-slate-400">첨부파일이 없습니다</p>
