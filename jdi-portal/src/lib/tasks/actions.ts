@@ -395,26 +395,39 @@ export async function addComment(
 
   if (error) throw error;
 
-  // 알림: 할일 담당자들에게 (댓글 작성자 제외)
-  const { data: assignees } = await supabase
-    .from("task_assignees")
-    .select("user_id")
-    .eq("task_id", taskId)
-    .neq("user_id", userId);
+  // 알림: 할일 담당자들에게 (댓글 작성자 제외) — 백그라운드 처리
+  const commentData = data as TaskActivity;
+  sendCommentNotifications(supabase, taskId, userId, content);
+  return commentData;
+}
 
-  if (assignees && assignees.length > 0) {
-    await createNotificationForMany(
-      assignees.map((a) => a.user_id),
-      {
-        type: "task_comment",
-        title: "할일에 새 댓글이 달렸습니다",
-        body: content.length > 100 ? content.slice(0, 100) + "..." : content,
-        link: `/dashboard/tasks/${taskId}`,
-      }
-    );
+async function sendCommentNotifications(
+  supabase: ReturnType<typeof getSupabase>,
+  taskId: string,
+  userId: string,
+  content: string
+) {
+  try {
+    const { data: assignees } = await supabase
+      .from("task_assignees")
+      .select("user_id")
+      .eq("task_id", taskId)
+      .neq("user_id", userId);
+
+    if (assignees && assignees.length > 0) {
+      await createNotificationForMany(
+        assignees.map((a) => a.user_id),
+        {
+          type: "task_comment",
+          title: "할일에 새 댓글이 달렸습니다",
+          body: content.length > 100 ? content.slice(0, 100) + "..." : content,
+          link: `/dashboard/tasks/${taskId}`,
+        }
+      );
+    }
+  } catch {
+    // 알림 실패 무시
   }
-
-  return data as TaskActivity;
 }
 
 export async function deleteActivity(activityId: string) {

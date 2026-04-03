@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { Notification } from "@/lib/notifications/types";
@@ -16,10 +16,11 @@ export default function NotificationProvider({
   onNewNotification,
   children,
 }: NotificationProviderProps) {
-  const handleNewNotification = useCallback(
+  const lastCheckedRef = useRef<string>(new Date().toISOString());
+
+  const showToast = useCallback(
     (notification: Notification) => {
       onNewNotification();
-
       toast(notification.title, {
         description: notification.body ?? undefined,
         duration: 5000,
@@ -36,31 +37,29 @@ export default function NotificationProvider({
     [onNewNotification]
   );
 
+  // 5초마다 새 알림 폴링
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-        },
-        (payload) => {
-          const newRow = payload.new as Notification;
-          // 본인 알림만 처리
-          if (newRow.user_id === userId) {
-            handleNewNotification(newRow);
-          }
-        }
-      )
-      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
+    const poll = async () => {
+      const since = lastCheckedRef.current;
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .gt("created_at", since)
+        .order("created_at", { ascending: true });
+
+      if (data && data.length > 0) {
+        const notifications = data as Notification[];
+        lastCheckedRef.current = notifications[notifications.length - 1].created_at;
+        notifications.forEach((n) => showToast(n));
+      }
     };
-  }, [userId, handleNewNotification]);
+
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [userId, showToast]);
 
   return <>{children}</>;
 }
