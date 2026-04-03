@@ -50,6 +50,8 @@ export default function SignupPage() {
       if (error) {
         setErrorMessage(error.message);
       } else {
+        // 이메일 확인 꺼진 경우 자동 로그인됨 → 즉시 로그아웃
+        await supabase.auth.signOut();
         setSuccess(true);
       }
     } catch {

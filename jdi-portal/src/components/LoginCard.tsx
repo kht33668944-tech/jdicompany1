@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -9,6 +9,7 @@ type ValidationState = "" | "error" | "success";
 
 export default function LoginCard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [usernameState, setUsernameState] = useState<ValidationState>("");
@@ -137,6 +138,11 @@ export default function LoginCard() {
 
         {/* Form */}
         <form className="space-y-4 relative z-10" onSubmit={handleSubmit}>
+          {searchParams.get("error") === "not_approved" && !errorMessage && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm text-center">
+              관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다.
+            </div>
+          )}
           {errorMessage && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">
               {errorMessage}

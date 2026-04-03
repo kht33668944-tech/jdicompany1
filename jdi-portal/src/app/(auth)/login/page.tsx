@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Aurora from "@/components/Aurora";
 import DotBackground from "@/components/DotBackground";
 import HeroSection from "@/components/HeroSection";
@@ -15,7 +16,9 @@ export default function LoginPage() {
       <Aurora />
       <main className="relative z-10 flex min-h-screen w-full items-center justify-center xl:justify-between px-6 py-12 xl:pl-48 xl:pr-48 2xl:pl-56 2xl:pr-56 gap-8 xl:gap-12">
         <HeroSection />
-        <LoginCard />
+        <Suspense>
+          <LoginCard />
+        </Suspense>
       </main>
     </div>
   );
