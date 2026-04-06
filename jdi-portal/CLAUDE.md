@@ -24,7 +24,7 @@ npm run lint     # ESLint
 ### Routes
 
 `/` 랜딩 | `/(auth)/login,signup,forgot-password,reset-password` 인증 | `/auth/callback,signout` OAuth 콜백
-`/dashboard` 홈 | `/dashboard/attendance` 근태 | `/dashboard/tasks` 할일 (`[id]` 상세) | `/dashboard/schedule` 스케줄 | `/dashboard/reports` 오류접수 | `/dashboard/settings` 설정
+`/dashboard` 홈 | `/dashboard/attendance` 근태 | `/dashboard/tasks` 할일 (`[id]` 상세) | `/dashboard/schedule` 스케줄 | `/dashboard/chat` 채팅 (`[channelId]` 대화방) | `/dashboard/reports` 오류접수 | `/dashboard/settings` 설정
 
 ### Middleware (Next.js 16)
 
@@ -32,7 +32,7 @@ npm run lint     # ESLint
 
 ### Data Layer
 
-도메인별 `src/lib/{domain}/` 구조 (attendance, tasks, schedule, reports, settings, notifications):
+도메인별 `src/lib/{domain}/` 구조 (attendance, tasks, schedule, reports, chat, settings, notifications):
 
 | 파일 | 역할 | Supabase 클라이언트 |
 |------|------|-------------------|

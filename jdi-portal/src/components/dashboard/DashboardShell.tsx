@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import NotificationProvider from "./NotificationProvider";
+import ChatUnreadProvider from "./chat/ChatUnreadProvider";
 
 interface DashboardShellProps {
   user: { id: string; email: string; name: string; avatarUrl?: string | null };
@@ -15,6 +16,7 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const handleNewNotification = useCallback(() => {
     setUnreadCount((prev) => prev + 1);
@@ -48,6 +50,7 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
           collapsed={sidebarCollapsed}
           mobileOpen={sidebarOpen}
           onMobileClose={() => setSidebarOpen(false)}
+          chatUnreadCount={chatUnreadCount}
         />
 
         <div
@@ -66,6 +69,8 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
           <main className="p-6">{children}</main>
         </div>
       </div>
+
+      <ChatUnreadProvider userId={user.id} onUnreadChange={setChatUnreadCount} />
 
       <Toaster
         position="bottom-right"

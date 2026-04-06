@@ -8,6 +8,7 @@ import {
   Clock,
   ListChecks,
   CalendarBlank,
+  ChatCircle,
   WarningCircle,
   GearSix,
   SignOut,
@@ -18,6 +19,7 @@ interface SidebarProps {
   collapsed: boolean;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  chatUnreadCount?: number;
 }
 
 const navItems = [
@@ -25,11 +27,12 @@ const navItems = [
   { href: "/dashboard/attendance", label: "근태관리", icon: Clock },
   { href: "/dashboard/tasks", label: "할일", icon: ListChecks },
   { href: "/dashboard/schedule", label: "스케줄", icon: CalendarBlank },
+  { href: "/dashboard/chat", label: "채팅", icon: ChatCircle },
   { href: "/dashboard/reports", label: "오류 접수", icon: WarningCircle },
   { href: "/dashboard/settings", label: "설정", icon: GearSix },
 ];
 
-export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose }: SidebarProps) {
+export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, chatUnreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) =>
@@ -60,7 +63,7 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose }: 
               href={item.href}
               prefetch={true}
               onClick={onMobileClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 active
                   ? "bg-brand-50 text-brand-600 shadow-sm"
                   : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -69,6 +72,14 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose }: 
             >
               <Icon size={20} weight={active ? "fill" : "regular"} className="shrink-0" />
               {!collapsed && <span>{item.label}</span>}
+              {!collapsed && item.href === "/dashboard/chat" && chatUnreadCount > 0 && (
+                <span className="ml-auto w-5 h-5 bg-blue-600 text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                  {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                </span>
+              )}
+              {collapsed && item.href === "/dashboard/chat" && chatUnreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-full" />
+              )}
             </Link>
           );
         })}
