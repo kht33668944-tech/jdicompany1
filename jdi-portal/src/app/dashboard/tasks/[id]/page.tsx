@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import {
-  getTaskById,
+  getTaskBasic,
   getChecklistItems,
-  getSubtasks,
+  getSubtasksBasic,
   getAttachments,
   getActivities,
 } from "@/lib/tasks/queries";
@@ -19,16 +19,24 @@ export default async function TaskDetailPage({ params }: Props) {
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
 
-  const task = await getTaskById(auth.supabase, id);
-  if (!task) redirect("/dashboard/tasks");
-
-  const [checklist, subtasks, attachments, activities, profiles] = await Promise.all([
+  // 모든 쿼리를 병렬 실행 — 순차 대기 없음
+  const [task, checklist, subtasks, attachments, activities, profiles] = await Promise.all([
+    getTaskBasic(auth.supabase, id),
     getChecklistItems(auth.supabase, id),
-    getSubtasks(auth.supabase, id),
+    getSubtasksBasic(auth.supabase, id),
     getAttachments(auth.supabase, id),
     getActivities(auth.supabase, id),
     getCachedAllProfiles(),
   ]);
+
+  if (!task) redirect("/dashboard/tasks");
+
+  // 카운트는 이미 조회된 실제 데이터에서 계산
+  task.checklist_total = checklist.length;
+  task.checklist_completed = checklist.filter((c) => c.is_completed).length;
+  task.subtask_count = subtasks.length;
+  task.comment_count = activities.filter((a) => a.type === "comment").length;
+  task.attachment_count = attachments.length;
 
   return (
     <TaskDetailClient

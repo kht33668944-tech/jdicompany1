@@ -237,6 +237,54 @@ export async function getActivities(
   return (data as TaskActivity[]) ?? [];
 }
 
+/** 상세 페이지용 — 카운트 쿼리 없이 태스크 + 담당자만 조회 */
+export async function getTaskBasic(supabase: SupabaseClient, id: string): Promise<TaskWithDetails | null> {
+  const [taskResult, assigneeMap] = await Promise.all([
+    supabase.from("tasks").select(TASK_BASE_SELECT).eq("id", id).single(),
+    fetchAssigneesForTasks(supabase, [id]),
+  ]);
+
+  if (taskResult.error) return null;
+
+  return {
+    ...(taskResult.data as unknown as TaskWithDetails),
+    assignees: assigneeMap.get(id) ?? [],
+    checklist_total: 0,
+    checklist_completed: 0,
+    subtask_count: 0,
+    comment_count: 0,
+    attachment_count: 0,
+  };
+}
+
+/** 상세 페이지용 — 카운트 쿼리 없이 서브태스크 + 담당자만 조회 */
+export async function getSubtasksBasic(supabase: SupabaseClient, parentId: string): Promise<TaskWithDetails[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_BASE_SELECT)
+    .eq("parent_id", parentId)
+    .order("position", { ascending: true });
+
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+
+  const taskIds = data.map((t) => t.id as string);
+  const assigneeMap = await fetchAssigneesForTasks(supabase, taskIds);
+
+  return data.map((raw) => {
+    const tid = raw.id as string;
+    return {
+      ...(raw as unknown as TaskWithDetails),
+      assignees: assigneeMap.get(tid) ?? [],
+      checklist_total: 0,
+      checklist_completed: 0,
+      subtask_count: 0,
+      comment_count: 0,
+      attachment_count: 0,
+    };
+  });
+}
+
 export async function getMaxPosition(supabase: SupabaseClient, status: string): Promise<number> {
   const { data } = await supabase
     .from("tasks")
