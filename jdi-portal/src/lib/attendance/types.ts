@@ -9,6 +9,8 @@ export interface Profile {
   phone?: string | null;
   bio?: string | null;
   is_approved: boolean;
+  work_start_time: string | null;  // "HH:MM:SS" format or null
+  work_end_time: string | null;    // "HH:MM:SS" format or null
 }
 
 export interface AttendanceRecord {

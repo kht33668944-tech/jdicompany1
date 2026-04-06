@@ -303,3 +303,23 @@ export async function rejectCorrectionRequest(
     .eq("status", "대기중");
   if (error) throw error;
 }
+
+export async function updateWorkSchedule(
+  userId: string,
+  workStartTime: string | null,
+  workEndTime: string | null
+) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({
+      work_start_time: workStartTime,
+      work_end_time: workEndTime,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .select("work_start_time, work_end_time")
+    .single();
+  if (error) throw error;
+  return data;
+}

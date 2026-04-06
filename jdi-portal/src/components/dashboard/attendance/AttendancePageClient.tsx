@@ -71,16 +71,15 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
           todayRecord={props.todayRecord}
           weekRecords={props.weekRecords}
           weekStart={props.weekStart}
+          workStartTime={props.profile.work_start_time}
+          workEndTime={props.profile.work_end_time}
         />
       )}
 
       {activeTab === "records" && (
         <RecordsTab
-          userId={props.profile.id}
-          monthRecords={props.monthRecords}
-          correctionRequests={props.correctionRequests}
-          currentYear={props.currentYear}
-          currentMonth={props.currentMonth}
+          profile={props.profile}
+          allProfiles={props.allProfiles ?? []}
         />
       )}
 

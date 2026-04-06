@@ -113,6 +113,23 @@ export async function getCorrectionRequests(
   return data ?? [];
 }
 
+export async function getEmployeeRecordsByRange(
+  supabase: SupabaseClient,
+  userId: string,
+  startDate: string,
+  endDate: string
+): Promise<AttendanceRecord[]> {
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("work_date", startDate)
+    .lte("work_date", endDate)
+    .order("work_date", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
 // Admin queries
 export async function getAllTodayAttendance(
   supabase: SupabaseClient
