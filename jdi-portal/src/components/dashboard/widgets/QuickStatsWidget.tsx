@@ -106,19 +106,19 @@ export default function QuickStatsWidget({
   const weekdayLabels = ["월", "화", "수", "목", "금"];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       {/* Card 1 — 근무 상태 → 근태관리 페이지 */}
       <div
         onClick={() => router.push("/dashboard/attendance")}
-        className="bg-white p-6 rounded-[24px] shadow-sm flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+        className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm flex flex-col cursor-pointer hover:shadow-md transition-shadow"
       >
         {/* Top row */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-            <Clock size={24} />
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Clock size={18} />
           </div>
           <span
-            className={`px-3 py-1 rounded-full text-xs font-bold ${
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               attendanceStatus === "근무중"
                 ? "bg-emerald-50 text-emerald-600"
                 : attendanceStatus === "퇴근"
@@ -131,15 +131,15 @@ export default function QuickStatsWidget({
         </div>
 
         {/* Elapsed time */}
-        <p className="text-3xl font-bold mb-1 tabular-nums">{elapsed}</p>
-        <p className="text-sm text-slate-400 mb-4">오늘 누적 근무시간</p>
+        <p className="text-xl sm:text-2xl font-bold mb-0.5 tabular-nums">{elapsed}</p>
+        <p className="text-xs text-slate-400 mb-2.5">오늘 누적 근무시간</p>
 
         {/* Action button */}
         {attendanceStatus === "미출근" && (
           <button
             onClick={handleAttendance}
             disabled={isSubmitting}
-            className="w-full py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-colors mt-auto disabled:opacity-60"
+            className="w-full py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors mt-auto disabled:opacity-60"
           >
             출근하기
           </button>
@@ -148,7 +148,7 @@ export default function QuickStatsWidget({
           <button
             onClick={handleAttendance}
             disabled={isSubmitting}
-            className="w-full py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-colors mt-auto disabled:opacity-60"
+            className="w-full py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors mt-auto disabled:opacity-60"
           >
             퇴근하기
           </button>
@@ -156,7 +156,7 @@ export default function QuickStatsWidget({
         {attendanceStatus === "퇴근" && (
           <button
             disabled
-            className="w-full py-2.5 bg-slate-50 text-slate-400 rounded-xl text-sm font-bold mt-auto cursor-not-allowed"
+            className="w-full py-2 bg-slate-50 text-slate-400 rounded-lg text-xs font-bold mt-auto cursor-not-allowed"
           >
             퇴근 완료
           </button>
@@ -166,16 +166,16 @@ export default function QuickStatsWidget({
       {/* Card 2 — 할일 진행률 → 할일 페이지 */}
       <div
         onClick={() => router.push("/dashboard/tasks")}
-        className="bg-white p-6 rounded-[24px] shadow-sm flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+        className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm flex flex-col cursor-pointer hover:shadow-md transition-shadow"
       >
         {/* Top row */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-            <CheckSquare size={24} />
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="w-9 h-9 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <CheckSquare size={18} />
           </div>
           {/* Circular SVG progress */}
-          <div className="relative w-10 h-10">
-            <svg viewBox="0 0 36 36" className="w-10 h-10 -rotate-90">
+          <div className="relative w-8 h-8">
+            <svg viewBox="0 0 36 36" className="w-8 h-8 -rotate-90">
               <circle
                 cx="18"
                 cy="18"
@@ -200,26 +200,26 @@ export default function QuickStatsWidget({
                 strokeLinecap="round"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-purple-600">
+            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-purple-600">
               {percentage}%
             </span>
           </div>
         </div>
 
-        <p className="text-3xl font-bold mb-1">
+        <p className="text-xl sm:text-2xl font-bold mb-0.5">
           {taskCompleted}/{taskTotal}
         </p>
-        <p className="text-sm text-slate-400 mb-2">완료한 할일</p>
+        <p className="text-xs text-slate-400 mb-1.5">완료한 할일</p>
 
         {/* Priority badges */}
-        <div className="flex items-center gap-2 mt-auto">
+        <div className="flex items-center gap-1.5 mt-auto">
           {urgentCount > 0 && (
-            <span className="px-2 py-0.5 bg-red-50 text-red-500 text-[10px] font-bold rounded">
+            <span className="px-1.5 py-0.5 bg-red-50 text-red-500 text-[10px] font-bold rounded">
               긴급 {urgentCount}
             </span>
           )}
           {highCount > 0 && (
-            <span className="px-2 py-0.5 bg-orange-50 text-orange-500 text-[10px] font-bold rounded">
+            <span className="px-1.5 py-0.5 bg-orange-50 text-orange-500 text-[10px] font-bold rounded">
               높음 {highCount}
             </span>
           )}
@@ -229,27 +229,27 @@ export default function QuickStatsWidget({
       {/* Card 3 — 오늘 일정 → 스케줄 페이지 */}
       <div
         onClick={() => router.push("/dashboard/schedule")}
-        className="bg-white p-6 rounded-[24px] shadow-sm flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+        className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm flex flex-col cursor-pointer hover:shadow-md transition-shadow"
       >
         {/* Top row */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-            <CalendarBlank size={24} />
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <CalendarBlank size={18} />
           </div>
         </div>
 
-        <p className="text-3xl font-bold mb-1">{todayScheduleCount}개</p>
-        <p className="text-sm text-slate-400 mb-4">오늘 일정</p>
+        <p className="text-xl sm:text-2xl font-bold mb-0.5">{todayScheduleCount}개</p>
+        <p className="text-xs text-slate-400 mb-2.5">오늘 일정</p>
 
         {/* Next schedule */}
         <div className="mt-auto">
           {nextScheduleMinutes !== null ? (
-            <div className="flex items-center gap-2 text-sm font-bold text-orange-500">
-              <Clock size={18} />
+            <div className="flex items-center gap-1.5 text-xs font-bold text-orange-500">
+              <Clock size={14} />
               <span>다음 일정 {nextScheduleMinutes}분 후</span>
             </div>
           ) : (
-            <p className="text-sm text-slate-400">일정 없음</p>
+            <p className="text-xs text-slate-400">일정 없음</p>
           )}
         </div>
       </div>
@@ -257,17 +257,17 @@ export default function QuickStatsWidget({
       {/* Card 4 — 이번 주 근무 → 근태관리 페이지 */}
       <div
         onClick={() => router.push("/dashboard/attendance")}
-        className="bg-white p-6 rounded-[24px] shadow-sm flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+        className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm flex flex-col cursor-pointer hover:shadow-md transition-shadow"
       >
         {/* Top row */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-            <ChartBar size={24} />
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <ChartBar size={18} />
           </div>
         </div>
 
-        <p className="text-3xl font-bold mb-1 tabular-nums">{formatMinutes(weeklyMinutes)}</p>
-        <p className="text-sm text-slate-400 mb-4">이번 주 누적</p>
+        <p className="text-xl sm:text-2xl font-bold mb-0.5 tabular-nums">{formatMinutes(weeklyMinutes)}</p>
+        <p className="text-xs text-slate-400 mb-2.5">이번 주 누적</p>
 
         {/* Weekday bars — 오늘까지 채움, 오늘=indigo, 과거=emerald, 미래=비움 */}
         <div className="mt-auto">
@@ -275,7 +275,7 @@ export default function QuickStatsWidget({
             {weekdayLabels.map((_, i) => (
               <div
                 key={i}
-                className={`h-2 flex-1 rounded-full ${
+                className={`h-1.5 flex-1 rounded-full ${
                   i === todayIndex
                     ? "bg-indigo-400"
                     : i < todayIndex
@@ -285,7 +285,7 @@ export default function QuickStatsWidget({
               />
             ))}
           </div>
-          <p className="text-[10px] text-slate-400 mt-2">
+          <p className="text-[10px] text-slate-400 mt-1.5">
             {weekdayLabels.map((label, i) => (
               <span key={i} className={i === todayIndex ? "font-bold text-indigo-500" : ""}>
                 {label}

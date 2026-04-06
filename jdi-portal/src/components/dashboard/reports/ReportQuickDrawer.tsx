@@ -125,7 +125,7 @@ export default function ReportQuickDrawer({ open, onClose, userId }: ReportQuick
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`fixed inset-0 z-40 transition-opacity duration-300 ${
           open ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
