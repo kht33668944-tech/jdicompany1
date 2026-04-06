@@ -10,6 +10,7 @@ import {
 import type { TaskWithDetails, TaskStatus } from "@/lib/tasks/types";
 import { PRIORITY_CONFIG } from "@/lib/tasks/constants";
 import { formatDueDate, calculateProgress } from "@/lib/tasks/utils";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   task: TaskWithDetails;
@@ -29,23 +30,6 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
   "진행중": "text-orange-500",
   "완료": "text-emerald-500",
 };
-
-const AVATAR_COLORS = [
-  { bg: "bg-indigo-100", text: "text-indigo-600" },
-  { bg: "bg-purple-100", text: "text-purple-600" },
-  { bg: "bg-pink-100", text: "text-pink-600" },
-  { bg: "bg-amber-100", text: "text-amber-600" },
-  { bg: "bg-emerald-100", text: "text-emerald-600" },
-  { bg: "bg-slate-100", text: "text-slate-500" },
-];
-
-function getAvatarColor(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
 
 export default function ListRow({ task, subtasks, onTaskClick, isSubtask }: Props) {
   const StatusIcon = STATUS_ICONS[task.status];
@@ -105,18 +89,15 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask }: Prop
         {/* 담당자 */}
         <td className="px-4 py-3">
           <div className="flex -space-x-2">
-            {task.assignees.slice(0, 3).map((assignee) => {
-              const color = getAvatarColor(assignee.full_name);
-              return (
-                <div
-                  key={assignee.user_id}
-                  title={assignee.full_name}
-                  className={`w-7 h-7 rounded-full ${color.bg} border-2 border-white flex items-center justify-center text-[10px] font-bold ${color.text}`}
-                >
-                  {assignee.full_name.charAt(0)}
-                </div>
-              );
-            })}
+            {task.assignees.slice(0, 3).map((assignee) => (
+              <UserAvatar
+                key={assignee.user_id}
+                name={assignee.full_name}
+                avatarUrl={assignee.avatar_url}
+                size="sm"
+                className="border-2 border-white"
+              />
+            ))}
             {task.assignees.length > 3 && (
               <div className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-400">
                 +{task.assignees.length - 3}

@@ -14,6 +14,7 @@ import type { TaskWithDetails, TaskStatus } from "@/lib/tasks/types";
 import { TASK_STATUS_CONFIG, PRIORITY_CONFIG } from "@/lib/tasks/constants";
 import { formatDueDate } from "@/lib/tasks/utils";
 import ListRow from "./ListRow";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   groupedTasks: { key: string; label: string; tasks: TaskWithDetails[] }[];
@@ -71,9 +72,13 @@ function MobileTaskCard({
           {task.assignees.length > 0 && (
             <div className="flex -space-x-1.5">
               {task.assignees.slice(0, 2).map((a) => (
-                <div key={a.user_id} className="w-5 h-5 rounded-full bg-indigo-100 border border-white flex items-center justify-center text-[8px] font-bold text-indigo-600">
-                  {a.full_name.charAt(0)}
-                </div>
+                <UserAvatar
+                  key={a.user_id}
+                  name={a.full_name}
+                  avatarUrl={a.avatar_url}
+                  size="xs"
+                  className="border border-white"
+                />
               ))}
               {task.assignees.length > 2 && (
                 <div className="w-5 h-5 rounded-full bg-slate-100 border border-white flex items-center justify-center text-[8px] font-bold text-slate-400">

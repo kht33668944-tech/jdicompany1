@@ -7,6 +7,7 @@ import type { TaskWithDetails, TaskStatus } from "@/lib/tasks/types";
 import type { Profile } from "@/lib/attendance/types";
 import { PRIORITY_CONFIG } from "@/lib/tasks/constants";
 import TaskCreateModal from "../TaskCreateModal";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   taskId: string;
@@ -72,9 +73,11 @@ export default function TaskSubtasks({ taskId, subtasks, userId, profiles, canEd
                   {sub.priority}
                 </span>
                 {sub.assignees.length > 0 && (
-                  <span className="text-xs text-slate-400">
-                    {sub.assignees[0].full_name}
-                  </span>
+                  <UserAvatar
+                    name={sub.assignees[0].full_name}
+                    avatarUrl={sub.assignees[0].avatar_url}
+                    size="xs"
+                  />
                 )}
               </div>
             );

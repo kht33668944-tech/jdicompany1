@@ -24,6 +24,7 @@ import TaskSubtasks from "./TaskSubtasks";
 import TaskAttachments from "./TaskAttachments";
 import TaskActivityTimeline from "./TaskActivityTimeline";
 import TaskCommentInput from "./TaskCommentInput";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   task: TaskWithDetails;
@@ -377,7 +378,10 @@ export default function TaskDetailClient({
               <div className="space-y-2">
                 {task.assignees.map((a) => (
                   <div key={a.user_id} className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">{a.full_name}</span>
+                    <div className="flex items-center gap-2">
+                      <UserAvatar name={a.full_name} avatarUrl={a.avatar_url} size="sm" />
+                      <span className="text-sm text-slate-600">{a.full_name}</span>
+                    </div>
                     {canEdit && (
                       <button
                         onClick={() => handleRemoveAssignee(a.user_id)}
@@ -409,9 +413,12 @@ export default function TaskDetailClient({
 
             {/* 생성자 / 생성일 */}
             <div className="pt-3 border-t border-slate-100 space-y-2">
-              <div className="flex justify-between text-xs text-slate-400">
+              <div className="flex justify-between items-center text-xs text-slate-400">
                 <span>생성자</span>
-                <span className="text-slate-600">{task.creator_profile.full_name}</span>
+                <div className="flex items-center gap-1.5">
+                  <UserAvatar name={task.creator_profile.full_name} avatarUrl={task.creator_profile.avatar_url} size="xs" />
+                  <span className="text-slate-600">{task.creator_profile.full_name}</span>
+                </div>
               </div>
               <div className="flex justify-between text-xs text-slate-400">
                 <span>생성일</span>

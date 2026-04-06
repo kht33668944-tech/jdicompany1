@@ -10,6 +10,7 @@ import type { Profile } from "@/lib/attendance/types";
 import type { TaskPriority } from "@/lib/tasks/types";
 import { getErrorMessage } from "@/lib/utils/errors";
 import ModalContainer from "@/components/shared/ModalContainer";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface TaskCreateModalProps {
   userId: string;
@@ -167,8 +168,9 @@ export default function TaskCreateModal({ userId, profiles, onClose, parentId }:
                 return (
                   <span
                     key={id}
-                    className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium"
+                    className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium"
                   >
+                    <UserAvatar name={profile?.full_name ?? "?"} avatarUrl={profile?.avatar_url} size="xs" />
                     {profile?.full_name ?? "알 수 없음"}
                     <button
                       type="button"

@@ -5,6 +5,7 @@ import { CaretLeft, CaretRight } from "phosphor-react";
 import type { TaskWithDetails } from "@/lib/tasks/types";
 import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
 import { toDateString, addDays, toDateStringFromTimestamp } from "@/lib/utils/date";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   tasks: TaskWithDetails[];
@@ -203,9 +204,20 @@ export default function TimelineView({ tasks, onTaskClick }: Props) {
                     {task.title}
                   </span>
                   {task.assignees.length > 0 && (
-                    <span className="text-[10px] text-slate-400 truncate mt-0.5">
-                      {task.assignees.map((a) => a.full_name).join(", ")}
-                    </span>
+                    <div className="flex -space-x-1 mt-0.5">
+                      {task.assignees.slice(0, 2).map((a) => (
+                        <UserAvatar
+                          key={a.user_id}
+                          name={a.full_name}
+                          avatarUrl={a.avatar_url}
+                          size="xs"
+                          className="border border-white"
+                        />
+                      ))}
+                      {task.assignees.length > 2 && (
+                        <span className="text-[10px] text-slate-400 ml-1">+{task.assignees.length - 2}</span>
+                      )}
+                    </div>
                   )}
                 </button>
               ))

@@ -4,18 +4,11 @@ import Link from "next/link";
 import { CheckCircle } from "phosphor-react";
 import type { TaskWithDetails } from "@/lib/tasks/types";
 import { formatDueDate } from "@/lib/tasks/utils";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   tasks: TaskWithDetails[];
 }
-
-const AVATAR_COLORS = [
-  { bg: "bg-indigo-100", text: "text-indigo-600" },
-  { bg: "bg-purple-100", text: "text-purple-600" },
-  { bg: "bg-pink-100", text: "text-pink-600" },
-  { bg: "bg-amber-100", text: "text-amber-600" },
-  { bg: "bg-emerald-100", text: "text-emerald-600" },
-];
 
 export default function MyTasksWidget({ tasks }: Props) {
   const sorted = [...tasks]
@@ -50,12 +43,11 @@ export default function MyTasksWidget({ tasks }: Props) {
         </p>
       ) : (
         <ul className="space-y-3">
-          {sorted.map((task, index) => {
+          {sorted.map((task) => {
             const due = formatDueDate(task.due_date, task.status);
             const isDone = task.status === "완료";
             const isInProgress = task.status === "진행중";
             const firstAssignee = task.assignees?.[0];
-            const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
 
             const subtitleParts: string[] = [];
             if (task.category) subtitleParts.push(task.category);
@@ -99,11 +91,11 @@ export default function MyTasksWidget({ tasks }: Props) {
 
                   {/* Right: assignee avatar */}
                   {firstAssignee && (
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor.bg} ${avatarColor.text}`}
-                    >
-                      {firstAssignee.full_name?.charAt(0) ?? "?"}
-                    </div>
+                    <UserAvatar
+                      name={firstAssignee.full_name ?? "?"}
+                      avatarUrl={firstAssignee.avatar_url}
+                      size="md"
+                    />
                   )}
                 </Link>
               </li>

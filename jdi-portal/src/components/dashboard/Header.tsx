@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   List,
   CaretLeft,
@@ -12,6 +11,7 @@ import {
 } from "phosphor-react";
 import NotificationCenter from "./NotificationCenter";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface HeaderProps {
   user: { id: string; email: string; name: string; avatarUrl?: string | null };
@@ -79,13 +79,7 @@ export default function Header({ user, onMenuClick, onCollapseToggle, collapsed,
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-100 transition-colors"
             >
-              {user.avatarUrl ? (
-                <Image src={user.avatarUrl} alt="" width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="md" />
               <span className="hidden sm:block text-sm font-medium text-slate-700">{user.name}</span>
             </button>
 

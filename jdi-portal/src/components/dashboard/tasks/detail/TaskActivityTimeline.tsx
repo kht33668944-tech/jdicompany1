@@ -13,6 +13,7 @@ import {
 import type { TaskActivity, ActivityType } from "@/lib/tasks/types";
 import { deleteActivity } from "@/lib/tasks/actions";
 import { useRouter } from "next/navigation";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   activities: TaskActivity[];
@@ -102,9 +103,11 @@ export default function TaskActivityTimeline({ activities, userId }: Props) {
 
         return (
           <div key={activity.id} className="flex gap-3 group">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${colorClass}`}>
-              <Icon size={14} />
-            </div>
+            <UserAvatar
+              name={activity.user_profile.full_name}
+              avatarUrl={activity.user_profile.avatar_url}
+              size="md"
+            />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-slate-700">

@@ -4,6 +4,7 @@ import { Users } from "phosphor-react";
 import { formatTime } from "@/lib/utils/date";
 import { ATTENDANCE_STATUS_CONFIG } from "@/lib/attendance/constants";
 import type { AttendanceWithProfile, Profile } from "@/lib/attendance/types";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface AdminAttendanceTableProps {
   todayAttendance: AttendanceWithProfile[];
@@ -32,9 +33,7 @@ export default function AdminAttendanceTable({ todayAttendance, allProfiles }: A
           return (
             <div key={profile.id} className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-slate-50/50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                  {profile.full_name.charAt(0)}
-                </div>
+                <UserAvatar name={profile.full_name} avatarUrl={profile.avatar_url} size="md" />
                 <div>
                   <p className="text-sm font-medium text-slate-700">{profile.full_name}</p>
                   <p className="text-xs text-slate-400">{profile.department}</p>
