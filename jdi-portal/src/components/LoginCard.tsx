@@ -66,7 +66,7 @@ export default function LoginCard() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: username,
         password,
       });
@@ -84,6 +84,7 @@ export default function LoginCard() {
         const { data: profile } = await supabase
           .from("profiles")
           .select("is_approved")
+          .eq("id", data.user.id)
           .single();
 
         if (profile && !profile.is_approved) {

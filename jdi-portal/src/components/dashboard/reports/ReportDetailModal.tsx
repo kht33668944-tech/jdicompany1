@@ -344,6 +344,7 @@ export default function ReportDetailModal({
                         {/* Image preview */}
                         {isImage && previewUrl && (
                           <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="block">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={previewUrl}
                               alt={att.file_name}

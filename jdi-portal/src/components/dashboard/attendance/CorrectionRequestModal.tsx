@@ -69,7 +69,7 @@ export default function CorrectionRequestModal({ userId, record, targetDate: ini
           <h3 className="text-lg font-bold text-slate-800">
             {isMissingMode ? "기록 누락 신청" : "출퇴근 정정 요청"}
           </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
             <X size={20} />
           </button>
         </div>

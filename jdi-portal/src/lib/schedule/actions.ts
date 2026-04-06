@@ -38,19 +38,25 @@ export async function createSchedule(params: {
   if (error) throw error;
 
   if (params.participantIds && params.participantIds.length > 0) {
-    await setParticipants(data.id, params.participantIds);
+    try {
+      await setParticipants(data.id, params.participantIds);
 
-    // 알림: 참여자들에게 (생성자 제외)
-    const notifyIds = params.participantIds.filter((id) => id !== params.createdBy);
-    for (const pid of notifyIds) {
-      await createNotification({
-        userId: pid,
-        type: "schedule_invite",
-        title: "새 일정에 참여자로 추가되었습니다",
-        body: params.title,
-        link: "/dashboard/schedule",
-        metadata: { schedule_id: data.id },
-      });
+      // 알림: 참여자들에게 (생성자 제외)
+      const notifyIds = params.participantIds.filter((id) => id !== params.createdBy);
+      for (const pid of notifyIds) {
+        await createNotification({
+          userId: pid,
+          type: "schedule_invite",
+          title: "새 일정에 참여자로 추가되었습니다",
+          body: params.title,
+          link: "/dashboard/schedule",
+          metadata: { schedule_id: data.id },
+        });
+      }
+    } catch (participantError) {
+      // 롤백: 참여자 설정 실패 시 생성된 일정 삭제
+      await supabase.from("schedules").delete().eq("id", data.id);
+      throw participantError;
     }
   }
 

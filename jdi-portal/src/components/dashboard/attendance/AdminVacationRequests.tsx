@@ -179,8 +179,8 @@ export default function AdminVacationRequests({
                       </div>
                     ) : (
                       <div className="flex gap-2">
-                        <button onClick={() => handleApproveVacation(req.id)} disabled={loading} className="flex-1 py-1.5 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-40">승인</button>
-                        <button onClick={() => setRejectingId(req.id)} disabled={loading} className="flex-1 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors disabled:opacity-40">반려</button>
+                        <button onClick={() => handleApproveVacation(req.id)} disabled={loading} className="flex-1 py-2.5 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-40">승인</button>
+                        <button onClick={() => setRejectingId(req.id)} disabled={loading} className="flex-1 py-2.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors disabled:opacity-40">반려</button>
                       </div>
                     )}
                   </li>
@@ -214,14 +214,14 @@ export default function AdminVacationRequests({
                       <button
                         onClick={() => handleCancelVacation(req.id)}
                         disabled={loading}
-                        className="flex-1 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-40"
+                        className="flex-1 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-40"
                       >
                         취소 승인
                       </button>
                       <button
                         onClick={() => handleRejectCancelRequest(req.id)}
                         disabled={loading}
-                        className="flex-1 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors disabled:opacity-40"
+                        className="flex-1 py-2.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors disabled:opacity-40"
                       >
                         거부
                       </button>
@@ -264,8 +264,8 @@ export default function AdminVacationRequests({
                     </div>
                     <p className="text-xs text-slate-500 mb-3">사유: {req.reason}</p>
                     <div className="flex gap-2">
-                      <button onClick={() => handleApproveCorrection(req.id)} disabled={loading} className="flex-1 py-1.5 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-40">승인</button>
-                      <button onClick={() => handleRejectCorrection(req.id)} disabled={loading} className="flex-1 py-1.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors disabled:opacity-40">반려</button>
+                      <button onClick={() => handleApproveCorrection(req.id)} disabled={loading} className="flex-1 py-2.5 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-40">승인</button>
+                      <button onClick={() => handleRejectCorrection(req.id)} disabled={loading} className="flex-1 py-2.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors disabled:opacity-40">반려</button>
                     </div>
                   </li>
                 ))}

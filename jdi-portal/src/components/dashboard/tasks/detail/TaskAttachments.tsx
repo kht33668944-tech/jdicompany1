@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Paperclip, Trash, DownloadSimple, Image as ImageIcon, File } from "phosphor-react";
 import { uploadAttachment, deleteAttachment, getAttachmentUrl } from "@/lib/tasks/actions";
 import type { TaskAttachment } from "@/lib/tasks/types";
+import { validateFile } from "@/lib/utils/upload";
+import { toast } from "sonner";
 
 interface Props {
   taskId: string;
@@ -44,11 +46,14 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
+        const err = validateFile(file);
+        if (err) { toast.error(err); continue; }
         await uploadAttachment(taskId, userId, file);
       }
       router.refresh();
     } catch (error) {
       console.error("첨부파일 업로드 실패:", error);
+      toast.error("첨부파일 업로드에 실패했습니다.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

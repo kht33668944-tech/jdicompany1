@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { ReportType, ReportPage, ReportStatus, ReportAttachment } from "./types";
+import { validateFile } from "@/lib/utils/upload";
 
 function getSupabase() {
   return createClient();
@@ -84,13 +85,16 @@ export async function deleteReport(reportId: string) {
   }
 
   const { error } = await supabase.from("reports").delete().eq("id", reportId);
-  if (error) throw error;
+  if (error) throw new Error(`보고서 삭제에 실패했습니다: ${error.message}`);
 }
 
 export async function uploadReportAttachment(
   reportId: string,
   file: File
 ): Promise<ReportAttachment> {
+  const validationError = validateFile(file);
+  if (validationError) throw new Error(validationError);
+
   const supabase = getSupabase();
   const ext = file.name.split(".").pop() ?? "bin";
   const filePath = `${reportId}/${crypto.randomUUID()}.${ext}`;

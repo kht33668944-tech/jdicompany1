@@ -49,11 +49,10 @@ export default function TaskDetailClient({
 }: Props) {
   const router = useRouter();
   const [liveActivities, setLiveActivities] = useState<TaskActivity[]>(activities);
-  const prevActivitiesRef = useRef(activities);
-  if (prevActivitiesRef.current !== activities) {
-    prevActivitiesRef.current = activities;
+
+  useEffect(() => {
     setLiveActivities(activities);
-  }
+  }, [activities]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -117,7 +116,7 @@ export default function TaskDetailClient({
   const isCreator = task.created_by === userId;
   const isAssignee = task.assignees.some((a) => a.user_id === userId);
   const canEdit = isCreator || isAssignee || isAdmin;
-  const canDelete = true;
+  const canDelete = isCreator || isAdmin;
 
   const handleSave = async () => {
     setSaving(true);

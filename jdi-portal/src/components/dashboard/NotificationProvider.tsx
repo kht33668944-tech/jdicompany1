@@ -59,7 +59,7 @@ export default function NotificationProvider({
     };
 
     poll();
-    const interval = setInterval(poll, 5000);
+    const interval = setInterval(poll, 30_000);
     return () => { aborted = true; clearInterval(interval); };
   }, [userId, showToast]);
 

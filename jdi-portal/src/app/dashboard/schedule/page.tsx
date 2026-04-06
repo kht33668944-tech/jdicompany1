@@ -34,7 +34,12 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
       getCachedAllProfiles(),
     ]);
   } catch {
-    // DB 오류 시 빈 데이터로 페이지 렌더링
+    return (
+      <div className="rounded-2xl bg-red-50 border border-red-200 p-6 text-center">
+        <p className="text-red-700 font-semibold">데이터를 불러오는 중 오류가 발생했습니다.</p>
+        <p className="text-red-500 text-sm mt-1">잠시 후 다시 시도해주세요.</p>
+      </div>
+    );
   }
 
   return (

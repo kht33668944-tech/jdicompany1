@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { createReport, uploadReportAttachment } from "@/lib/reports/actions";
 import type { ReportType, ReportPage } from "@/lib/reports/types";
 import { REPORT_PAGES, REPORT_PAGE_CONFIG } from "@/lib/reports/constants";
+import { validateFile } from "@/lib/utils/upload";
 
 interface ReportCreateModalProps {
   open: boolean;
@@ -32,17 +33,26 @@ export default function ReportCreateModal({ open, onClose, onCreated, userId }: 
 
   if (!open) return null;
 
+  function filterValidFiles(fileList: File[]): File[] {
+    return fileList.filter((f) => {
+      const err = validateFile(f);
+      if (err) { toast.error(err); return false; }
+      return true;
+    });
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
-    const dropped = Array.from(e.dataTransfer.files);
+    const dropped = filterValidFiles(Array.from(e.dataTransfer.files));
     setFiles((prev) => [...prev, ...dropped]);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files;
     if (selected && selected.length > 0) {
-      setFiles((prev) => [...prev, ...Array.from(selected)]);
+      const valid = filterValidFiles(Array.from(selected));
+      setFiles((prev) => [...prev, ...valid]);
     }
     // Reset so the same file can be re-selected
     if (fileInputRef.current) {
@@ -62,7 +72,8 @@ export default function ReportCreateModal({ open, onClose, onCreated, userId }: 
     }
     if (pastedFiles.length > 0) {
       e.preventDefault();
-      setFiles((prev) => [...prev, ...pastedFiles]);
+      const valid = filterValidFiles(pastedFiles);
+      setFiles((prev) => [...prev, ...valid]);
     }
   }
 

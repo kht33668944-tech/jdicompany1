@@ -130,9 +130,9 @@ export default function RecordsDetailTable({
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setSelectedRecord(record)}
-                          className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium whitespace-nowrap"
+                          className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium whitespace-nowrap px-2 py-2 rounded-lg hover:bg-brand-50 transition-colors"
                         >
-                          <PencilSimple size={12} />
+                          <PencilSimple size={14} />
                           수정 요청
                         </button>
                       </td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Toaster } from "sonner";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
@@ -19,6 +19,15 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
   const handleNewNotification = useCallback(() => {
     setUnreadCount((prev) => prev + 1);
   }, []);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [sidebarOpen]);
 
   return (
     <NotificationProvider

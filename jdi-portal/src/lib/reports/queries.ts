@@ -20,10 +20,10 @@ export async function getReports(
   if (error) throw error;
 
   // Get attachment counts
-  const reportIds = (data ?? []).map((r: any) => r.id as string);
+  const reportIds = (data ?? []).map((r) => r.id as string);
   const attachmentCounts = await fetchAttachmentCounts(supabase, reportIds);
 
-  return (data ?? []).map((r: any) => ({
+  return (data ?? []).map((r) => ({
     ...r,
     attachment_count: attachmentCounts.get(r.id) ?? 0,
   })) as ReportWithProfile[];

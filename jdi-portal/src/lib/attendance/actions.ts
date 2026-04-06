@@ -27,36 +27,14 @@ const CHECKED_OUT_STATUS = ATTENDANCE_STATUSES[2];
 
 export async function checkIn(userId: string) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("attendance_records")
-    .upsert(
-      {
-        user_id: userId,
-        work_date: toDateString(),
-        check_in: new Date().toISOString(),
-        status: WORKING_STATUS,
-      },
-      { onConflict: "user_id,work_date" }
-    )
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("attendance_check_in");
   if (error) throw error;
   return data;
 }
 
 export async function checkOut(userId: string) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("attendance_records")
-    .update({
-      check_out: new Date().toISOString(),
-      status: CHECKED_OUT_STATUS,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId)
-    .eq("work_date", toDateString())
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("attendance_check_out");
   if (error) throw error;
   return data;
 }

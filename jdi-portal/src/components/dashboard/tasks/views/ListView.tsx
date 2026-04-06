@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   CircleDashed,
@@ -49,9 +49,12 @@ function MobileEditSheet({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const sheetRef = useRef<HTMLDivElement>(null);
   const [localAssigneeIds, setLocalAssigneeIds] = useState(
     () => new Set(task.assignees.map((a) => a.user_id))
   );
+
+  useEffect(() => { sheetRef.current?.focus(); }, []);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -130,7 +133,7 @@ function MobileEditSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true">
       <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full bg-white rounded-t-3xl p-6 pb-8 max-h-[80vh] overflow-y-auto">
+      <div ref={sheetRef} tabIndex={-1} className="relative w-full bg-white rounded-t-3xl p-6 pb-8 max-h-[80vh] overflow-y-auto outline-none">
         {/* Handle */}
         <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
         <h4 className="font-bold text-slate-700 truncate mb-5">{task.title}</h4>

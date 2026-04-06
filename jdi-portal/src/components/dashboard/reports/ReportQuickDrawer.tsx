@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Bug, SmileySad, Lightbulb, CloudArrowUp, X } from "phosphor-react";
 import { toast } from "sonner";
 import { createReport, uploadReportAttachment } from "@/lib/reports/actions";
 import type { ReportType, ReportPage } from "@/lib/reports/types";
 import { REPORT_PAGES, REPORT_PAGE_CONFIG } from "@/lib/reports/constants";
+import { validateFile } from "@/lib/utils/upload";
 
 interface ReportQuickDrawerProps {
   open: boolean;
@@ -22,6 +23,14 @@ const TYPE_OPTIONS: { value: ReportType; label: string; Icon: React.ComponentTyp
 
 export default function ReportQuickDrawer({ open, onClose, userId }: ReportQuickDrawerProps) {
   const router = useRouter();
+
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handle);
+    return () => document.removeEventListener("keydown", handle);
+  }, [open, onClose]);
+
   const [type, setType] = useState<ReportType>("bug");
   const [page, setPage] = useState<ReportPage | "">("");
   const [title, setTitle] = useState("");
@@ -39,16 +48,24 @@ export default function ReportQuickDrawer({ open, onClose, userId }: ReportQuick
     setFiles([]);
   }
 
+  function filterValidFiles(fileList: File[]): File[] {
+    return fileList.filter((f) => {
+      const err = validateFile(f);
+      if (err) { toast.error(err); return false; }
+      return true;
+    });
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
-    setFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files)]);
+    setFiles((prev) => [...prev, ...filterValidFiles(Array.from(e.dataTransfer.files))]);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files;
     if (selected && selected.length > 0) {
-      setFiles((prev) => [...prev, ...Array.from(selected)]);
+      setFiles((prev) => [...prev, ...filterValidFiles(Array.from(selected))]);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -65,7 +82,7 @@ export default function ReportQuickDrawer({ open, onClose, userId }: ReportQuick
     }
     if (pastedFiles.length > 0) {
       e.preventDefault();
-      setFiles((prev) => [...prev, ...pastedFiles]);
+      setFiles((prev) => [...prev, ...filterValidFiles(pastedFiles)]);
     }
   }
 

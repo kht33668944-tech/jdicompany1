@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { TASK_PRIORITIES, TASK_STATUSES } from "./constants";
+import { validateFile } from "@/lib/utils/upload";
 import type { TaskPriority, TaskStatus, TaskChecklistItem, TaskAttachment, TaskActivity } from "./types";
 import { createNotification, createNotificationForMany } from "@/lib/notifications/actions";
 
@@ -83,22 +84,28 @@ export async function createTask(params: {
     user_id: userId,
   }));
 
-  const { error: assigneeError } = await supabase
-    .from("task_assignees")
-    .insert(assigneeRows);
+  try {
+    const { error: assigneeError } = await supabase
+      .from("task_assignees")
+      .insert(assigneeRows);
 
-  if (assigneeError) throw assigneeError;
+    if (assigneeError) throw assigneeError;
 
-  // 알림: 배정된 사용자들에게 (본인 제외)
-  const notifyIds = assigneeIds.filter((id) => id !== params.createdBy);
-  if (notifyIds.length > 0) {
-    await createNotificationForMany(notifyIds, {
-      type: "task_assigned",
-      title: "새 할일이 배정되었습니다",
-      body: params.title,
-      link: `/dashboard/tasks/${data.id}`,
-      metadata: { task_id: data.id },
-    });
+    // 알림: 배정된 사용자들에게 (본인 제외)
+    const notifyIds = assigneeIds.filter((id) => id !== params.createdBy);
+    if (notifyIds.length > 0) {
+      await createNotificationForMany(notifyIds, {
+        type: "task_assigned",
+        title: "새 할일이 배정되었습니다",
+        body: params.title,
+        link: `/dashboard/tasks/${data.id}`,
+        metadata: { task_id: data.id },
+      });
+    }
+  } catch (assigneeError) {
+    // 롤백: 담당자 배정 실패 시 생성된 할일 삭제
+    await supabase.from("tasks").delete().eq("id", data.id);
+    throw assigneeError;
   }
 
   return data;
@@ -317,6 +324,9 @@ export async function uploadAttachment(
   userId: string,
   file: File
 ): Promise<TaskAttachment> {
+  const validationError = validateFile(file);
+  if (validationError) throw new Error(validationError);
+
   const supabase = getSupabase();
   const ext = file.name.split(".").pop() ?? "bin";
   const filePath = `${taskId}/${crypto.randomUUID()}.${ext}`;

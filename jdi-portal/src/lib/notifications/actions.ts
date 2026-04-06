@@ -1,8 +1,17 @@
 import { createClient } from "@/lib/supabase/client";
 import type { NotificationType } from "./types";
+import { SETTING_TYPE_MAP } from "./constants";
 
 function getSupabase() {
   return createClient();
+}
+
+/** NotificationType → notification_settings 컬럼명 역방향 조회 */
+function getSettingKeyForType(type: NotificationType): string | null {
+  for (const [key, types] of Object.entries(SETTING_TYPE_MAP)) {
+    if ((types as NotificationType[]).includes(type)) return key;
+  }
+  return null;
 }
 
 /** 알림 생성 (실패 시 무시 — fire-and-forget) */
@@ -16,6 +25,18 @@ export async function createNotification(params: {
 }) {
   try {
     const supabase = getSupabase();
+
+    // 수신자의 알림 설정 확인
+    const settingKey = getSettingKeyForType(params.type);
+    if (settingKey) {
+      const { data: settings } = await supabase
+        .from("notification_settings")
+        .select("*")
+        .eq("user_id", params.userId)
+        .single();
+      if (settings && (settings as unknown as Record<string, unknown>)[settingKey] === false) return;
+    }
+
     await supabase.rpc("insert_notification", {
       p_user_id: params.userId,
       p_type: params.type,
@@ -43,7 +64,28 @@ export async function createNotificationForMany(
   if (userIds.length === 0) return;
   try {
     const supabase = getSupabase();
-    const notifications = userIds.map((userId) => ({
+
+    // 수신자들의 알림 설정 확인 후 비활성화된 사용자 필터링
+    const settingKey = getSettingKeyForType(params.type);
+    let filteredUserIds = userIds;
+    if (settingKey) {
+      const { data: allSettings } = await supabase
+        .from("notification_settings")
+        .select("*")
+        .in("user_id", userIds);
+      if (allSettings && allSettings.length > 0) {
+        const disabledSet = new Set(
+          allSettings
+            .filter((s) => (s as unknown as Record<string, unknown>)[settingKey] === false)
+            .map((s) => s.user_id)
+        );
+        filteredUserIds = userIds.filter((uid) => !disabledSet.has(uid));
+      }
+    }
+
+    if (filteredUserIds.length === 0) return;
+
+    const notifications = filteredUserIds.map((userId) => ({
       user_id: userId,
       type: params.type,
       title: params.title,

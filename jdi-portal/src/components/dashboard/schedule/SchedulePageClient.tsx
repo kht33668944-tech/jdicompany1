@@ -236,7 +236,7 @@ export default function SchedulePageClient({
       {/* 목록 뷰 */}
       {activeTab === "list" && (
         <ListView
-          schedules={schedules}
+          schedules={filteredSchedules}
           onEventClick={setSelectedSchedule}
         />
       )}
