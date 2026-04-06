@@ -5,6 +5,21 @@ function getSupabase() {
   return createClient();
 }
 
+/**
+ * 채널이 memo 타입인지 확인 (멤버 변경 차단용)
+ */
+async function assertNotMemoChannel(channelId: string, action: string): Promise<void> {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from("channels")
+    .select("type")
+    .eq("id", channelId)
+    .single();
+  if (data?.type === "memo") {
+    throw new Error(`메모 채널은 ${action}할 수 없습니다.`);
+  }
+}
+
 async function fetchProfileMap(userIds: string[]): Promise<Map<string, { full_name: string; avatar_url: string | null }>> {
   if (userIds.length === 0) return new Map();
   const supabase = getSupabase();
@@ -24,6 +39,11 @@ export async function createChannel(params: {
   userId: string;
 }): Promise<Channel> {
   const supabase = getSupabase();
+
+  // memo 채널은 ensureMemoChannel을 통해서만 생성되어야 함
+  if (params.type === "memo") {
+    throw new Error("메모 채널은 ensureMemoChannel을 사용하세요.");
+  }
 
   // SECURITY DEFINER RPC로 채널 + 멤버 한번에 생성
   const { data: channelId, error } = await supabase.rpc("create_chat_channel", {
@@ -60,6 +80,7 @@ export async function updateChannel(
 }
 
 export async function deleteChannel(channelId: string): Promise<void> {
+  await assertNotMemoChannel(channelId, "삭제");
   const supabase = getSupabase();
   const { error } = await supabase.from("channels").delete().eq("id", channelId);
   if (error) throw error;
@@ -74,6 +95,7 @@ export async function addMembers(
   userIds: string[],
   currentUserName: string
 ): Promise<void> {
+  await assertNotMemoChannel(channelId, "멤버를 초대");
   const supabase = getSupabase();
 
   const members = userIds.map((id) => ({
@@ -112,6 +134,7 @@ export async function removeMember(
   removedName: string,
   currentUserName: string
 ): Promise<void> {
+  await assertNotMemoChannel(channelId, "멤버를 제거");
   const supabase = getSupabase();
 
   const { error } = await supabase
@@ -135,6 +158,7 @@ export async function leaveChannel(
   userId: string,
   userName: string
 ): Promise<void> {
+  await assertNotMemoChannel(channelId, "나가기를");
   const supabase = getSupabase();
 
   const { error } = await supabase
@@ -338,17 +362,20 @@ export async function getReadReceipts(messageId: string): Promise<MessageReadRec
 
 export async function ensureMemoChannel(): Promise<Channel> {
   const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("인증이 필요합니다.");
 
-  // 기존 메모 채널 조회
+  // 본인 소유 메모 채널만 조회
   const { data: existing } = await supabase
     .from("channels")
     .select("*")
     .eq("type", "memo")
+    .eq("created_by", user.id)
     .maybeSingle();
 
   if (existing) return existing as Channel;
 
-  // 없으면 RPC로 생성
+  // 없으면 RPC로 생성 (memo 타입이면 RPC가 본인 1명만 owner로 추가)
   const { data: channelId, error } = await supabase.rpc("create_chat_channel", {
     p_name: "나만의 메모",
     p_description: "나만 볼 수 있는 개인 메모 공간입니다.",
@@ -363,6 +390,7 @@ export async function ensureMemoChannel(): Promise<Channel> {
         .from("channels")
         .select("*")
         .eq("type", "memo")
+        .eq("created_by", user.id)
         .maybeSingle();
       if (retry) return retry as Channel;
     }

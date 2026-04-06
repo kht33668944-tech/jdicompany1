@@ -80,6 +80,7 @@ export default function ChannelSettingsDrawer({
 
   const isOwner = channel.created_by === userId;
   const isTwoPersonChannel = channel.member_count === 2;
+  const isMemo = channel.type === "memo";
 
   useEffect(() => {
     setName(channel.name);
@@ -345,7 +346,18 @@ export default function ChannelSettingsDrawer({
 
             <div className="mx-6 h-px bg-slate-100" />
 
+            {/* Memo info — 멤버 섹션 대체 */}
+            {isMemo && (
+              <div className="p-6">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">사용 안내</label>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  나만의 메모는 본인만 사용할 수 있는 개인 공간입니다. 다른 사용자를 초대하거나 나갈 수 없습니다.
+                </p>
+              </div>
+            )}
+
             {/* Members */}
+            {!isMemo && (
             <div className="p-6">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
@@ -466,6 +478,7 @@ export default function ChannelSettingsDrawer({
                 })}
               </div>
             </div>
+            )}
 
             <div className="mx-6 h-px bg-slate-100" />
 
@@ -498,9 +511,10 @@ export default function ChannelSettingsDrawer({
               </button>
             </div>
 
-            <div className="mx-6 h-px bg-slate-100" />
+            {!isMemo && <div className="mx-6 h-px bg-slate-100" />}
 
-            {/* Danger Zone */}
+            {/* Danger Zone — memo 채널은 표시하지 않음 */}
+            {!isMemo && (
             <div className="p-6 space-y-4">
               <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">위험 영역</label>
 
@@ -532,6 +546,7 @@ export default function ChannelSettingsDrawer({
                 </>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>
