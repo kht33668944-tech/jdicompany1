@@ -28,10 +28,11 @@ interface ContextMenuState {
 /** 리액션 바 */
 function ReactionBar({ message, userId }: { message: Message; userId: string }) {
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
-  const [showPicker, setShowPicker] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    getReactions(message.id, userId).then(setReactions).catch(() => {});
+    setLoaded(false);
+    getReactions(message.id, userId).then((r) => { setReactions(r); setLoaded(true); }).catch(() => setLoaded(true));
   }, [message.id, userId]);
 
   async function handleToggle(emoji: string) {
@@ -40,8 +41,9 @@ function ReactionBar({ message, userId }: { message: Message; userId: string }) 
       const updated = await getReactions(message.id, userId);
       setReactions(updated);
     } catch { /* ignore */ }
-    setShowPicker(false);
   }
+
+  if (!loaded || reactions.length === 0) return null;
 
   return (
     <div className="flex items-center gap-1 flex-wrap mt-1">
@@ -59,27 +61,6 @@ function ReactionBar({ message, userId }: { message: Message; userId: string }) 
           <span className="text-[10px] font-medium">{r.count}</span>
         </button>
       ))}
-      <div className="relative">
-        <button
-          onClick={() => setShowPicker(!showPicker)}
-          className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 text-xs transition-colors"
-        >
-          +
-        </button>
-        {showPicker && (
-          <div className="absolute bottom-8 left-0 bg-white rounded-xl shadow-lg border border-slate-100 p-2 flex gap-1 z-20">
-            {QUICK_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => handleToggle(emoji)}
-                className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base transition-colors"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

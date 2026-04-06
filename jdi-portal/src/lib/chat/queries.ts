@@ -31,20 +31,49 @@ export async function getChannels(
   if (chErr) throw chErr;
   if (!channels) return [];
 
-  // 각 채널의 마지막 메시지
-  const { data: lastMessages } = await supabase
-    .from("messages")
-    .select("channel_id, content, created_at, type, user_id")
-    .in("channel_id", channelIds)
-    .eq("is_deleted", false)
-    .order("created_at", { ascending: false });
+  // 마지막 메시지, 읽지 않은 수, 멤버 수를 모두 병렬 조회
+  type LastMsg = { channel_id: string; content: string; created_at: string; type: string; user_id: string };
+  const lastMsgMap = new Map<string, LastMsg>();
+  const unreadCounts = new Map<string, number>();
+  const memberCountMap = new Map<string, number>();
 
-  const lastMsgMap = new Map<string, typeof lastMessages extends (infer T)[] | null ? T : never>();
-  for (const msg of lastMessages ?? []) {
-    if (!lastMsgMap.has(msg.channel_id)) {
-      lastMsgMap.set(msg.channel_id, msg);
-    }
-  }
+  await Promise.all([
+    // 각 채널의 마지막 메시지 (채널당 1개씩 병렬)
+    Promise.all(channelIds.map(async (chId) => {
+      const { data } = await supabase
+        .from("messages")
+        .select("channel_id, content, created_at, type, user_id")
+        .eq("channel_id", chId)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (data) lastMsgMap.set(chId, data as LastMsg);
+    })),
+    // 각 채널의 읽지 않은 메시지 수 (병렬)
+    Promise.all(channelIds.map(async (channelId) => {
+      const lastRead = lastReadMap.get(channelId);
+      if (!lastRead) return;
+      const { count } = await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("channel_id", channelId)
+        .eq("is_deleted", false)
+        .neq("user_id", userId)
+        .gt("created_at", lastRead);
+      unreadCounts.set(channelId, count ?? 0);
+    })),
+    // 각 채널의 멤버 수
+    supabase
+      .from("channel_members")
+      .select("channel_id")
+      .in("channel_id", channelIds)
+      .then(({ data: memberCounts }) => {
+        for (const m of memberCounts ?? []) {
+          memberCountMap.set(m.channel_id, (memberCountMap.get(m.channel_id) ?? 0) + 1);
+        }
+      }),
+  ]);
 
   // 마지막 메시지 작성자 프로필
   const userIds = new Set<string>();
@@ -60,32 +89,6 @@ export async function getChannels(
     for (const p of profiles ?? []) {
       profileMap.set(p.id, p.full_name);
     }
-  }
-
-  // 각 채널의 읽지 않은 메시지 수
-  const unreadCounts = new Map<string, number>();
-  for (const channelId of channelIds) {
-    const lastRead = lastReadMap.get(channelId);
-    if (!lastRead) continue;
-    const { count } = await supabase
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("channel_id", channelId)
-      .eq("is_deleted", false)
-      .neq("user_id", userId)
-      .gt("created_at", lastRead);
-    unreadCounts.set(channelId, count ?? 0);
-  }
-
-  // 각 채널의 멤버 수
-  const { data: memberCounts } = await supabase
-    .from("channel_members")
-    .select("channel_id")
-    .in("channel_id", channelIds);
-
-  const memberCountMap = new Map<string, number>();
-  for (const m of memberCounts ?? []) {
-    memberCountMap.set(m.channel_id, (memberCountMap.get(m.channel_id) ?? 0) + 1);
   }
 
   return channels.map((ch) => {
@@ -235,16 +238,17 @@ export async function getTotalUnreadCount(
 
   if (!memberships || memberships.length === 0) return 0;
 
-  let total = 0;
-  for (const m of memberships) {
-    const { count } = await supabase
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("channel_id", m.channel_id)
-      .eq("is_deleted", false)
-      .neq("user_id", userId)
-      .gt("created_at", m.last_read_at);
-    total += count ?? 0;
-  }
-  return total;
+  const counts = await Promise.all(
+    memberships.map(async (m) => {
+      const { count } = await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("channel_id", m.channel_id)
+        .eq("is_deleted", false)
+        .neq("user_id", userId)
+        .gt("created_at", m.last_read_at);
+      return count ?? 0;
+    })
+  );
+  return counts.reduce((a, b) => a + b, 0);
 }

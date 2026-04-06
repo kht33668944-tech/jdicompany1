@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { PaperPlaneRight, Paperclip, X, Image as ImageIcon, Plus } from "phosphor-react";
+import { PaperPlaneRight, Paperclip, X, Image as ImageIcon } from "phosphor-react";
 import { toast } from "sonner";
 import type { Message } from "@/lib/chat/types";
 import { validateFile } from "@/lib/utils/upload";
@@ -89,35 +89,32 @@ export default function MessageInput({
   }
 
   async function handleSend() {
-    // 파일이 있으면 순차 업로드
-    if (pendingFiles.length > 0 && onFileUpload) {
-      if (sending) return;
-      setSending(true);
-      try {
+    const trimmed = content.trim();
+    const hasFiles = pendingFiles.length > 0 && onFileUpload;
+    if (!hasFiles && !trimmed) return;
+    if (sending) return;
+
+    setSending(true);
+    try {
+      // 파일 업로드
+      if (hasFiles) {
         for (const file of pendingFiles) {
           await onFileUpload(file);
         }
         setPendingFiles([]);
-        setContent("");
-      } catch {
-        toast.error("파일 업로드에 실패했습니다.");
-      } finally {
-        setSending(false);
       }
-      return;
-    }
-
-    // 텍스트 전송
-    const trimmed = content.trim();
-    if (!trimmed || sending) return;
-    setSending(true);
-    try {
-      await onSend(trimmed);
+      // 텍스트 전송 (파일과 함께 또는 단독)
+      if (trimmed) {
+        await onSend(trimmed);
+      }
       setContent("");
       const el = textareaRef.current;
       if (el) el.style.height = "auto";
+    } catch {
+      toast.error(hasFiles ? "파일 업로드에 실패했습니다." : "메시지 전송에 실패했습니다.");
     } finally {
       setSending(false);
+      textareaRef.current?.focus();
     }
   }
 
@@ -164,7 +161,7 @@ export default function MessageInput({
     }
   }
 
-  const canSend = pendingFiles.length > 0 ? !sending : content.trim().length > 0 && !sending;
+  const canSend = !sending && (pendingFiles.length > 0 || content.trim().length > 0);
 
   return (
     <footer className="px-6 py-3 bg-white border-t border-slate-100 flex-shrink-0">
@@ -215,14 +212,6 @@ export default function MessageInput({
                 </div>
               );
             })}
-            {/* 추가 버튼 */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
-              aria-label="파일 추가"
-            >
-              <Plus size={20} className="text-slate-400" />
-            </button>
           </div>
           <div className="flex items-center justify-between mt-2">
             <span className="text-[11px] text-slate-400">{pendingFiles.length}개 파일</span>
@@ -258,10 +247,9 @@ export default function MessageInput({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder={pendingFiles.length > 0 ? "전송 버튼을 눌러 파일을 보내세요" : "메시지를 입력하세요..."}
+          placeholder={pendingFiles.length > 0 ? "메시지를 함께 입력할 수 있습니다" : "메시지를 입력하세요..."}
           rows={1}
-          disabled={pendingFiles.length > 0}
-          className="flex-1 bg-transparent border-none text-sm py-2 resize-none max-h-32 outline-none disabled:opacity-50"
+          className="flex-1 bg-transparent border-none text-sm py-2 resize-none max-h-32 outline-none"
         />
         <button
           onClick={handleSend}
