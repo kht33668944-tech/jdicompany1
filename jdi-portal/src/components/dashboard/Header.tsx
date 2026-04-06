@@ -8,8 +8,10 @@ import {
   CaretLeft,
   GearSix,
   SignOut,
+  WarningCircle,
 } from "phosphor-react";
 import NotificationCenter from "./NotificationCenter";
+import ReportQuickDrawer from "./reports/ReportQuickDrawer";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import UserAvatar from "@/components/shared/UserAvatar";
 
@@ -27,17 +29,20 @@ const titles: Record<string, string> = {
   "/dashboard/attendance": "근태관리",
   "/dashboard/tasks": "할일",
   "/dashboard/schedule": "스케줄",
+  "/dashboard/reports": "오류 접수",
   "/dashboard/settings": "설정",
 };
 
 export default function Header({ user, onMenuClick, onCollapseToggle, collapsed, unreadCount, onUnreadCountChange }: HeaderProps) {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showReportDrawer, setShowReportDrawer] = useState(false);
   const dropdownRef = useClickOutside<HTMLDivElement>(() => setDropdownOpen(false));
 
   const pageTitle = titles[pathname] ?? "대시보드";
 
   return (
+    <>
     <header className="sticky top-0 z-20 glass-header">
       <div className="flex items-center justify-between h-16 px-6">
         {/* Left */}
@@ -66,6 +71,15 @@ export default function Header({ user, onMenuClick, onCollapseToggle, collapsed,
 
         {/* Right */}
         <div className="flex items-center gap-2">
+          {/* Bug report shortcut */}
+          <button
+            onClick={() => setShowReportDrawer(true)}
+            className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-brand-600 transition-colors"
+            title="오류 접수"
+          >
+            <WarningCircle size={22} />
+          </button>
+
           {/* Notifications */}
           <NotificationCenter
             userId={user.id}
@@ -112,5 +126,13 @@ export default function Header({ user, onMenuClick, onCollapseToggle, collapsed,
         </div>
       </div>
     </header>
+
+      {/* Quick report drawer */}
+      <ReportQuickDrawer
+        open={showReportDrawer}
+        onClose={() => setShowReportDrawer(false)}
+        userId={user.id}
+      />
+    </>
   );
 }

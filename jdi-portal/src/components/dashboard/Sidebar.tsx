@@ -8,6 +8,7 @@ import {
   Clock,
   ListChecks,
   CalendarBlank,
+  WarningCircle,
   GearSix,
   SignOut,
 } from "phosphor-react";
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/dashboard/attendance", label: "근태관리", icon: Clock },
   { href: "/dashboard/tasks", label: "할일", icon: ListChecks },
   { href: "/dashboard/schedule", label: "스케줄", icon: CalendarBlank },
+  { href: "/dashboard/reports", label: "오류 접수", icon: WarningCircle },
   { href: "/dashboard/settings", label: "설정", icon: GearSix },
 ];
 
