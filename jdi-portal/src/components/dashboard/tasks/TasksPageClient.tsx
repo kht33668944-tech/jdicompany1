@@ -151,6 +151,8 @@ export default function TasksPageClient({ allTasks, profiles, userId }: Props) {
           groupedTasks={groupedTasks}
           allTasks={tasksWithChildren}
           onTaskClick={handleTaskClick}
+          profiles={profiles}
+          userId={userId}
         />
       )}
       {activeView === "calendar" && (

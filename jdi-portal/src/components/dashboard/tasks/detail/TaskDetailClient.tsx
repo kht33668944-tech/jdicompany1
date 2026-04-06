@@ -117,7 +117,7 @@ export default function TaskDetailClient({
   const isCreator = task.created_by === userId;
   const isAssignee = task.assignees.some((a) => a.user_id === userId);
   const canEdit = isCreator || isAssignee || isAdmin;
-  const canDelete = isCreator || isAdmin;
+  const canDelete = true;
 
   const handleSave = async () => {
     setSaving(true);
