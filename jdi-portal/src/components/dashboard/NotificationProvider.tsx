@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { Notification } from "@/lib/notifications/types";
+import { showDesktopNotification } from "@/lib/notifications/desktop";
 
 interface NotificationProviderProps {
   userId: string;
@@ -32,6 +33,14 @@ export default function NotificationProvider({
               },
             }
           : undefined,
+      });
+
+      // OS 네이티브 알림도 동시 표시 (권한 없으면 silent no-op)
+      showDesktopNotification({
+        title: notification.title,
+        body: notification.body,
+        link: notification.link,
+        tag: `notification:${notification.id}`,
       });
     },
     [onNewNotification]

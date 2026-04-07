@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { getMessages as fetchMessages, getChannelById } from "@/lib/chat/queries";
 import { ensureMemoChannel, markAsRead } from "@/lib/chat/actions";
+import { showDesktopNotification } from "@/lib/notifications/desktop";
 import type { ChannelWithDetails, Message, Channel } from "@/lib/chat/types";
 import ChannelList from "./ChannelList";
 import ChatRoom from "./ChatRoom";
@@ -184,6 +185,14 @@ export default function ChatPageClient({
             if (!mutedChannelsRef.current.has(fullMsg.channel_id)) {
               const senderName = fullMsg.user_profile?.full_name ?? "누군가";
               toast.info(`${senderName}: ${fullMsg.content}`, { duration: 3000 });
+
+              // OS 네이티브 알림도 동시 표시 (메시지마다 고유 tag)
+              showDesktopNotification({
+                title: senderName,
+                body: fullMsg.type === "image" ? "사진을 보냈습니다." : fullMsg.type === "file" ? "파일을 보냈습니다." : fullMsg.content,
+                link: `/dashboard/chat/${fullMsg.channel_id}`,
+                tag: `chat-msg:${fullMsg.id}`,
+              });
             }
           }
         }

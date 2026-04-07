@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  BellRinging,
   UserPlus,
   ChatDots,
   ArrowsClockwise,
@@ -18,6 +19,12 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import { markAsRead, markAllAsRead } from "@/lib/notifications/actions";
+import {
+  getDesktopPermission,
+  requestDesktopPermission,
+  isDesktopSupported,
+  type DesktopPermission,
+} from "@/lib/notifications/desktop";
 import { formatTimeAgo } from "@/lib/utils/date";
 import type { Notification, NotificationType } from "@/lib/notifications/types";
 
@@ -59,8 +66,21 @@ export default function NotificationCenter({
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [desktopPermission, setDesktopPermission] = useState<DesktopPermission>("default");
+  const [desktopSupported, setDesktopSupported] = useState(false);
   const ref = useClickOutside<HTMLDivElement>(() => setOpen(false));
   const router = useRouter();
+
+  // 마운트 시 데스크톱 알림 지원 여부 + 권한 상태 동기화 (SSR-safe)
+  useEffect(() => {
+    setDesktopSupported(isDesktopSupported());
+    setDesktopPermission(getDesktopPermission());
+  }, [open]);
+
+  const handleRequestDesktopPermission = useCallback(async () => {
+    const result = await requestDesktopPermission();
+    setDesktopPermission(result);
+  }, []);
 
   // 드롭다운 열릴 때 알림 목록 fetch
   const fetchNotifications = useCallback(async () => {
@@ -155,6 +175,33 @@ export default function NotificationCenter({
               </button>
             )}
           </div>
+
+          {/* 데스크톱 알림 권한 상태 — 항상 표시 */}
+          {desktopSupported && (
+            <div className="border-b border-slate-100">
+              {desktopPermission === "default" && (
+                <button
+                  onClick={handleRequestDesktopPermission}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-brand-50/60 hover:bg-brand-50 text-brand-700 text-xs font-medium transition-colors"
+                >
+                  <BellRinging size={14} weight="fill" />
+                  <span className="flex-1 text-left">데스크톱 알림 켜기 — Windows 알림으로 받기</span>
+                </button>
+              )}
+              {desktopPermission === "granted" && (
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50/60 text-emerald-700 text-[11px]">
+                  <BellRinging size={12} weight="fill" />
+                  <span>데스크톱 알림이 활성화되어 있습니다.</span>
+                </div>
+              )}
+              {desktopPermission === "denied" && (
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 text-slate-500 text-[11px]">
+                  <BellRinging size={12} />
+                  <span>데스크톱 알림이 차단됨 — 브라우저 사이트 설정에서 허용해주세요.</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 알림 목록 */}
           <div className="max-h-96 overflow-y-auto">
