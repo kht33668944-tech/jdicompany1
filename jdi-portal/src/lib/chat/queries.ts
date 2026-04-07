@@ -134,30 +134,13 @@ export async function getMemoChannel(
 
 /**
  * 전체 채널 읽지 않은 메시지 총 합산 (사이드바 뱃지용)
+ * - 단일 RPC 호출 (이전: 채널 수만큼 N+1 쿼리)
  */
 export async function getTotalUnreadCount(
   supabase: SupabaseClient,
-  userId: string
+  _userId: string
 ): Promise<number> {
-  const { data: memberships } = await supabase
-    .from("channel_members")
-    .select("channel_id, last_read_at")
-    .eq("user_id", userId)
-    .eq("is_muted", false);
-
-  if (!memberships || memberships.length === 0) return 0;
-
-  const counts = await Promise.all(
-    memberships.map(async (m) => {
-      const { count } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("channel_id", m.channel_id)
-        .eq("is_deleted", false)
-        .neq("user_id", userId)
-        .gt("created_at", m.last_read_at);
-      return count ?? 0;
-    })
-  );
-  return counts.reduce((a, b) => a + b, 0);
+  const { data, error } = await supabase.rpc("get_total_unread_count");
+  if (error) return 0;
+  return (data as number | null) ?? 0;
 }

@@ -111,6 +111,18 @@ export default function TaskDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
+  // 다른 할일로 라우팅되거나 외부 변경이 prop 으로 들어왔을 때 편집 폼 재동기화
+  // (task.id 가 같으면 사용자가 편집 중일 수 있어 덮어쓰지 않음)
+  useEffect(() => {
+    setTitle(task.title);
+    setDescription(task.description ?? "");
+    setStatus(task.status);
+    setPriority(task.priority);
+    setCategory(task.category ?? "");
+    setDueDate(task.due_date ?? "");
+    setStartDate(task.start_date ?? "");
+  }, [task.id]);
+
   const currentProfile = profiles.find((p) => p.id === userId);
   const isAdmin = currentProfile?.role === "admin";
   const isCreator = task.created_by === userId;

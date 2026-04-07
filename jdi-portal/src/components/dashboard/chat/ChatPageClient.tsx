@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { getMessages as fetchMessages, getChannelById } from "@/lib/chat/queries";
@@ -41,13 +41,50 @@ export default function ChatPageClient({
   const [mutedChannels, setMutedChannels] = useState<Set<string>>(new Set());
   const [favoriteChannels, setFavoriteChannels] = useState<Set<string>>(new Set());
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  // 현재 선택된 채널의 멤버 ID 셋 — 채널별 온라인 인원 계산용
+  const [selectedChannelMemberIds, setSelectedChannelMemberIds] = useState<Set<string>>(new Set());
 
   const selectedChannelRef = useRef(selectedChannel);
-  selectedChannelRef.current = selectedChannel;
   const mutedChannelsRef = useRef(mutedChannels);
-  mutedChannelsRef.current = mutedChannels;
   const channelsRef = useRef(channels);
-  channelsRef.current = channels;
+
+  // ref 동기화는 effect 로 (React 19: render 중 ref mutation 금지)
+  useEffect(() => { selectedChannelRef.current = selectedChannel; }, [selectedChannel]);
+  useEffect(() => { mutedChannelsRef.current = mutedChannels; }, [mutedChannels]);
+  useEffect(() => { channelsRef.current = channels; }, [channels]);
+
+  // 선택된 채널이 바뀔 때마다 멤버 목록 fetch (초기 진입/외부 라우팅 포함)
+  useEffect(() => {
+    if (!selectedChannel) return;
+    let cancelled = false;
+    const supabase = createClient();
+    supabase
+      .from("channel_members")
+      .select("user_id")
+      .eq("channel_id", selectedChannel.id)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSelectedChannelMemberIds(new Set((data ?? []).map((m) => m.user_id as string)));
+      });
+    return () => { cancelled = true; };
+  }, [selectedChannel?.id]);
+
+  // 선택 해제 시 멤버 목록 비우기 (event 처리에서 직접 호출하는 게 맞지만 안전망)
+  useEffect(() => {
+    if (selectedChannel) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedChannelMemberIds(new Set());
+  }, [selectedChannel]);
+
+  // 현재 채널 멤버 중 온라인인 사람 수 (전체 온라인 X)
+  const channelOnlineCount = useMemo(() => {
+    if (selectedChannelMemberIds.size === 0) return 0;
+    let count = 0;
+    for (const id of selectedChannelMemberIds) {
+      if (onlineUsers.has(id)) count++;
+    }
+    return count;
+  }, [selectedChannelMemberIds, onlineUsers]);
 
   // Ensure memo channel exists on mount
   useEffect(() => {
@@ -355,8 +392,15 @@ export default function ChatPageClient({
       setShowSettings(false);
 
       const supabase = createClient();
-      const msgs = await fetchMessages(supabase, channel.id);
+      // 메시지 + 채널 멤버 ID 동시 로드 (멤버는 온라인 인원 계산용)
+      const [msgs, membersRes] = await Promise.all([
+        fetchMessages(supabase, channel.id),
+        supabase.from("channel_members").select("user_id").eq("channel_id", channel.id),
+      ]);
       setMessages(msgs);
+      setSelectedChannelMemberIds(
+        new Set((membersRes.data ?? []).map((m) => m.user_id as string))
+      );
 
       await markAsRead(channel.id);
       setChannels((prev) =>
@@ -465,7 +509,7 @@ export default function ChatPageClient({
               onMessagesUpdate={setMessages}
               onBack={handleBackToList}
               onSettingsClick={() => setShowSettings(true)}
-              onlineCount={onlineUsers.size > 0 ? onlineUsers.size : undefined}
+              onlineCount={channelOnlineCount > 0 ? channelOnlineCount : undefined}
             />
           ) : (
             <EmptyState type="no-selection" />

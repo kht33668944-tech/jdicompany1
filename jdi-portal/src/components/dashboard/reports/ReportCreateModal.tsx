@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Bug, SmileySad, Lightbulb, CloudArrowUp, X, CaretDown } from "phosphor-react";
 import { toast } from "sonner";
-import { createReport, uploadReportAttachment } from "@/lib/reports/actions";
+import { createReport, deleteReport, uploadReportAttachment } from "@/lib/reports/actions";
 import type { ReportType, ReportPage } from "@/lib/reports/types";
 import { REPORT_PAGES, REPORT_PAGE_CONFIG } from "@/lib/reports/constants";
 import { validateFile } from "@/lib/utils/upload";
@@ -15,7 +15,7 @@ interface ReportCreateModalProps {
   userId: string;
 }
 
-const TYPE_OPTIONS: { value: ReportType; label: string; Icon: React.ComponentType<any> }[] = [
+const TYPE_OPTIONS: { value: ReportType; label: string; Icon: typeof Bug }[] = [
   { value: "bug", label: "오류", Icon: Bug },
   { value: "inconvenience", label: "불편사항", Icon: SmileySad },
   { value: "improvement", label: "개선요청", Icon: Lightbulb },
@@ -91,8 +91,14 @@ export default function ReportCreateModal({ open, onClose, onCreated, userId }: 
     try {
       const report = await createReport({ type, page: page as ReportPage, title: title.trim(), content: content.trim(), userId });
 
-      for (const f of files) {
-        await uploadReportAttachment(report.id, f);
+      // 첨부 업로드 중 실패하면 생성된 report 자체를 정리 (반쪽 저장 방지)
+      try {
+        for (const f of files) {
+          await uploadReportAttachment(report.id, f);
+        }
+      } catch (uploadErr) {
+        await deleteReport(report.id).catch(() => {});
+        throw uploadErr;
       }
 
       toast.success("오류가 접수되었습니다");

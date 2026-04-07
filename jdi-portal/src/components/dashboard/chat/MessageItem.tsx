@@ -28,11 +28,22 @@ interface ContextMenuState {
 /** 리액션 바 */
 function ReactionBar({ message, userId }: { message: Message; userId: string }) {
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  // loaded 를 별도 상태로 두지 않고, "어떤 메시지에 대해 로드 끝났는지" 로 추적
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const loaded = loadedFor === message.id;
 
   useEffect(() => {
-    setLoaded(false);
-    getReactions(message.id, userId).then((r) => { setReactions(r); setLoaded(true); }).catch(() => setLoaded(true));
+    let cancelled = false;
+    getReactions(message.id, userId)
+      .then((r) => {
+        if (cancelled) return;
+        setReactions(r);
+        setLoadedFor(message.id);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadedFor(message.id);
+      });
+    return () => { cancelled = true; };
   }, [message.id, userId]);
 
   async function handleToggle(emoji: string) {
@@ -106,6 +117,8 @@ function MessageContextMenu({
       if (y + rect.height > vh) adjustedY = vh - rect.height - 8;
       if (adjustedX < 8) adjustedX = 8;
       if (adjustedY < 8) adjustedY = 8;
+      // 렌더 후 DOM 측정 → 위치 보정 (legitimate measurement effect)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPos({ x: adjustedX, y: adjustedY });
     }
   }, [x, y]);

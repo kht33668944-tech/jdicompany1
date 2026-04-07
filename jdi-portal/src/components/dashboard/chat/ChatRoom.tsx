@@ -50,15 +50,20 @@ export default function ChatRoom({
   const dragCountRef = useRef(0);
   const isFocused = useRef(true);
   const onMessagesUpdateRef = useRef(onMessagesUpdate);
-  onMessagesUpdateRef.current = onMessagesUpdate;
+  // ref 동기화는 effect 로 — render 중 ref mutation 금지 (React 19)
+  useEffect(() => {
+    onMessagesUpdateRef.current = onMessagesUpdate;
+  }, [onMessagesUpdate]);
   const presenceChannelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 채널 변경 시 검색/서랍/고정 패널 닫기 + 고정 메시지 로드
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setShowSearch(false);
     setShowDrawer(false);
     setShowPinnedPanel(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
     getPinnedMessages(channel.id).then(setPinnedMessages).catch(() => {});
   }, [channel.id]);
 

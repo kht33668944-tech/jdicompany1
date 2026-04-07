@@ -33,7 +33,7 @@ interface ReportDetailModalProps {
   userRole: string;
 }
 
-const TYPE_OPTIONS: { value: ReportType; label: string; Icon: React.ComponentType<any> }[] = [
+const TYPE_OPTIONS: { value: ReportType; label: string; Icon: typeof Bug }[] = [
   { value: "bug", label: "오류", Icon: Bug },
   { value: "inconvenience", label: "불편사항", Icon: SmileySad },
   { value: "improvement", label: "개선요청", Icon: Lightbulb },

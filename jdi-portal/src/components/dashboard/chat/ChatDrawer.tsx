@@ -207,19 +207,24 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // 이미지 뷰어
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  // 이미지 뷰어 — id 기반으로 추적 (이전: 인덱스 기반 → URL 미준비 이미지가 섞이면 인덱스 mismatch)
+  const [viewerImageId, setViewerImageId] = useState<string | null>(null);
   const [urlMap, setUrlMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
+    // 탭/채널 변경 시 로딩 플래그/선택 초기화 (intentional state reset)
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setSelecting(false);
     setSelectedIds(new Set());
+    /* eslint-enable react-hooks/set-state-in-effect */
     getDrawerItems(channelId, tab)
-      .then(setItems)
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
+      .then((data) => { if (!cancelled) setItems(data); })
+      .catch(() => { if (!cancelled) setItems([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [open, channelId, tab]);
 
   useEffect(() => {
@@ -269,15 +274,18 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
     }
   }
 
-  // 이미지 뷰어용 데이터
+  // 이미지 뷰어용 데이터 — URL 준비된 것만 (id 포함)
   const imageItems = tab === "images" ? items : [];
   const viewerImages = imageItems
     .map((item) => {
       const url = urlMap.get(item.id);
       const fileData = parseFileContent(item.content);
-      return url && fileData ? { url, name: fileData.name } : null;
+      return url && fileData ? { id: item.id, url, name: fileData.name } : null;
     })
-    .filter((x): x is { url: string; name: string } => x !== null);
+    .filter((x): x is { id: string; url: string; name: string } => x !== null);
+  const viewerIndex = viewerImageId
+    ? viewerImages.findIndex((v) => v.id === viewerImageId)
+    : -1;
 
   const monthGroups = groupByMonth(items);
   const dateGroups = groupByDate(items);
@@ -401,20 +409,17 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
                       <span className="text-[10px] text-slate-400">{group.items.length}장</span>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
-                      {group.items.map((item) => {
-                        const globalIndex = items.indexOf(item);
-                        return (
-                          <DrawerImageItem
-                            key={item.id}
-                            item={item}
-                            selecting={selecting}
-                            selected={selectedIds.has(item.id)}
-                            onToggleSelect={() => toggleSelect(item.id)}
-                            onView={() => setViewerIndex(globalIndex)}
-                            onUrlReady={handleUrlReady}
-                          />
-                        );
-                      })}
+                      {group.items.map((item) => (
+                        <DrawerImageItem
+                          key={item.id}
+                          item={item}
+                          selecting={selecting}
+                          selected={selectedIds.has(item.id)}
+                          onToggleSelect={() => toggleSelect(item.id)}
+                          onView={() => setViewerImageId(item.id)}
+                          onUrlReady={handleUrlReady}
+                        />
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -473,12 +478,12 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
       </div>
 
       {/* Image Viewer */}
-      {viewerIndex !== null && viewerImages.length > 0 && (
+      {viewerImageId !== null && viewerIndex >= 0 && (
         <ImageViewer
           images={viewerImages}
           currentIndex={viewerIndex}
-          onClose={() => setViewerIndex(null)}
-          onNavigate={setViewerIndex}
+          onClose={() => setViewerImageId(null)}
+          onNavigate={(i) => setViewerImageId(viewerImages[i]?.id ?? null)}
         />
       )}
     </>

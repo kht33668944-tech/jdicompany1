@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   CircleDashed,
@@ -44,7 +44,14 @@ type EditingField = "priority" | "category" | "assignee" | "dueDate" | null;
 export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profiles, userId }: Props) {
   const router = useRouter();
   const [editingField, setEditingField] = useState<EditingField>(null);
-  const [localAssigneeIds, setLocalAssigneeIds] = useState(() => new Set(task.assignees.map((a) => a.user_id)));
+  // 서버 상태에서 파생된 담당자 ID — task.assignees 가 바뀌면 자동 갱신 (effect 불필요)
+  const serverAssigneeIds = useMemo(
+    () => new Set(task.assignees.map((a) => a.user_id)),
+    [task.assignees]
+  );
+  // optimistic override (서버 응답 도착 전 임시 표시용)
+  const [optimisticOverride, setOptimisticOverride] = useState<Set<string> | null>(null);
+  const localAssigneeIds = optimisticOverride ?? serverAssigneeIds;
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const StatusIcon = STATUS_ICONS[task.status];
@@ -53,11 +60,6 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
   const progress = calculateProgress(task.checklist_total, task.checklist_completed);
   const progressBarColor =
     progress === 100 ? "bg-emerald-500" : task.status === "진행중" ? "bg-indigo-500" : "bg-indigo-300";
-
-  // Sync local assignees when task prop updates (after router.refresh)
-  useEffect(() => {
-    setLocalAssigneeIds(new Set(task.assignees.map((a) => a.user_id)));
-  }, [task.assignees]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -103,13 +105,11 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
 
   const handleToggleAssignee = async (assigneeId: string) => {
     const isAssigned = localAssigneeIds.has(assigneeId);
-    // Optimistic update
-    setLocalAssigneeIds((prev) => {
-      const next = new Set(prev);
-      if (isAssigned) next.delete(assigneeId);
-      else next.add(assigneeId);
-      return next;
-    });
+    // Optimistic override
+    const next = new Set(localAssigneeIds);
+    if (isAssigned) next.delete(assigneeId);
+    else next.add(assigneeId);
+    setOptimisticOverride(next);
     try {
       if (isAssigned) {
         await removeAssignee(task.id, assigneeId, userId);
@@ -117,10 +117,12 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
         await addAssignee(task.id, assigneeId, userId);
       }
       router.refresh();
+      // 서버 응답 반영 후 override 해제 → serverAssigneeIds 자동 사용
+      setOptimisticOverride(null);
     } catch (error) {
       console.error("담당자 변경 실패:", error);
-      // Revert optimistic update
-      setLocalAssigneeIds(new Set(task.assignees.map((a) => a.user_id)));
+      // Revert
+      setOptimisticOverride(null);
     }
   };
 
