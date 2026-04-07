@@ -66,45 +66,29 @@ async function fetchCountsForTasks(
     };
   }
 
-  const [commentResult, attachmentResult, subtaskResult, checklistResult] = await Promise.all([
-    supabase
-      .from("task_activities")
-      .select("task_id")
-      .in("task_id", taskIds)
-      .eq("type", "comment"),
-    supabase
-      .from("task_attachments")
-      .select("task_id")
-      .in("task_id", taskIds),
-    supabase
-      .from("tasks")
-      .select("parent_id")
-      .in("parent_id", taskIds),
-    supabase.rpc("get_task_checklist_stats", { p_task_ids: taskIds }),
-  ]);
+  // 4개 쿼리 → get_task_stats RPC 1회로 통합
+  const { data, error } = await supabase.rpc("get_task_stats", { p_task_ids: taskIds });
+  if (error) throw error;
 
   const comments = new Map<string, number>();
-  for (const row of commentResult.data ?? []) {
-    comments.set(row.task_id, (comments.get(row.task_id) ?? 0) + 1);
-  }
-
   const attachments = new Map<string, number>();
-  for (const row of attachmentResult.data ?? []) {
-    attachments.set(row.task_id, (attachments.get(row.task_id) ?? 0) + 1);
-  }
-
   const subtasks = new Map<string, number>();
-  for (const row of subtaskResult.data ?? []) {
-    if (row.parent_id) {
-      subtasks.set(row.parent_id, (subtasks.get(row.parent_id) ?? 0) + 1);
-    }
-  }
-
   const checklist = new Map<string, { total: number; completed: number }>();
-  for (const row of checklistResult.data ?? []) {
+
+  for (const row of (data ?? []) as Array<{
+    task_id: string;
+    comment_count: number;
+    attachment_count: number;
+    subtask_count: number;
+    checklist_total: number;
+    checklist_completed: number;
+  }>) {
+    comments.set(row.task_id, row.comment_count);
+    attachments.set(row.task_id, row.attachment_count);
+    subtasks.set(row.task_id, row.subtask_count);
     checklist.set(row.task_id, {
-      total: Number(row.total),
-      completed: Number(row.completed),
+      total: row.checklist_total,
+      completed: row.checklist_completed,
     });
   }
 
@@ -302,3 +286,19 @@ export const getCachedTasksWithDetails = cache(async (): Promise<TaskWithDetails
   const supabase = await createClient();
   return getTasksWithDetails(supabase);
 });
+
+/** 특정 사용자의 할일만 RPC로 직접 조회 — 전체 목록 fetch 후 필터링 불필요 */
+export async function getMyTasksWithDetails(
+  supabase: SupabaseClient,
+  userId: string,
+  includeCompleted: boolean = true,
+  completedDays: number = 7
+): Promise<TaskWithDetails[]> {
+  const { data, error } = await supabase.rpc("get_my_tasks_with_details", {
+    p_user_id: userId,
+    p_include_completed: includeCompleted,
+    p_completed_days: completedDays,
+  });
+  if (error) throw error;
+  return (data ?? []) as TaskWithDetails[];
+}

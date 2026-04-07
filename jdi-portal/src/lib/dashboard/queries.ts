@@ -4,7 +4,7 @@ import type { TaskWithDetails } from "@/lib/tasks/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import { toDateString, getWeekRange, addDays } from "@/lib/utils/date";
 import { getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
-import { getCachedTasksWithDetails } from "@/lib/tasks/queries";
+import { getMyTasksWithDetails } from "@/lib/tasks/queries";
 import { getTodaySchedules } from "@/lib/schedule/queries";
 import { sortTasks } from "@/lib/tasks/utils";
 
@@ -40,21 +40,16 @@ export async function getDashboardData(
   const today = toDateString();
   const { start: weekStart, end: weekEnd } = getWeekRange();
 
-  const [todayRecord, weekRecords, allTasks, todaySchedules, recentActivities] =
+  const [todayRecord, weekRecords, allTasksForUser, todaySchedules, recentActivities] =
     await Promise.all([
       getTodayRecord(supabase, userId),
       getWeekRecords(supabase, userId, weekStart, weekEnd),
-      getCachedTasksWithDetails(),
+      getMyTasksWithDetails(supabase, userId, true, 7),
       getTodaySchedules(supabase, today),
       fetchRecentActivities(supabase, 15),
     ]);
 
-  // 내게 배정된 할일 (전체 — 완료 포함)
-  const allTasksForUser = allTasks.filter(
-    (t) => t.assignees.some((a) => a.user_id === userId)
-  );
-
-  // 미완료만, 마감일순 정렬 (기존 sortTasks 유틸 활용)
+  // 미완료만, 마감일순 정렬
   const myTasks = sortTasks(
     allTasksForUser.filter((t) => t.status !== "완료"),
     "due_date"
