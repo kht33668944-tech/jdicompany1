@@ -23,6 +23,8 @@ import {
   getDesktopPermission,
   requestDesktopPermission,
   isDesktopSupported,
+  isDesktopEnabled,
+  setDesktopEnabled,
   type DesktopPermission,
 } from "@/lib/notifications/desktop";
 import { formatTimeAgo } from "@/lib/utils/date";
@@ -68,19 +70,27 @@ export default function NotificationCenter({
   const [loading, setLoading] = useState(false);
   const [desktopPermission, setDesktopPermission] = useState<DesktopPermission>("default");
   const [desktopSupported, setDesktopSupported] = useState(false);
+  const [desktopEnabled, setDesktopEnabledState] = useState(true);
   const ref = useClickOutside<HTMLDivElement>(() => setOpen(false));
   const router = useRouter();
 
-  // 마운트 시 데스크톱 알림 지원 여부 + 권한 상태 동기화 (SSR-safe)
+  // 마운트 시 데스크톱 알림 지원 여부 + 권한 + 로컬 토글 상태 동기화 (SSR-safe)
   useEffect(() => {
     setDesktopSupported(isDesktopSupported());
     setDesktopPermission(getDesktopPermission());
+    setDesktopEnabledState(isDesktopEnabled());
   }, [open]);
 
   const handleRequestDesktopPermission = useCallback(async () => {
     const result = await requestDesktopPermission();
     setDesktopPermission(result);
   }, []);
+
+  const handleToggleDesktop = useCallback(() => {
+    const next = !desktopEnabled;
+    setDesktopEnabled(next);
+    setDesktopEnabledState(next);
+  }, [desktopEnabled]);
 
   // 드롭다운 열릴 때 알림 목록 fetch
   const fetchNotifications = useCallback(async () => {
@@ -189,10 +199,32 @@ export default function NotificationCenter({
                 </button>
               )}
               {desktopPermission === "granted" && (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50/60 text-emerald-700 text-[11px]">
-                  <BellRinging size={12} weight="fill" />
-                  <span>데스크톱 알림이 활성화되어 있습니다.</span>
-                </div>
+                <button
+                  onClick={handleToggleDesktop}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors ${
+                    desktopEnabled
+                      ? "bg-emerald-50/60 hover:bg-emerald-50 text-emerald-700"
+                      : "bg-slate-50 hover:bg-slate-100 text-slate-500"
+                  }`}
+                  aria-pressed={desktopEnabled}
+                >
+                  <BellRinging size={14} weight={desktopEnabled ? "fill" : "regular"} />
+                  <span className="flex-1 text-left">
+                    데스크톱 알림 {desktopEnabled ? "켜짐" : "꺼짐"}
+                  </span>
+                  {/* 스위치 */}
+                  <span
+                    className={`relative inline-flex h-4 w-7 flex-shrink-0 rounded-full transition-colors ${
+                      desktopEnabled ? "bg-emerald-500" : "bg-slate-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${
+                        desktopEnabled ? "translate-x-3.5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </span>
+                </button>
               )}
               {desktopPermission === "denied" && (
                 <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 text-slate-500 text-[11px]">

@@ -12,6 +12,32 @@
 export type DesktopPermission = "default" | "granted" | "denied" | "unsupported";
 
 const STORAGE_KEY = "jdi:desktop-notification-prompted";
+const ENABLED_KEY = "jdi:desktop-notification-enabled";
+const ENABLED_CHANGE_EVENT = "jdi:desktop-notification-enabled-change";
+
+/**
+ * 사용자의 로컬 토글 상태 (기본 true). 브라우저 권한이 있어도 이 값이 false면 알림 표시 안 함.
+ */
+export function isDesktopEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(ENABLED_KEY) !== "0";
+}
+
+export function setDesktopEnabled(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ENABLED_KEY, enabled ? "1" : "0");
+  window.dispatchEvent(new CustomEvent(ENABLED_CHANGE_EVENT, { detail: { enabled } }));
+}
+
+export function onDesktopEnabledChange(handler: (enabled: boolean) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const listener = (e: Event) => {
+    const detail = (e as CustomEvent<{ enabled: boolean }>).detail;
+    handler(detail?.enabled ?? true);
+  };
+  window.addEventListener(ENABLED_CHANGE_EVENT, listener);
+  return () => window.removeEventListener(ENABLED_CHANGE_EVENT, listener);
+}
 
 export function isDesktopSupported(): boolean {
   return typeof window !== "undefined" && "Notification" in window;
@@ -64,6 +90,8 @@ interface ShowOptions {
 export function showDesktopNotification(opts: ShowOptions): void {
   if (!isDesktopSupported()) return;
   if (window.Notification.permission !== "granted") return;
+  // 사용자가 로컬 토글로 꺼둔 경우 skip
+  if (!isDesktopEnabled()) return;
 
   try {
     // renotify는 TS lib에 없지만 대부분 브라우저가 지원 — 옵셔널 필드로 캐스팅
