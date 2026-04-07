@@ -1,8 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Notification } from "./types";
 
-/** 30일 이상된 알림 자동 삭제 (조회 시 함께 실행) */
-async function cleanupOldNotifications(supabase: SupabaseClient, userId: string) {
+/**
+ * 30일 이상된 알림 정리.
+ * - 별도 함수로 분리: 자주 호출되는 getNotifications 안에서 매번 DELETE 가 발생하던 문제 제거
+ * - 호출 주체: 관리 cron / 사용자 메뉴 / 세션 시작 등 빈도 낮은 곳에서 명시적으로 호출
+ */
+export async function cleanupOldNotifications(supabase: SupabaseClient, userId: string) {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   await supabase
     .from("notifications")
@@ -26,9 +30,6 @@ export async function getNotifications(
   if (options?.unreadOnly) {
     query = query.eq("is_read", false);
   }
-
-  // 오래된 알림 정리 (fire-and-forget)
-  cleanupOldNotifications(supabase, userId).catch(() => {});
 
   const { data, error } = await query;
   if (error) throw error;

@@ -45,7 +45,8 @@ export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardPr
   useEffect(() => {
     setElapsed(calcElapsed());
     if (status !== WORKING_STATUS) return;
-    const timer = setInterval(() => setElapsed(calcElapsed()), 1000);
+    // 표시는 분 단위 (formatMinutes) — 1초마다 리렌더할 필요 없음. 60초 간격으로 갱신.
+    const timer = setInterval(() => setElapsed(calcElapsed()), 60_000);
     return () => clearInterval(timer);
   }, [calcElapsed, status]);
 
