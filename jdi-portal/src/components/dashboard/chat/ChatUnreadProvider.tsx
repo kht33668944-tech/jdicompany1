@@ -23,15 +23,14 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
   const membershipsRef = useRef<Map<string, MembershipInfo>>(new Map());
 
   const fetchUnread = useCallback(async () => {
-    // 채팅 페이지에 있을 때는 ChatPageClient가 직접 관리
-    if (isChatPage) return;
+    // 사이드바 뱃지는 채팅 페이지에서도 항상 정확해야 함
     try {
       const count = await getTotalUnreadCount(createClient(), userId);
       onUnreadChange(count);
     } catch {
       // 실패 시 무시
     }
-  }, [userId, onUnreadChange, isChatPage]);
+  }, [userId, onUnreadChange]);
 
   // 채널 멤버십/음소거 상태 캐시 로드
   const loadMemberships = useCallback(async () => {
@@ -65,16 +64,19 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "channel_members", filter: `user_id=eq.${userId}` },
-        () => { loadMemberships(); }
+        () => {
+          loadMemberships();
+          // last_read_at 변경 등 멤버십이 바뀌면 사이드바 뱃지도 즉시 재계산
+          fetchUnread();
+        }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userId, loadMemberships]);
+  }, [userId, loadMemberships, fetchUnread]);
 
   // Realtime 구독: 새 메시지 → unread 재계산 + 토스트 + OS 알림
+  // (사이드바 뱃지는 채팅 페이지에서도 항상 갱신, 토스트/OS 알림만 채팅 페이지에서 스킵)
   useEffect(() => {
-    if (isChatPage) return;
-
     const supabase = createClient();
     const channel = supabase
       .channel("chat:unread-badge")
@@ -100,14 +102,17 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
           // 시스템 메시지/삭제 메시지 무시
           if (newMsg.type === "system" || newMsg.is_deleted) return;
 
-          // 내가 속한 채널인지 + 음소거 여부 확인 (캐시 사용)
+          // 내가 속한 채널인지 확인 (캐시 사용)
           const membership = membershipsRef.current.get(newMsg.channel_id);
           if (!membership) return; // 멤버 아니면 무시
-          if (membership.is_muted) {
-            // 음소거여도 unread count는 갱신 (배지 정확도 유지)
-            fetchUnread();
-            return;
-          }
+
+          // 사이드바 뱃지는 항상 갱신 (음소거여도 정확도 유지)
+          fetchUnread();
+
+          // 채팅 페이지에 있으면 토스트/OS 알림 스킵 (ChatPageClient가 자체 처리)
+          if (isChatPage) return;
+          // 음소거 채널은 토스트/OS 알림 발사하지 않음
+          if (membership.is_muted) return;
 
           // 발신자 + 채널 이름 병렬 조회
           const [{ data: profile }, { data: channelInfo }] = await Promise.all([
@@ -117,13 +122,8 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
 
           const senderName = profile?.full_name ?? "누군가";
           const channelName = channelInfo?.name ?? "채팅";
-          const isMemo = channelInfo?.type === "memo";
-
           // 본인 메모 채널은 알림 불필요 (본인 메시지는 위에서 이미 차단됨)
-          if (isMemo) {
-            fetchUnread();
-            return;
-          }
+          if (channelInfo?.type === "memo") return;
 
           const bodyText =
             newMsg.type === "image"
@@ -151,9 +151,6 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
             link: `/dashboard/chat/${newMsg.channel_id}`,
             tag: `chat-msg:${newMsg.id}`,
           });
-
-          // 배지 업데이트
-          fetchUnread();
         }
       )
       .subscribe();

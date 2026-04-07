@@ -9,105 +9,14 @@ export async function getChannels(
   supabase: SupabaseClient,
   userId: string
 ): Promise<ChannelWithDetails[]> {
-  // 내가 속한 채널 ID 목록
-  const { data: memberships, error: memErr } = await supabase
-    .from("channel_members")
-    .select("channel_id, last_read_at")
-    .eq("user_id", userId);
-
-  if (memErr) throw memErr;
-  if (!memberships || memberships.length === 0) return [];
-
-  const channelIds = memberships.map((m) => m.channel_id);
-  const lastReadMap = new Map(memberships.map((m) => [m.channel_id, m.last_read_at]));
-
-  // 채널 정보 조회
-  const { data: channels, error: chErr } = await supabase
-    .from("channels")
-    .select("*")
-    .in("id", channelIds)
-    .order("updated_at", { ascending: false });
-
-  if (chErr) throw chErr;
-  if (!channels) return [];
-
-  // 마지막 메시지, 읽지 않은 수, 멤버 수를 모두 병렬 조회
-  type LastMsg = { channel_id: string; content: string; created_at: string; type: string; user_id: string };
-  const lastMsgMap = new Map<string, LastMsg>();
-  const unreadCounts = new Map<string, number>();
-  const memberCountMap = new Map<string, number>();
-
-  await Promise.all([
-    // 각 채널의 마지막 메시지 (채널당 1개씩 병렬)
-    Promise.all(channelIds.map(async (chId) => {
-      const { data } = await supabase
-        .from("messages")
-        .select("channel_id, content, created_at, type, user_id")
-        .eq("channel_id", chId)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      if (data) lastMsgMap.set(chId, data as LastMsg);
-    })),
-    // 각 채널의 읽지 않은 메시지 수 (병렬)
-    Promise.all(channelIds.map(async (channelId) => {
-      const lastRead = lastReadMap.get(channelId);
-      if (!lastRead) return;
-      const { count } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("channel_id", channelId)
-        .eq("is_deleted", false)
-        .neq("user_id", userId)
-        .gt("created_at", lastRead);
-      unreadCounts.set(channelId, count ?? 0);
-    })),
-    // 각 채널의 멤버 수
-    supabase
-      .from("channel_members")
-      .select("channel_id")
-      .in("channel_id", channelIds)
-      .then(({ data: memberCounts }) => {
-        for (const m of memberCounts ?? []) {
-          memberCountMap.set(m.channel_id, (memberCountMap.get(m.channel_id) ?? 0) + 1);
-        }
-      }),
-  ]);
-
-  // 마지막 메시지 작성자 프로필
-  const userIds = new Set<string>();
-  for (const msg of lastMsgMap.values()) {
-    if (msg) userIds.add(msg.user_id);
-  }
-  const profileMap = new Map<string, string>();
-  if (userIds.size > 0) {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, full_name")
-      .in("id", Array.from(userIds));
-    for (const p of profiles ?? []) {
-      profileMap.set(p.id, p.full_name);
-    }
-  }
-
-  return channels.map((ch) => {
-    const lastMsg = lastMsgMap.get(ch.id);
-    return {
-      ...ch,
-      members: [],
-      member_count: memberCountMap.get(ch.id) ?? 0,
-      last_message: lastMsg
-        ? {
-            content: lastMsg.content,
-            created_at: lastMsg.created_at,
-            user_name: profileMap.get(lastMsg.user_id) ?? "",
-            type: lastMsg.type,
-          }
-        : null,
-      unread_count: unreadCounts.get(ch.id) ?? 0,
-    } as ChannelWithDetails;
-  });
+  // 단일 RPC 호출로 채널 + 마지막 메시지 + 멤버 수 + 안읽은 수 일괄 조회
+  const { data, error } = await supabase.rpc("get_user_channels", { p_user_id: userId });
+  if (error) throw error;
+  if (!data) return [];
+  return (data as ChannelWithDetails[]).map((ch) => ({
+    ...ch,
+    members: [],
+  }));
 }
 
 /**

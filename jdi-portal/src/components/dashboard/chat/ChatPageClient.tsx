@@ -28,6 +28,7 @@ export default function ChatPageClient({
   initialMessages,
   userId,
   userName,
+  userAvatar,
 }: ChatPageClientProps) {
   const [channels, setChannels] = useState<ChannelWithDetails[]>(initialChannels);
   const [selectedChannel, setSelectedChannel] = useState<ChannelWithDetails | undefined>(
@@ -45,6 +46,8 @@ export default function ChatPageClient({
   selectedChannelRef.current = selectedChannel;
   const mutedChannelsRef = useRef(mutedChannels);
   mutedChannelsRef.current = mutedChannels;
+  const channelsRef = useRef(channels);
+  channelsRef.current = channels;
 
   // Ensure memo channel exists on mount
   useEffect(() => {
@@ -108,6 +111,154 @@ export default function ChatPageClient({
     };
   }, [userId]);
 
+  // 채널 멤버십 실시간 동기화 (다른 사람이 나를 채널에 초대/제거하면 즉시 반영)
+  useEffect(() => {
+    const supabase = createClient();
+    const subscription = supabase
+      .channel(`chat:memberships:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "channel_members",
+          filter: `user_id=eq.${userId}`,
+        },
+        async (payload) => {
+          const newMember = payload.new as { channel_id: string };
+          // 이미 목록에 있으면 무시
+          let exists = false;
+          setChannels((prev) => {
+            exists = prev.some((ch) => ch.id === newMember.channel_id);
+            return prev;
+          });
+          if (exists) return;
+          // 새 채널 정보 가져오기
+          const full = await getChannelById(supabase, newMember.channel_id);
+          if (!full) return;
+          setChannels((prev) => {
+            if (prev.some((ch) => ch.id === full.id)) return prev;
+            return [full, ...prev];
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "channel_members",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const removed = payload.old as { channel_id: string };
+          setChannels((prev) => prev.filter((ch) => ch.id !== removed.channel_id));
+          // 현재 보고 있던 채널이 제거됐으면 선택 해제
+          if (selectedChannelRef.current?.id === removed.channel_id) {
+            setSelectedChannel(undefined);
+            setMobileShowChat(false);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "channel_members",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          // mute / favorite 다른 기기/탭 동기화
+          const row = payload.new as { channel_id: string; is_muted: boolean; is_favorite: boolean };
+          setMutedChannels((prev) => {
+            const next = new Set(prev);
+            if (row.is_muted) next.add(row.channel_id);
+            else next.delete(row.channel_id);
+            return next;
+          });
+          setFavoriteChannels((prev) => {
+            const next = new Set(prev);
+            if (row.is_favorite) next.add(row.channel_id);
+            else next.delete(row.channel_id);
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [userId]);
+
+  // 채널 메타(이름/설명/updated_at) 실시간 동기화
+  useEffect(() => {
+    const supabase = createClient();
+    const sub = supabase
+      .channel("chat:channels-meta")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "channels" },
+        (payload) => {
+          const updated = payload.new as { id: string; name: string; description: string; updated_at: string };
+          setChannels((prev) =>
+            prev.map((ch) =>
+              ch.id === updated.id
+                ? { ...ch, name: updated.name, description: updated.description, updated_at: updated.updated_at }
+                : ch
+            )
+          );
+          setSelectedChannel((prev) =>
+            prev && prev.id === updated.id
+              ? { ...prev, name: updated.name, description: updated.description, updated_at: updated.updated_at }
+              : prev
+          );
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, []);
+
+  // 멤버 수 변동 실시간 동기화 (#2): 다른 사람이 내가 속한 채널에 들어오거나 나가면 즉시 반영
+  useEffect(() => {
+    const supabase = createClient();
+    const refreshMemberCount = async (channelId: string) => {
+      // 내가 속한 채널만 갱신
+      if (!channelsRef.current.some((ch) => ch.id === channelId)) return;
+      const { count } = await supabase
+        .from("channel_members")
+        .select("id", { count: "exact", head: true })
+        .eq("channel_id", channelId);
+      const next = count ?? 0;
+      setChannels((prev) =>
+        prev.map((ch) => (ch.id === channelId ? { ...ch, member_count: next } : ch))
+      );
+      setSelectedChannel((prev) =>
+        prev && prev.id === channelId ? { ...prev, member_count: next } : prev
+      );
+    };
+
+    const sub = supabase
+      .channel("chat:member-count-sync")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "channel_members" },
+        (payload) => refreshMemberCount((payload.new as { channel_id: string }).channel_id)
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "channel_members" },
+        (payload) => refreshMemberCount((payload.old as { channel_id: string }).channel_id)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, []);
+
   // Global realtime subscription for new messages
   useEffect(() => {
     const supabase = createClient();
@@ -117,25 +268,18 @@ export default function ChatPageClient({
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
         async (payload) => {
-          const newMsg = payload.new as Message;
+          // payload.new를 그대로 사용 — 메시지 refetch 제거
+          const fullMsg = payload.new as Message;
 
-          const { data } = await supabase
-            .from("messages")
-            .select("*")
-            .eq("id", newMsg.id)
-            .single();
-
-          if (data) {
+          // 발신자 프로필 lazy fetch (목록 미리보기에 필요)
+          if (fullMsg.user_id !== userId) {
             const { data: profile } = await supabase
               .from("profiles")
               .select("full_name, avatar_url")
-              .eq("id", data.user_id)
+              .eq("id", fullMsg.user_id)
               .single();
-            data.user_profile = profile;
+            if (profile) fullMsg.user_profile = profile;
           }
-
-          const fullMsg = data as Message | null;
-          if (!fullMsg) return;
 
           const currentSelected = selectedChannelRef.current;
 
@@ -317,6 +461,7 @@ export default function ChatPageClient({
               messages={messages}
               userId={userId}
               userName={userName}
+              userAvatar={userAvatar}
               onMessagesUpdate={setMessages}
               onBack={handleBackToList}
               onSettingsClick={() => setShowSettings(true)}

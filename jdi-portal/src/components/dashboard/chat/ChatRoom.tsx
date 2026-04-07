@@ -20,6 +20,7 @@ interface ChatRoomProps {
   messages: Message[];
   userId: string;
   userName: string;
+  userAvatar?: string | null;
   onMessagesUpdate: (updater: (prev: Message[]) => Message[]) => void;
   onBack?: () => void;
   onSettingsClick: () => void;
@@ -31,6 +32,7 @@ export default function ChatRoom({
   messages,
   userId,
   userName,
+  userAvatar,
   onMessagesUpdate,
   onBack,
   onSettingsClick,
@@ -126,22 +128,43 @@ export default function ChatRoom({
           filter: `channel_id=eq.${channel.id}`,
         },
         async (payload) => {
-          const { data } = await supabase
-            .from("messages")
-            .select("*")
-            .eq("id", payload.new.id)
-            .single();
-          if (data) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("full_name, avatar_url")
-              .eq("id", data.user_id)
-              .single();
-            data.user_profile = profile;
+          const newMsg = payload.new as Message;
+
+          // 본인이 보낸 메시지는 handleSend에서 이미 추가됨 → 중복 방지
+          if (newMsg.user_id === userId) return;
+
+          // 기존 메시지 목록에서 동일 사용자의 프로필을 캐시에서 검색
+          let cachedProfile: { full_name: string; avatar_url: string | null } | undefined;
+          onMessagesUpdateRef.current((prev) => {
+            const found = prev.find((m) => m.user_id === newMsg.user_id && m.user_profile);
+            if (found?.user_profile) cachedProfile = found.user_profile;
+            return prev; // 변경 없음 (탐색만)
+          });
+
+          if (cachedProfile) {
+            // 캐시 히트: 즉시 추가
+            const enriched = { ...newMsg, user_profile: cachedProfile };
             onMessagesUpdateRef.current((prev) => {
-              if (prev.some((m) => m.id === data.id)) return prev;
-              return [...prev, data as Message];
+              if (prev.some((m) => m.id === enriched.id)) return prev;
+              return [...prev, enriched];
             });
+            return;
+          }
+
+          // 캐시 미스: 일단 추가하고, 프로필 도착하면 채움
+          onMessagesUpdateRef.current((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, avatar_url")
+            .eq("id", newMsg.user_id)
+            .single();
+          if (profile) {
+            onMessagesUpdateRef.current((prev) =>
+              prev.map((m) => (m.id === newMsg.id ? { ...m, user_profile: profile } : m))
+            );
           }
         }
       )
@@ -154,13 +177,34 @@ export default function ChatRoom({
           filter: `channel_id=eq.${channel.id}`,
         },
         (payload) => {
+          const updated = payload.new as Message;
           onMessagesUpdateRef.current((prev) =>
             prev.map((m) =>
-              m.id === payload.new.id
-                ? { ...m, ...payload.new, user_profile: m.user_profile }
+              m.id === updated.id
+                ? { ...m, ...updated, user_profile: m.user_profile }
                 : m
             )
           );
+          // 고정 메시지 패널 실시간 동기화 (#3)
+          setPinnedMessages((prev) => {
+            const wasPinned = prev.some((p) => p.id === updated.id);
+            if (updated.is_pinned && !updated.is_deleted) {
+              if (wasPinned) {
+                return prev.map((p) => (p.id === updated.id ? { ...p, ...updated, user_profile: p.user_profile } : p));
+              }
+              // 새로 고정됨 — 호출자가 user_profile 모를 수 있으므로 messages 캐시에서 시도
+              let userProfile: Message["user_profile"];
+              onMessagesUpdateRef.current((cur) => {
+                const found = cur.find((m) => m.id === updated.id);
+                userProfile = found?.user_profile;
+                return cur;
+              });
+              return [{ ...updated, user_profile: userProfile }, ...prev];
+            } else {
+              // 고정 해제 또는 삭제
+              return wasPinned ? prev.filter((p) => p.id !== updated.id) : prev;
+            }
+          });
         }
       )
       .subscribe();
@@ -186,9 +230,14 @@ export default function ChatRoom({
       } else {
         const sent = await sendMessage({ channelId: channel.id, content, parentMessageId: replyingTo?.id });
         setReplyingTo(null);
+        // sendMessage가 더 이상 프로필을 채우지 않으므로 보낸이 정보로 직접 채움
+        const sentWithProfile: Message = {
+          ...sent,
+          user_profile: { full_name: userName, avatar_url: userAvatar ?? null },
+        };
         onMessagesUpdate((prev) => {
-          if (prev.some((m) => m.id === sent.id)) return prev;
-          return [...prev, sent];
+          if (prev.some((m) => m.id === sentWithProfile.id)) return prev;
+          return [...prev, sentWithProfile];
         });
       }
     } catch (err) {
@@ -223,9 +272,13 @@ export default function ChatRoom({
         type: result.fileType,
       });
       const sent = await sendMessage({ channelId: channel.id, content, type: msgType });
+      const sentWithProfile: Message = {
+        ...sent,
+        user_profile: { full_name: userName, avatar_url: userAvatar ?? null },
+      };
       onMessagesUpdate((prev) => {
-        if (prev.some((m) => m.id === sent.id)) return prev;
-        return [...prev, sent];
+        if (prev.some((m) => m.id === sentWithProfile.id)) return prev;
+        return [...prev, sentWithProfile];
       });
     } catch (err) {
       console.error("파일 업로드 실패:", err);

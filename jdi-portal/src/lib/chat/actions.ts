@@ -188,9 +188,12 @@ export async function sendMessage(params: {
   parentMessageId?: string;
 }): Promise<Message> {
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  // getSession()은 로컬 저장소에서 즉시 읽음 (네트워크 호출 없음)
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) throw new Error("인증이 필요합니다.");
 
+  // 메시지 INSERT 단 1회 round-trip
   const { data, error } = await supabase
     .from("messages")
     .insert({
@@ -205,20 +208,14 @@ export async function sendMessage(params: {
 
   if (error) throw error;
 
-  // 프로필 별도 조회
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, avatar_url")
-    .eq("id", user.id)
-    .single();
-
-  // 채널 updated_at 갱신 (목록 정렬용)
-  await supabase
+  // 채널 updated_at 갱신은 fire-and-forget — 발신자가 기다릴 필요 없음
+  void supabase
     .from("channels")
     .update({ updated_at: new Date().toISOString() })
     .eq("id", params.channelId);
 
-  return { ...data, user_profile: profile } as Message;
+  // 프로필은 호출자가 자신의 정보를 알고 있으므로 여기서 조회하지 않음
+  return data as Message;
 }
 
 export async function editMessage(messageId: string, content: string): Promise<void> {
@@ -287,49 +284,8 @@ export async function getPinnedMessages(channelId: string): Promise<Message[]> {
 
 export async function markAsRead(channelId: string): Promise<void> {
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  // 갱신 전 old last_read_at 조회
-  const { data: membership } = await supabase
-    .from("channel_members")
-    .select("last_read_at")
-    .eq("channel_id", channelId)
-    .eq("user_id", user.id)
-    .single();
-
-  const oldLastReadAt = membership?.last_read_at ?? null;
-
-  // last_read_at 갱신
-  await supabase
-    .from("channel_members")
-    .update({ last_read_at: new Date().toISOString() })
-    .eq("channel_id", channelId)
-    .eq("user_id", user.id);
-
-  // 진짜 안 읽은 메시지만 처리 (oldLastReadAt 이후)
-  let query = supabase
-    .from("messages")
-    .select("id")
-    .eq("channel_id", channelId)
-    .eq("is_deleted", false)
-    .neq("user_id", user.id);
-
-  if (oldLastReadAt) {
-    query = query.gt("created_at", oldLastReadAt);
-  }
-
-  const { data: unreadMessages } = await query;
-
-  if (!unreadMessages || unreadMessages.length === 0) return;
-
-  const reads = unreadMessages.map((m) => ({
-    message_id: m.id,
-    user_id: user.id,
-  }));
-
-  // upsert로 중복 방지
-  await supabase.from("message_reads").upsert(reads, { onConflict: "message_id,user_id" });
+  // 단일 RPC 호출 — last_read_at 갱신 + 누락된 read_receipt 일괄 INSERT
+  await supabase.rpc("mark_channel_read", { p_channel_id: channelId });
 }
 
 export async function getReadReceipts(messageId: string): Promise<MessageReadReceipt[]> {
