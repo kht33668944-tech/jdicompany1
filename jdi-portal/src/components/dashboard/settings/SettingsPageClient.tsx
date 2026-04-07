@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserCircle, ShieldCheck, Bell, UsersThree } from "phosphor-react";
 import ProfileSection from "./ProfileSection";
 import AccountSection from "./AccountSection";
+import InstallAppCard from "./InstallAppCard";
 import NotificationsSection from "./NotificationsSection";
 import AdminSection from "./AdminSection";
 import type { Profile } from "@/lib/attendance/types";
@@ -67,7 +68,10 @@ export default function SettingsPageClient({
         <ProfileSection profile={profile} onUpdated={() => router.refresh()} />
       )}
       {activeTab === "account" && (
-        <AccountSection profile={profile} />
+        <div className="space-y-6">
+          <AccountSection profile={profile} />
+          <InstallAppCard />
+        </div>
       )}
       {activeTab === "notifications" && (
         <NotificationsSection userId={profile.id} initialSettings={notificationSettings} />
