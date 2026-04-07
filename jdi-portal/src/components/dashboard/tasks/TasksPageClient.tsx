@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MagnifyingGlass, Plus } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskWithDetails, TaskViewId, TaskFilterState } from "@/lib/tasks/types";
 import { TASK_VIEWS, DEFAULT_FILTER_STATE } from "@/lib/tasks/constants";
 import { filterTasks, sortTasks, groupTasks, computeSummary, buildTaskTree } from "@/lib/tasks/utils";
+import { getTasksWithDetails } from "@/lib/tasks/queries";
+import { getCachedTasks, cacheTasks } from "@/lib/tasks/tasksCache";
+import { createClient } from "@/lib/supabase/client";
 import TaskSummaryPanel from "./TaskSummaryPanel";
 import TaskFilters from "./TaskFilters";
 import ListView from "./views/ListView";
@@ -15,36 +18,90 @@ import TimelineView from "./views/TimelineView";
 import TaskCreateModal from "./TaskCreateModal";
 
 interface Props {
-  allTasks: TaskWithDetails[];
   profiles: Profile[];
   userId: string;
+  /** SSR 호출마다 새 값 — router.refresh() 후 client re-fetch 트리거 */
+  refreshSignal: number;
 }
 
 const VIEW_STORAGE_KEY = "tasks-active-view";
 const FILTER_STORAGE_KEY = "tasks-filters";
 
-function getInitialView(): TaskViewId {
-  if (typeof window === "undefined") return "list";
-  return (window.localStorage.getItem(VIEW_STORAGE_KEY) as TaskViewId | null) ?? "list";
-}
-
-function getInitialFilters(): TaskFilterState {
-  if (typeof window === "undefined") return DEFAULT_FILTER_STATE;
-  try {
-    const saved = window.localStorage.getItem(FILTER_STORAGE_KEY);
-    if (saved) return { ...DEFAULT_FILTER_STATE, ...JSON.parse(saved) };
-  } catch {
-    // 로컬스토리지 파싱 실패 무시 — 기본값으로 폴백
-  }
-  return DEFAULT_FILTER_STATE;
-}
-
-export default function TasksPageClient({ allTasks, profiles, userId }: Props) {
+export default function TasksPageClient({ profiles, userId, refreshSignal }: Props) {
   const router = useRouter();
-  const [activeView, setActiveView] = useState<TaskViewId>(getInitialView);
-  const [filters, setFilters] = useState<TaskFilterState>(getInitialFilters);
+  // SSR/CSR hydration mismatch 방지 — 항상 기본값으로 시작 후 mount 시 localStorage 로드
+  const [activeView, setActiveView] = useState<TaskViewId>("list");
+  const [filters, setFilters] = useState<TaskFilterState>(DEFAULT_FILTER_STATE);
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // mount 후 localStorage 에서 사용자 설정 복원
+  useEffect(() => {
+    try {
+      const savedView = window.localStorage.getItem(VIEW_STORAGE_KEY) as TaskViewId | null;
+      if (savedView) setActiveView(savedView);
+      const savedFilters = window.localStorage.getItem(FILTER_STORAGE_KEY);
+      if (savedFilters) {
+        setFilters({ ...DEFAULT_FILTER_STATE, ...JSON.parse(savedFilters) });
+      }
+    } catch {
+      // 파싱 실패 무시 — 기본값 유지
+    }
+  }, []);
+  // 할일 데이터: SSR 없이 클라이언트가 직접 로딩
+  // 1) mount 시 IndexedDB 캐시 즉시 표시 (체감 0ms, 두 번째 진입부터)
+  // 2) 백그라운드 client fetch → 최신 데이터로 교체 + 캐시 갱신
+  const [allTasks, setAllTasks] = useState<TaskWithDetails[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // 1) IndexedDB 즉시 표시
+    void getCachedTasks().then((cached) => {
+      if (cancelled || !cached || cached.length === 0) return;
+      setAllTasks((prev) => (prev.length === 0 ? cached : prev));
+    });
+
+    // 2) 백그라운드 신선 fetch
+    void (async () => {
+      try {
+        const supabase = createClient();
+        const fresh = await getTasksWithDetails(supabase);
+        if (cancelled) return;
+        setAllTasks(fresh);
+        void cacheTasks(fresh);
+      } catch (err) {
+        console.warn("[TasksPageClient] fetch failed:", err);
+      } finally {
+        if (!cancelled) setHasLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // mutation 후 router.refresh() 대용 — 클라이언트에서 직접 재조회
+  const refreshTasks = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const fresh = await getTasksWithDetails(supabase);
+      setAllTasks(fresh);
+      void cacheTasks(fresh);
+    } catch (err) {
+      console.warn("[TasksPageClient] refreshTasks failed:", err);
+    }
+  }, []);
+
+  // refreshSignal 변화 감지 → re-fetch
+  // 첫 mount 는 위 useEffect 가 처리하므로 hasLoaded 로 가드
+  useEffect(() => {
+    if (!hasLoaded) return;
+    void refreshTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal]);
 
   useEffect(() => {
     window.localStorage.setItem(VIEW_STORAGE_KEY, activeView);

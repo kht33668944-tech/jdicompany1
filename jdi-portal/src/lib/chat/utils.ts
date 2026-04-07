@@ -92,6 +92,10 @@ export function groupMessagesByDate(messages: Message[]): { date: string; messag
   }));
 }
 
+// SSR/CSR 동일 결과를 보장하기 위해 수동 포맷 사용
+// (Node.js 에 한국어 ICU 데이터가 없어 toLocaleString 결과가 환경마다 다름)
+const KOREAN_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
 /**
  * 채널 목록용 시간 포맷: 오늘이면 "오후 2:30", 이번주면 "월", 이전이면 "4/5"
  */
@@ -100,16 +104,16 @@ export function formatChannelTime(dateStr: string): string {
   const now = new Date();
 
   if (isSameDay(date, now)) {
-    return date.toLocaleTimeString("ko-KR", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+    const h = date.getHours();
+    const m = date.getMinutes();
+    const period = h < 12 ? "오전" : "오후";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${period} ${h12}:${String(m).padStart(2, "0")}`;
   }
 
   const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays < 7) {
-    return date.toLocaleDateString("ko-KR", { weekday: "short" });
+    return KOREAN_WEEKDAYS[date.getDay()];
   }
 
   return `${date.getMonth() + 1}/${date.getDate()}`;

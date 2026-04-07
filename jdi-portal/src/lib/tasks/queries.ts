@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { cache } from "react";
 import type {
   TaskWithDetails,
   TaskChecklistItem,
@@ -281,13 +280,6 @@ export async function getMaxPosition(supabase: SupabaseClient, status: string): 
     .single();
   return data?.position ?? 0;
 }
-
-/** 요청 단위 캐싱 — 같은 렌더에서 여러 번 호출해도 1회만 실행 */
-export const getCachedTasksWithDetails = cache(async (): Promise<TaskWithDetails[]> => {
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
-  return getTasksWithDetails(supabase);
-});
 
 /** 특정 사용자의 할일만 RPC로 직접 조회 — 전체 목록 fetch 후 필터링 불필요 */
 export async function getMyTasksWithDetails(

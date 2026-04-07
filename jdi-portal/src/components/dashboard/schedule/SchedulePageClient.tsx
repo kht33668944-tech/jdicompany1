@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarBlank, List, CalendarCheck, Calendar, Plus, Buildings, User, FunnelSimple } from "phosphor-react";
 import MonthlyCalendar from "./MonthlyCalendar";
@@ -11,6 +11,13 @@ import DaySidebar from "./DaySidebar";
 import ScheduleCreateModal from "./ScheduleCreateModal";
 import ScheduleDetailModal from "./ScheduleDetailModal";
 import { toDateString } from "@/lib/utils/date";
+import { createClient } from "@/lib/supabase/client";
+import { getMonthSchedules } from "@/lib/schedule/queries";
+import {
+  getCachedMonth,
+  cacheMonth,
+  invalidateMonthCache,
+} from "@/lib/schedule/scheduleCache";
 import type { ScheduleTabId, ScheduleWithProfile } from "@/lib/schedule/types";
 import type { Profile } from "@/lib/attendance/types";
 
@@ -45,10 +52,10 @@ function getInitialTab(): ScheduleTabId {
 }
 
 export default function SchedulePageClient({
-  schedules,
+  schedules: initialSchedules,
   profiles,
-  currentYear,
-  currentMonth,
+  currentYear: initialYear,
+  currentMonth: initialMonth,
   userId,
   userRole,
 }: SchedulePageClientProps) {
@@ -58,6 +65,22 @@ export default function SchedulePageClient({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleWithProfile | null>(null);
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
+
+  // 클라이언트 상태로 month/schedules 관리 — 월 전환 시 SSR 왕복 없이 IDB+직접 fetch
+  const [currentYear, setCurrentYear] = useState<number>(initialYear);
+  const [currentMonth, setCurrentMonth] = useState<number>(initialMonth);
+  const [schedules, setSchedules] = useState<ScheduleWithProfile[]>(initialSchedules);
+
+  // 진행 중인 fetch 의 대상 키 — 응답 도착 시 현재 월과 일치할 때만 반영
+  const inflightKeyRef = useRef<string | null>(null);
+
+  // SSR 에서 새로 props 가 도착하면(예: router.refresh) state 에 반영하고 캐시 갱신
+  useEffect(() => {
+    setCurrentYear(initialYear);
+    setCurrentMonth(initialMonth);
+    setSchedules(initialSchedules);
+    void cacheMonth(initialYear, initialMonth, initialSchedules);
+  }, [initialYear, initialMonth, initialSchedules]);
 
   const filteredSchedules = useMemo(() => schedules.filter((s) => {
     if (visibilityFilter === "all") return true;
@@ -71,17 +94,59 @@ export default function SchedulePageClient({
     window.localStorage.setItem(STORAGE_KEY, activeTab);
   }, [activeTab]);
 
+  // 현재 월의 신선한 데이터를 fetch 해서 IDB+state 갱신
+  const refetchMonth = async (year: number, month: number) => {
+    const key = `${year}-${month}`;
+    inflightKeyRef.current = key;
+    try {
+      const supabase = createClient();
+      const fresh = await getMonthSchedules(supabase, year, month);
+      // 그 사이 다른 월로 이동했다면 무시
+      if (inflightKeyRef.current !== key) return;
+      setSchedules(fresh);
+      void cacheMonth(year, month, fresh);
+    } catch (err) {
+      console.warn("[schedule] refetch failed:", err);
+    }
+  };
+
   const handleMonthChange = (year: number, month: number) => {
-    router.push(`/dashboard/schedule?year=${year}&month=${month}`);
+    if (year === currentYear && month === currentMonth) return;
+
+    // 1) 클라이언트 상태 즉시 전환
+    setCurrentYear(year);
+    setCurrentMonth(month);
+
+    // 2) IDB 캐시 hit → 즉시 표시 (체감 0ms)
+    void getCachedMonth(year, month).then((cached) => {
+      if (cached && inflightKeyRef.current === `${year}-${month}`) {
+        setSchedules(cached);
+      }
+    });
+    // 캐시 조회 동안 빈 화면 방지: 일단 비우지 않고 기존 데이터 유지
+    // 신선한 데이터가 도착하면 자동으로 교체됨
+
+    // 3) 백그라운드 신선 fetch
+    void refetchMonth(year, month);
+
+    // 4) URL 동기화 (가벼운 replace, 스크롤 유지)
+    router.replace(`/dashboard/schedule?year=${year}&month=${month}`, { scroll: false });
   };
 
   const handleScheduleCreated = () => {
     setShowCreateModal(false);
+    // 캐시 무효화 후 현재 월 재조회
+    void invalidateMonthCache(currentYear, currentMonth).then(() =>
+      refetchMonth(currentYear, currentMonth)
+    );
     router.refresh();
   };
 
   const handleScheduleUpdated = () => {
     setSelectedSchedule(null);
+    void invalidateMonthCache(currentYear, currentMonth).then(() =>
+      refetchMonth(currentYear, currentMonth)
+    );
     router.refresh();
   };
 
