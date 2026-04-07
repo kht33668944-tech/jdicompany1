@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { ATTENDANCE_STATUS_CONFIG } from "./constants";
-import type { AttendanceRecord, CorrectionRequest } from "./types";
+import type { CorrectionRequest } from "./types";
 import { toDateString } from "@/lib/utils/date";
 import type { VacationType } from "./types";
 import { createNotification } from "@/lib/notifications/actions";
@@ -20,10 +19,6 @@ async function verifyAdmin(supabase: ReturnType<typeof getSupabase>, adminId: st
     throw new Error("권한이 없습니다: 관리자만 가능합니다.");
   }
 }
-
-const ATTENDANCE_STATUSES = Object.keys(ATTENDANCE_STATUS_CONFIG) as AttendanceRecord["status"][];
-const WORKING_STATUS = ATTENDANCE_STATUSES[1];
-const CHECKED_OUT_STATUS = ATTENDANCE_STATUSES[2];
 
 export async function checkIn(userId: string) {
   const supabase = getSupabase();
@@ -190,55 +185,12 @@ export async function approveCorrectionRequest(
   adminId: string
 ) {
   const supabase = getSupabase();
-  await verifyAdmin(supabase, adminId);
-
-  const { data: correction, error: fetchError } = await supabase
-    .from("correction_requests")
-    .select("*")
-    .eq("id", requestId)
-    .eq("status", "대기중")
-    .single();
-  if (fetchError) throw fetchError;
-
-  const { error: updateError } = await supabase
-    .from("correction_requests")
-    .update({
-      status: "승인",
-      reviewed_by: adminId,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", requestId)
-    .eq("status", "대기중");
-  if (updateError) throw updateError;
-
-  if (correction.request_type === "기록누락") {
-    const { error: upsertError } = await supabase.from("attendance_records").upsert(
-      {
-        user_id: correction.user_id,
-        work_date: correction.target_date,
-        check_in: correction.requested_check_in,
-        check_out: correction.requested_check_out,
-        status: correction.requested_check_out ? CHECKED_OUT_STATUS : WORKING_STATUS,
-      },
-      { onConflict: "user_id,work_date" }
-    );
-    if (upsertError) throw upsertError;
-  } else {
-    const updateData: Record<string, string | null> = {};
-    if (correction.requested_check_in) updateData.check_in = correction.requested_check_in;
-    if (correction.requested_check_out) {
-      updateData.check_out = correction.requested_check_out;
-      updateData.status = CHECKED_OUT_STATUS;
-    }
-    if (Object.keys(updateData).length > 0) {
-      const { error: attendanceError } = await supabase
-        .from("attendance_records")
-        .update(updateData)
-        .eq("user_id", correction.user_id)
-        .eq("work_date", correction.target_date);
-      if (attendanceError) throw attendanceError;
-    }
-  }
+  // 정정 승인 + attendance_records 반영을 RPC 한 트랜잭션으로 처리
+  // (admin 권한 검사도 RPC 내부에서 수행)
+  const { error } = await supabase.rpc("approve_correction_request", {
+    p_request_id: requestId,
+  });
+  if (error) throw error;
 }
 
 export async function rejectVacationCancel(

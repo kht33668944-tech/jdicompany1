@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, PencilSimple, Trash, MapPin, Monitor, Clock, CalendarBlank, User, Lock, Buildings, Users, XCircle } from "phosphor-react";
 import ModalContainer from "@/components/shared/ModalContainer";
-import { updateSchedule, deleteSchedule, setParticipants } from "@/lib/schedule/actions";
+import { updateScheduleWithParticipants, deleteSchedule } from "@/lib/schedule/actions";
 import { SCHEDULE_CATEGORIES, SCHEDULE_CATEGORY_CONFIG, getCategoryStyle } from "@/lib/schedule/constants";
 import { formatTime } from "@/lib/utils/date";
 import type { ScheduleVisibility, ScheduleWithProfile } from "@/lib/schedule/types";
@@ -101,17 +101,21 @@ export default function ScheduleDetailModal({
         return;
       }
 
-      await updateSchedule(schedule.id, {
-        title: title.trim(),
-        description: description.trim() || null,
-        category: finalCategory,
-        visibility,
-        startTime: startISO,
-        endTime: endISO,
-        isAllDay,
-        location: location.trim() || null,
-      });
-      await setParticipants(schedule.id, participantIds);
+      // 본문 + 참가자 동시 업데이트 (RPC 한 트랜잭션)
+      await updateScheduleWithParticipants(
+        schedule.id,
+        {
+          title: title.trim(),
+          description: description.trim() || null,
+          category: finalCategory,
+          visibility,
+          startTime: startISO,
+          endTime: endISO,
+          isAllDay,
+          location: location.trim() || null,
+        },
+        participantIds
+      );
       onUpdated();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "일정 수정에 실패했습니다.");

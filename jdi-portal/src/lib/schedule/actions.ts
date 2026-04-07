@@ -132,3 +132,43 @@ export async function setParticipants(scheduleId: string, userIds: string[]) {
     if (insertError) throw insertError;
   }
 }
+
+/**
+ * 일정 본문 + 참가자 동시 업데이트 (RPC 한 트랜잭션)
+ * - 참가자는 diff 기반으로 갱신 (전체 삭제 후 재삽입 X)
+ * - 도중 실패해도 부분 반영이 남지 않음
+ */
+export async function updateScheduleWithParticipants(
+  scheduleId: string,
+  params: {
+    title?: string;
+    description?: string | null;
+    category?: string;
+    startTime?: string;
+    endTime?: string;
+    isAllDay?: boolean;
+    location?: string | null;
+    visibility?: string;
+  },
+  participantIds: string[] | null
+) {
+  const supabase = getSupabase();
+
+  // 변경된 필드만 JSONB 로 보냄 (DB 함수가 transmitted key 만 반영)
+  const updates: Record<string, unknown> = {};
+  if (params.title !== undefined) updates.title = params.title;
+  if (params.description !== undefined) updates.description = params.description;
+  if (params.category !== undefined) updates.category = params.category;
+  if (params.startTime !== undefined) updates.start_time = params.startTime;
+  if (params.endTime !== undefined) updates.end_time = params.endTime;
+  if (params.isAllDay !== undefined) updates.is_all_day = params.isAllDay;
+  if (params.location !== undefined) updates.location = params.location;
+  if (params.visibility !== undefined) updates.visibility = params.visibility;
+
+  const { error } = await supabase.rpc("update_schedule_with_participants", {
+    p_schedule_id: scheduleId,
+    p_updates: updates,
+    p_participant_ids: participantIds,
+  });
+  if (error) throw error;
+}

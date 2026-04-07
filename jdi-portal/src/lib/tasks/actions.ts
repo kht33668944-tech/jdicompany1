@@ -350,7 +350,11 @@ export async function uploadAttachment(
     .select("*, uploader_profile:profiles!task_attachments_user_id_fkey(full_name)")
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // 메타데이터 INSERT 실패 시 업로드된 파일 정리 (고아 방지)
+    await supabase.storage.from("task-attachments").remove([filePath]).catch(() => {});
+    throw error;
+  }
 
   await logActivity(taskId, userId, "attachment", null, {
     file_name: file.name,
@@ -363,13 +367,21 @@ export async function uploadAttachment(
 export async function deleteAttachment(attachmentId: string, filePath: string, taskId: string, userId: string) {
   const supabase = getSupabase();
 
-  await supabase.storage.from("task-attachments").remove([filePath]);
-
+  // 1) DB 메타데이터 먼저 삭제 (실패 시 사용자 입장의 진실은 그대로 보존)
   const { error } = await supabase
     .from("task_attachments")
     .delete()
     .eq("id", attachmentId);
   if (error) throw error;
+
+  // 2) 스토리지 파일 best-effort 삭제 (DB 가 성공한 이후에만 시도)
+  //    실패해도 화면은 정상이고 고아 파일만 남음 — 별도 정리 잡으로 처리
+  const { error: storageError } = await supabase.storage
+    .from("task-attachments")
+    .remove([filePath]);
+  if (storageError) {
+    console.warn("스토리지 첨부파일 삭제 실패 (DB 는 정리됨):", storageError);
+  }
 
   await logActivity(taskId, userId, "attachment_deleted", null, { attachment_id: attachmentId });
 }

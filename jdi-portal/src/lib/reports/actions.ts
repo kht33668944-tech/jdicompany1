@@ -72,20 +72,25 @@ export async function updateReportStatus(reportId: string, status: ReportStatus)
 
 export async function deleteReport(reportId: string) {
   const supabase = getSupabase();
-  // Delete attachments from storage first
+  // 첨부 파일 경로 미리 수집 (DB 삭제 후에 best-effort 로 정리)
   const { data: attachments } = await supabase
     .from("report_attachments")
     .select("file_path")
     .eq("report_id", reportId);
 
-  if (attachments && attachments.length > 0) {
-    await supabase.storage
-      .from("reports")
-      .remove(attachments.map((a) => a.file_path));
-  }
-
+  // DB 먼저 삭제 (report_attachments 는 FK CASCADE 로 함께 정리)
   const { error } = await supabase.from("reports").delete().eq("id", reportId);
   if (error) throw new Error(`보고서 삭제에 실패했습니다: ${error.message}`);
+
+  // 스토리지는 best-effort — 실패해도 사용자 화면은 정상
+  if (attachments && attachments.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from("reports")
+      .remove(attachments.map((a) => a.file_path));
+    if (storageError) {
+      console.warn("보고서 스토리지 정리 실패 (DB 는 정리됨):", storageError);
+    }
+  }
 }
 
 export async function uploadReportAttachment(
@@ -116,18 +121,30 @@ export async function uploadReportAttachment(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // 메타데이터 INSERT 실패 시 업로드된 파일 정리 (고아 방지)
+    await supabase.storage.from("reports").remove([filePath]).catch(() => {});
+    throw error;
+  }
   return data as ReportAttachment;
 }
 
 export async function deleteReportAttachment(attachmentId: string, filePath: string) {
   const supabase = getSupabase();
-  await supabase.storage.from("reports").remove([filePath]);
+  // DB 먼저 삭제 — 사용자 화면 진실을 우선
   const { error } = await supabase
     .from("report_attachments")
     .delete()
     .eq("id", attachmentId);
   if (error) throw error;
+
+  // 스토리지는 best-effort
+  const { error: storageError } = await supabase.storage
+    .from("reports")
+    .remove([filePath]);
+  if (storageError) {
+    console.warn("보고서 첨부 스토리지 삭제 실패 (DB 는 정리됨):", storageError);
+  }
 }
 
 export async function getAttachmentUrl(filePath: string): Promise<string> {
