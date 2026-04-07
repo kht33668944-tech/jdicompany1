@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import type { Message, ChannelWithDetails } from "@/lib/chat/types";
 import { groupMessagesByDate, formatDateDivider, formatMessageTime, parseFileContent } from "@/lib/chat/utils";
 import { getChatFileUrl } from "@/lib/chat/actions";
+import { useChatFileUrls } from "./ChatFileUrlsContext";
 import MessageItem from "./MessageItem";
 import EmptyState from "./EmptyState";
 
@@ -44,14 +45,22 @@ function groupConsecutiveImages(messages: Message[]): MessageChunk[] {
 // --- GridImage: loads signed URL for a single image in the group grid ---
 
 function GridImage({ storagePath, fileName }: { storagePath: string; fileName: string }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const { urls: batchUrls } = useChatFileUrls();
+  const batched = batchUrls[storagePath];
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
+  // batch 에서 받지 못한 경우에만 개별 요청 (실시간 신규 파일 등 edge case)
   useEffect(() => {
+    if (batched) return;
+    let cancelled = false;
     getChatFileUrl(storagePath)
-      .then((u) => setUrl(u))
-      .catch(() => setError(true));
-  }, [storagePath]);
+      .then((u) => { if (!cancelled) setFallbackUrl(u); })
+      .catch(() => { if (!cancelled) setError(true); });
+    return () => { cancelled = true; };
+  }, [storagePath, batched]);
+
+  const url = batched ?? fallbackUrl;
 
   if (error) {
     return (

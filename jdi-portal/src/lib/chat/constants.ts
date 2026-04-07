@@ -1,6 +1,6 @@
 import type { ChannelType, MessageType } from "./types";
 
-export const MESSAGES_PER_PAGE = 50;
+export const MESSAGES_PER_PAGE = 30;
 
 export const CHANNEL_TYPE_CONFIG: Record<ChannelType, { label: string }> = {
   group: { label: "그룹 채널" },

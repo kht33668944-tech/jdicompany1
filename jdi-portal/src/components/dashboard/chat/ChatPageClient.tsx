@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { getMessages as fetchMessages, getChannelById } from "@/lib/chat/queries";
 import { ensureMemoChannel, markAsRead } from "@/lib/chat/actions";
+import { parseFileContent } from "@/lib/chat/utils";
 import { showDesktopNotification } from "@/lib/notifications/desktop";
 import type { ChannelWithDetails, Message, Channel } from "@/lib/chat/types";
 import ChannelList from "./ChannelList";
@@ -12,6 +13,7 @@ import ChatRoom from "./ChatRoom";
 import EmptyState from "./EmptyState";
 import ChannelCreateModal from "./ChannelCreateModal";
 import ChannelSettingsDrawer from "./ChannelSettingsDrawer";
+import { ChatFileUrlsProvider, useChatFileUrls } from "./ChatFileUrlsContext";
 
 interface ChatPageClientProps {
   initialChannels: ChannelWithDetails[];
@@ -22,7 +24,15 @@ interface ChatPageClientProps {
   userAvatar?: string | null;
 }
 
-export default function ChatPageClient({
+export default function ChatPageClient(props: ChatPageClientProps) {
+  return (
+    <ChatFileUrlsProvider>
+      <ChatPageClientInner {...props} />
+    </ChatFileUrlsProvider>
+  );
+}
+
+function ChatPageClientInner({
   initialChannels,
   initialChannel,
   initialMessages,
@@ -30,6 +40,7 @@ export default function ChatPageClient({
   userName,
   userAvatar,
 }: ChatPageClientProps) {
+  const { ensure: ensureFileUrls } = useChatFileUrls();
   const [channels, setChannels] = useState<ChannelWithDetails[]>(initialChannels);
   const [selectedChannel, setSelectedChannel] = useState<ChannelWithDetails | undefined>(
     initialChannel
@@ -57,6 +68,21 @@ export default function ChatPageClient({
   useEffect(() => { selectedChannelRef.current = selectedChannel; }, [selectedChannel]);
   useEffect(() => { mutedChannelsRef.current = mutedChannels; }, [mutedChannels]);
   useEffect(() => { channelsRef.current = channels; }, [channels]);
+
+  // 파일/이미지 메시지의 서명 URL을 batch 로 미리 요청
+  // - 메시지 목록 변경 시 누락된 path 만 추출해 단일 createSignedUrls 호출
+  // - 하위 GridImage/ChatImage/ChatFile 는 context 에서 즉시 조회 (네트워크 0회)
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const paths: string[] = [];
+    for (const m of messages) {
+      if (m.is_deleted) continue;
+      if (m.type !== "image" && m.type !== "file") continue;
+      const file = parseFileContent(m.content);
+      if (file?.path) paths.push(file.path);
+    }
+    if (paths.length > 0) ensureFileUrls(paths);
+  }, [messages, ensureFileUrls]);
 
   // setMessages 래퍼: state 갱신과 함께 현재 채널 캐시도 동기화
   // (실시간 INSERT, 메시지 편집/삭제, 더 보기 등 모든 경로가 캐시를 자동 갱신)

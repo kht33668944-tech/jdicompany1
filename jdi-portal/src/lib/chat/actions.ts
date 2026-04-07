@@ -399,6 +399,29 @@ export async function getChatFileUrl(path: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+/**
+ * 여러 파일의 서명 URL을 한 번의 요청으로 일괄 생성.
+ * - 채널 진입 시 이미지/파일 N개마다 개별 요청하던 것을 단일 roundtrip 로 통합
+ * - 반환: path → signedUrl 매핑 (실패한 항목은 생략)
+ */
+export async function getChatFileUrls(
+  paths: string[]
+): Promise<Record<string, string>> {
+  if (paths.length === 0) return {};
+  const supabase = getSupabase();
+  const unique = Array.from(new Set(paths));
+  const { data } = await supabase.storage
+    .from("chat-attachments")
+    .createSignedUrls(unique, 3600);
+  const out: Record<string, string> = {};
+  for (const item of data ?? []) {
+    if (item?.path && item.signedUrl && !item.error) {
+      out[item.path] = item.signedUrl;
+    }
+  }
+  return out;
+}
+
 // ============================================
 // 서랍 (사진/파일/링크)
 // ============================================

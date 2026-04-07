@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { Message, MessageReaction } from "@/lib/chat/types";
 import { formatMessageTime, formatFileSize, parseFileContent } from "@/lib/chat/utils";
 import { getChatFileUrl, toggleReaction, getReactions } from "@/lib/chat/actions";
+import { useChatFileUrls } from "./ChatFileUrlsContext";
 import ReadReceiptModal from "./ReadReceiptModal";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏", "🎉"];
@@ -263,14 +264,21 @@ function ReadCountButton({ message }: { message: Message }) {
 
 /** 이미지 메시지 렌더러 */
 function ChatImage({ storagePath, fileName }: { storagePath: string; fileName: string }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const { urls: batchUrls } = useChatFileUrls();
+  const batched = batchUrls[storagePath];
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (batched) return;
+    let cancelled = false;
     getChatFileUrl(storagePath)
-      .then((u) => setUrl(u))
-      .catch(() => setError(true));
-  }, [storagePath]);
+      .then((u) => { if (!cancelled) setFallbackUrl(u); })
+      .catch(() => { if (!cancelled) setError(true); });
+    return () => { cancelled = true; };
+  }, [storagePath, batched]);
+
+  const url = batched ?? fallbackUrl;
 
   if (error) {
     return (
@@ -301,13 +309,20 @@ function ChatImage({ storagePath, fileName }: { storagePath: string; fileName: s
 
 /** 파일 메시지 렌더러 */
 function ChatFile({ storagePath, fileName, fileSize }: { storagePath: string; fileName: string; fileSize: number }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const { urls: batchUrls } = useChatFileUrls();
+  const batched = batchUrls[storagePath];
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (batched) return;
+    let cancelled = false;
     getChatFileUrl(storagePath)
-      .then((u) => setUrl(u))
+      .then((u) => { if (!cancelled) setFallbackUrl(u); })
       .catch(() => {});
-  }, [storagePath]);
+    return () => { cancelled = true; };
+  }, [storagePath, batched]);
+
+  const url = batched ?? fallbackUrl;
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl min-w-[200px]">
