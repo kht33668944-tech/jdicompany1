@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MagnifyingGlass, Plus } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
@@ -35,6 +35,10 @@ export default function TasksPageClient({ profiles, userId, refreshSignal }: Pro
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [allTasks, setAllTasks] = useState<TaskWithDetails[]>([]);
+  // fresh fetch 가 적용된 후 늦게 도착한 IDB 캐시가 빈 fresh 를 stale 로 덮어쓰는 race 차단
+  const freshLoadedRef = useRef(false);
+
   // mount 후 localStorage 에서 사용자 설정 복원
   useEffect(() => {
     try {
@@ -48,58 +52,35 @@ export default function TasksPageClient({ profiles, userId, refreshSignal }: Pro
       // 파싱 실패 무시 — 기본값 유지
     }
   }, []);
-  // 할일 데이터: SSR 없이 클라이언트가 직접 로딩
-  // 1) mount 시 IndexedDB 캐시 즉시 표시 (체감 0ms, 두 번째 진입부터)
-  // 2) 백그라운드 client fetch → 최신 데이터로 교체 + 캐시 갱신
-  const [allTasks, setAllTasks] = useState<TaskWithDetails[]>([]);
-  const [hasLoaded, setHasLoaded] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    // 1) IndexedDB 즉시 표시
-    void getCachedTasks().then((cached) => {
-      if (cancelled || !cached || cached.length === 0) return;
-      setAllTasks((prev) => (prev.length === 0 ? cached : prev));
-    });
-
-    // 2) 백그라운드 신선 fetch
-    void (async () => {
-      try {
-        const supabase = createClient();
-        const fresh = await getTasksWithDetails(supabase);
-        if (cancelled) return;
-        setAllTasks(fresh);
-        void cacheTasks(fresh);
-      } catch (err) {
-        console.warn("[TasksPageClient] fetch failed:", err);
-      } finally {
-        if (!cancelled) setHasLoaded(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // mutation 후 router.refresh() 대용 — 클라이언트에서 직접 재조회
   const refreshTasks = useCallback(async () => {
     try {
       const supabase = createClient();
       const fresh = await getTasksWithDetails(supabase);
       setAllTasks(fresh);
+      freshLoadedRef.current = true;
       void cacheTasks(fresh);
     } catch (err) {
       console.warn("[TasksPageClient] refreshTasks failed:", err);
     }
   }, []);
 
-  // refreshSignal 변화 감지 → re-fetch
-  // 첫 mount 는 위 useEffect 가 처리하므로 hasLoaded 로 가드
   useEffect(() => {
-    if (!hasLoaded) return;
-    void refreshTasks();
+    let cancelled = false;
+
+    void getCachedTasks().then((cached) => {
+      if (cancelled || freshLoadedRef.current || !cached || cached.length === 0) return;
+      setAllTasks(cached);
+    });
+
+    void refreshTasks().finally(() => {
+      if (cancelled) freshLoadedRef.current = false;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // refreshSignal 변화도 같은 effect 로 처리 — 첫 mount + router.refresh 통합
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshSignal]);
 

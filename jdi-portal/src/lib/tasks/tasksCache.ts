@@ -71,10 +71,10 @@ export async function cacheTasks(tasks: TaskWithDetails[]): Promise<void> {
   if (!dbp) return;
   try {
     const db = await dbp;
+    // Supabase 응답은 plain JSON 이라 IndexedDB 의 structured clone 이 그대로 처리
     const record: CachedTasksRecord = {
       key: ALL_KEY,
-      // 구조화 복제 호환을 위해 정규화 (undefined → null, 함수/심볼 제거)
-      tasks: JSON.parse(JSON.stringify(tasks)) as TaskWithDetails[],
+      tasks,
       cached_at: new Date().toISOString(),
     };
     await db.put(TASKS_STORE, record);

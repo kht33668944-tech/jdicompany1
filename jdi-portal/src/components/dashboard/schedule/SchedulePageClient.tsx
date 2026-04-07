@@ -66,21 +66,22 @@ export default function SchedulePageClient({
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleWithProfile | null>(null);
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
 
-  // 클라이언트 상태로 month/schedules 관리 — 월 전환 시 SSR 왕복 없이 IDB+직접 fetch
+  // 클라이언트 상태로 month/schedules 관리 — props 는 최초 시드로만 사용
   const [currentYear, setCurrentYear] = useState<number>(initialYear);
   const [currentMonth, setCurrentMonth] = useState<number>(initialMonth);
   const [schedules, setSchedules] = useState<ScheduleWithProfile[]>(initialSchedules);
 
-  // 진행 중인 fetch 의 대상 키 — 응답 도착 시 현재 월과 일치할 때만 반영
+  // 진행 중인 fetch 의 키 — 응답 도착 시점의 race 가드
+  // - refetch 가 set 하면 캐시 콜백은 자기보다 먼저 도착할 때만 적용
+  // - fetch 완료 후 null 로 리셋 → 늦게 도착한 캐시 콜백이 fresh 를 덮어쓰지 못함
   const inflightKeyRef = useRef<string | null>(null);
 
-  // SSR 에서 새로 props 가 도착하면(예: router.refresh) state 에 반영하고 캐시 갱신
+  // 최초 mount 시 props 데이터를 IDB 에 시드
   useEffect(() => {
-    setCurrentYear(initialYear);
-    setCurrentMonth(initialMonth);
-    setSchedules(initialSchedules);
     void cacheMonth(initialYear, initialMonth, initialSchedules);
-  }, [initialYear, initialMonth, initialSchedules]);
+    // initialXxx 변경 시 재실행하지 않음 (router.refresh 후 stale 데이터로 덮어쓰기 방지)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredSchedules = useMemo(() => schedules.filter((s) => {
     if (visibilityFilter === "all") return true;
@@ -94,60 +95,57 @@ export default function SchedulePageClient({
     window.localStorage.setItem(STORAGE_KEY, activeTab);
   }, [activeTab]);
 
-  // 현재 월의 신선한 데이터를 fetch 해서 IDB+state 갱신
   const refetchMonth = async (year: number, month: number) => {
     const key = `${year}-${month}`;
     inflightKeyRef.current = key;
     try {
       const supabase = createClient();
       const fresh = await getMonthSchedules(supabase, year, month);
-      // 그 사이 다른 월로 이동했다면 무시
       if (inflightKeyRef.current !== key) return;
       setSchedules(fresh);
       void cacheMonth(year, month, fresh);
     } catch (err) {
       console.warn("[schedule] refetch failed:", err);
+    } finally {
+      // fresh 적용 후 inflight 해제 → 늦게 도착한 캐시 콜백이 덮어쓰지 못함
+      if (inflightKeyRef.current === key) inflightKeyRef.current = null;
     }
   };
 
   const handleMonthChange = (year: number, month: number) => {
     if (year === currentYear && month === currentMonth) return;
 
-    // 1) 클라이언트 상태 즉시 전환
     setCurrentYear(year);
     setCurrentMonth(month);
 
-    // 2) IDB 캐시 hit → 즉시 표시 (체감 0ms)
-    void getCachedMonth(year, month).then((cached) => {
-      if (cached && inflightKeyRef.current === `${year}-${month}`) {
-        setSchedules(cached);
-      }
-    });
-    // 캐시 조회 동안 빈 화면 방지: 일단 비우지 않고 기존 데이터 유지
-    // 신선한 데이터가 도착하면 자동으로 교체됨
+    const key = `${year}-${month}`;
+    inflightKeyRef.current = key;
 
-    // 3) 백그라운드 신선 fetch
+    // IDB 캐시 → 즉시 표시 (단 fresh 가 먼저 도착했으면 무시)
+    void getCachedMonth(year, month).then((cached) => {
+      if (!cached) return;
+      if (inflightKeyRef.current !== key) return;
+      setSchedules(cached);
+    });
+
     void refetchMonth(year, month);
 
-    // 4) URL 동기화 (가벼운 replace, 스크롤 유지)
     router.replace(`/dashboard/schedule?year=${year}&month=${month}`, { scroll: false });
+  };
+
+  const revalidateCurrentMonth = async () => {
+    await invalidateMonthCache(currentYear, currentMonth);
+    await refetchMonth(currentYear, currentMonth);
   };
 
   const handleScheduleCreated = () => {
     setShowCreateModal(false);
-    // 캐시 무효화 후 현재 월 재조회
-    void invalidateMonthCache(currentYear, currentMonth).then(() =>
-      refetchMonth(currentYear, currentMonth)
-    );
-    router.refresh();
+    void revalidateCurrentMonth();
   };
 
   const handleScheduleUpdated = () => {
     setSelectedSchedule(null);
-    void invalidateMonthCache(currentYear, currentMonth).then(() =>
-      refetchMonth(currentYear, currentMonth)
-    );
-    router.refresh();
+    void revalidateCurrentMonth();
   };
 
   return (

@@ -81,9 +81,10 @@ export async function cacheMonth(
   if (!dbp) return;
   try {
     const db = await dbp;
+    // Supabase 응답은 plain JSON 이라 IndexedDB 의 structured clone 이 그대로 처리
     const record: CachedMonthRecord = {
       key: monthKey(year, month),
-      schedules: serialize(schedules),
+      schedules,
       cached_at: new Date().toISOString(),
     };
     await db.put(MONTH_STORE, record);
@@ -120,9 +121,3 @@ export async function clearScheduleCache(): Promise<void> {
   }
 }
 
-/**
- * IndexedDB 친화 형태로 정규화 (구조화 복제 호환).
- */
-function serialize(schedules: ScheduleWithProfile[]): ScheduleWithProfile[] {
-  return JSON.parse(JSON.stringify(schedules));
-}
