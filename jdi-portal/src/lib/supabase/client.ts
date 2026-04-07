@@ -1,7 +1,6 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// 모듈 스코프 캐시 — 브라우저에서 인스턴스를 1회만 생성
 let cachedClient: SupabaseClient | null = null;
 
 export function createClient(): SupabaseClient {

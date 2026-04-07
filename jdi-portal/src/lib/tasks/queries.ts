@@ -8,6 +8,15 @@ import type {
   TaskAssignee,
 } from "./types";
 
+interface TaskStatsRow {
+  task_id: string;
+  comment_count: number;
+  attachment_count: number;
+  subtask_count: number;
+  checklist_total: number;
+  checklist_completed: number;
+}
+
 const TASK_BASE_SELECT = `
   id, title, description, status, priority, category,
   due_date, start_date, position, parent_id, created_by,
@@ -66,7 +75,6 @@ async function fetchCountsForTasks(
     };
   }
 
-  // 4개 쿼리 → get_task_stats RPC 1회로 통합
   const { data, error } = await supabase.rpc("get_task_stats", { p_task_ids: taskIds });
   if (error) throw error;
 
@@ -75,14 +83,8 @@ async function fetchCountsForTasks(
   const subtasks = new Map<string, number>();
   const checklist = new Map<string, { total: number; completed: number }>();
 
-  for (const row of (data ?? []) as Array<{
-    task_id: string;
-    comment_count: number;
-    attachment_count: number;
-    subtask_count: number;
-    checklist_total: number;
-    checklist_completed: number;
-  }>) {
+  const rows = (data ?? []) as TaskStatsRow[];
+  for (const row of rows) {
     comments.set(row.task_id, row.comment_count);
     attachments.set(row.task_id, row.attachment_count);
     subtasks.set(row.task_id, row.subtask_count);
@@ -300,5 +302,5 @@ export async function getMyTasksWithDetails(
     p_completed_days: completedDays,
   });
   if (error) throw error;
-  return (data ?? []) as TaskWithDetails[];
+  return Array.isArray(data) ? (data as TaskWithDetails[]) : [];
 }
