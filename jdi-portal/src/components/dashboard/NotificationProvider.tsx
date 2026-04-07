@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { Notification } from "@/lib/notifications/types";
@@ -17,8 +17,6 @@ export default function NotificationProvider({
   onNewNotification,
   children,
 }: NotificationProviderProps) {
-  const lastCheckedRef = useRef<string>(new Date().toISOString());
-
   const showToast = useCallback(
     (notification: Notification) => {
       onNewNotification();
@@ -46,30 +44,29 @@ export default function NotificationProvider({
     [onNewNotification]
   );
 
-  // 5초마다 새 알림 폴링
+  // Realtime 구독: 본인 알림 INSERT 즉시 처리 (폴링 제거)
   useEffect(() => {
-    let aborted = false;
     const supabase = createClient();
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const notification = payload.new as Notification;
+          showToast(notification);
+        }
+      )
+      .subscribe();
 
-    const poll = async () => {
-      const since = lastCheckedRef.current;
-      const { data } = await supabase
-        .from("notifications")
-        .select("*")
-        .eq("user_id", userId)
-        .gt("created_at", since)
-        .order("created_at", { ascending: true });
-
-      if (!aborted && data && data.length > 0) {
-        const notifications = data as Notification[];
-        lastCheckedRef.current = notifications[notifications.length - 1].created_at;
-        notifications.forEach((n) => showToast(n));
-      }
+    return () => {
+      supabase.removeChannel(channel);
     };
-
-    poll();
-    const interval = setInterval(poll, 30_000);
-    return () => { aborted = true; clearInterval(interval); };
   }, [userId, showToast]);
 
   return <>{children}</>;
