@@ -90,9 +90,14 @@ export default function InstallAppCard() {
   return (
     <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-8">
       <div className="flex items-start gap-4 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-50 to-indigo-50 flex items-center justify-center flex-shrink-0">
+        <button
+          type="button"
+          onClick={deferredPrompt && !isIOS ? handleInstall : undefined}
+          disabled={busy || !deferredPrompt || isIOS}
+          className={`w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-50 to-indigo-50 flex items-center justify-center flex-shrink-0 transition-all ${deferredPrompt && !isIOS ? "hover:from-brand-100 hover:to-indigo-100 cursor-pointer hover:shadow-md" : "cursor-default"}`}
+        >
           <DownloadSimple size={24} weight="bold" className="text-brand-600" />
-        </div>
+        </button>
         <div className="flex-1">
           <h2 className="text-lg font-bold text-slate-800">앱으로 설치하기</h2>
           <p className="text-sm text-slate-500 mt-1">
