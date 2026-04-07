@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import PWAInit from "@/components/PWAInit";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -8,9 +9,40 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+const APP_NAME = "JDI 포털";
+const APP_DESCRIPTION = "JDICOMPANY 내부 시스템 포털";
+
 export const metadata: Metadata = {
-  title: "JDICOMPANY Internal Portal",
-  description: "JDICOMPANY 내부 시스템 포털",
+  applicationName: APP_NAME,
+  title: {
+    default: "JDICOMPANY Internal Portal",
+    template: "%s | JDI 포털",
+  },
+  description: APP_DESCRIPTION,
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: APP_NAME,
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2563eb",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -30,7 +62,10 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
         />
       </head>
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <PWAInit />
+        {children}
+      </body>
     </html>
   );
 }
