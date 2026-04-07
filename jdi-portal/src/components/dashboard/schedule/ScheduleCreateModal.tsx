@@ -118,7 +118,11 @@ export default function ScheduleCreateModal({
               </button>
               <button
                 type="button"
-                onClick={() => setVisibility("private")}
+                onClick={() => {
+                  setVisibility("private");
+                  // 개인 일정으로 전환 시 참여자 비움 (RLS 와 UI 모순 방지)
+                  setParticipantIds([]);
+                }}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${
                   visibility === "private"
                     ? "bg-amber-50 text-amber-700 border-amber-200"
@@ -268,7 +272,8 @@ export default function ScheduleCreateModal({
             />
           </div>
 
-          {/* 참여자 */}
+          {/* 참여자 — 개인 일정에서는 숨김 */}
+          {visibility !== "private" && (
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1">
               참여자 <span className="text-slate-400 font-normal">(선택)</span>
@@ -315,6 +320,7 @@ export default function ScheduleCreateModal({
               </div>
             )}
           </div>
+          )}
 
           <button
             type="submit"
