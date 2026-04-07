@@ -6,6 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { getMessages as fetchMessages, getChannelById } from "@/lib/chat/queries";
 import { ensureMemoChannel, markAsRead } from "@/lib/chat/actions";
 import { parseFileContent } from "@/lib/chat/utils";
+import {
+  getCachedMessages,
+  cacheMessages,
+  upsertCachedMessage,
+} from "@/lib/chat/messageCache";
 import { showDesktopNotification } from "@/lib/notifications/desktop";
 import type { ChannelWithDetails, Message, Channel } from "@/lib/chat/types";
 import ChannelList from "./ChannelList";
@@ -91,7 +96,20 @@ function ChatPageClientInner({
       setMessages((prev) => {
         const next = updater(prev);
         const channelId = selectedChannelRef.current?.id;
-        if (channelId) messagesCacheRef.current.set(channelId, next);
+        if (channelId) {
+          messagesCacheRef.current.set(channelId, next);
+          // IndexedDB 동기화 — 새로 추가/변경된 메시지만 upsert
+          // (전체 저장은 handleSelectChannel 의 cacheMessages 가 담당)
+          const prevIds = new Set(prev.map((m) => m.id));
+          const changed: Message[] = [];
+          for (const m of next) {
+            const old = prev.find((p) => p.id === m.id);
+            if (!prevIds.has(m.id) || old !== m) changed.push(m);
+          }
+          if (changed.length > 0) {
+            void cacheMessages(channelId, changed);
+          }
+        }
         return next;
       });
     },
@@ -365,6 +383,12 @@ function ChatPageClientInner({
 
           const currentSelected = selectedChannelRef.current;
 
+          // 다른 채널 메시지도 IndexedDB 에 캐시 — 그 채널 진입 시 즉시 표시
+          // (현재 채널은 ChatRoom → updateMessages 가 이미 캐시함)
+          if (currentSelected?.id !== fullMsg.channel_id) {
+            void upsertCachedMessage(fullMsg);
+          }
+
           // Skip processing if message is for the currently selected channel
           // (ChatRoom's own filtered handler already processes it)
           if (currentSelected?.id === fullMsg.channel_id) {
@@ -446,13 +470,26 @@ function ChatPageClientInner({
       setShowSettings(false);
 
       // 2) 캐시된 메시지가 있으면 즉시 표시 (체감상 0ms 전환)
-      const cached = messagesCacheRef.current.get(channel.id);
-      if (cached) {
-        setMessages(cached);
+      //    - 메모리 캐시(같은 세션) 우선
+      //    - 없으면 IndexedDB(이전 세션) 조회 → 즉시 표시
+      //    - 둘 다 없으면 로딩 스피너
+      const memCached = messagesCacheRef.current.get(channel.id);
+      if (memCached) {
+        setMessages(memCached);
         setLoadingMessages(false);
       } else {
         setMessages([]);
         setLoadingMessages(true);
+        // IndexedDB 비동기 조회 — fetch 보다 먼저 끝나면 즉시 표시
+        void getCachedMessages(channel.id).then((cached) => {
+          if (cached.length === 0) return;
+          if (selectedChannelRef.current?.id !== channel.id) return;
+          // fetch 결과가 이미 도착했으면 메모리 캐시가 채워져 있어 덮어쓰지 않음
+          if (messagesCacheRef.current.has(channel.id)) return;
+          messagesCacheRef.current.set(channel.id, cached);
+          setMessages(cached);
+          setLoadingMessages(false);
+        });
       }
 
       // 3) 안 읽음 뱃지는 낙관적 즉시 0 으로 (RPC 응답 기다리지 않음)
@@ -469,6 +506,8 @@ function ChatPageClientInner({
         const supabase = createClient();
         const msgs = await fetchMessages(supabase, channel.id);
         messagesCacheRef.current.set(channel.id, msgs);
+        // IndexedDB 동기화 (백그라운드, 사용자 흐름 차단 X)
+        void cacheMessages(channel.id, msgs);
         // 그 사이 다른 채널로 이동했다면 무시
         if (selectedChannelRef.current?.id === channel.id) {
           setMessages(msgs);
