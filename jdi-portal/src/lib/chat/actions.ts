@@ -286,6 +286,10 @@ export async function markAsRead(channelId: string): Promise<void> {
   const supabase = getSupabase();
   // 단일 RPC 호출 — last_read_at 갱신 + 누락된 read_receipt 일괄 INSERT
   await supabase.rpc("mark_channel_read", { p_channel_id: channelId });
+  // 사이드바 unread 뱃지 즉시 갱신 트리거 (realtime 의존 없이 확실히 동작)
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("chat:read", { detail: { channelId } }));
+  }
 }
 
 export async function getReadReceipts(messageId: string): Promise<MessageReadReceipt[]> {

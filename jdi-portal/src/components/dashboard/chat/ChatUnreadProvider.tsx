@@ -56,6 +56,13 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
     loadMemberships();
   }, [fetchUnread, loadMemberships]);
 
+  // markAsRead 직후 사이드바 뱃지 즉시 갱신 (realtime 지연 우회)
+  useEffect(() => {
+    const handler = () => { fetchUnread(); };
+    window.addEventListener("chat:read", handler);
+    return () => window.removeEventListener("chat:read", handler);
+  }, [fetchUnread]);
+
   // 멤버십 변경 감지: channel_members 변경 시 캐시 새로고침
   useEffect(() => {
     const supabase = createClient();
