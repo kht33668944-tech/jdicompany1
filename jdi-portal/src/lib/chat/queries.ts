@@ -63,6 +63,7 @@ export async function getChannelById(
 
 /**
  * 메시지 목록 조회 (커서 기반 페이지네이션, 최신순)
+ * - 단일 RPC 호출: 메시지 + 프로필 임베드 한 번에 (이전: messages + profiles 2 round-trip)
  */
 export async function getMessages(
   supabase: SupabaseClient,
@@ -70,41 +71,13 @@ export async function getMessages(
   cursor?: string,
   limit: number = MESSAGES_PER_PAGE
 ): Promise<Message[]> {
-  let query = supabase
-    .from("messages")
-    .select("*")
-    .eq("channel_id", channelId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (cursor) {
-    query = query.lt("created_at", cursor);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc("get_channel_messages", {
+    p_channel_id: channelId,
+    p_cursor: cursor ?? null,
+    p_limit: limit,
+  });
   if (error) throw error;
-
-  const messages = (data ?? []) as Message[];
-  if (messages.length === 0) return [];
-
-  // 프로필 별도 조회
-  const userIds = [...new Set(messages.map((m) => m.user_id))];
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, full_name, avatar_url")
-    .in("id", userIds);
-
-  const profileMap = new Map(
-    (profiles ?? []).map((p) => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }])
-  );
-
-  const withProfiles = messages.map((m) => ({
-    ...m,
-    user_profile: profileMap.get(m.user_id) ?? undefined,
-  })) as Message[];
-
-  // 시간순으로 뒤집어서 반환 (오래된 것이 위)
-  return withProfiles.reverse();
+  return (data as Message[] | null) ?? [];
 }
 
 /**

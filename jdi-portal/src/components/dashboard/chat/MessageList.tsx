@@ -139,6 +139,7 @@ function ImageGroupRenderer({ chunk, isOwn, userId }: { chunk: Extract<MessageCh
 
 interface MessageListProps {
   messages: Message[];
+  loading?: boolean;
   userId: string;
   channel: ChannelWithDetails;
   onLoadMore: () => Promise<void>;
@@ -149,8 +150,37 @@ interface MessageListProps {
   typingUsers?: string[];
 }
 
+function MessageSkeleton() {
+  // 정적 패턴 — 매 렌더마다 위치/크기가 흔들리지 않도록 고정
+  const rows = [
+    { own: false, w: "w-44" },
+    { own: false, w: "w-64" },
+    { own: true, w: "w-40" },
+    { own: false, w: "w-52" },
+    { own: true, w: "w-56" },
+    { own: false, w: "w-36" },
+  ];
+  return (
+    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {rows.map((r, i) => (
+        <div
+          key={i}
+          className={`flex items-start gap-3 ${r.own ? "flex-row-reverse" : ""}`}
+        >
+          {!r.own && <div className="w-9 h-9 rounded-xl bg-slate-100 animate-pulse flex-shrink-0" />}
+          <div className={`space-y-2 ${r.own ? "items-end" : ""}`}>
+            {!r.own && <div className="h-3 w-20 bg-slate-100 rounded animate-pulse" />}
+            <div className={`h-10 ${r.w} bg-slate-100 rounded-2xl animate-pulse`} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function MessageList({
   messages,
+  loading = false,
   userId,
   channel,
   onLoadMore,
@@ -201,6 +231,7 @@ export default function MessageList({
   }
 
   if (messages.length === 0) {
+    if (loading) return <MessageSkeleton />;
     return (
       <div className="flex-1 overflow-y-auto flex items-center justify-center">
         <EmptyState type="no-messages" />

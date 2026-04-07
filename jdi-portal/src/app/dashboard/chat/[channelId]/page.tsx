@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import ChatPageClient from "@/components/dashboard/chat/ChatPageClient";
-import { getChannels, getChannelById, getMessages } from "@/lib/chat/queries";
+import { getChannels, getMessages } from "@/lib/chat/queries";
 import type { ChannelWithDetails, Message } from "@/lib/chat/types";
 
 interface Props {
@@ -15,13 +15,14 @@ export default async function ChatChannelPage({ params }: Props) {
   const { channelId } = await params;
 
   let channels: ChannelWithDetails[] = [];
-  let selectedChannel: ChannelWithDetails | null = null;
   let initialMessages: Message[] = [];
 
   try {
-    [channels, selectedChannel, initialMessages] = await Promise.all([
+    // SSR critical path 최소화:
+    // - 선택 채널 정보는 getChannels 결과에서 find — 별도 getChannelById 라운드트립 제거
+    // - 멤버 목록은 ChannelSettingsDrawer가 열릴 때 lazy-load 함
+    [channels, initialMessages] = await Promise.all([
       getChannels(auth.supabase, auth.user.id),
-      getChannelById(auth.supabase, channelId),
       getMessages(auth.supabase, channelId),
     ]);
   } catch {
@@ -33,6 +34,7 @@ export default async function ChatChannelPage({ params }: Props) {
     );
   }
 
+  const selectedChannel = channels.find((ch) => ch.id === channelId) ?? null;
   if (!selectedChannel) redirect("/dashboard/chat");
 
   return (

@@ -35,6 +35,7 @@ export default function ChatPageClient({
     initialChannel
   );
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [mobileShowChat, setMobileShowChat] = useState(!!initialChannel);
@@ -47,11 +48,29 @@ export default function ChatPageClient({
   const selectedChannelRef = useRef(selectedChannel);
   const mutedChannelsRef = useRef(mutedChannels);
   const channelsRef = useRef(channels);
+  // 채널별 메시지 캐시 — 채널 전환 시 즉시 표시용 (SSR 초기 메시지로 시드)
+  const messagesCacheRef = useRef<Map<string, Message[]>>(
+    new Map(initialChannel && initialMessages ? [[initialChannel.id, initialMessages]] : [])
+  );
 
   // ref 동기화는 effect 로 (React 19: render 중 ref mutation 금지)
   useEffect(() => { selectedChannelRef.current = selectedChannel; }, [selectedChannel]);
   useEffect(() => { mutedChannelsRef.current = mutedChannels; }, [mutedChannels]);
   useEffect(() => { channelsRef.current = channels; }, [channels]);
+
+  // setMessages 래퍼: state 갱신과 함께 현재 채널 캐시도 동기화
+  // (실시간 INSERT, 메시지 편집/삭제, 더 보기 등 모든 경로가 캐시를 자동 갱신)
+  const updateMessages = useCallback(
+    (updater: (prev: Message[]) => Message[]) => {
+      setMessages((prev) => {
+        const next = updater(prev);
+        const channelId = selectedChannelRef.current?.id;
+        if (channelId) messagesCacheRef.current.set(channelId, next);
+        return next;
+      });
+    },
+    []
+  );
 
   // 선택된 채널이 바뀔 때마다 멤버 목록 fetch (초기 진입/외부 라우팅 포함)
   useEffect(() => {
@@ -387,25 +406,54 @@ export default function ChatPageClient({
 
   const handleSelectChannel = useCallback(
     async (channel: ChannelWithDetails) => {
+      // 같은 채널 재선택 시 아무 것도 안 함 (불필요한 fetch 방지)
+      if (selectedChannelRef.current?.id === channel.id) {
+        setMobileShowChat(true);
+        setShowSettings(false);
+        return;
+      }
+
+      // 1) 즉시 UI 전환 — ref도 즉시 갱신해 늦게 도착하는 fetch 결과의 채널 매칭 가능
+      selectedChannelRef.current = channel;
       setSelectedChannel(channel);
       setMobileShowChat(true);
       setShowSettings(false);
 
-      const supabase = createClient();
-      // 메시지 + 채널 멤버 ID 동시 로드 (멤버는 온라인 인원 계산용)
-      const [msgs, membersRes] = await Promise.all([
-        fetchMessages(supabase, channel.id),
-        supabase.from("channel_members").select("user_id").eq("channel_id", channel.id),
-      ]);
-      setMessages(msgs);
-      setSelectedChannelMemberIds(
-        new Set((membersRes.data ?? []).map((m) => m.user_id as string))
-      );
+      // 2) 캐시된 메시지가 있으면 즉시 표시 (체감상 0ms 전환)
+      const cached = messagesCacheRef.current.get(channel.id);
+      if (cached) {
+        setMessages(cached);
+        setLoadingMessages(false);
+      } else {
+        setMessages([]);
+        setLoadingMessages(true);
+      }
 
-      await markAsRead(channel.id);
+      // 3) 안 읽음 뱃지는 낙관적 즉시 0 으로 (RPC 응답 기다리지 않음)
       setChannels((prev) =>
         prev.map((ch) => (ch.id === channel.id ? { ...ch, unread_count: 0 } : ch))
       );
+
+      // 4) 읽음 처리는 fire-and-forget — UI 차단하지 않음
+      markAsRead(channel.id).catch(() => {});
+
+      // 5) 백그라운드로 최신 메시지 fetch — 끝나면 캐시 갱신 후 화면 반영
+      //    (channel_members 는 selectedChannel?.id useEffect 가 처리하므로 중복 fetch 제거)
+      try {
+        const supabase = createClient();
+        const msgs = await fetchMessages(supabase, channel.id);
+        messagesCacheRef.current.set(channel.id, msgs);
+        // 그 사이 다른 채널로 이동했다면 무시
+        if (selectedChannelRef.current?.id === channel.id) {
+          setMessages(msgs);
+        }
+      } catch (err) {
+        console.error("메시지 로드 실패:", err);
+      } finally {
+        if (selectedChannelRef.current?.id === channel.id) {
+          setLoadingMessages(false);
+        }
+      }
     },
     []
   );
@@ -503,10 +551,11 @@ export default function ChatPageClient({
             <ChatRoom
               channel={selectedChannel}
               messages={messages}
+              loading={loadingMessages}
               userId={userId}
               userName={userName}
               userAvatar={userAvatar}
-              onMessagesUpdate={setMessages}
+              onMessagesUpdate={updateMessages}
               onBack={handleBackToList}
               onSettingsClick={() => setShowSettings(true)}
               onlineCount={channelOnlineCount > 0 ? channelOnlineCount : undefined}

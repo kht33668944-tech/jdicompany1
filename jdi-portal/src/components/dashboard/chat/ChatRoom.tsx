@@ -18,6 +18,7 @@ import PinnedMessagesPanel from "./PinnedMessagesPanel";
 interface ChatRoomProps {
   channel: ChannelWithDetails;
   messages: Message[];
+  loading?: boolean;
   userId: string;
   userName: string;
   userAvatar?: string | null;
@@ -30,6 +31,7 @@ interface ChatRoomProps {
 export default function ChatRoom({
   channel,
   messages,
+  loading = false,
   userId,
   userName,
   userAvatar,
@@ -397,6 +399,7 @@ export default function ChatRoom({
       )}
       <MessageList
         messages={messages}
+        loading={loading}
         userId={userId}
         channel={channel}
         onLoadMore={handleLoadMore}
