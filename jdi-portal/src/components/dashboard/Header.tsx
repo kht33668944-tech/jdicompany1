@@ -14,6 +14,7 @@ import NotificationCenter from "./NotificationCenter";
 import ReportQuickDrawer from "./reports/ReportQuickDrawer";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import UserAvatar from "@/components/shared/UserAvatar";
+import LogoutButton from "@/components/LogoutButton";
 
 interface HeaderProps {
   user: { id: string; email: string; name: string; avatarUrl?: string | null };
@@ -111,15 +112,10 @@ export default function Header({ user, onMenuClick, onCollapseToggle, collapsed,
                   <GearSix size={16} />
                   설정
                 </Link>
-                <form action="/auth/signout" method="post">
-                  <button
-                    type="submit"
-                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <SignOut size={16} />
-                    로그아웃
-                  </button>
-                </form>
+                <LogoutButton className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                  <SignOut size={16} />
+                  로그아웃
+                </LogoutButton>
               </div>
             )}
           </div>

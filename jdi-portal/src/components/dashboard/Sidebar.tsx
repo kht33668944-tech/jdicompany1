@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import LogoutButton from "@/components/LogoutButton";
 import {
   SquaresFour,
   Clock,
@@ -102,18 +103,15 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
             </div>
           )}
         </div>
-        <form action="/auth/signout" method="post" className="mt-2">
-          <button
-            type="submit"
-            className={`flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all duration-200 ${
-              collapsed ? "justify-center" : ""
-            }`}
-            title={collapsed ? "로그아웃" : undefined}
-          >
-            <SignOut size={18} className="shrink-0" />
-            {!collapsed && <span>로그아웃</span>}
-          </button>
-        </form>
+        <LogoutButton
+          className={`mt-2 flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all duration-200 ${
+            collapsed ? "justify-center" : ""
+          }`}
+          title={collapsed ? "로그아웃" : undefined}
+        >
+          <SignOut size={18} className="shrink-0" />
+          {!collapsed && <span>로그아웃</span>}
+        </LogoutButton>
       </div>
     </div>
   );
