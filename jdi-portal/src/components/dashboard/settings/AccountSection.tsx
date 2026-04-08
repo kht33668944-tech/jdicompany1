@@ -2,15 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { EnvelopeSimple, CalendarCheck, Key, Lock, FloppyDisk } from "phosphor-react";
-import { updatePassword, updateHireDate } from "@/lib/settings/actions";
-import type { Profile } from "@/lib/attendance/types";
+import { EnvelopeSimple, CalendarCheck, Key, Lock, FloppyDisk, PaperPlaneTilt, X } from "phosphor-react";
+import {
+  updatePassword,
+  setInitialHireDate,
+  submitHireDateChangeRequest,
+  cancelMyHireDateChangeRequest,
+  adminSetHireDate,
+} from "@/lib/settings/actions";
+import type { Profile, HireDateChangeRequest } from "@/lib/attendance/types";
 
 interface AccountSectionProps {
   profile: Profile;
+  isAdmin: boolean;
+  myHireDateChangeRequests: HireDateChangeRequest[];
 }
 
-export default function AccountSection({ profile }: AccountSectionProps) {
+export default function AccountSection({ profile, isAdmin, myHireDateChangeRequests }: AccountSectionProps) {
   const router = useRouter();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -18,6 +26,20 @@ export default function AccountSection({ profile }: AccountSectionProps) {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [hireDateInput, setHireDateInput] = useState(profile.hire_date ?? "");
   const [hireDateSaving, setHireDateSaving] = useState(false);
+
+  // 변경 요청 폼 상태
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [requestDate, setRequestDate] = useState(profile.hire_date ?? "");
+  const [requestReason, setRequestReason] = useState("");
+  const [requestSaving, setRequestSaving] = useState(false);
+
+  const pendingRequest = myHireDateChangeRequests.find((r) => r.status === "대기중");
+
+  // 모드 결정
+  // isAdmin → 항상 직접 저장
+  // !isAdmin && !hire_date_locked → 첫 설정 (직접 저장, setInitialHireDate)
+  // !isAdmin && hire_date_locked → 변경 요청 모드
+  const isLocked = profile.hire_date_locked && !isAdmin;
 
   const handleHireDateSave = async () => {
     if (!hireDateInput) {
@@ -27,13 +49,49 @@ export default function AccountSection({ profile }: AccountSectionProps) {
     setHireDateSaving(true);
     setFeedback(null);
     try {
-      await updateHireDate(profile.id, hireDateInput);
-      setFeedback({ type: "success", message: "입사일이 저장되었습니다. 연차가 다시 계산됩니다." });
+      if (isAdmin) {
+        await adminSetHireDate({ userId: profile.id, hireDate: hireDateInput });
+        setFeedback({ type: "success", message: "입사일이 저장되었습니다. 연차가 다시 계산됩니다." });
+      } else {
+        await setInitialHireDate(hireDateInput);
+        setFeedback({ type: "success", message: "입사일이 저장되었습니다. 연차가 다시 계산됩니다." });
+      }
       router.refresh();
     } catch {
       setFeedback({ type: "error", message: "입사일 저장에 실패했습니다." });
     } finally {
       setHireDateSaving(false);
+    }
+  };
+
+  const handleSubmitRequest = async () => {
+    if (!requestDate) {
+      setFeedback({ type: "error", message: "요청할 입사일을 선택해주세요." });
+      return;
+    }
+    setRequestSaving(true);
+    setFeedback(null);
+    try {
+      await submitHireDateChangeRequest({ hireDate: requestDate, reason: requestReason });
+      setFeedback({ type: "success", message: "변경 요청이 제출되었습니다. 관리자 승인을 기다려주세요." });
+      setShowRequestForm(false);
+      setRequestReason("");
+      router.refresh();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "변경 요청 제출에 실패했습니다.";
+      setFeedback({ type: "error", message: msg });
+    } finally {
+      setRequestSaving(false);
+    }
+  };
+
+  const handleCancelRequest = async (requestId: string) => {
+    setFeedback(null);
+    try {
+      await cancelMyHireDateChangeRequest(requestId);
+      router.refresh();
+    } catch {
+      setFeedback({ type: "error", message: "요청 취소에 실패했습니다." });
     }
   };
 
@@ -94,6 +152,8 @@ export default function AccountSection({ profile }: AccountSectionProps) {
             </div>
             <Lock size={16} className="text-slate-300" />
           </div>
+
+          {/* 입사일 카드 */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400">
@@ -104,23 +164,101 @@ export default function AccountSection({ profile }: AccountSectionProps) {
                 <p className="text-[11px] text-slate-500">연차 계산의 기준이 됩니다</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                value={hireDateInput}
-                onChange={(e) => setHireDateInput(e.target.value)}
-                className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700"
-              />
-              <button
-                type="button"
-                onClick={handleHireDateSave}
-                disabled={hireDateSaving || !hireDateInput || hireDateInput === profile.hire_date}
-                className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
-              >
-                <FloppyDisk size={14} />
-                저장
-              </button>
-            </div>
+
+            {/* Mode 1 & 3: 직접 입력 (미잠금 직원 or 관리자) */}
+            {!isLocked && (
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={hireDateInput}
+                  onChange={(e) => setHireDateInput(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700"
+                />
+                <button
+                  type="button"
+                  onClick={handleHireDateSave}
+                  disabled={hireDateSaving || !hireDateInput || hireDateInput === profile.hire_date}
+                  className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
+                >
+                  <FloppyDisk size={14} />
+                  저장
+                </button>
+              </div>
+            )}
+
+            {/* Mode 2: 잠금 (직원 본인, hire_date_locked = true) */}
+            {isLocked && (
+              <div className="space-y-3">
+                {/* 현재 입사일 읽기 전용 */}
+                <div className="px-3 py-2 rounded-xl bg-white border border-slate-100 text-sm text-slate-700">
+                  {profile.hire_date ?? "미설정"}
+                </div>
+
+                {/* 대기중 요청이 있을 때 */}
+                {pendingRequest ? (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-amber-700">승인 대기 중</p>
+                        <p className="text-xs text-amber-600 mt-0.5">요청 입사일: {pendingRequest.requested_hire_date}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCancelRequest(pendingRequest.id)}
+                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium"
+                      >
+                        <X size={12} />
+                        요청 취소
+                      </button>
+                    </div>
+                  </div>
+                ) : showRequestForm ? (
+                  /* 변경 요청 폼 */
+                  <div className="space-y-2">
+                    <input
+                      type="date"
+                      value={requestDate}
+                      onChange={(e) => setRequestDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700"
+                    />
+                    <textarea
+                      value={requestReason}
+                      onChange={(e) => setRequestReason(e.target.value)}
+                      placeholder="변경 사유 (선택)"
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSubmitRequest}
+                        disabled={requestSaving || !requestDate}
+                        className="flex-1 py-2 rounded-xl bg-indigo-500 text-white font-bold text-xs hover:bg-indigo-600 transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+                      >
+                        <PaperPlaneTilt size={13} />
+                        제출
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowRequestForm(false); setRequestReason(""); }}
+                        className="px-3 py-2 rounded-xl bg-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-300 transition-colors"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* 변경 요청 버튼 */
+                  <button
+                    type="button"
+                    onClick={() => setShowRequestForm(true)}
+                    className="w-full py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors"
+                  >
+                    변경 요청
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

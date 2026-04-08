@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import { getNotificationSettings, getDepartments } from "@/lib/settings/queries";
+import { getMyHireDateChangeRequests } from "@/lib/attendance/queries";
 import SettingsPageClient from "@/components/dashboard/settings/SettingsPageClient";
-import type { Profile } from "@/lib/attendance/types";
+import type { Profile, HireDateChangeRequest } from "@/lib/attendance/types";
 
 export default async function SettingsPage() {
   const auth = await getAuthUser();
@@ -15,15 +16,20 @@ export default async function SettingsPage() {
   let notificationSettings = null;
   let departments: Awaited<ReturnType<typeof getDepartments>> = [];
   let allProfiles: Profile[] = [];
+  let myHireDateChangeRequests: HireDateChangeRequest[] = [];
 
   if (profile.role === "admin") {
-    [notificationSettings, departments, allProfiles] = await Promise.all([
+    [notificationSettings, departments, allProfiles, myHireDateChangeRequests] = await Promise.all([
       getNotificationSettings(supabase, auth.user.id),
       getDepartments(supabase),
       getCachedAllProfiles(),
+      getMyHireDateChangeRequests(supabase, auth.user.id),
     ]);
   } else {
-    notificationSettings = await getNotificationSettings(supabase, auth.user.id);
+    [notificationSettings, myHireDateChangeRequests] = await Promise.all([
+      getNotificationSettings(supabase, auth.user.id),
+      getMyHireDateChangeRequests(supabase, auth.user.id),
+    ]);
   }
 
   return (
@@ -33,6 +39,7 @@ export default async function SettingsPage() {
       departments={departments}
       allProfiles={allProfiles}
       userRole={profile.role}
+      myHireDateChangeRequests={myHireDateChangeRequests}
     />
   );
 }

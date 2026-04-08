@@ -9,6 +9,7 @@ import type {
   AttendanceWithProfile,
   WorkSchedule,
   WorkScheduleChangeRequest,
+  HireDateChangeRequest,
 } from "./types";
 
 export async function getProfile(
@@ -287,4 +288,31 @@ export async function getWorkSchedulesForUser(
   userId: string
 ): Promise<WorkSchedule[]> {
   return getWorkSchedules(supabase, userId);
+}
+
+/** 관리자용: 대기 중 입사일 변경 요청 전체 */
+export async function getPendingHireDateChangeRequests(
+  supabase: SupabaseClient
+): Promise<HireDateChangeRequest[]> {
+  const { data, error } = await supabase
+    .from("hire_date_change_requests")
+    .select("*, profiles:user_id(full_name, hire_date)")
+    .eq("status", "대기중")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data as HireDateChangeRequest[]) ?? [];
+}
+
+/** 본인의 입사일 변경 요청 목록 */
+export async function getMyHireDateChangeRequests(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<HireDateChangeRequest[]> {
+  const { data, error } = await supabase
+    .from("hire_date_change_requests")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
 }
