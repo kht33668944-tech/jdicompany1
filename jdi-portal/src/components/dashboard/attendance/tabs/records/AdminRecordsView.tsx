@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Users } from "phosphor-react";
 import { createClient } from "@/lib/supabase/client";
 import { calcAttendanceStats, EMPTY_STATS } from "@/lib/attendance/stats";
-import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
+import type { AttendanceRecord, Profile, WorkSchedule } from "@/lib/attendance/types";
 import type { AttendanceStats } from "@/lib/attendance/stats";
+import { getWorkSchedulesForUser } from "@/lib/attendance/queries";
 import { getMonthRange } from "@/lib/utils/date";
 import RecordsFilter from "./RecordsFilter";
 import EmployeeCard, { getAvatarColor } from "./EmployeeCard";
@@ -16,9 +17,10 @@ import AttendanceCharts from "./AttendanceCharts";
 interface AdminRecordsViewProps {
   profile: Profile;
   allProfiles: Profile[];
+  workSchedules: WorkSchedule[];
 }
 
-export default function AdminRecordsView({ profile, allProfiles }: AdminRecordsViewProps) {
+export default function AdminRecordsView({ profile, allProfiles, workSchedules }: AdminRecordsViewProps) {
   const isAdmin = profile.role === "admin";
   const now = new Date();
   const currentRange = getMonthRange(now.getFullYear(), now.getMonth() + 1);
@@ -34,6 +36,7 @@ export default function AdminRecordsView({ profile, allProfiles }: AdminRecordsV
   const [employeeStats, setEmployeeStats] = useState<Map<string, AttendanceStats>>(new Map());
   const [prevStats, setPrevStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [employeeSchedules, setEmployeeSchedules] = useState<WorkSchedule[]>([]);
 
   const detailRef = useRef<HTMLDivElement>(null);
 
@@ -75,7 +78,7 @@ export default function AdminRecordsView({ profile, allProfiles }: AdminRecordsV
       for (const p of targetProfiles) {
         const records = data.filter((r) => r.user_id === p.id);
         newRecords.set(p.id, records);
-        newStats.set(p.id, calcAttendanceStats(records, p.work_start_time, p.work_end_time));
+        newStats.set(p.id, calcAttendanceStats(records, p.id === profile.id ? workSchedules : []));
       }
     }
 
@@ -103,13 +106,26 @@ export default function AdminRecordsView({ profile, allProfiles }: AdminRecordsV
       .lte("work_date", prevRange.end);
 
     if (data) {
-      setPrevStats(calcAttendanceStats(data, targetProfile.work_start_time, targetProfile.work_end_time));
+      const schedulesForTarget = targetProfile.id === profile.id ? workSchedules : employeeSchedules;
+      setPrevStats(calcAttendanceStats(data, schedulesForTarget));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, allProfiles, profile]);
+  }, [startDate, allProfiles, profile, workSchedules, employeeSchedules]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAllRecords(); fetchPrevStats(); }, []);
+
+  useEffect(() => {
+    if (selectedUserId === profile.id) {
+      setEmployeeSchedules([]);
+      return;
+    }
+    let cancelled = false;
+    getWorkSchedulesForUser(createClient(), selectedUserId).then((data) => {
+      if (!cancelled) setEmployeeSchedules(data);
+    });
+    return () => { cancelled = true; };
+  }, [selectedUserId, profile.id]);
 
   const selectedProfile = allProfiles.find((p) => p.id === selectedUserId) ?? profile;
   const selectedRecords = employeeRecords.get(selectedUserId) ?? [];
@@ -192,7 +208,7 @@ export default function AdminRecordsView({ profile, allProfiles }: AdminRecordsV
                 records={selectedRecords}
                 employeeName={selectedProfile.full_name}
                 periodLabel={periodLabel}
-                workStartTime={selectedProfile.work_start_time}
+                workSchedules={selectedUserId === profile.id ? workSchedules : employeeSchedules}
                 userId={selectedProfile.id}
                 isOwnRecord={selectedProfile.id === profile.id || isAdmin}
               />

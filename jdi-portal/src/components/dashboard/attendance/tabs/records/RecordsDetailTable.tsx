@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { DownloadSimple, PencilSimple, Plus } from "phosphor-react";
 import { formatDate, formatTime, formatMinutes } from "@/lib/utils/date";
-import { timeStringToMinutes } from "@/lib/attendance/stats";
-import type { AttendanceRecord } from "@/lib/attendance/types";
+import { timeStringToMinutes, getScheduleForDate } from "@/lib/attendance/stats";
+import type { AttendanceRecord, WorkSchedule } from "@/lib/attendance/types";
 import CorrectionRequestModal from "../../CorrectionRequestModal";
 import * as XLSX from "xlsx";
 
@@ -12,13 +12,16 @@ interface RecordsDetailTableProps {
   records: AttendanceRecord[];
   employeeName: string;
   periodLabel: string;
-  workStartTime: string | null;
+  workSchedules: WorkSchedule[];
   userId: string;
   isOwnRecord: boolean;
 }
 
-function getRecordStatus(record: AttendanceRecord, workStartMinutes: number): { label: string; color: string } {
+function getRecordStatus(record: AttendanceRecord, workSchedules: WorkSchedule[]): { label: string; color: string } {
   if (!record.check_in) return { label: "미출근", color: "bg-slate-100 text-slate-600" };
+
+  const { workStart } = getScheduleForDate(workSchedules, record.work_date);
+  const workStartMinutes = timeStringToMinutes(workStart);
 
   const date = new Date(record.check_in);
   const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
@@ -34,20 +37,16 @@ export default function RecordsDetailTable({
   records,
   employeeName,
   periodLabel,
-  workStartTime,
+  workSchedules,
   userId,
   isOwnRecord,
 }: RecordsDetailTableProps) {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [showMissingModal, setShowMissingModal] = useState(false);
 
-  const workStartMinutes = workStartTime
-    ? timeStringToMinutes(workStartTime)
-    : 540; // 09:00
-
   const handleExcelDownload = () => {
     const data = records.map((record) => {
-      const status = getRecordStatus(record, workStartMinutes);
+      const status = getRecordStatus(record, workSchedules);
       return {
         "날짜": record.work_date,
         "출근 시간": formatTime(record.check_in),
@@ -113,7 +112,7 @@ export default function RecordsDetailTable({
               </tr>
             ) : (
               records.map((record) => {
-                const status = getRecordStatus(record, workStartMinutes);
+                const status = getRecordStatus(record, workSchedules);
                 return (
                   <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{formatDate(record.work_date)}</td>

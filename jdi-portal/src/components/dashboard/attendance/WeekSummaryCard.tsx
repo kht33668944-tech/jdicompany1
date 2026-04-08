@@ -2,11 +2,12 @@
 
 import { ChartBar } from "phosphor-react";
 import { formatMinutes, toDateString } from "@/lib/utils/date";
-import type { AttendanceRecord } from "@/lib/attendance/types";
+import type { AttendanceRecord, WorkSchedule } from "@/lib/attendance/types";
 
 interface WeekSummaryCardProps {
   weekRecords: AttendanceRecord[];
   weekStart: string;
+  workSchedules: WorkSchedule[];
 }
 
 const WEEKDAYS = ["월", "화", "수", "목", "금"];
