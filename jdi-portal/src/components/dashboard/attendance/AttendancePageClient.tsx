@@ -14,6 +14,8 @@ import type {
   Profile,
   VacationBalance,
   VacationRequest,
+  WorkSchedule,
+  WorkScheduleChangeRequest,
 } from "@/lib/attendance/types";
 
 interface AttendancePageClientProps {
@@ -32,6 +34,9 @@ interface AttendancePageClientProps {
   pendingVacationRequests: VacationRequest[] | null;
   cancelVacationRequests: VacationRequest[] | null;
   pendingCorrectionRequests: CorrectionRequest[] | null;
+  workSchedules: WorkSchedule[];
+  myWorkScheduleChangeRequests: WorkScheduleChangeRequest[];
+  pendingWorkScheduleChangeRequests: WorkScheduleChangeRequest[] | null;
 }
 
 const STORAGE_KEY = "attendance-active-tab";
@@ -68,11 +73,12 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
       {activeTab === "checkin" && (
         <CheckInOutTab
           userId={props.profile.id}
+          isAdmin={isAdmin}
           todayRecord={props.todayRecord}
           weekRecords={props.weekRecords}
           weekStart={props.weekStart}
-          workStartTime={props.profile.work_start_time}
-          workEndTime={props.profile.work_end_time}
+          workSchedules={props.workSchedules}
+          myChangeRequests={props.myWorkScheduleChangeRequests}
         />
       )}
 
@@ -80,6 +86,7 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
         <RecordsTab
           profile={props.profile}
           allProfiles={props.allProfiles ?? []}
+          workSchedules={props.workSchedules}
         />
       )}
 
@@ -99,6 +106,7 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
           pendingVacationRequests={props.pendingVacationRequests ?? []}
           cancelVacationRequests={props.cancelVacationRequests ?? []}
           pendingCorrectionRequests={props.pendingCorrectionRequests ?? []}
+          pendingWorkScheduleChangeRequests={props.pendingWorkScheduleChangeRequests ?? []}
         />
       )}
     </div>
