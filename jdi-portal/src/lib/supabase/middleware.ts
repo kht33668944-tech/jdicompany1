@@ -38,13 +38,20 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  // 네트워크 일시 오류는 "로그아웃"으로 취급하지 않음 — 기존 쿠키/세션 그대로 통과
+  const isTransientAuthError =
+    !!authError &&
+    ((authError as { name?: string }).name === "AuthRetryableFetchError" ||
+      ((authError as { message?: string }).message ?? "").toLowerCase().includes("fetch") ||
+      (typeof (authError as { status?: number }).status === "number" &&
+        (authError as { status?: number }).status! >= 500));
 
   // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
   if (
     !user &&
+    !isTransientAuthError &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/signup") &&
     !request.nextUrl.pathname.startsWith("/forgot-password") &&
