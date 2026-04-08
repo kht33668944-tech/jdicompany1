@@ -11,6 +11,9 @@ import {
   adminSetHireDate,
 } from "@/lib/settings/actions";
 import type { Profile, HireDateChangeRequest } from "@/lib/attendance/types";
+import ReauthModal from "@/components/ReauthModal";
+
+const REAUTH_WINDOW_MS = 5 * 60 * 1000; // 5분
 
 interface AccountSectionProps {
   profile: Profile;
@@ -23,6 +26,7 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [reauthOpen, setReauthOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [hireDateInput, setHireDateInput] = useState(profile.hire_date ?? "");
   const [hireDateSaving, setHireDateSaving] = useState(false);
@@ -95,17 +99,20 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
     }
   };
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword.length < 8) {
-      setFeedback({ type: "error", message: "비밀번호는 8자 이상이어야 합니다." });
-      return;
+  const needsReauth = (): boolean => {
+    if (typeof window === "undefined") return true;
+    try {
+      const raw = window.sessionStorage.getItem("jdi:reauth-at");
+      if (!raw) return true;
+      const at = Number(raw);
+      if (!Number.isFinite(at)) return true;
+      return Date.now() - at > REAUTH_WINDOW_MS;
+    } catch {
+      return true;
     }
-    if (newPassword !== confirmPassword) {
-      setFeedback({ type: "error", message: "새 비밀번호가 일치하지 않습니다." });
-      return;
-    }
+  };
 
+  const actuallyChangePassword = async () => {
     setLoading(true);
     setFeedback(null);
     try {
@@ -120,8 +127,36 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
     }
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setFeedback({ type: "error", message: "비밀번호는 8자 이상이어야 합니다." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setFeedback({ type: "error", message: "새 비밀번호가 일치하지 않습니다." });
+      return;
+    }
+
+    if (needsReauth()) {
+      setReauthOpen(true);
+      return;
+    }
+    await actuallyChangePassword();
+  };
+
   return (
     <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-8">
+      {reauthOpen && (
+        <ReauthModal
+          email={profile.email}
+          onSuccess={async () => {
+            setReauthOpen(false);
+            await actuallyChangePassword();
+          }}
+          onCancel={() => setReauthOpen(false)}
+        />
+      )}
       <div className="mb-8">
         <h2 className="text-lg font-bold text-slate-800">계정 및 보안</h2>
         <p className="text-xs text-slate-400 mt-1">계정 보안 정보 및 로그인을 위한 설정을 관리합니다.</p>
