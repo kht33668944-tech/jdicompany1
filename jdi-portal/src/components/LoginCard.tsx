@@ -23,6 +23,19 @@ export default function LoginCard() {
 
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // next 파라미터 안전 검증: 동일 origin 내부 경로만 허용
+  const sanitizeNext = (raw: string | null): string => {
+    if (!raw) return "/dashboard";
+    // "/" 로 시작하고, "//" (스키마리스 URL) 이나 "/\" 로 시작하지 않아야 함
+    if (!raw.startsWith("/")) return "/dashboard";
+    if (raw.startsWith("//") || raw.startsWith("/\\")) return "/dashboard";
+    // 로그인/인증 경로 자체로 되돌아가지 않도록
+    if (raw.startsWith("/login") || raw.startsWith("/signup") || raw.startsWith("/auth")) {
+      return "/dashboard";
+    }
+    return raw;
+  };
+
   const validateUsername = (value: string) => value.length >= 3 || value.includes("@");
   const validatePassword = (value: string) => value.length >= 8;
 
@@ -93,7 +106,8 @@ export default function LoginCard() {
           setShaking(true);
           setTimeout(() => setShaking(false), 500);
         } else {
-          router.push("/dashboard");
+          const nextPath = sanitizeNext(searchParams.get("next"));
+          router.push(nextPath);
           router.refresh();
         }
       }
