@@ -68,6 +68,11 @@ export async function updateSession(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    // 원래 가려던 경로 보존 (pathname + search)
+    const originalPath = request.nextUrl.pathname + request.nextUrl.search;
+    if (originalPath && originalPath !== "/") {
+      url.searchParams.set("next", originalPath);
+    }
     return NextResponse.redirect(url);
   }
 
