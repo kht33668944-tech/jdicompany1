@@ -1,6 +1,19 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7일 (초 단위)
+
+function withPersistentMaxAge(
+  name: string,
+  options: { maxAge?: number; [key: string]: unknown } | undefined
+) {
+  // Supabase 인증 쿠키(sb-*)에만 적용. 그 외 쿠키는 원본 옵션 유지.
+  if (!name.startsWith("sb-")) return options;
+  // 이미 maxAge가 지정돼 있으면 존중
+  if (options && typeof options.maxAge === "number") return options;
+  return { ...(options ?? {}), maxAge: SESSION_MAX_AGE };
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -18,7 +31,7 @@ export async function updateSession(request: NextRequest) {
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, withPersistentMaxAge(name, options))
           );
         },
       },
