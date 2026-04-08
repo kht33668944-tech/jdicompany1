@@ -33,7 +33,7 @@ export default function ReauthModal({ email, onSuccess, onCancel }: ReauthModalP
         setError(
           authError.message === "Invalid login credentials"
             ? "비밀번호가 올바르지 않습니다."
-            : authError.message
+            : "본인 확인에 실패했습니다. 다시 시도해 주세요."
         );
         return;
       }
