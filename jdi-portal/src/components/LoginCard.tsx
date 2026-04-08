@@ -7,6 +7,36 @@ import { createClient } from "@/lib/supabase/client";
 
 type ValidationState = "" | "error" | "success";
 
+// next 파라미터 안전 검증: 동일 origin 내부 경로만 허용.
+// 퍼센트 인코딩 우회(%2F%2F), 제어 문자(\t, \n), 스키마-리스(//)/역슬래시(/\) 차단.
+function sanitizeNext(raw: string | null): string {
+  if (!raw) return "/dashboard";
+
+  // 제어 문자 / 공백 문자 차단 (탭, 개행, NULL 등)
+  if (/[\s\x00-\x1F]/.test(raw)) return "/dashboard";
+
+  // 퍼센트 인코딩 디코드 후 재검사 (decode 실패 시 거부)
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return "/dashboard";
+  }
+
+  if (!decoded.startsWith("/")) return "/dashboard";
+  if (decoded.startsWith("//") || decoded.startsWith("/\\")) return "/dashboard";
+  if (
+    decoded.startsWith("/login") ||
+    decoded.startsWith("/signup") ||
+    decoded.startsWith("/auth")
+  ) {
+    return "/dashboard";
+  }
+
+  // 원본(raw)을 리턴해서 router 가 두 번 디코드하지 않도록
+  return raw;
+}
+
 export default function LoginCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -22,19 +52,6 @@ export default function LoginCard() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const cardRef = useRef<HTMLDivElement>(null);
-
-  // next 파라미터 안전 검증: 동일 origin 내부 경로만 허용
-  const sanitizeNext = (raw: string | null): string => {
-    if (!raw) return "/dashboard";
-    // "/" 로 시작하고, "//" (스키마리스 URL) 이나 "/\" 로 시작하지 않아야 함
-    if (!raw.startsWith("/")) return "/dashboard";
-    if (raw.startsWith("//") || raw.startsWith("/\\")) return "/dashboard";
-    // 로그인/인증 경로 자체로 되돌아가지 않도록
-    if (raw.startsWith("/login") || raw.startsWith("/signup") || raw.startsWith("/auth")) {
-      return "/dashboard";
-    }
-    return raw;
-  };
 
   const validateUsername = (value: string) => value.length >= 3 || value.includes("@");
   const validatePassword = (value: string) => value.length >= 8;
