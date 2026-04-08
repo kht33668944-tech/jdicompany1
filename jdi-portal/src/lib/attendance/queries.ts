@@ -8,6 +8,8 @@ import type {
   VacationRequest,
   CorrectionRequest,
   AttendanceWithProfile,
+  WorkSchedule,
+  WorkScheduleChangeRequest,
 } from "./types";
 
 export async function getProfile(
@@ -225,4 +227,71 @@ export async function getApprovedVacationsForMonth(
     .order("start_date", { ascending: true });
   if (error) throw error;
   return (data as VacationRequest[]) ?? [];
+}
+
+/** 직원 본인의 모든 근무시간 이력 (effective_from ASC) */
+export async function getWorkSchedules(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<WorkSchedule[]> {
+  const { data, error } = await supabase
+    .from("work_schedules")
+    .select("*")
+    .eq("user_id", userId)
+    .order("effective_from", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** 오늘 시점 적용 중인 근무시간 1행 */
+export async function getCurrentWorkSchedule(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<WorkSchedule | null> {
+  const today = toDateString();
+  const { data, error } = await supabase
+    .from("work_schedules")
+    .select("*")
+    .eq("user_id", userId)
+    .lte("effective_from", today)
+    .order("effective_from", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** 본인의 변경 요청 목록 */
+export async function getMyWorkScheduleChangeRequests(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<WorkScheduleChangeRequest[]> {
+  const { data, error } = await supabase
+    .from("work_schedule_change_requests")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** 관리자용: 대기 중 변경 요청 전체 */
+export async function getPendingWorkScheduleChangeRequests(
+  supabase: SupabaseClient
+): Promise<WorkScheduleChangeRequest[]> {
+  const { data, error } = await supabase
+    .from("work_schedule_change_requests")
+    .select("*, profiles:user_id(full_name)")
+    .eq("status", "대기중")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data as WorkScheduleChangeRequest[]) ?? [];
+}
+
+/** 관리자용: 특정 직원의 모든 이력 */
+export async function getWorkSchedulesForUser(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<WorkSchedule[]> {
+  return getWorkSchedules(supabase, userId);
 }

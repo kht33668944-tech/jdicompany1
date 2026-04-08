@@ -8,7 +8,10 @@ export type NotificationType =
   | "schedule_invite"
   | "system_announce"
   | "signup_pending"
-  | "chat_message";
+  | "chat_message"
+  | "work_schedule_change_requested"
+  | "work_schedule_approved"
+  | "work_schedule_rejected";
 
 export interface Notification {
   id: string;

@@ -14,6 +14,9 @@ export const NOTIFICATION_TYPE_CONFIG: Record<
   system_announce: { label: "시스템 공지", icon: "Megaphone", color: "text-blue-600" },
   signup_pending: { label: "가입 승인 대기", icon: "UserCirclePlus", color: "text-orange-500" },
   chat_message: { label: "채팅 메시지", icon: "ChatCircle", color: "text-indigo-500" },
+  work_schedule_change_requested: { label: "근무시간 변경 요청", icon: "Clock", color: "text-violet-500" },
+  work_schedule_approved: { label: "근무시간 변경 승인", icon: "CheckCircle", color: "text-emerald-500" },
+  work_schedule_rejected: { label: "근무시간 변경 반려", icon: "XCircle", color: "text-red-500" },
 };
 
 /** notification_settings 컬럼 → NotificationType[] 매핑 */

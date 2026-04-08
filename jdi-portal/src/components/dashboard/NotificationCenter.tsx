@@ -42,6 +42,9 @@ const TYPE_ICONS: Record<NotificationType, React.ElementType> = {
   system_announce: Megaphone,
   signup_pending: UserCirclePlus,
   chat_message: ChatCircle,
+  work_schedule_change_requested: Bell,
+  work_schedule_approved: CheckCircle,
+  work_schedule_rejected: XCircle,
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -55,6 +58,9 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   system_announce: "text-blue-600 bg-blue-50",
   signup_pending: "text-orange-500 bg-orange-50",
   chat_message: "text-indigo-500 bg-indigo-50",
+  work_schedule_change_requested: "text-violet-500 bg-violet-50",
+  work_schedule_approved: "text-emerald-500 bg-emerald-50",
+  work_schedule_rejected: "text-red-500 bg-red-50",
 };
 
 interface NotificationCenterProps {

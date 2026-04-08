@@ -25,6 +25,33 @@ export function minutesToTimeLabel(minutes: number): string {
   return `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
 }
 
+/** 한 직원의 근무시간 이력 1행 (stats 계산용 슬림 형) */
+export interface WorkScheduleEntry {
+  effective_from: string;
+  work_start_time: string;
+  work_end_time: string;
+}
+
+/**
+ * 주어진 work_date에 대해 적용되는 근무시간 기준을 반환.
+ * schedules는 effective_from ASC 정렬되어 있어야 함.
+ * 매칭 행이 없으면 09:00 / 18:00 기본값 반환.
+ */
+export function getScheduleForDate(
+  schedules: WorkScheduleEntry[],
+  workDate: string
+): { workStart: string; workEnd: string } {
+  let match: WorkScheduleEntry | null = null;
+  for (const s of schedules) {
+    if (s.effective_from <= workDate) match = s;
+    else break;
+  }
+  if (!match) {
+    return { workStart: DEFAULT_WORK_START, workEnd: DEFAULT_WORK_END };
+  }
+  return { workStart: match.work_start_time, workEnd: match.work_end_time };
+}
+
 export interface AttendanceStats {
   totalDays: number;
   avgWorkMinutes: number;
@@ -45,28 +72,12 @@ export const EMPTY_STATS: AttendanceStats = {
 
 export function calcAttendanceStats(
   records: AttendanceRecord[],
-  workStartTime: string | null,
-  workEndTime: string | null
+  schedules: WorkScheduleEntry[]
 ): AttendanceStats {
-  const workStart = timeStringToMinutes(workStartTime ?? DEFAULT_WORK_START);
-  const workEnd = timeStringToMinutes(workEndTime ?? DEFAULT_WORK_END);
-
   const checkedInRecords = records.filter((r) => r.check_in);
   const totalDays = checkedInRecords.length;
 
-  if (totalDays === 0) {
-    return {
-      totalDays: 0,
-      avgWorkMinutes: 0,
-      onTimeRate: 0,
-      avgLateMinutes: 0,
-      avgCheckInMinutes: 0,
-      avgCheckOutMinutes: 0,
-      normalCount: 0,
-      lateCount: 0,
-      earlyLeaveCount: 0,
-    };
-  }
+  if (totalDays === 0) return { ...EMPTY_STATS };
 
   let totalWorkMinutes = 0;
   let totalCheckInMinutes = 0;
@@ -77,12 +88,16 @@ export function calcAttendanceStats(
   let earlyLeaveCount = 0;
 
   for (const record of checkedInRecords) {
+    const { workStart, workEnd } = getScheduleForDate(schedules, record.work_date);
+    const workStartMin = timeStringToMinutes(workStart);
+    const workEndMin = timeStringToMinutes(workEnd);
+
     const checkInMin = extractTimeMinutes(record.check_in!);
     totalCheckInMinutes += checkInMin;
 
-    if (checkInMin > workStart) {
+    if (checkInMin > workStartMin) {
       lateCount++;
-      totalLateMinutes += checkInMin - workStart;
+      totalLateMinutes += checkInMin - workStartMin;
     }
 
     if (record.check_out) {
@@ -90,7 +105,7 @@ export function calcAttendanceStats(
       totalCheckOutMinutes += checkOutMin;
       checkOutCount++;
 
-      if (checkOutMin < workEnd) {
+      if (checkOutMin < workEndMin) {
         earlyLeaveCount++;
       }
     }
@@ -123,7 +138,7 @@ export function calcWeekdayAvgCheckIn(records: AttendanceRecord[]): { day: strin
   for (const record of records) {
     if (!record.check_in) continue;
     const date = new Date(`${record.work_date}T12:00:00+09:00`);
-    const dow = date.getDay(); // 0=Sun, 1=Mon...
+    const dow = date.getDay();
     if (dow >= 1 && dow <= 5) {
       buckets[dow - 1].push(extractTimeMinutes(record.check_in));
     }
@@ -149,7 +164,6 @@ export function calcWeeklyWorkHours(records: AttendanceRecord[]): { week: string
     const dayOfMonth = date.getDate();
     const weekNum = Math.ceil(dayOfMonth / 7);
     const key = `${weekNum}주`;
-
     const prev = weeks.get(key) ?? 0;
     weeks.set(key, prev + (record.total_minutes ?? 0));
   }

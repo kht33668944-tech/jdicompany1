@@ -71,3 +71,29 @@ export interface CorrectionRequest {
 export interface AttendanceWithProfile extends AttendanceRecord {
   profiles: { full_name: string; email: string; department: string };
 }
+
+export interface WorkSchedule {
+  id: string;
+  user_id: string;
+  work_start_time: string;       // "HH:MM:SS"
+  work_end_time: string;         // "HH:MM:SS"
+  effective_from: string;        // "YYYY-MM-DD"
+  is_initial_seed: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface WorkScheduleChangeRequest {
+  id: string;
+  user_id: string;
+  requested_start_time: string;
+  requested_end_time: string;
+  effective_from: string;
+  reason: string | null;
+  status: "대기중" | "승인" | "반려";
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reject_reason: string | null;
+  created_at: string;
+  profiles?: { full_name: string };
+}

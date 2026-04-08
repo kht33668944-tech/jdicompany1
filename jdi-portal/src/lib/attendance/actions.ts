@@ -234,22 +234,152 @@ export async function rejectCorrectionRequest(
   if (error) throw error;
 }
 
-export async function updateWorkSchedule(
-  userId: string,
-  workStartTime: string | null,
-  workEndTime: string | null
+/** 첫 근무시간 설정 (이력에 비-시드 행이 없을 때만 가능) */
+export async function setInitialWorkSchedule(
+  startTime: string,
+  endTime: string
 ) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  const { data, error } = await supabase.rpc("set_initial_work_schedule", {
+    p_start: startTime,
+    p_end: endTime,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/** 근무시간 변경 요청 제출 */
+export async function submitWorkScheduleChangeRequest(params: {
+  startTime: string;
+  endTime: string;
+  effectiveFrom: string;
+  reason: string;
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc(
+    "submit_work_schedule_change_request",
+    {
+      p_start: params.startTime,
+      p_end: params.endTime,
+      p_effective_from: params.effectiveFrom,
+      p_reason: params.reason ?? "",
+    }
+  );
+  if (error) throw error;
+
+  // 모든 관리자에게 알림
+  const { data: admins } = await supabase
     .from("profiles")
-    .update({
-      work_start_time: workStartTime,
-      work_end_time: workEndTime,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", userId)
-    .select("work_start_time, work_end_time")
+    .select("id")
+    .eq("role", "admin");
+  if (admins) {
+    await Promise.all(
+      admins.map((a: { id: string }) =>
+        createNotification({
+          userId: a.id,
+          type: "work_schedule_change_requested",
+          title: "근무시간 변경 요청",
+          body: `${params.startTime.slice(0, 5)} ~ ${params.endTime.slice(
+            0,
+            5
+          )} (적용일: ${params.effectiveFrom})`,
+          link: "/dashboard/attendance",
+        })
+      )
+    );
+  }
+  return data;
+}
+
+/** 본인 대기중 요청 취소 */
+export async function cancelMyWorkScheduleChangeRequest(requestId: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("work_schedule_change_requests")
+    .delete()
+    .eq("id", requestId)
+    .eq("status", "대기중");
+  if (error) throw error;
+}
+
+/** 변경 요청 승인 (관리자) */
+export async function approveWorkScheduleChangeRequest(
+  requestId: string,
+  adminId: string
+) {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc(
+    "approve_work_schedule_change_request",
+    { p_request_id: requestId }
+  );
+  if (error) throw error;
+
+  // 신청자에게 알림
+  const { data: req } = await supabase
+    .from("work_schedule_change_requests")
+    .select(
+      "user_id, requested_start_time, requested_end_time, effective_from"
+    )
+    .eq("id", requestId)
     .single();
+  if (req) {
+    await createNotification({
+      userId: req.user_id,
+      type: "work_schedule_approved",
+      title: "근무시간 변경이 승인되었습니다",
+      body: `${req.requested_start_time.slice(
+        0,
+        5
+      )} ~ ${req.requested_end_time.slice(0, 5)} (적용일: ${req.effective_from})`,
+      link: "/dashboard/attendance",
+    });
+  }
+}
+
+/** 변경 요청 반려 (관리자) */
+export async function rejectWorkScheduleChangeRequest(
+  requestId: string,
+  adminId: string,
+  rejectReason: string
+) {
+  const supabase = getSupabase();
+  const { data: req } = await supabase
+    .from("work_schedule_change_requests")
+    .select("user_id, requested_start_time, requested_end_time, effective_from")
+    .eq("id", requestId)
+    .single();
+
+  const { error } = await supabase.rpc("reject_work_schedule_change_request", {
+    p_request_id: requestId,
+    p_reason: rejectReason,
+  });
+  if (error) throw error;
+
+  if (req) {
+    await createNotification({
+      userId: req.user_id,
+      type: "work_schedule_rejected",
+      title: "근무시간 변경이 반려되었습니다",
+      body: `사유: ${rejectReason}`,
+      link: "/dashboard/attendance",
+    });
+  }
+}
+
+/** 관리자가 직접 저장 (즉시 반영) */
+export async function adminSetWorkSchedule(params: {
+  userId: string;
+  startTime: string;
+  endTime: string;
+  effectiveFrom: string;
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc("admin_set_work_schedule", {
+    p_user_id: params.userId,
+    p_start: params.startTime,
+    p_end: params.endTime,
+    p_effective_from: params.effectiveFrom,
+  });
   if (error) throw error;
   return data;
 }
