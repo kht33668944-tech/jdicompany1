@@ -19,6 +19,8 @@ import EmptyState from "./EmptyState";
 import ChannelCreateModal from "./ChannelCreateModal";
 import ChannelSettingsDrawer from "./ChannelSettingsDrawer";
 import { ChatFileUrlsProvider, useChatFileUrls } from "./ChatFileUrlsContext";
+import PushPromptBanner from "./PushPromptBanner";
+import { touchChannelSeen } from "@/lib/push/actions";
 
 interface ChatPageClientProps {
   initialChannels: ChannelWithDetails[];
@@ -454,6 +456,18 @@ function ChatPageClientInner({
     };
   }, [userId, userName]);
 
+  // 활성 채널 heartbeat: last_seen_at 갱신으로 푸시 알림 억제
+  useEffect(() => {
+    if (!selectedChannel?.id) return;
+    void touchChannelSeen(selectedChannel.id);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void touchChannelSeen(selectedChannel.id);
+      }
+    }, 5000);
+    return () => clearInterval(id);
+  }, [selectedChannel?.id]);
+
   const handleSelectChannel = useCallback(
     async (channel: ChannelWithDetails) => {
       // 같은 채널 재선택 시 아무 것도 안 함 (불필요한 fetch 방지)
@@ -583,6 +597,7 @@ function ChatPageClientInner({
 
   return (
     <>
+      <PushPromptBanner userId={userId} />
       <div className="flex h-[calc(100vh-8rem)] rounded-2xl overflow-hidden bg-white shadow-sm">
         {/* Channel list */}
         <div
