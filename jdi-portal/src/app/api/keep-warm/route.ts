@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 // Vercel serverless 콜드 스타트 방지용 핑 엔드포인트
-// - 외부 cron 이 5분마다 호출
+// - 외부 cron (cron-job.org) 이 5분마다 호출
 // - 인증 불필요
-// - 단순 응답이 아니라 Supabase 클라이언트를 실제로 초기화 + 가벼운 쿼리 1회
-//   → DB 연결 풀, Supabase SDK 모듈 V8 캐시, 라우트 컴파일 모두 warm 유지
+// - Supabase SDK 초기화 + 각 페이지가 실제 쓰는 테이블에 가벼운 쿼리 1회씩
+//   → DB 연결 풀, PostgREST JIT, Postgres query plan 캐시, V8 모듈 캐시 모두 warm
+//
+// 주의:
+// - RLS 로 결과는 0건이지만 실제 쿼리가 DB까지 왕복하므로 warm-up 효과는 동일
+// - Promise.all 로 병렬 실행 → 실행 시간 < 1초 유지 (cron-job.org 타임아웃 안전)
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -23,9 +27,17 @@ export async function GET() {
         },
       }
     );
-    // 인증 없이도 통과하는 가벼운 RPC: 토큰 없이도 DB 라운드트립만 발생하면 됨
-    // (RLS 로 결과는 0건이지만 connection pool warm 효과는 동일)
-    await supabase.from("profiles").select("id").limit(1);
+
+    // 대시보드/할일/근태/일정 페이지가 첫 진입 시 실제로 쓰는 테이블들을
+    // 미리 한 번씩 찔러서 연결·쿼리플래너 캐시를 warm 유지
+    await Promise.all([
+      supabase.from("profiles").select("id").limit(1),
+      supabase.from("tasks").select("id").limit(1),
+      supabase.from("task_activities").select("id").limit(1),
+      supabase.from("attendance_records").select("id").limit(1),
+      supabase.from("vacation_requests").select("id").limit(1),
+      supabase.from("schedules").select("id").limit(1),
+    ]);
     dbOk = true;
   } catch {
     dbOk = false;
