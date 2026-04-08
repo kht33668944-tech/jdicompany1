@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { EnvelopeSimple, CalendarCheck, Key, Lock } from "phosphor-react";
-import { updatePassword } from "@/lib/settings/actions";
+import { useRouter } from "next/navigation";
+import { EnvelopeSimple, CalendarCheck, Key, Lock, FloppyDisk } from "phosphor-react";
+import { updatePassword, updateHireDate } from "@/lib/settings/actions";
 import type { Profile } from "@/lib/attendance/types";
 
 interface AccountSectionProps {
@@ -10,17 +11,31 @@ interface AccountSectionProps {
 }
 
 export default function AccountSection({ profile }: AccountSectionProps) {
+  const router = useRouter();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [hireDateInput, setHireDateInput] = useState(profile.hire_date ?? "");
+  const [hireDateSaving, setHireDateSaving] = useState(false);
 
-  const hireDate = new Date(`${profile.hire_date}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const handleHireDateSave = async () => {
+    if (!hireDateInput) {
+      setFeedback({ type: "error", message: "입사일을 선택해주세요." });
+      return;
+    }
+    setHireDateSaving(true);
+    setFeedback(null);
+    try {
+      await updateHireDate(profile.id, hireDateInput);
+      setFeedback({ type: "success", message: "입사일이 저장되었습니다. 연차가 다시 계산됩니다." });
+      router.refresh();
+    } catch {
+      setFeedback({ type: "error", message: "입사일 저장에 실패했습니다." });
+    } finally {
+      setHireDateSaving(false);
+    }
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,15 +94,32 @@ export default function AccountSection({ profile }: AccountSectionProps) {
             </div>
             <Lock size={16} className="text-slate-300" />
           </div>
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400">
                 <CalendarCheck size={20} />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">입사일</p>
-                <p className="text-sm font-bold text-slate-700">{hireDate}</p>
+                <p className="text-[11px] text-slate-500">연차 계산의 기준이 됩니다</p>
               </div>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={hireDateInput}
+                onChange={(e) => setHireDateInput(e.target.value)}
+                className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700"
+              />
+              <button
+                type="button"
+                onClick={handleHireDateSave}
+                disabled={hireDateSaving || !hireDateInput || hireDateInput === profile.hire_date}
+                className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
+              >
+                <FloppyDisk size={14} />
+                저장
+              </button>
             </div>
           </div>
         </div>

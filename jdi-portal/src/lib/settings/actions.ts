@@ -48,6 +48,28 @@ export async function uploadAvatar(userId: string, file: File) {
   return avatarUrl;
 }
 
+export async function updateHireDate(userId: string, hireDate: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      hire_date: hireDate,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+  if (error) throw error;
+  // 트리거가 vacation_balances 를 자동 재계산하지만, 혹시 모를 상황을 대비해
+  // 클라이언트에서도 명시적으로 보장 호출 (현재 년도)
+  const currentYear = new Date().getFullYear();
+  const { error: rpcError } = await supabase.rpc("ensure_vacation_balance", {
+    p_user_id: userId,
+    p_year: currentYear,
+  });
+  if (rpcError) {
+    console.error("ensure_vacation_balance after hire_date update:", rpcError);
+  }
+}
+
 export async function updatePassword(newPassword: string) {
   const supabase = getSupabase();
   const { error } = await supabase.auth.updateUser({ password: newPassword });

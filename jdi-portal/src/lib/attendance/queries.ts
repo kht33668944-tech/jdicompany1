@@ -77,14 +77,27 @@ export async function getVacationBalance(
   userId: string,
   year: number = new Date().getFullYear()
 ): Promise<VacationBalance | null> {
+  // 1) 우선 기존 레코드 조회
   const { data, error } = await supabase
     .from("vacation_balances")
     .select("*")
     .eq("user_id", userId)
     .eq("year", year)
-    .single();
-  if (error && error.code !== "PGRST116") throw error;
-  return data;
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return data;
+
+  // 2) 없으면 프로필의 입사일 기준으로 자동 생성 (SECURITY DEFINER RPC)
+  const { data: ensured, error: rpcError } = await supabase.rpc(
+    "ensure_vacation_balance",
+    { p_user_id: userId, p_year: year }
+  );
+  if (rpcError) {
+    // RPC 실패는 치명적이지 않음 - null 반환해 0일로 표시 (로그만)
+    console.error("ensure_vacation_balance failed:", rpcError);
+    return null;
+  }
+  return (ensured as VacationBalance) ?? null;
 }
 
 export async function getVacationRequests(
