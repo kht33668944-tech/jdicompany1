@@ -1,7 +1,5 @@
 # 근태관리 기록 탭 확장 구현 계획
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** 개인 근무시간 설정 기능을 추가하고, 기록 탭을 관리자/직원 공용 UI로 확장하여 직원별 근태 분석이 가능하도록 구현한다.
 
 **Architecture:** 1단계로 profiles 테이블에 work_start_time/work_end_time 컬럼을 추가하고 출퇴근 탭에 설정 UI를 배치한다. 2단계로 기록 탭을 확장하여 직원 목록 + 상세 기록 + 통계 + 차트 구조의 공용 UI를 구현한다. 관리자는 전체 직원을, 일반 직원은 본인만 조회한다.

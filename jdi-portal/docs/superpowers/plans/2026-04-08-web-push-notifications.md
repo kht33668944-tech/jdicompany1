@@ -1,7 +1,5 @@
 # Web Push 알림 시스템 구현 계획
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** JDI 포털에서 채팅 메시지/in-app 알림이 발생하면 사용자의 폰/PC에 OS 푸시 알림이 도달하도록 한다.
 
 **Architecture:** Supabase Database Webhook이 INSERT 이벤트를 Edge Function `push-dispatch`로 전달하면, 함수가 수신자를 결정하고 web-push 라이브러리로 VAPID 서명한 후 FCM/APNs에 발송한다. 클라이언트는 Service Worker 등록 + PushSubscription을 받아 Supabase에 저장한다.

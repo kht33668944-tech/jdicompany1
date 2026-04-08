@@ -1,7 +1,5 @@
 # Security & Code Quality Fixes Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Fix all 10 identified issues (3 Critical, 7 Important) from the code review — security vulnerabilities, routing bugs, and code quality improvements.
 
 **Architecture:** Patch existing files in-place. No new dependencies. Keep the existing Server/Client Component split pattern from login page.
