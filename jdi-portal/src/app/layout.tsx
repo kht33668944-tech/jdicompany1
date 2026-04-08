@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import PWAInit from "@/components/PWAInit";
+import NavigationListener from "@/components/NavigationListener";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -64,6 +65,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col font-sans">
         <PWAInit />
+        <NavigationListener />
         {children}
       </body>
     </html>
