@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -52,6 +52,25 @@ export default function LoginCard() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const cardRef = useRef<HTMLDivElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
+  // 마지막 로그인 이메일 자동 채움 (7일 후 재로그인 시 비밀번호만 입력하도록)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const lastEmail = window.localStorage.getItem("jdi:last-email");
+      if (lastEmail) {
+        setUsername(lastEmail);
+        setUsernameState(validateUsername(lastEmail) ? "success" : "");
+        // 이메일이 있으면 비밀번호 칸으로 포커스 이동
+        setTimeout(() => {
+          passwordInputRef.current?.focus();
+        }, 50);
+      }
+    } catch {
+      /* localStorage 접근 실패 (프라이빗 모드 등) — 무시 */
+    }
+  }, []);
 
   const validateUsername = (value: string) => value.length >= 3 || value.includes("@");
   const validatePassword = (value: string) => value.length >= 8;
@@ -123,6 +142,13 @@ export default function LoginCard() {
           setShaking(true);
           setTimeout(() => setShaking(false), 500);
         } else {
+          // 마지막 로그인 이메일 기억 (비밀번호는 저장하지 않음)
+          try {
+            window.localStorage.setItem("jdi:last-email", username);
+          } catch {
+            /* 무시 */
+          }
+
           const nextPath = sanitizeNext(searchParams.get("next"));
           router.push(nextPath);
           router.refresh();
@@ -221,6 +247,7 @@ export default function LoginCard() {
                 </svg>
               </div>
               <input
+                ref={passwordInputRef}
                 type={showPassword ? "text" : "password"}
                 id="password"
                 value={password}
