@@ -9,7 +9,7 @@
  * 캐시 버전: 코드 변경 시 CACHE_VERSION 을 올리면 구버전 자동 삭제
  */
 
-const CACHE_VERSION = "jdi-v1";
+const CACHE_VERSION = "jdi-v2-push";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGES_CACHE = `${CACHE_VERSION}-pages`;
 const OFFLINE_URL = "/offline";
@@ -126,4 +126,60 @@ self.addEventListener("fetch", (event) => {
       })()
     );
   }
+});
+
+// ============================================================
+// Web Push 알림
+// ============================================================
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data?.json() ?? {};
+  } catch {
+    payload = { title: "JDI 포털", body: event.data?.text() ?? "" };
+  }
+
+  const title = payload.title || "JDI 포털";
+  const options = {
+    body: payload.body || "",
+    icon: payload.icon || "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: payload.tag || payload.link || "jdi-portal",
+    data: { link: payload.link || "/dashboard" },
+    requireInteraction: false,
+    renotify: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const link = event.notification.data?.link || "/dashboard";
+
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      // 이미 열린 PWA/탭이 있으면 그쪽으로 포커스
+      for (const client of all) {
+        if (client.url.includes(self.location.origin)) {
+          await client.focus();
+          if ("navigate" in client) {
+            try {
+              await client.navigate(link);
+            } catch {
+              /* navigate가 막히면 postMessage로 라우팅 */
+              client.postMessage({ type: "NAVIGATE", link });
+            }
+          }
+          return;
+        }
+      }
+      // 없으면 새 창
+      await self.clients.openWindow(link);
+    })()
+  );
 });
