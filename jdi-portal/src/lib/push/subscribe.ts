@@ -55,7 +55,8 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription>
   if (!sub) {
     sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as any,
     });
   }
 
