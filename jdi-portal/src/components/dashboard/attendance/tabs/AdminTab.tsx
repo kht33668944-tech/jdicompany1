@@ -2,7 +2,14 @@
 
 import AdminAttendanceTable from "../AdminAttendanceTable";
 import AdminVacationRequests from "../AdminVacationRequests";
-import type { AttendanceWithProfile, Profile, VacationRequest, CorrectionRequest } from "@/lib/attendance/types";
+import AdminWorkScheduleRequests from "../AdminWorkScheduleRequests";
+import type {
+  AttendanceWithProfile,
+  Profile,
+  VacationRequest,
+  CorrectionRequest,
+  WorkScheduleChangeRequest,
+} from "@/lib/attendance/types";
 
 interface AdminTabProps {
   adminId: string;
@@ -11,13 +18,33 @@ interface AdminTabProps {
   pendingVacationRequests: VacationRequest[];
   cancelVacationRequests: VacationRequest[];
   pendingCorrectionRequests: CorrectionRequest[];
+  pendingWorkScheduleChangeRequests: WorkScheduleChangeRequest[];
 }
 
-export default function AdminTab({ adminId, allTodayAttendance, allProfiles, pendingVacationRequests, cancelVacationRequests, pendingCorrectionRequests }: AdminTabProps) {
+export default function AdminTab({
+  adminId,
+  allTodayAttendance,
+  allProfiles,
+  pendingVacationRequests,
+  cancelVacationRequests,
+  pendingCorrectionRequests,
+  pendingWorkScheduleChangeRequests,
+}: AdminTabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <AdminAttendanceTable todayAttendance={allTodayAttendance} allProfiles={allProfiles} />
-      <AdminVacationRequests adminId={adminId} vacationRequests={pendingVacationRequests} cancelRequests={cancelVacationRequests} correctionRequests={pendingCorrectionRequests} />
+      <div className="space-y-6">
+        <AdminVacationRequests
+          adminId={adminId}
+          vacationRequests={pendingVacationRequests}
+          cancelRequests={cancelVacationRequests}
+          correctionRequests={pendingCorrectionRequests}
+        />
+        <AdminWorkScheduleRequests
+          adminId={adminId}
+          requests={pendingWorkScheduleChangeRequests}
+        />
+      </div>
     </div>
   );
 }

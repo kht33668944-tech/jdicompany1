@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import TasksPageClient from "@/components/dashboard/tasks/TasksPageClient";
-import { getCachedAllProfiles } from "@/lib/attendance/queries";
+import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import type { Profile } from "@/lib/attendance/types";
 
 // 할일 데이터는 SSR 에서 fetch 하지 않음 — 클라이언트가 IndexedDB 캐시 →

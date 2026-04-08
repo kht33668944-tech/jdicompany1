@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { cache } from "react";
 import { toDateString, getMonthRange } from "@/lib/utils/date";
 import type {
   Profile,
@@ -169,12 +168,6 @@ export async function getAllProfiles(
   return data ?? [];
 }
 
-/** 요청 단위 캐싱 — 같은 렌더에서 여러 번 호출해도 1회만 실행 */
-export const getCachedAllProfiles = cache(async (): Promise<Profile[]> => {
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
-  return getAllProfiles(supabase);
-});
 
 export async function getPendingVacationRequests(
   supabase: SupabaseClient

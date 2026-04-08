@@ -7,7 +7,7 @@ import {
   getAttachments,
   getActivities,
 } from "@/lib/tasks/queries";
-import { getCachedAllProfiles } from "@/lib/attendance/queries";
+import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import TaskDetailClient from "@/components/dashboard/tasks/detail/TaskDetailClient";
 
 interface Props {

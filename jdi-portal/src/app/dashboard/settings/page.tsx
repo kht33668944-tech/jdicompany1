@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { getCachedAllProfiles } from "@/lib/attendance/queries";
+import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import { getNotificationSettings, getDepartments } from "@/lib/settings/queries";
 import SettingsPageClient from "@/components/dashboard/settings/SettingsPageClient";
 import type { Profile } from "@/lib/attendance/types";

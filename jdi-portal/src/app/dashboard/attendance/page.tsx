@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import AttendancePageClient from "@/components/dashboard/attendance/AttendancePageClient";
 import {
-  getCachedAllProfiles,
   getAllTodayAttendance,
   getCancelVacationRequests,
   getCorrectionRequests,
@@ -17,6 +16,7 @@ import {
   getMyWorkScheduleChangeRequests,
   getPendingWorkScheduleChangeRequests,
 } from "@/lib/attendance/queries";
+import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import { getWeekRange, toDateString } from "@/lib/utils/date";
 import { getSingleValue, parseYearParam, parseMonthParam } from "@/lib/utils/params";
 

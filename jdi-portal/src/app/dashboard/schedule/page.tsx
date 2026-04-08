@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import SchedulePageClient from "@/components/dashboard/schedule/SchedulePageClient";
 import { getMonthSchedules } from "@/lib/schedule/queries";
-import { getCachedAllProfiles } from "@/lib/attendance/queries";
+import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import { toDateString } from "@/lib/utils/date";
 import { getSingleValue, parseYearParam, parseMonthParam } from "@/lib/utils/params";
 import type { Profile } from "@/lib/attendance/types";
