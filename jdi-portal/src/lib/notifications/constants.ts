@@ -17,6 +17,9 @@ export const NOTIFICATION_TYPE_CONFIG: Record<
   work_schedule_change_requested: { label: "근무시간 변경 요청", icon: "Clock", color: "text-violet-500" },
   work_schedule_approved: { label: "근무시간 변경 승인", icon: "CheckCircle", color: "text-emerald-500" },
   work_schedule_rejected: { label: "근무시간 변경 반려", icon: "XCircle", color: "text-red-500" },
+  hire_date_change_requested: { label: "입사일 변경 요청", icon: "CalendarBlank", color: "text-violet-500" },
+  hire_date_approved: { label: "입사일 변경 승인", icon: "CheckCircle", color: "text-emerald-500" },
+  hire_date_rejected: { label: "입사일 변경 반려", icon: "XCircle", color: "text-red-500" },
 };
 
 /** notification_settings 컬럼 → NotificationType[] 매핑 */

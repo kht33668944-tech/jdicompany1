@@ -11,7 +11,10 @@ export type NotificationType =
   | "chat_message"
   | "work_schedule_change_requested"
   | "work_schedule_approved"
-  | "work_schedule_rejected";
+  | "work_schedule_rejected"
+  | "hire_date_change_requested"
+  | "hire_date_approved"
+  | "hire_date_rejected";
 
 export interface Notification {
   id: string;

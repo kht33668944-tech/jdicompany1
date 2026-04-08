@@ -9,6 +9,7 @@ export interface Profile {
   phone?: string | null;
   bio?: string | null;
   is_approved: boolean;
+  hire_date_locked: boolean;
   work_start_time: string | null;  // "HH:MM:SS" format or null
   work_end_time: string | null;    // "HH:MM:SS" format or null
 }
@@ -96,4 +97,17 @@ export interface WorkScheduleChangeRequest {
   reject_reason: string | null;
   created_at: string;
   profiles?: { full_name: string };
+}
+
+export interface HireDateChangeRequest {
+  id: string;
+  user_id: string;
+  requested_hire_date: string;
+  reason: string | null;
+  status: "대기중" | "승인" | "반려";
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reject_reason: string | null;
+  created_at: string;
+  profiles?: { full_name: string; hire_date: string | null };
 }

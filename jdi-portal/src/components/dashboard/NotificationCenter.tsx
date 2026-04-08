@@ -45,6 +45,9 @@ const TYPE_ICONS: Record<NotificationType, React.ElementType> = {
   work_schedule_change_requested: Bell,
   work_schedule_approved: CheckCircle,
   work_schedule_rejected: XCircle,
+  hire_date_change_requested: Bell,
+  hire_date_approved: CheckCircle,
+  hire_date_rejected: XCircle,
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -61,6 +64,9 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   work_schedule_change_requested: "text-violet-500 bg-violet-50",
   work_schedule_approved: "text-emerald-500 bg-emerald-50",
   work_schedule_rejected: "text-red-500 bg-red-50",
+  hire_date_change_requested: "text-violet-500 bg-violet-50",
+  hire_date_approved: "text-emerald-500 bg-emerald-50",
+  hire_date_rejected: "text-red-500 bg-red-50",
 };
 
 interface NotificationCenterProps {
