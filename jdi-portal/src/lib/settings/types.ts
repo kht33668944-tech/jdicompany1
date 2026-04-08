@@ -6,6 +6,8 @@ export interface NotificationSettings {
   schedule_remind: boolean;
   task_deadline: boolean;
   system_announce: boolean;
+  push_enabled: boolean;
+  chat_message_notify: boolean;
 }
 
 export interface Department {

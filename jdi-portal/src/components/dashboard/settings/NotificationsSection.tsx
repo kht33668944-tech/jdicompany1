@@ -50,6 +50,8 @@ const DEFAULT_SETTINGS: Omit<NotificationSettings, "user_id"> = {
   schedule_remind: true,
   task_deadline: false,
   system_announce: true,
+  push_enabled: false,
+  chat_message_notify: true,
 };
 
 export default function NotificationsSection({ userId, initialSettings }: NotificationsSectionProps) {

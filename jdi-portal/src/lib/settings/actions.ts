@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { NotificationSettings } from "@/lib/settings/types";
 
 function getSupabase() {
   return createClient();
@@ -55,12 +56,7 @@ export async function updatePassword(newPassword: string) {
 
 export async function updateNotificationSettings(
   userId: string,
-  settings: {
-    vacation_notify: boolean;
-    schedule_remind: boolean;
-    task_deadline: boolean;
-    system_announce: boolean;
-  }
+  settings: Partial<Omit<NotificationSettings, "user_id">>
 ) {
   const supabase = getSupabase();
   const { error } = await supabase.from("notification_settings").upsert(
