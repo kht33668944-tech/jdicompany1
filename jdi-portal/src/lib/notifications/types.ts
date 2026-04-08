@@ -7,7 +7,8 @@ export type NotificationType =
   | "vacation_rejected"
   | "schedule_invite"
   | "system_announce"
-  | "signup_pending";
+  | "signup_pending"
+  | "chat_message";
 
 export interface Notification {
   id: string;

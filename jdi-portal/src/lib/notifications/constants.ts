@@ -13,6 +13,7 @@ export const NOTIFICATION_TYPE_CONFIG: Record<
   schedule_invite: { label: "일정 초대", icon: "CalendarPlus", color: "text-purple-500" },
   system_announce: { label: "시스템 공지", icon: "Megaphone", color: "text-blue-600" },
   signup_pending: { label: "가입 승인 대기", icon: "UserCirclePlus", color: "text-orange-500" },
+  chat_message: { label: "채팅 메시지", icon: "ChatCircle", color: "text-indigo-500" },
 };
 
 /** notification_settings 컬럼 → NotificationType[] 매핑 */
@@ -21,4 +22,5 @@ export const SETTING_TYPE_MAP: Record<string, NotificationType[]> = {
   schedule_remind: ["schedule_invite"],
   task_deadline: ["task_deadline", "task_assigned", "task_comment", "task_status_changed"],
   system_announce: ["system_announce", "signup_pending"],
+  chat_message_notify: ["chat_message"],
 };

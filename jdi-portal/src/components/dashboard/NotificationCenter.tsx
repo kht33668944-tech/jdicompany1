@@ -15,6 +15,7 @@ import {
   Megaphone,
   UserCirclePlus,
   Checks,
+  ChatCircle,
 } from "phosphor-react";
 import { createClient } from "@/lib/supabase/client";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
@@ -40,6 +41,7 @@ const TYPE_ICONS: Record<NotificationType, React.ElementType> = {
   schedule_invite: CalendarPlus,
   system_announce: Megaphone,
   signup_pending: UserCirclePlus,
+  chat_message: ChatCircle,
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -52,6 +54,7 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   schedule_invite: "text-purple-500 bg-purple-50",
   system_announce: "text-blue-600 bg-blue-50",
   signup_pending: "text-orange-500 bg-orange-50",
+  chat_message: "text-indigo-500 bg-indigo-50",
 };
 
 interface NotificationCenterProps {
