@@ -16,6 +16,7 @@ import type {
   VacationRequest,
   WorkSchedule,
   WorkScheduleChangeRequest,
+  HireDateChangeRequest,
 } from "@/lib/attendance/types";
 
 interface AttendancePageClientProps {
@@ -37,6 +38,7 @@ interface AttendancePageClientProps {
   workSchedules: WorkSchedule[];
   myWorkScheduleChangeRequests: WorkScheduleChangeRequest[];
   pendingWorkScheduleChangeRequests: WorkScheduleChangeRequest[] | null;
+  pendingHireDateChangeRequests: HireDateChangeRequest[] | null;
 }
 
 const STORAGE_KEY = "attendance-active-tab";
@@ -107,6 +109,7 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
           cancelVacationRequests={props.cancelVacationRequests ?? []}
           pendingCorrectionRequests={props.pendingCorrectionRequests ?? []}
           pendingWorkScheduleChangeRequests={props.pendingWorkScheduleChangeRequests ?? []}
+          pendingHireDateChangeRequests={props.pendingHireDateChangeRequests ?? []}
         />
       )}
     </div>

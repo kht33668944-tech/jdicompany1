@@ -15,6 +15,7 @@ import {
   getWorkSchedules,
   getMyWorkScheduleChangeRequests,
   getPendingWorkScheduleChangeRequests,
+  getPendingHireDateChangeRequests,
 } from "@/lib/attendance/queries";
 import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import { getWeekRange, toDateString } from "@/lib/utils/date";
@@ -51,6 +52,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
   let workSchedules: Awaited<ReturnType<typeof getWorkSchedules>> = [];
   let myWorkScheduleChangeRequests: Awaited<ReturnType<typeof getMyWorkScheduleChangeRequests>> = [];
   let pendingWorkScheduleChangeRequests: Awaited<ReturnType<typeof getPendingWorkScheduleChangeRequests>> | null = null;
+  let pendingHireDateChangeRequests: Awaited<ReturnType<typeof getPendingHireDateChangeRequests>> | null = null;
   let allTodayAttendance = null;
   let allProfiles = null;
   let pendingVacationRequests = null;
@@ -71,7 +73,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
     ] as const;
 
     if (profile.role === "admin") {
-      const [tr, wr, mr, vb, vr, cr, ws, mwscr, ata, ap, pvr, cvr, pcr, pwscr] = await Promise.all([
+      const [tr, wr, mr, vb, vr, cr, ws, mwscr, ata, ap, pvr, cvr, pcr, pwscr, phdcr] = await Promise.all([
         ...basePromises,
         getAllTodayAttendance(supabase),
         getCachedAllProfiles(),
@@ -79,6 +81,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
         getCancelVacationRequests(supabase),
         getPendingCorrectionRequests(supabase),
         getPendingWorkScheduleChangeRequests(supabase),
+        getPendingHireDateChangeRequests(supabase),
       ]);
       todayRecord = tr;
       weekRecords = wr;
@@ -94,6 +97,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
       cancelVacationRequests = cvr;
       pendingCorrectionRequests = pcr;
       pendingWorkScheduleChangeRequests = pwscr;
+      pendingHireDateChangeRequests = phdcr;
     } else {
       const [tr, wr, mr, vb, vr, cr, ws, mwscr] = await Promise.all([
         ...basePromises,
@@ -136,6 +140,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
       workSchedules={workSchedules}
       myWorkScheduleChangeRequests={myWorkScheduleChangeRequests}
       pendingWorkScheduleChangeRequests={pendingWorkScheduleChangeRequests}
+      pendingHireDateChangeRequests={pendingHireDateChangeRequests}
     />
   );
 }
