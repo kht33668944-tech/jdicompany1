@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import type { AuthError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7일 (초 단위)
@@ -12,6 +13,17 @@ function withPersistentMaxAge(
   // 이미 maxAge가 지정돼 있으면 존중
   if (options && typeof options.maxAge === "number") return options;
   return { ...(options ?? {}), maxAge: SESSION_MAX_AGE };
+}
+
+// Supabase 인증 에러가 "일시 오류"인지 판정.
+// - AuthRetryableFetchError: SDK가 네트워크/일시 오류로 태깅한 canonical 클래스
+// - status >= 500: 서버 일시 장애 (4xx 는 영구 오류라 절대 포함하지 않음)
+// 메시지 문자열 매칭은 SDK 버전이 바뀌면 false-positive 위험이 있어 의도적으로 제외.
+function isTransientError(error: AuthError | null): boolean {
+  if (!error) return false;
+  if (error.name === "AuthRetryableFetchError") return true;
+  if (typeof error.status === "number" && error.status >= 500) return true;
+  return false;
 }
 
 export async function updateSession(request: NextRequest) {
@@ -41,12 +53,7 @@ export async function updateSession(request: NextRequest) {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   // 네트워크 일시 오류는 "로그아웃"으로 취급하지 않음 — 기존 쿠키/세션 그대로 통과
-  const isTransientAuthError =
-    !!authError &&
-    ((authError as { name?: string }).name === "AuthRetryableFetchError" ||
-      ((authError as { message?: string }).message ?? "").toLowerCase().includes("fetch") ||
-      (typeof (authError as { status?: number }).status === "number" &&
-        (authError as { status?: number }).status! >= 500));
+  const isTransientAuthError = isTransientError(authError);
 
   // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
   if (
