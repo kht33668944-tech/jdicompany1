@@ -1,8 +1,8 @@
 // supabase/functions/push-dispatch/index.ts
-// Web Push 발송 — notifications/messages 테이블 INSERT webhook을 받아 처리
+// Web Push 발송 — notifications/messages INSERT webhook 처리 (Deno 네이티브)
 
-import webpush from "web-push";
-import { createClient } from "@supabase/supabase-js";
+import * as webpush from "jsr:@negrel/webpush";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // ============================================================
 // 환경 변수
@@ -12,13 +12,62 @@ const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@jdicompany.com";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const ACTIVE_THRESHOLD_MS = 10_000; // 10초 이내 heartbeat = active
+const ACTIVE_THRESHOLD_MS = 10_000;
 
 if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
   console.error("VAPID keys missing");
 }
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
+// ============================================================
+// base64url 유틸 + 원시 VAPID 키 → JWK 변환
+// ============================================================
+function base64UrlDecode(s: string): Uint8Array {
+  const pad = "=".repeat((4 - (s.length % 4)) % 4);
+  const base64 = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+function base64UrlEncode(u8: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+// 원시 base64url 키 → JWK (EC P-256)
+function rawVapidToJwk(publicB64: string, privateB64: string): {
+  publicKey: JsonWebKey;
+  privateKey: JsonWebKey;
+} {
+  const pub = base64UrlDecode(publicB64); // 65 bytes: 0x04 | X(32) | Y(32)
+  const priv = base64UrlDecode(privateB64); // 32 bytes
+  const x = base64UrlEncode(pub.slice(1, 33));
+  const y = base64UrlEncode(pub.slice(33, 65));
+  const d = base64UrlEncode(priv);
+  return {
+    publicKey: { kty: "EC", crv: "P-256", x, y, ext: true },
+    privateKey: { kty: "EC", crv: "P-256", x, y, d, ext: true },
+  };
+}
+
+// ============================================================
+// ApplicationServer 초기화 (콜드스타트 시 1회)
+// ============================================================
+const vapidKeys = await webpush.importVapidKeys(
+  rawVapidToJwk(VAPID_PUBLIC, VAPID_PRIVATE),
+  { extractable: false },
+);
+
+const appServer = await webpush.ApplicationServer.new({
+  contactInformation: VAPID_SUBJECT,
+  vapidKeys,
+});
+
+// ============================================================
+// Supabase 클라이언트 (service role)
+// ============================================================
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
@@ -50,8 +99,7 @@ interface SubscriptionRow {
 }
 
 // ============================================================
-// 알림 종류 → notification_settings 컬럼 매핑
-// (클라이언트 SETTING_TYPE_MAP과 동기화 유지)
+// 알림 종류 → notification_settings 컬럼
 // ============================================================
 const SETTING_KEY_BY_TYPE: Record<string, string> = {
   task_assigned: "task_deadline",
@@ -70,7 +118,7 @@ const SETTING_KEY_BY_TYPE: Record<string, string> = {
 // 수신자 결정
 // ============================================================
 async function resolveRecipientsForNotifications(
-  record: Record<string, unknown>
+  record: Record<string, unknown>,
 ): Promise<{ userIds: string[]; payload: PushPayload; settingKey: string | null }> {
   const userId = record.user_id as string;
   const type = record.type as string;
@@ -86,17 +134,15 @@ async function resolveRecipientsForNotifications(
 }
 
 async function resolveRecipientsForMessages(
-  record: Record<string, unknown>
+  record: Record<string, unknown>,
 ): Promise<{ userIds: string[]; payload: PushPayload; settingKey: string; channelId: string } | null> {
   const channelId = record.channel_id as string;
   const senderId = record.user_id as string;
   const msgType = (record.type as string) || "text";
   const content = (record.content as string) || "";
 
-  // system 메시지는 푸시 안 함
   if (msgType === "system") return null;
 
-  // 1) 채널 정보
   const { data: channel } = await supabase
     .from("channels")
     .select("name, type")
@@ -104,7 +150,6 @@ async function resolveRecipientsForMessages(
     .single();
   if (!channel || channel.type === "memo") return null;
 
-  // 2) 발신자 프로필
   const { data: sender } = await supabase
     .from("profiles")
     .select("full_name")
@@ -112,7 +157,6 @@ async function resolveRecipientsForMessages(
     .single();
   const senderName = sender?.full_name ?? "알 수 없음";
 
-  // 3) 수신 멤버 (발신자 제외 + 음소거 제외)
   const { data: members } = await supabase
     .from("channel_members")
     .select("user_id, is_muted, last_seen_at")
@@ -124,7 +168,6 @@ async function resolveRecipientsForMessages(
     .filter((m) => m.user_id !== senderId)
     .filter((m) => !m.is_muted)
     .filter((m) => {
-      // 현재 채널 보고 있는 사용자는 제외
       if (!m.last_seen_at) return true;
       return new Date(m.last_seen_at).getTime() < cutoff;
     })
@@ -132,7 +175,6 @@ async function resolveRecipientsForMessages(
 
   if (candidates.length === 0) return null;
 
-  // 4) 본문 가공
   let preview: string;
   if (msgType === "image") preview = "사진을 보냈습니다";
   else if (msgType === "file") preview = "파일을 보냈습니다";
@@ -152,11 +194,11 @@ async function resolveRecipientsForMessages(
 }
 
 // ============================================================
-// settings 필터링 (push_enabled + 종류별 토글)
+// settings 필터링
 // ============================================================
 async function filterBySettings(
   userIds: string[],
-  settingKey: string | null
+  settingKey: string | null,
 ): Promise<string[]> {
   if (userIds.length === 0) return [];
   const { data: rows } = await supabase
@@ -189,29 +231,28 @@ async function sendPushToUsers(userIds: string[], payload: PushPayload) {
   await Promise.allSettled(
     (subs as SubscriptionRow[]).map(async (sub) => {
       try {
-        await webpush.sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh, auth: sub.auth },
-          },
-          JSON.stringify(payload),
-          { TTL: 60 * 60 }
-        );
-        // 사용 시각 갱신 (best effort)
+        const subscriber = appServer.subscribe({
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth },
+        });
+        await subscriber.pushTextMessage(JSON.stringify(payload), {
+          ttl: 60 * 60,
+        });
         await supabase
           .from("push_subscriptions")
           .update({ last_used_at: new Date().toISOString() })
           .eq("id", sub.id);
       } catch (err) {
-        const status = (err as { statusCode?: number }).statusCode;
-        if (status === 404 || status === 410) {
-          // 만료 → 삭제
+        // @negrel/webpush의 PushMessageError 처리
+        const e = err as { isGone?: () => boolean; response?: { status?: number } };
+        const status = e.response?.status;
+        if ((e.isGone && e.isGone()) || status === 404 || status === 410) {
           await supabase.from("push_subscriptions").delete().eq("id", sub.id);
         } else {
           console.error("push send failed", status, err);
         }
       }
-    })
+    }),
   );
 }
 
