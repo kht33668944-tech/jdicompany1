@@ -43,9 +43,47 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
   const [visible, setVisible] = useState(false);
   const [sliding, setSliding] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const prevTaskIdRef = useRef<string | null>(null);
+
+  // --- 함수 선언 (모든 useEffect 보다 먼저) ---
+  const closePanel = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("detail");
+    const qs = params.toString();
+    router.push(`/dashboard/tasks${qs ? `?${qs}` : ""}`, { scroll: false });
+  };
+
+  const navigateToTask = (newTaskId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("detail", newTaskId);
+    router.push(`/dashboard/tasks?${params.toString()}`, { scroll: false });
+  };
+
+  const handleRefresh = () => {
+    if (!taskId) return;
+    const supabase = createClient();
+    Promise.all([
+      getTaskBasic(supabase, taskId),
+      getChecklistItems(supabase, taskId),
+      getSubtasksBasic(supabase, taskId),
+      getAttachments(supabase, taskId),
+      getActivities(supabase, taskId),
+    ]).then(([task, checklist, subtasks, attachments, activities]) => {
+      if (!task) return;
+      task.checklist_total = checklist.length;
+      task.checklist_completed = checklist.filter((c) => c.is_completed).length;
+      task.subtask_count = subtasks.length;
+      task.comment_count = activities.filter((a) => a.type === "comment").length;
+      task.attachment_count = attachments.length;
+      setData({ task, checklist, subtasks, attachments, activities });
+    }).catch((err) => {
+      console.warn("[TaskDetailPanel] refresh failed:", err);
+    });
+  };
+
+  // --- Effects ---
 
   // 닫기 애니메이션 (taskId 소멸 감지)
-  const prevTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (prevTaskIdRef.current && !taskId) {
       setSliding(false);
@@ -65,7 +103,6 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     setLoading(true);
     setError(null);
 
-    // 약간의 지연 후 슬라이드 시작 (mount 직후 transition 적용을 위해)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (!cancelled) setSliding(true);
@@ -112,49 +149,11 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
   useEffect(() => {
     if (!visible) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("detail");
-      const qs = params.toString();
-      router.push(`/dashboard/tasks${qs ? `?${qs}` : ""}`, { scroll: false });
+      if (e.key === "Escape") closePanel();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [visible, router, searchParams]);
-
-  function closePanel() {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("detail");
-    const qs = params.toString();
-    router.push(`/dashboard/tasks${qs ? `?${qs}` : ""}`, { scroll: false });
-  }
-
-  function navigateToTask(newTaskId: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("detail", newTaskId);
-    router.push(`/dashboard/tasks?${params.toString()}`, { scroll: false });
-  }
-
-  function handleRefresh() {
-    if (!taskId) return;
-    const supabase = createClient();
-    Promise.all([
-      getTaskBasic(supabase, taskId),
-      getChecklistItems(supabase, taskId),
-      getSubtasksBasic(supabase, taskId),
-      getAttachments(supabase, taskId),
-      getActivities(supabase, taskId),
-    ]).then(([task, checklist, subtasks, attachments, activities]) => {
-      if (!task) return;
-      task.checklist_total = checklist.length;
-      task.checklist_completed = checklist.filter((c) => c.is_completed).length;
-      task.subtask_count = subtasks.length;
-      task.comment_count = activities.filter((a) => a.type === "comment").length;
-      task.attachment_count = attachments.length;
-      setData({ task, checklist, subtasks, attachments, activities });
-    }).catch((err) => {
-      console.warn("[TaskDetailPanel] refresh failed:", err);
-    });
-  }
+  });
 
   // body scroll lock
   useEffect(() => {
