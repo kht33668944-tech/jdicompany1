@@ -87,14 +87,11 @@ Co-Authored-By: Claude Sonnet 4.6 (1M context) <noreply@anthropic.com>
 
 ## 절대 금지
 
-- ❌ 새 마이그레이션에 `is_approved_user()` RLS 체크 누락
-- ❌ 새 테이블에 SELECT/INSERT/UPDATE/DELETE 정책 누락
-- ❌ Edge Function에서 `web-push` npm 사용 (Deno `crypto.ECDH` 미지원)
 - ❌ `tsconfig.json` include에 `supabase/functions/**`
 - ❌ `.env.local` 커밋
 - ❌ 사용자 허락 없이 master push
-- ❌ Supabase RPC 내부 `CURRENT_DATE` / `NOW()` 직접 사용 (UTC)
 
+> DB/마이그레이션/RLS/Edge Function 관련 금지사항 → `supabase/CLAUDE.md` 참조.  
 > 위 항목이 왜 금지인지 배경은 `docs/claude/archive/past-lessons.md` 참조.
 
 ## 공용 유틸/타입
