@@ -44,17 +44,21 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
   const [sliding, setSliding] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // 닫기 애니메이션 (taskId 소멸 감지)
+  const prevTaskIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevTaskIdRef.current && !taskId) {
+      setSliding(false);
+      const timer = setTimeout(() => setVisible(false), 200);
+      prevTaskIdRef.current = null;
+      return () => clearTimeout(timer);
+    }
+    prevTaskIdRef.current = taskId;
+  }, [taskId]);
+
   // taskId 변경 시 데이터 fetch
   useEffect(() => {
-    if (!taskId) {
-      // 닫기 애니메이션
-      if (visible) {
-        setSliding(false);
-        const timer = setTimeout(() => setVisible(false), 200);
-        return () => clearTimeout(timer);
-      }
-      return;
-    }
+    if (!taskId) return;
 
     let cancelled = false;
     setVisible(true);
@@ -104,28 +108,6 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     };
   }, [taskId]);
 
-  // ESC 키로 닫기
-  useEffect(() => {
-    if (!visible) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closePanel();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [visible]);
-
-  // body scroll lock
-  useEffect(() => {
-    if (visible) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [visible]);
-
   const closePanel = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("detail");
@@ -160,8 +142,32 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
       task.comment_count = activities.filter((a) => a.type === "comment").length;
       task.attachment_count = attachments.length;
       setData({ task, checklist, subtasks, attachments, activities });
+    }).catch((err) => {
+      console.warn("[TaskDetailPanel] refresh failed:", err);
     });
   }, [taskId]);
+
+  // ESC 키로 닫기
+  useEffect(() => {
+    if (!visible) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closePanel();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [visible, closePanel]);
+
+  // body scroll lock
+  useEffect(() => {
+    if (visible) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [visible]);
 
   if (!visible) return null;
 
