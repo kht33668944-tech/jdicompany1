@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { EnvelopeSimple, CalendarCheck, Key, Lock, FloppyDisk, PaperPlaneTilt, X } from "phosphor-react";
+import { EnvelopeSimple, CalendarCheck, Key, Lock, FloppyDisk, PaperPlaneTilt, X, WifiHigh } from "phosphor-react";
 import {
   updatePassword,
   setInitialHireDate,
   submitHireDateChangeRequest,
   cancelMyHireDateChangeRequest,
   adminSetHireDate,
+  updateAllowedIp,
 } from "@/lib/settings/actions";
 import type { Profile, HireDateChangeRequest } from "@/lib/attendance/types";
 import ReauthModal from "@/components/ReauthModal";
@@ -36,6 +37,37 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
   const [requestDate, setRequestDate] = useState(profile.hire_date ?? "");
   const [requestReason, setRequestReason] = useState("");
   const [requestSaving, setRequestSaving] = useState(false);
+
+  // IP 설정 상태
+  const [allowedIp, setAllowedIp] = useState(profile.allowed_ip ?? "");
+  const [currentIp, setCurrentIp] = useState<string | null>(null);
+  const [ipSaving, setIpSaving] = useState(false);
+
+  // 현재 접속 IP 가져오기
+  useEffect(() => {
+    fetch("/api/ip")
+      .then((r) => r.json())
+      .then((d) => setCurrentIp(d.ip))
+      .catch(() => setCurrentIp(null));
+  }, []);
+
+  const handleIpSave = async () => {
+    setIpSaving(true);
+    setFeedback(null);
+    try {
+      await updateAllowedIp(profile.id, allowedIp.trim());
+      setFeedback({ type: "success", message: "출퇴근 허용 IP가 저장되었습니다." });
+      router.refresh();
+    } catch {
+      setFeedback({ type: "error", message: "IP 저장에 실패했습니다." });
+    } finally {
+      setIpSaving(false);
+    }
+  };
+
+  const handleUseCurrentIp = () => {
+    if (currentIp) setAllowedIp(currentIp);
+  };
 
   const pendingRequest = myHireDateChangeRequests.find((r) => r.status === "대기중");
 
@@ -293,6 +325,54 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
                   </button>
                 )}
               </div>
+            )}
+          </div>
+          {/* 출퇴근 허용 IP 카드 */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400">
+                <WifiHigh size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">출퇴근 허용 IP</p>
+                <p className="text-[11px] text-slate-500">등록된 IP에서만 출퇴근이 가능합니다</p>
+              </div>
+            </div>
+
+            {currentIp && (
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-xs text-slate-400">현재 접속 IP:</span>
+                <span className="text-xs font-mono font-bold text-slate-600">{currentIp}</span>
+                <button
+                  type="button"
+                  onClick={handleUseCurrentIp}
+                  className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold underline underline-offset-2"
+                >
+                  이 IP 사용
+                </button>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={allowedIp}
+                onChange={(e) => setAllowedIp(e.target.value)}
+                placeholder="예: 123.456.789.0"
+                className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleIpSave}
+                disabled={ipSaving || allowedIp.trim() === (profile.allowed_ip ?? "")}
+                className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
+              >
+                <FloppyDisk size={14} />
+                저장
+              </button>
+            </div>
+            {!allowedIp.trim() && profile.allowed_ip === null && (
+              <p className="mt-2 text-[11px] text-amber-500">⚠ IP가 설정되지 않으면 어디서든 출퇴근이 가능합니다.</p>
             )}
           </div>
         </div>

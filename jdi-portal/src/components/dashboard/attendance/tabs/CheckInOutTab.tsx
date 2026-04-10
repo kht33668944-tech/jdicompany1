@@ -17,6 +17,7 @@ interface CheckInOutTabProps {
   weekStart: string;
   workSchedules: WorkSchedule[];
   myChangeRequests: WorkScheduleChangeRequest[];
+  allowedIp: string | null;
 }
 
 export default function CheckInOutTab({
@@ -27,11 +28,12 @@ export default function CheckInOutTab({
   weekStart,
   workSchedules,
   myChangeRequests,
+  allowedIp,
 }: CheckInOutTabProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CheckInOutCard userId={userId} todayRecord={todayRecord} />
+        <CheckInOutCard userId={userId} todayRecord={todayRecord} allowedIp={allowedIp} />
         <WeekSummaryCard weekRecords={weekRecords} weekStart={weekStart} workSchedules={workSchedules} />
       </div>
       <WorkScheduleCard

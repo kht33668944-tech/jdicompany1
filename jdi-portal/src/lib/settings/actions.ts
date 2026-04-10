@@ -208,6 +208,15 @@ export async function deleteDepartment(id: string) {
   if (error) throw error;
 }
 
+export async function updateAllowedIp(userId: string, ip: string | null) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ allowed_ip: ip || null, updated_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (error) throw error;
+}
+
 export async function updateUserRole(
   userId: string,
   role: "employee" | "admin"

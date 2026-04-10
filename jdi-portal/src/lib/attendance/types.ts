@@ -12,6 +12,7 @@ export interface Profile {
   hire_date_locked: boolean;
   work_start_time: string | null;  // "HH:MM:SS" format or null
   work_end_time: string | null;    // "HH:MM:SS" format or null
+  allowed_ip: string | null;
 }
 
 export interface AttendanceRecord {

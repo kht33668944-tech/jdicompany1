@@ -12,13 +12,25 @@ import type { AttendanceRecord } from "@/lib/attendance/types";
 interface CheckInOutCardProps {
   userId: string;
   todayRecord: AttendanceRecord | null;
+  allowedIp: string | null;
 }
 
 const ATTENDANCE_STATUSES = Object.keys(ATTENDANCE_STATUS_CONFIG) as AttendanceRecord["status"][];
 const ABSENT_STATUS = ATTENDANCE_STATUSES[0];
 const WORKING_STATUS = ATTENDANCE_STATUSES[1];
 
-export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardProps) {
+async function verifyIp(allowedIp: string | null): Promise<boolean> {
+  if (!allowedIp) return true; // IP 미설정 시 제한 없음
+  try {
+    const res = await fetch("/api/ip");
+    const { ip } = await res.json();
+    return ip === allowedIp;
+  } catch {
+    return false;
+  }
+}
+
+export default function CheckInOutCard({ userId, todayRecord, allowedIp }: CheckInOutCardProps) {
   const router = useRouter();
   const [status, setStatus] = useState(todayRecord?.status ?? ABSENT_STATUS);
   const [checkInTime, setCheckInTime] = useState(todayRecord?.check_in ?? null);
@@ -54,6 +66,11 @@ export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardPr
     setCheckInLoading(true);
     setFeedback(null);
     try {
+      const ipOk = await verifyIp(allowedIp);
+      if (!ipOk) {
+        setFeedback({ type: "error", message: "등록된 IP에서만 출근할 수 있습니다. 설정에서 IP를 확인해주세요." });
+        return;
+      }
       const record = await checkIn(userId);
       setStatus(record.status);
       setCheckInTime(record.check_in);
@@ -70,6 +87,11 @@ export default function CheckInOutCard({ userId, todayRecord }: CheckInOutCardPr
     setCheckOutLoading(true);
     setFeedback(null);
     try {
+      const ipOk = await verifyIp(allowedIp);
+      if (!ipOk) {
+        setFeedback({ type: "error", message: "등록된 IP에서만 퇴근할 수 있습니다. 설정에서 IP를 확인해주세요." });
+        return;
+      }
       const record = await checkOut(userId);
       setStatus(record.status);
       setCheckOutTime(record.check_out);

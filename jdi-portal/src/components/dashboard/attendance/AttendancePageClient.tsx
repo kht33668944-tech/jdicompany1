@@ -81,6 +81,7 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
           weekStart={props.weekStart}
           workSchedules={props.workSchedules}
           myChangeRequests={props.myWorkScheduleChangeRequests}
+          allowedIp={props.profile.allowed_ip}
         />
       )}
 
