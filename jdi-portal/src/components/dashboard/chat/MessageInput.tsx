@@ -164,7 +164,7 @@ export default function MessageInput({
   const canSend = !sending && (pendingFiles.length > 0 || content.trim().length > 0);
 
   return (
-    <footer className="px-6 py-3 bg-white border-t border-slate-100 flex-shrink-0">
+    <footer className="px-3 sm:px-6 py-2 sm:py-3 bg-white border-t border-slate-100 flex-shrink-0">
       {editingMessage && (
         <div className="flex items-center justify-between px-3 py-2 mb-2 bg-blue-50 rounded-xl text-sm">
           <span className="text-blue-600 font-medium">메시지 수정 중</span>

@@ -598,7 +598,7 @@ function ChatPageClientInner({
   return (
     <>
       <PushPromptBanner userId={userId} />
-      <div className="flex h-[calc(100vh-8rem)] rounded-2xl overflow-hidden bg-white shadow-sm">
+      <div className="flex h-[calc(100dvh-7rem)] sm:h-[calc(100vh-8rem)] rounded-2xl overflow-hidden bg-white shadow-sm">
         {/* Channel list */}
         <div
           className={`${
@@ -615,7 +615,7 @@ function ChatPageClientInner({
               onCreateClick={handleCreateChannel}
             />
           ) : (
-            <div className="w-80 flex-shrink-0 border-r border-slate-100 flex flex-col bg-white items-center justify-center">
+            <div className="w-full sm:w-80 flex-shrink-0 border-r border-slate-100 flex flex-col bg-white items-center justify-center">
               <EmptyState type="no-channels" onCreateChannel={handleCreateChannel} />
             </div>
           )}

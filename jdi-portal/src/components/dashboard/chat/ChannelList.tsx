@@ -55,7 +55,7 @@ export default function ChannelList({
   const nonFavoriteGroupChannels = sortedGroupChannels.filter((ch) => !favoriteChannels.has(ch.id));
 
   return (
-    <aside className="w-80 flex-shrink-0 border-r border-slate-100 flex flex-col bg-white">
+    <aside className="w-full sm:w-80 flex-shrink-0 border-r border-slate-100 flex flex-col bg-white">
       {/* Header */}
       <div className="px-4 pt-5 pb-3 flex items-center justify-between flex-shrink-0">
         <h1 className="text-2xl font-bold text-slate-800">채팅</h1>
