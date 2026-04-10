@@ -74,18 +74,18 @@ export default function ReportsPageClient({
   };
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">오류 접수</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">오류 접수</h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
             시스템 이용 중 발생하는 문제나 불편사항을 알려주세요.
           </p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="bg-[#2563eb] hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+          className="bg-[#2563eb] hover:bg-blue-700 text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-2xl font-bold flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-blue-500/20 transition-all active:scale-95 flex-shrink-0 whitespace-nowrap text-sm sm:text-base"
         >
           <Plus size={16} weight="bold" />
           새 접수
@@ -93,12 +93,12 @@ export default function ReportsPageClient({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
         {/* Type pills */}
-        <div className="flex items-center gap-2 bg-white/60 p-1.5 rounded-2xl shadow-sm border border-white/50">
+        <div className="flex items-center gap-1 sm:gap-2 bg-white/60 p-1 sm:p-1.5 rounded-2xl shadow-sm border border-white/50 overflow-x-auto">
           <button
             onClick={() => setTypeFilter("all")}
-            className={`px-5 py-2 rounded-xl font-medium transition-all ${
+            className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-sm sm:text-base font-medium transition-all whitespace-nowrap ${
               typeFilter === "all"
                 ? "bg-[#2563eb] text-white font-bold shadow-sm"
                 : "text-slate-600 hover:bg-white/80"
@@ -110,7 +110,7 @@ export default function ReportsPageClient({
             <button
               key={type}
               onClick={() => setTypeFilter(type)}
-              className={`px-5 py-2 rounded-xl font-medium transition-all ${
+              className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-sm sm:text-base font-medium transition-all whitespace-nowrap ${
                 typeFilter === type
                   ? "bg-[#2563eb] text-white font-bold shadow-sm"
                   : "text-slate-600 hover:bg-white/80"
@@ -122,7 +122,7 @@ export default function ReportsPageClient({
         </div>
 
         {/* Right controls */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           {/* Only mine toggle */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-slate-600">내 접수만 보기</span>
