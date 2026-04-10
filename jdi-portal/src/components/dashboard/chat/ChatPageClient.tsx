@@ -24,7 +24,6 @@ import { touchChannelSeen } from "@/lib/push/actions";
 import { usePresence } from "./hooks/usePresence";
 import { useMembershipSync } from "./hooks/useMembershipSync";
 import { useChannelMetaSync } from "./hooks/useChannelMetaSync";
-import type { Profile } from "@/lib/attendance/types";
 
 interface ChatPageClientProps {
   initialChannels: ChannelWithDetails[];
@@ -33,7 +32,6 @@ interface ChatPageClientProps {
   userId: string;
   userName: string;
   userAvatar?: string | null;
-  allProfiles?: Profile[];
 }
 
 export default function ChatPageClient(props: ChatPageClientProps) {
@@ -51,7 +49,6 @@ function ChatPageClientInner({
   userId,
   userName,
   userAvatar,
-  allProfiles = [],
 }: ChatPageClientProps) {
   const { ensure: ensureFileUrls } = useChatFileUrls();
   const [channels, setChannels] = useState<ChannelWithDetails[]>(initialChannels);
@@ -489,7 +486,6 @@ function ChatPageClientInner({
           onClose={() => setShowCreateModal(false)}
           userId={userId}
           onCreated={handleChannelCreated}
-          profiles={allProfiles}
         />
       )}
 

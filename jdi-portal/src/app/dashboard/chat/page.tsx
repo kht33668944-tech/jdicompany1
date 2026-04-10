@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import ChatPageClient from "@/components/dashboard/chat/ChatPageClient";
 import { getChannels } from "@/lib/chat/queries";
-import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import type { ChannelWithDetails } from "@/lib/chat/types";
 
 export default async function ChatPage() {
@@ -22,15 +21,12 @@ export default async function ChatPage() {
     );
   }
 
-  const allProfiles = await getCachedAllProfiles();
-
   return (
     <ChatPageClient
       initialChannels={channels}
       userId={auth.user.id}
       userName={auth.profile.full_name}
       userAvatar={auth.profile.avatar_url}
-      allProfiles={allProfiles}
     />
   );
 }

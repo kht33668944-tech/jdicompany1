@@ -1,17 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, MagnifyingGlass, XCircle } from "phosphor-react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
-import { createChannel } from "@/lib/chat/actions";
+import { createChannel, getAllProfiles } from "@/lib/chat/actions";
 import type { Channel } from "@/lib/chat/types";
 
 interface ChannelCreateModalProps {
   onClose: () => void;
   userId: string;
   onCreated: (channel: Channel) => void;
-  profiles: Profile[];
 }
 
 interface Profile {
@@ -30,12 +29,21 @@ function getAvatarColor(index: number) {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 }
 
-export default function ChannelCreateModal({ onClose, userId, onCreated, profiles }: ChannelCreateModalProps) {
+export default function ChannelCreateModal({ onClose, userId, onCreated }: ChannelCreateModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(true);
+
+  useEffect(() => {
+    getAllProfiles()
+      .then(setProfiles)
+      .catch(() => toast.error("멤버 목록을 불러오지 못했습니다."))
+      .finally(() => setLoadingProfiles(false));
+  }, []);
 
   const otherProfiles = profiles.filter((p) => p.id !== userId);
   const filteredProfiles = otherProfiles.filter((p) =>
@@ -192,7 +200,10 @@ export default function ChannelCreateModal({ onClose, userId, onCreated, profile
                   </div>
                 </label>
               ))}
-              {filteredProfiles.length === 0 && (
+              {loadingProfiles && (
+                <div className="px-4 py-6 text-center text-sm text-slate-400">멤버 목록 불러오는 중...</div>
+              )}
+              {!loadingProfiles && filteredProfiles.length === 0 && (
                 <div className="px-4 py-6 text-center text-sm text-slate-400">검색 결과가 없습니다.</div>
               )}
             </div>
