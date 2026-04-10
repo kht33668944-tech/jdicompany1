@@ -6,6 +6,17 @@ function getSupabase() {
   return createClient();
 }
 
+async function verifyAdmin(supabase: ReturnType<typeof getSupabase>, adminId: string) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", adminId)
+    .single();
+  if (profile?.role !== "admin") {
+    throw new Error("권한이 없습니다: 관리자만 가능합니다.");
+  }
+}
+
 export async function updateProfile(params: {
   userId: string;
   fullName: string;
@@ -208,13 +219,117 @@ export async function deleteDepartment(id: string) {
   if (error) throw error;
 }
 
-export async function updateAllowedIp(userId: string, ip: string | null) {
+/** 첫 허용 IP 설정 (allowed_ip_locked = false 일 때만) */
+export async function setInitialAllowedIp(ip: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc("set_initial_allowed_ip", {
+    p_ip: ip,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/** IP 변경 요청 제출 */
+export async function submitIpChangeRequest(params: {
+  ip: string;
+  reason: string;
+}) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc("submit_ip_change_request", {
+    p_ip: params.ip,
+    p_reason: params.reason ?? "",
+  });
+  if (error) throw error;
+
+  // 모든 관리자에게 알림
+  const { data: admins } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("role", "admin");
+  if (admins) {
+    await Promise.all(
+      admins.map((a: { id: string }) =>
+        createNotification({
+          userId: a.id,
+          type: "ip_change_requested",
+          title: "출퇴근 IP 변경 요청",
+          body: `요청 IP: ${params.ip}`,
+          link: "/dashboard/attendance",
+        })
+      )
+    );
+  }
+  return data;
+}
+
+/** 본인 대기중 IP 변경 요청 취소 */
+export async function cancelMyIpChangeRequest(requestId: string) {
   const supabase = getSupabase();
   const { error } = await supabase
-    .from("profiles")
-    .update({ allowed_ip: ip || null, updated_at: new Date().toISOString() })
-    .eq("id", userId);
+    .from("ip_change_requests")
+    .delete()
+    .eq("id", requestId)
+    .eq("status", "대기중");
   if (error) throw error;
+}
+
+/** IP 변경 요청 승인 (관리자) */
+export async function approveIpChangeRequest(
+  requestId: string,
+  adminId: string
+) {
+  const supabase = getSupabase();
+  await verifyAdmin(supabase, adminId);
+  const { error } = await supabase.rpc("approve_ip_change_request", {
+    p_request_id: requestId,
+  });
+  if (error) throw error;
+
+  const { data: req } = await supabase
+    .from("ip_change_requests")
+    .select("user_id, requested_ip")
+    .eq("id", requestId)
+    .single();
+  if (req) {
+    await createNotification({
+      userId: req.user_id,
+      type: "ip_change_approved",
+      title: "출퇴근 IP 변경이 승인되었습니다",
+      body: `새 허용 IP: ${req.requested_ip}`,
+      link: "/dashboard/settings",
+    });
+  }
+}
+
+/** IP 변경 요청 반려 (관리자) */
+export async function rejectIpChangeRequest(
+  requestId: string,
+  adminId: string,
+  rejectReason: string
+) {
+  const supabase = getSupabase();
+  const { data: req } = await supabase
+    .from("ip_change_requests")
+    .select("user_id, requested_ip")
+    .eq("id", requestId)
+    .single();
+
+  await verifyAdmin(supabase, adminId);
+  const { error } = await supabase.rpc("reject_ip_change_request", {
+    p_request_id: requestId,
+    p_reason: rejectReason,
+  });
+  if (error) throw error;
+
+  if (req) {
+    await createNotification({
+      userId: req.user_id,
+      type: "ip_change_rejected",
+      title: "출퇴근 IP 변경이 반려되었습니다",
+      body: `사유: ${rejectReason}`,
+      link: "/dashboard/settings",
+    });
+  }
 }
 
 export async function updateUserRole(

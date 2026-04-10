@@ -13,6 +13,7 @@ export interface Profile {
   work_start_time: string | null;  // "HH:MM:SS" format or null
   work_end_time: string | null;    // "HH:MM:SS" format or null
   allowed_ip: string | null;
+  allowed_ip_locked: boolean;
 }
 
 export interface AttendanceRecord {
@@ -98,6 +99,19 @@ export interface WorkScheduleChangeRequest {
   reject_reason: string | null;
   created_at: string;
   profiles?: { full_name: string };
+}
+
+export interface IpChangeRequest {
+  id: string;
+  user_id: string;
+  requested_ip: string;
+  reason: string | null;
+  status: "대기중" | "승인" | "반려";
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reject_reason: string | null;
+  created_at: string;
+  profiles?: { full_name: string; allowed_ip: string | null };
 }
 
 export interface HireDateChangeRequest {

@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import { getNotificationSettings, getDepartments } from "@/lib/settings/queries";
-import { getMyHireDateChangeRequests } from "@/lib/attendance/queries";
+import { getMyHireDateChangeRequests, getMyIpChangeRequests } from "@/lib/attendance/queries";
 import SettingsPageClient from "@/components/dashboard/settings/SettingsPageClient";
-import type { Profile, HireDateChangeRequest } from "@/lib/attendance/types";
+import type { Profile, HireDateChangeRequest, IpChangeRequest } from "@/lib/attendance/types";
 
 export default async function SettingsPage() {
   const auth = await getAuthUser();
@@ -17,18 +17,21 @@ export default async function SettingsPage() {
   let departments: Awaited<ReturnType<typeof getDepartments>> = [];
   let allProfiles: Profile[] = [];
   let myHireDateChangeRequests: HireDateChangeRequest[] = [];
+  let myIpChangeRequests: IpChangeRequest[] = [];
 
   if (profile.role === "admin") {
-    [notificationSettings, departments, allProfiles, myHireDateChangeRequests] = await Promise.all([
+    [notificationSettings, departments, allProfiles, myHireDateChangeRequests, myIpChangeRequests] = await Promise.all([
       getNotificationSettings(supabase, auth.user.id),
       getDepartments(supabase),
       getCachedAllProfiles(),
       getMyHireDateChangeRequests(supabase, auth.user.id),
+      getMyIpChangeRequests(supabase, auth.user.id),
     ]);
   } else {
-    [notificationSettings, myHireDateChangeRequests] = await Promise.all([
+    [notificationSettings, myHireDateChangeRequests, myIpChangeRequests] = await Promise.all([
       getNotificationSettings(supabase, auth.user.id),
       getMyHireDateChangeRequests(supabase, auth.user.id),
+      getMyIpChangeRequests(supabase, auth.user.id),
     ]);
   }
 
@@ -40,6 +43,7 @@ export default async function SettingsPage() {
       allProfiles={allProfiles}
       userRole={profile.role}
       myHireDateChangeRequests={myHireDateChangeRequests}
+      myIpChangeRequests={myIpChangeRequests}
     />
   );
 }

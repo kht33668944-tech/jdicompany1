@@ -4,6 +4,7 @@ import AdminAttendanceTable from "../AdminAttendanceTable";
 import AdminVacationRequests from "../AdminVacationRequests";
 import AdminWorkScheduleRequests from "../AdminWorkScheduleRequests";
 import AdminHireDateRequests from "../AdminHireDateRequests";
+import AdminIpChangeRequests from "../AdminIpChangeRequests";
 import type {
   AttendanceWithProfile,
   Profile,
@@ -11,6 +12,7 @@ import type {
   CorrectionRequest,
   WorkScheduleChangeRequest,
   HireDateChangeRequest,
+  IpChangeRequest,
 } from "@/lib/attendance/types";
 
 interface AdminTabProps {
@@ -22,6 +24,7 @@ interface AdminTabProps {
   pendingCorrectionRequests: CorrectionRequest[];
   pendingWorkScheduleChangeRequests: WorkScheduleChangeRequest[];
   pendingHireDateChangeRequests: HireDateChangeRequest[];
+  pendingIpChangeRequests: IpChangeRequest[];
 }
 
 export default function AdminTab({
@@ -33,6 +36,7 @@ export default function AdminTab({
   pendingCorrectionRequests,
   pendingWorkScheduleChangeRequests,
   pendingHireDateChangeRequests,
+  pendingIpChangeRequests,
 }: AdminTabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -51,6 +55,10 @@ export default function AdminTab({
         <AdminHireDateRequests
           adminId={adminId}
           requests={pendingHireDateChangeRequests}
+        />
+        <AdminIpChangeRequests
+          adminId={adminId}
+          requests={pendingIpChangeRequests}
         />
       </div>
     </div>

@@ -8,7 +8,7 @@ import AccountSection from "./AccountSection";
 import InstallAppCard from "./InstallAppCard";
 import NotificationsSection from "./NotificationsSection";
 import AdminSection from "./AdminSection";
-import type { Profile, HireDateChangeRequest } from "@/lib/attendance/types";
+import type { Profile, HireDateChangeRequest, IpChangeRequest } from "@/lib/attendance/types";
 import type { SettingsTab, NotificationSettings, Department } from "@/lib/settings/types";
 
 interface SettingsPageClientProps {
@@ -18,6 +18,7 @@ interface SettingsPageClientProps {
   allProfiles: Profile[];
   userRole: string;
   myHireDateChangeRequests: HireDateChangeRequest[];
+  myIpChangeRequests: IpChangeRequest[];
 }
 
 const tabs: { id: SettingsTab; label: string; icon: React.ElementType; adminOnly?: boolean }[] = [
@@ -34,6 +35,7 @@ export default function SettingsPageClient({
   allProfiles,
   userRole,
   myHireDateChangeRequests,
+  myIpChangeRequests,
 }: SettingsPageClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
@@ -75,6 +77,7 @@ export default function SettingsPageClient({
           profile={profile}
           isAdmin={isAdmin}
           myHireDateChangeRequests={myHireDateChangeRequests}
+          myIpChangeRequests={myIpChangeRequests}
         />
           <InstallAppCard />
         </div>

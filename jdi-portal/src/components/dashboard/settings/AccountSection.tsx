@@ -9,9 +9,11 @@ import {
   submitHireDateChangeRequest,
   cancelMyHireDateChangeRequest,
   adminSetHireDate,
-  updateAllowedIp,
+  setInitialAllowedIp,
+  submitIpChangeRequest,
+  cancelMyIpChangeRequest,
 } from "@/lib/settings/actions";
-import type { Profile, HireDateChangeRequest } from "@/lib/attendance/types";
+import type { Profile, HireDateChangeRequest, IpChangeRequest } from "@/lib/attendance/types";
 import ReauthModal from "@/components/ReauthModal";
 
 const REAUTH_WINDOW_MS = 5 * 60 * 1000; // 5분
@@ -20,9 +22,10 @@ interface AccountSectionProps {
   profile: Profile;
   isAdmin: boolean;
   myHireDateChangeRequests: HireDateChangeRequest[];
+  myIpChangeRequests: IpChangeRequest[];
 }
 
-export default function AccountSection({ profile, isAdmin, myHireDateChangeRequests }: AccountSectionProps) {
+export default function AccountSection({ profile, isAdmin, myHireDateChangeRequests, myIpChangeRequests }: AccountSectionProps) {
   const router = useRouter();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -42,6 +45,13 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
   const [allowedIp, setAllowedIp] = useState(profile.allowed_ip ?? "");
   const [currentIp, setCurrentIp] = useState<string | null>(null);
   const [ipSaving, setIpSaving] = useState(false);
+  const [showIpRequestForm, setShowIpRequestForm] = useState(false);
+  const [ipRequestIp, setIpRequestIp] = useState("");
+  const [ipRequestReason, setIpRequestReason] = useState("");
+  const [ipRequestSaving, setIpRequestSaving] = useState(false);
+
+  const pendingIpRequest = myIpChangeRequests.find((r) => r.status === "대기중");
+  const isIpLocked = profile.allowed_ip_locked && !isAdmin;
 
   // 현재 접속 IP 가져오기
   useEffect(() => {
@@ -52,10 +62,14 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
   }, []);
 
   const handleIpSave = async () => {
+    if (!allowedIp.trim()) {
+      setFeedback({ type: "error", message: "IP를 입력해주세요." });
+      return;
+    }
     setIpSaving(true);
     setFeedback(null);
     try {
-      await updateAllowedIp(profile.id, allowedIp.trim());
+      await setInitialAllowedIp(allowedIp.trim());
       setFeedback({ type: "success", message: "출퇴근 허용 IP가 저장되었습니다." });
       router.refresh();
     } catch {
@@ -65,8 +79,39 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
     }
   };
 
-  const handleUseCurrentIp = () => {
-    if (currentIp) setAllowedIp(currentIp);
+  const handleSubmitIpRequest = async () => {
+    if (!ipRequestIp.trim()) {
+      setFeedback({ type: "error", message: "변경할 IP를 입력해주세요." });
+      return;
+    }
+    setIpRequestSaving(true);
+    setFeedback(null);
+    try {
+      await submitIpChangeRequest({ ip: ipRequestIp.trim(), reason: ipRequestReason });
+      setFeedback({ type: "success", message: "IP 변경 요청이 제출되었습니다. 관리자 승인을 기다려주세요." });
+      setShowIpRequestForm(false);
+      setIpRequestReason("");
+      router.refresh();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "변경 요청 제출에 실패했습니다.";
+      setFeedback({ type: "error", message: msg });
+    } finally {
+      setIpRequestSaving(false);
+    }
+  };
+
+  const handleCancelIpRequest = async (requestId: string) => {
+    setFeedback(null);
+    try {
+      await cancelMyIpChangeRequest(requestId);
+      router.refresh();
+    } catch {
+      setFeedback({ type: "error", message: "요청 취소에 실패했습니다." });
+    }
+  };
+
+  const handleUseCurrentIp = (setter: (v: string) => void) => {
+    if (currentIp) setter(currentIp);
   };
 
   const pendingRequest = myHireDateChangeRequests.find((r) => r.status === "대기중");
@@ -343,36 +388,125 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-xs text-slate-400">현재 접속 IP:</span>
                 <span className="text-xs font-mono font-bold text-slate-600">{currentIp}</span>
-                <button
-                  type="button"
-                  onClick={handleUseCurrentIp}
-                  className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold underline underline-offset-2"
-                >
-                  이 IP 사용
-                </button>
               </div>
             )}
 
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={allowedIp}
-                onChange={(e) => setAllowedIp(e.target.value)}
-                placeholder="예: 123.456.789.0"
-                className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 font-mono"
-              />
-              <button
-                type="button"
-                onClick={handleIpSave}
-                disabled={ipSaving || allowedIp.trim() === (profile.allowed_ip ?? "")}
-                className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
-              >
-                <FloppyDisk size={14} />
-                저장
-              </button>
-            </div>
-            {!allowedIp.trim() && profile.allowed_ip === null && (
-              <p className="mt-2 text-[11px] text-amber-500">⚠ IP가 설정되지 않으면 어디서든 출퇴근이 가능합니다.</p>
+            {/* 모드 1: 첫 등록 (미잠금) */}
+            {!isIpLocked && (
+              <div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={allowedIp}
+                    onChange={(e) => setAllowedIp(e.target.value)}
+                    placeholder="예: 220.117.30.202"
+                    className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleIpSave}
+                    disabled={ipSaving || !allowedIp.trim()}
+                    className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
+                  >
+                    <FloppyDisk size={14} />
+                    저장
+                  </button>
+                </div>
+                {currentIp && (
+                  <button
+                    type="button"
+                    onClick={() => handleUseCurrentIp(setAllowedIp)}
+                    className="mt-1.5 text-[11px] text-indigo-500 hover:text-indigo-700 font-bold underline underline-offset-2"
+                  >
+                    현재 IP를 사용하기
+                  </button>
+                )}
+                {!allowedIp.trim() && profile.allowed_ip === null && (
+                  <p className="mt-2 text-[11px] text-amber-500">IP가 설정되지 않으면 어디서든 출퇴근이 가능합니다.</p>
+                )}
+              </div>
+            )}
+
+            {/* 모드 2: 잠금 (변경 요청 필요) */}
+            {isIpLocked && (
+              <div className="space-y-3">
+                <div className="px-3 py-2 rounded-xl bg-white border border-slate-100 text-sm text-slate-700 font-mono">
+                  {profile.allowed_ip ?? "미설정"}
+                </div>
+
+                {pendingIpRequest ? (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-amber-700">승인 대기 중</p>
+                        <p className="text-xs text-amber-600 mt-0.5 font-mono">요청 IP: {pendingIpRequest.requested_ip}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCancelIpRequest(pendingIpRequest.id)}
+                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium"
+                      >
+                        <X size={12} />
+                        요청 취소
+                      </button>
+                    </div>
+                  </div>
+                ) : showIpRequestForm ? (
+                  <div className="space-y-2">
+                    <div>
+                      <input
+                        type="text"
+                        value={ipRequestIp}
+                        onChange={(e) => setIpRequestIp(e.target.value)}
+                        placeholder="새 IP 주소"
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 font-mono"
+                      />
+                      {currentIp && (
+                        <button
+                          type="button"
+                          onClick={() => handleUseCurrentIp(setIpRequestIp)}
+                          className="mt-1 text-[11px] text-indigo-500 hover:text-indigo-700 font-bold underline underline-offset-2"
+                        >
+                          현재 IP를 사용하기
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      value={ipRequestReason}
+                      onChange={(e) => setIpRequestReason(e.target.value)}
+                      placeholder="변경 사유 (선택)"
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSubmitIpRequest}
+                        disabled={ipRequestSaving || !ipRequestIp.trim()}
+                        className="flex-1 py-2 rounded-xl bg-indigo-500 text-white font-bold text-xs hover:bg-indigo-600 transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+                      >
+                        <PaperPlaneTilt size={13} />
+                        제출
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowIpRequestForm(false); setIpRequestReason(""); setIpRequestIp(""); }}
+                        className="px-3 py-2 rounded-xl bg-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-300 transition-colors"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowIpRequestForm(true)}
+                    className="w-full py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors"
+                  >
+                    변경 요청
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

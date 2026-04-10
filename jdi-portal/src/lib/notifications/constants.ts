@@ -20,6 +20,9 @@ export const NOTIFICATION_TYPE_CONFIG: Record<
   hire_date_change_requested: { label: "입사일 변경 요청", icon: "CalendarBlank", color: "text-violet-500" },
   hire_date_approved: { label: "입사일 변경 승인", icon: "CheckCircle", color: "text-emerald-500" },
   hire_date_rejected: { label: "입사일 변경 반려", icon: "XCircle", color: "text-red-500" },
+  ip_change_requested: { label: "IP 변경 요청", icon: "WifiHigh", color: "text-violet-500" },
+  ip_change_approved: { label: "IP 변경 승인", icon: "CheckCircle", color: "text-emerald-500" },
+  ip_change_rejected: { label: "IP 변경 반려", icon: "XCircle", color: "text-red-500" },
 };
 
 /** notification_settings 컬럼 → NotificationType[] 매핑 */

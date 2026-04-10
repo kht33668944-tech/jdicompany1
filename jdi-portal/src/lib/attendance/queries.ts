@@ -10,6 +10,7 @@ import type {
   WorkSchedule,
   WorkScheduleChangeRequest,
   HireDateChangeRequest,
+  IpChangeRequest,
 } from "./types";
 
 export async function getProfile(
@@ -291,6 +292,31 @@ export async function getWorkSchedulesForUser(
 }
 
 /** 관리자용: 대기 중 입사일 변경 요청 전체 */
+export async function getPendingIpChangeRequests(
+  supabase: SupabaseClient
+): Promise<IpChangeRequest[]> {
+  const { data, error } = await supabase
+    .from("ip_change_requests")
+    .select("*, profiles:user_id(full_name, allowed_ip)")
+    .eq("status", "대기중")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data as IpChangeRequest[]) ?? [];
+}
+
+export async function getMyIpChangeRequests(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<IpChangeRequest[]> {
+  const { data, error } = await supabase
+    .from("ip_change_requests")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function getPendingHireDateChangeRequests(
   supabase: SupabaseClient
 ): Promise<HireDateChangeRequest[]> {
