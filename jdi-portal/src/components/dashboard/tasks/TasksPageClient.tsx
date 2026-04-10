@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MagnifyingGlass, Plus } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskWithDetails, TaskViewId, TaskFilterState } from "@/lib/tasks/types";
@@ -16,6 +16,7 @@ import ListView from "./views/ListView";
 import CalendarView from "./views/CalendarView";
 import TimelineView from "./views/TimelineView";
 import TaskCreateModal from "./TaskCreateModal";
+import TaskDetailPanel from "./TaskDetailPanel";
 
 interface Props {
   profiles: Profile[];
@@ -29,6 +30,7 @@ const FILTER_STORAGE_KEY = "tasks-filters";
 
 export default function TasksPageClient({ profiles, userId, refreshSignal }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   // SSR/CSR hydration mismatch 방지 — 항상 기본값으로 시작 후 mount 시 localStorage 로드
   const [activeView, setActiveView] = useState<TaskViewId>("list");
   const [filters, setFilters] = useState<TaskFilterState>(DEFAULT_FILTER_STATE);
@@ -92,6 +94,18 @@ export default function TasksPageClient({ profiles, userId, refreshSignal }: Pro
     window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
   }, [filters]);
 
+  // detail 파라미터 감시 — 패널이 닫힐 때 목록 갱신
+  const detailId = searchParams.get("detail");
+  const prevDetailRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // 패널이 열린 상태에서 닫힌 경우에만 refresh
+    if (prevDetailRef.current && !detailId) {
+      void refreshTasks();
+    }
+    prevDetailRef.current = detailId;
+  }, [detailId, refreshTasks]);
+
   const summary = useMemo(() => computeSummary(allTasks), [allTasks]);
 
   const processedTasks = useMemo(() => {
@@ -121,7 +135,9 @@ export default function TasksPageClient({ profiles, userId, refreshSignal }: Pro
   const tasksWithChildren = useMemo(() => buildTaskTree(processedTasks), [processedTasks]);
 
   const handleTaskClick = (taskId: string) => {
-    router.push(`/dashboard/tasks/${taskId}`);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("detail", taskId);
+    router.push(`/dashboard/tasks?${params.toString()}`, { scroll: false });
   };
 
   return (
@@ -214,6 +230,9 @@ export default function TasksPageClient({ profiles, userId, refreshSignal }: Pro
           onClose={() => setShowCreate(false)}
         />
       )}
+
+      {/* 상세 패널 */}
+      <TaskDetailPanel profiles={profiles} userId={userId} />
     </div>
   );
 }
