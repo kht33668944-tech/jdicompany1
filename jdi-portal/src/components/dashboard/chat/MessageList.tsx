@@ -117,21 +117,21 @@ function ImageGroupRenderer({ chunk, isOwn, userId }: { chunk: Extract<MessageCh
   }
 
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-2 sm:gap-3">
       {profile?.avatar_url ? (
         <img
           src={profile.avatar_url}
           alt={profile.full_name ?? ""}
-          className="w-9 h-9 rounded-xl flex-shrink-0 object-cover"
+          className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl flex-shrink-0 object-cover"
         />
       ) : (
-        <div className="w-9 h-9 rounded-xl bg-indigo-100 flex-shrink-0 flex items-center justify-center text-indigo-600 font-bold text-sm">
+        <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-indigo-100 flex-shrink-0 flex items-center justify-center text-indigo-600 font-bold text-xs sm:text-sm">
           {profile?.full_name?.charAt(0) ?? "?"}
         </div>
       )}
-      <div className="space-y-1 max-w-[70%]">
-        <div className="flex items-end gap-2">
-          <span className="text-xs font-bold text-slate-800">{profile?.full_name}</span>
+      <div className="space-y-0.5 sm:space-y-1 max-w-[75%] sm:max-w-[70%]">
+        <div className="flex items-end gap-1.5 sm:gap-2">
+          <span className="text-[11px] sm:text-xs font-bold text-slate-800">{profile?.full_name}</span>
           <span className="text-[10px] text-slate-400">{formatMessageTime(lastMsg.created_at)}</span>
         </div>
         <div className={`grid ${cols} gap-1`}>
@@ -254,7 +254,7 @@ export default function MessageList({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto px-6 py-4 space-y-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex-1 overflow-y-auto px-3 sm:px-6 py-3 sm:py-4 space-y-3 sm:space-y-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {loadingMore && (
         <div className="flex justify-center py-2">
@@ -262,11 +262,11 @@ export default function MessageList({
         </div>
       )}
       {groups.map((group) => (
-        <div key={group.date} className="space-y-4">
+        <div key={group.date} className="space-y-3 sm:space-y-4">
           {/* Date divider */}
-          <div className="flex items-center justify-center py-4">
+          <div className="flex items-center justify-center py-2 sm:py-4">
             <div className="h-px flex-1 bg-slate-100" />
-            <span className="px-4 text-[11px] font-bold text-slate-400 tracking-wider">
+            <span className="px-3 sm:px-4 text-[10px] sm:text-[11px] font-bold text-slate-400 tracking-wider">
               {formatDateDivider(group.date)}
             </span>
             <div className="h-px flex-1 bg-slate-100" />

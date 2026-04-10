@@ -346,7 +346,7 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
 
   if (message.is_deleted) {
     return (
-      <div className={`inline-block px-4 py-2.5 ${isOwn ? "bg-slate-100 rounded-2xl rounded-tr-md" : "bg-white border border-slate-100 rounded-2xl rounded-tl-md shadow-sm"} text-sm leading-relaxed`}>
+      <div className={`inline-block px-3 py-2 sm:px-4 sm:py-2.5 ${isOwn ? "bg-slate-100 rounded-2xl rounded-tr-md" : "bg-white border border-slate-100 rounded-2xl rounded-tl-md shadow-sm"} text-[13px] sm:text-sm leading-relaxed`}>
         <span className="text-slate-400 italic">삭제된 메시지입니다</span>
       </div>
     );
@@ -372,7 +372,7 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
           <span>답장됨</span>
         </div>
       )}
-      <div className={`inline-block px-4 py-2.5 ${isOwn ? "bg-blue-600 text-white rounded-2xl rounded-tr-md" : "bg-white border border-slate-100 rounded-2xl rounded-tl-md text-slate-700 shadow-sm"} text-sm leading-relaxed`}>
+      <div className={`inline-block px-3 py-2 sm:px-4 sm:py-2.5 ${isOwn ? "bg-blue-600 text-white rounded-2xl rounded-tr-md" : "bg-white border border-slate-100 rounded-2xl rounded-tl-md text-slate-700 shadow-sm"} text-[13px] sm:text-sm leading-relaxed`}>
         {message.content}
         {message.is_edited && (
           <span className={`text-[10px] ml-1 ${isOwn ? "text-blue-200" : "text-slate-400"}`}>(수정됨)</span>
@@ -462,8 +462,8 @@ export default function MessageItem({
   if (isOwn) {
     return (
       <>
-        <div className="flex flex-row-reverse items-start gap-3">
-          <div className="space-y-1 text-right max-w-[70%]">
+        <div className="flex flex-row-reverse items-start gap-2 sm:gap-3">
+          <div className="space-y-0.5 sm:space-y-1 text-right max-w-[75%] sm:max-w-[70%]">
             <div className="flex flex-row-reverse items-end gap-2">
               <span className="text-[10px] text-slate-400">
                 {formatMessageTime(message.created_at)}
@@ -528,21 +528,21 @@ export default function MessageItem({
   // Other's message (left-aligned)
   return (
     <>
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2 sm:gap-3">
         {message.user_profile?.avatar_url ? (
           <img
             src={message.user_profile.avatar_url}
             alt={message.user_profile.full_name ?? ""}
-            className="w-9 h-9 rounded-xl flex-shrink-0 object-cover"
+            className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl flex-shrink-0 object-cover"
           />
         ) : (
-          <div className="w-9 h-9 rounded-xl bg-indigo-100 flex-shrink-0 flex items-center justify-center text-indigo-600 font-bold text-sm">
+          <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-indigo-100 flex-shrink-0 flex items-center justify-center text-indigo-600 font-bold text-xs sm:text-sm">
             {message.user_profile?.full_name?.charAt(0) ?? "?"}
           </div>
         )}
-        <div className="space-y-1 max-w-[70%]">
-          <div className="flex items-end gap-2">
-            <span className="text-xs font-bold text-slate-800">
+        <div className="space-y-0.5 sm:space-y-1 max-w-[75%] sm:max-w-[70%]">
+          <div className="flex items-end gap-1.5 sm:gap-2">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-800">
               {message.user_profile?.full_name}
             </span>
             <span className="text-[10px] text-slate-400">
