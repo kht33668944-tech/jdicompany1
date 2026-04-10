@@ -14,10 +14,20 @@ interface Props {
   taskId: string;
   items: TaskChecklistItem[];
   canEdit: boolean;
+  mode?: "page" | "panel";
+  onRefresh?: () => void;
 }
 
-export default function TaskChecklist({ taskId, items, canEdit }: Props) {
+export default function TaskChecklist({ taskId, items, canEdit, mode = "page", onRefresh }: Props) {
   const router = useRouter();
+
+  const refresh = () => {
+    if (mode === "panel" && onRefresh) {
+      onRefresh();
+    } else {
+      refresh();
+    }
+  };
   const [newItem, setNewItem] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -31,7 +41,7 @@ export default function TaskChecklist({ taskId, items, canEdit }: Props) {
     try {
       await addChecklistItem(taskId, newItem.trim());
       setNewItem("");
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("체크리스트 항목 추가 실패:", error);
     } finally {
@@ -42,7 +52,7 @@ export default function TaskChecklist({ taskId, items, canEdit }: Props) {
   const handleToggle = async (item: TaskChecklistItem) => {
     try {
       await updateChecklistItem(item.id, { is_completed: !item.is_completed });
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("체크리스트 항목 토글 실패:", error);
     }
@@ -51,7 +61,7 @@ export default function TaskChecklist({ taskId, items, canEdit }: Props) {
   const handleDelete = async (itemId: string) => {
     try {
       await deleteChecklistItem(itemId);
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("체크리스트 항목 삭제 실패:", error);
     }

@@ -316,6 +316,8 @@ export default function TaskDetailClient({
               taskId={task.id}
               items={checklist}
               canEdit={canEdit}
+              mode="panel"
+              onRefresh={onRefresh}
             />
           </div>
         </div>
