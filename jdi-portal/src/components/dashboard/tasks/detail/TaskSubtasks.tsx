@@ -15,6 +15,9 @@ interface Props {
   userId: string;
   profiles: Profile[];
   canEdit: boolean;
+  mode?: "page" | "panel";
+  onNavigate?: (taskId: string) => void;
+  onRefresh?: () => void;
 }
 
 const STATUS_ICONS: Record<TaskStatus, React.ComponentType<import("phosphor-react").IconProps>> = {
@@ -29,9 +32,26 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
   "완료": "text-emerald-500",
 };
 
-export default function TaskSubtasks({ taskId, subtasks, userId, profiles, canEdit }: Props) {
+export default function TaskSubtasks({
+  taskId,
+  subtasks,
+  userId,
+  profiles,
+  canEdit,
+  mode = "page",
+  onNavigate,
+  onRefresh,
+}: Props) {
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
+
+  const handleSubtaskClick = (subId: string) => {
+    if (mode === "panel" && onNavigate) {
+      onNavigate(subId);
+    } else {
+      router.push(`/dashboard/tasks/${subId}`);
+    }
+  };
 
   return (
     <div className="bg-white rounded-3xl shadow-sm p-6">
@@ -56,7 +76,7 @@ export default function TaskSubtasks({ taskId, subtasks, userId, profiles, canEd
             return (
               <div
                 key={sub.id}
-                onClick={() => router.push(`/dashboard/tasks/${sub.id}`)}
+                onClick={() => handleSubtaskClick(sub.id)}
                 className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-all"
               >
                 <StatusIcon size={16} className={STATUS_COLORS[sub.status]} />
@@ -93,7 +113,11 @@ export default function TaskSubtasks({ taskId, subtasks, userId, profiles, canEd
           profiles={profiles}
           onClose={() => {
             setShowCreate(false);
-            router.refresh();
+            if (mode === "panel" && onRefresh) {
+              onRefresh();
+            } else {
+              router.refresh();
+            }
           }}
           parentId={taskId}
         />
