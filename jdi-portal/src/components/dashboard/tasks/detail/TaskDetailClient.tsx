@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Trash,
   XCircle,
+  X,
 } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
 import type {
@@ -34,6 +35,14 @@ interface Props {
   activities: TaskActivity[];
   profiles: Profile[];
   userId: string;
+  /** "page" (기본값) = 기존 전체 페이지, "panel" = 슬라이드 패널 */
+  mode?: "page" | "panel";
+  /** panel 모드 전용: 패널 닫기 */
+  onClose?: () => void;
+  /** panel 모드 전용: 패널 내 다른 task 로 이동 */
+  onNavigate?: (taskId: string) => void;
+  /** panel 모드 전용: 데이터 재조회 트리거 */
+  onRefresh?: () => void;
 }
 
 import { getErrorMessage } from "@/lib/utils/errors";
@@ -46,6 +55,10 @@ export default function TaskDetailClient({
   activities,
   profiles,
   userId,
+  mode = "page",
+  onClose,
+  onNavigate,
+  onRefresh,
 }: Props) {
   const router = useRouter();
   const [liveActivities, setLiveActivities] = useState<TaskActivity[]>(activities);
@@ -144,7 +157,11 @@ export default function TaskDetailClient({
         startDate: startDate || null,
       });
       setFeedback({ type: "success", message: "저장되었습니다." });
-      router.refresh();
+      if (mode === "panel" && onRefresh) {
+        onRefresh();
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       setFeedback({ type: "error", message: getErrorMessage(error, "저장에 실패했습니다.") });
     } finally {
@@ -157,8 +174,12 @@ export default function TaskDetailClient({
     setDeleting(true);
     try {
       await deleteTask(task.id);
-      router.push("/dashboard/tasks");
-      router.refresh();
+      if (mode === "panel" && onClose) {
+        onClose();
+      } else {
+        router.push("/dashboard/tasks");
+        router.refresh();
+      }
     } catch (error) {
       setFeedback({ type: "error", message: getErrorMessage(error, "삭제에 실패했습니다.") });
       setDeleting(false);
@@ -168,7 +189,11 @@ export default function TaskDetailClient({
   const handleAddAssignee = async (assigneeUserId: string) => {
     try {
       await addAssignee(task.id, assigneeUserId, userId);
-      router.refresh();
+      if (mode === "panel" && onRefresh) {
+        onRefresh();
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       console.error("담당자 추가 실패:", error);
     }
@@ -177,7 +202,11 @@ export default function TaskDetailClient({
   const handleRemoveAssignee = async (assigneeUserId: string) => {
     try {
       await removeAssignee(task.id, assigneeUserId, userId);
-      router.refresh();
+      if (mode === "panel" && onRefresh) {
+        onRefresh();
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       console.error("담당자 제거 실패:", error);
     }
@@ -187,13 +216,23 @@ export default function TaskDetailClient({
     <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => router.push("/dashboard/tasks")}
-          className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm font-medium"
-        >
-          <ArrowLeft size={18} />
-          뒤로 가기
-        </button>
+        {mode === "panel" ? (
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm font-medium"
+          >
+            <X size={18} />
+            닫기
+          </button>
+        ) : (
+          <button
+            onClick={() => router.push("/dashboard/tasks")}
+            className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm font-medium"
+          >
+            <ArrowLeft size={18} />
+            뒤로 가기
+          </button>
+        )}
         <div className="flex items-center gap-2">
           {canEdit && (
             <button
@@ -276,6 +315,9 @@ export default function TaskDetailClient({
             userId={userId}
             profiles={profiles}
             canEdit={canEdit}
+            mode={mode}
+            onNavigate={onNavigate}
+            onRefresh={onRefresh}
           />
 
           {/* 활동 타임라인 */}
