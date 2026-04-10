@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   ChatCircleDots,
   ArrowRight,
@@ -9,9 +10,11 @@ import {
   CheckSquare,
   PencilSimple,
   Trash,
+  DownloadSimple,
+  X,
 } from "phosphor-react";
 import type { TaskActivity, ActivityType } from "@/lib/tasks/types";
-import { deleteActivity } from "@/lib/tasks/actions";
+import { deleteActivity, getAttachmentUrl } from "@/lib/tasks/actions";
 import { useRouter } from "next/navigation";
 import UserAvatar from "@/components/shared/UserAvatar";
 
@@ -90,22 +93,128 @@ function CommentAttachments({ metadata }: { metadata: Record<string, unknown> | 
   const attachments = metadata.attachments as AttachmentMeta[];
   if (attachments.length === 0) return null;
 
+  const images = attachments.filter((a) => a.content_type?.startsWith("image/"));
+  const files = attachments.filter((a) => !a.content_type?.startsWith("image/"));
+
   return (
-    <div className="flex flex-wrap gap-1.5 mt-1.5">
-      {attachments.map((att) => {
-        const isImage = att.content_type?.startsWith("image/");
-        return (
-          <div
-            key={att.id}
-            className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-md text-xs text-slate-500"
-          >
-            <Paperclip size={11} />
-            <span className="max-w-[150px] truncate">{att.file_name}</span>
-            {isImage && <span className="text-[10px] text-indigo-400">이미지</span>}
-          </div>
-        );
-      })}
+    <div className="mt-2 space-y-2">
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {images.map((att) => (
+            <ImagePreview key={att.id} attachment={att} />
+          ))}
+        </div>
+      )}
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {files.map((att) => (
+            <FileChip key={att.id} attachment={att} />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function ImagePreview({ attachment }: { attachment: AttachmentMeta }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState(false);
+
+  useEffect(() => {
+    getAttachmentUrl(attachment.file_path)
+      .then(setUrl)
+      .catch(() => {});
+  }, [attachment.file_path]);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = attachment.file_name;
+    a.click();
+  };
+
+  if (!url) {
+    return (
+      <div className="w-48 h-32 bg-slate-100 rounded-xl animate-pulse" />
+    );
+  }
+
+  return (
+    <>
+      <div className="relative group cursor-pointer" onClick={() => setLightbox(true)}>
+        <img
+          src={url}
+          alt={attachment.file_name}
+          className="max-w-48 max-h-40 rounded-xl object-cover border border-slate-200"
+        />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-xl transition-all flex items-center justify-center">
+          <button
+            onClick={handleDownload}
+            className="opacity-0 group-hover:opacity-100 p-2 bg-white/90 rounded-full shadow transition-all hover:bg-white"
+          >
+            <DownloadSimple size={16} className="text-slate-700" />
+          </button>
+        </div>
+      </div>
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70"
+          onClick={() => setLightbox(false)}
+        >
+          <button
+            onClick={() => setLightbox(false)}
+            className="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/40 transition-colors"
+          >
+            <X size={24} className="text-white" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDownload(e); }}
+            className="absolute top-4 right-16 p-2 bg-white/20 rounded-full hover:bg-white/40 transition-colors"
+          >
+            <DownloadSimple size={24} className="text-white" />
+          </button>
+          <img
+            src={url}
+            alt={attachment.file_name}
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+function FileChip({ attachment }: { attachment: AttachmentMeta }) {
+  const handleDownload = async () => {
+    try {
+      const url = await getAttachmentUrl(attachment.file_path);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = attachment.file_name;
+      a.click();
+    } catch {
+      console.error("파일 다운로드 실패");
+    }
+  };
+
+  const sizeLabel = attachment.file_size < 1024 * 1024
+    ? `${Math.round(attachment.file_size / 1024)}KB`
+    : `${(attachment.file_size / (1024 * 1024)).toFixed(1)}MB`;
+
+  return (
+    <button
+      onClick={handleDownload}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 transition-colors"
+    >
+      <Paperclip size={12} />
+      <span className="max-w-[140px] truncate">{attachment.file_name}</span>
+      <span className="text-slate-400">{sizeLabel}</span>
+      <DownloadSimple size={12} className="text-slate-400" />
+    </button>
   );
 }
 
