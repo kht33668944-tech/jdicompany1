@@ -11,11 +11,10 @@ import { getErrorMessage } from "@/lib/utils/errors";
 import type { IpChangeRequest } from "@/lib/attendance/types";
 
 interface Props {
-  adminId: string;
   requests: IpChangeRequest[];
 }
 
-export default function AdminIpChangeRequests({ adminId, requests }: Props) {
+export default function AdminIpChangeRequests({ requests }: Props) {
   const router = useRouter();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -26,7 +25,7 @@ export default function AdminIpChangeRequests({ adminId, requests }: Props) {
     setLoading(true);
     setError(null);
     try {
-      await approveIpChangeRequest(id, adminId);
+      await approveIpChangeRequest(id);
       router.refresh();
     } catch (e) {
       setError(getErrorMessage(e, "승인에 실패했습니다."));
@@ -40,7 +39,7 @@ export default function AdminIpChangeRequests({ adminId, requests }: Props) {
     setLoading(true);
     setError(null);
     try {
-      await rejectIpChangeRequest(id, adminId, reason);
+      await rejectIpChangeRequest(id, reason);
       setRejectingId(null);
       setReason("");
       router.refresh();

@@ -55,7 +55,6 @@ export default function TaskCreateModal({ userId, profiles, onClose, parentId }:
         category: category || undefined,
         dueDate: dueDate || undefined,
         startDate: startDate || undefined,
-        createdBy: userId,
         assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
         parentId: parentId || undefined,
       });

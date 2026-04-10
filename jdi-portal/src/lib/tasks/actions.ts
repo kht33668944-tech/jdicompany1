@@ -1,14 +1,19 @@
-import { createClient } from "@/lib/supabase/client";
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
 import { TASK_PRIORITIES, TASK_STATUSES } from "./constants";
 import { validateFile } from "@/lib/utils/upload";
 import type { TaskPriority, TaskStatus, TaskChecklistItem, TaskAttachment, TaskActivity } from "./types";
 import { createNotification, createNotificationForMany } from "@/lib/notifications/actions";
 
-function getSupabase() {
-  return createClient();
+async function getSessionUserId() {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
+  return session.user.id;
 }
 
-async function getNextPosition(supabase: ReturnType<typeof getSupabase>, status: TaskStatus) {
+async function getNextPosition(supabase: Awaited<ReturnType<typeof createClient>>, status: TaskStatus) {
   const { data: maxRow, error } = await supabase
     .from("tasks")
     .select("position")
@@ -28,7 +33,7 @@ async function logActivity(
   content?: string | null,
   metadata?: Record<string, unknown> | null
 ) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   await supabase.from("task_activities").insert({
     task_id: taskId,
     user_id: userId,
@@ -50,11 +55,11 @@ export async function createTask(params: {
   category?: string;
   dueDate?: string;
   startDate?: string;
-  createdBy: string;
   assigneeIds?: string[];
   parentId?: string;
 }) {
-  const supabase = getSupabase();
+  const userId = await getSessionUserId();
+  const supabase = await createClient();
   const targetStatus = params.status ?? TASK_STATUSES[0];
   const nextPosition = await getNextPosition(supabase, targetStatus);
 
@@ -69,7 +74,7 @@ export async function createTask(params: {
       due_date: params.dueDate || null,
       start_date: params.startDate || null,
       position: nextPosition,
-      created_by: params.createdBy,
+      created_by: userId,
       parent_id: params.parentId || null,
     })
     .select()
@@ -78,10 +83,10 @@ export async function createTask(params: {
   if (error) throw error;
 
   // 담당자 배정
-  const assigneeIds = params.assigneeIds?.length ? params.assigneeIds : [params.createdBy];
-  const assigneeRows = assigneeIds.map((userId) => ({
+  const assigneeIds = params.assigneeIds?.length ? params.assigneeIds : [userId];
+  const assigneeRows = assigneeIds.map((assigneeId) => ({
     task_id: data.id,
-    user_id: userId,
+    user_id: assigneeId,
   }));
 
   try {
@@ -92,7 +97,7 @@ export async function createTask(params: {
     if (assigneeError) throw assigneeError;
 
     // 알림: 배정된 사용자들에게 (본인 제외)
-    const notifyIds = assigneeIds.filter((id) => id !== params.createdBy);
+    const notifyIds = assigneeIds.filter((id) => id !== userId);
     if (notifyIds.length > 0) {
       await createNotificationForMany(notifyIds, {
         type: "task_assigned",
@@ -113,7 +118,6 @@ export async function createTask(params: {
 
 export async function updateTask(
   taskId: string,
-  userId: string,
   params: {
     title?: string;
     description?: string | null;
@@ -124,7 +128,8 @@ export async function updateTask(
     startDate?: string | null;
   }
 ) {
-  const supabase = getSupabase();
+  const userId = await getSessionUserId();
+  const supabase = await createClient();
   const { data: currentTask, error: fetchError } = await supabase
     .from("tasks")
     .select("status, priority, title, created_by")
@@ -196,13 +201,13 @@ export async function updateTask(
 }
 
 export async function deleteTask(taskId: string) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw error;
 }
 
 export async function moveTask(taskId: string, newStatus: TaskStatus, newPosition: number) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const { error } = await supabase.rpc("reorder_task", {
     p_task_id: taskId,
     p_new_status: newStatus,
@@ -215,8 +220,9 @@ export async function moveTask(taskId: string, newStatus: TaskStatus, newPositio
 // 담당자
 // ============================================================
 
-export async function addAssignee(taskId: string, userId: string, currentUserId: string) {
-  const supabase = getSupabase();
+export async function addAssignee(taskId: string, userId: string) {
+  const currentUserId = await getSessionUserId();
+  const supabase = await createClient();
   const { error } = await supabase
     .from("task_assignees")
     .insert({ task_id: taskId, user_id: userId });
@@ -244,8 +250,9 @@ export async function addAssignee(taskId: string, userId: string, currentUserId:
   }
 }
 
-export async function removeAssignee(taskId: string, userId: string, currentUserId: string) {
-  const supabase = getSupabase();
+export async function removeAssignee(taskId: string, userId: string) {
+  const currentUserId = await getSessionUserId();
+  const supabase = await createClient();
   const { error } = await supabase
     .from("task_assignees")
     .delete()
@@ -263,7 +270,7 @@ export async function removeAssignee(taskId: string, userId: string, currentUser
 // ============================================================
 
 export async function addChecklistItem(taskId: string, content: string): Promise<TaskChecklistItem> {
-  const supabase = getSupabase();
+  const supabase = await createClient();
 
   const { data: maxRow } = await supabase
     .from("task_checklist_items")
@@ -289,7 +296,7 @@ export async function updateChecklistItem(
   itemId: string,
   updates: { content?: string; is_completed?: boolean }
 ) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const { error } = await supabase
     .from("task_checklist_items")
     .update(updates)
@@ -298,7 +305,7 @@ export async function updateChecklistItem(
 }
 
 export async function deleteChecklistItem(itemId: string) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const { error } = await supabase
     .from("task_checklist_items")
     .delete()
@@ -307,7 +314,7 @@ export async function deleteChecklistItem(itemId: string) {
 }
 
 export async function reorderChecklist(taskId: string, itemIds: string[]) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const updates = itemIds.map((id, index) =>
     supabase.from("task_checklist_items").update({ position: index }).eq("id", id)
   );
@@ -321,13 +328,13 @@ export async function reorderChecklist(taskId: string, itemIds: string[]) {
 
 export async function uploadAttachment(
   taskId: string,
-  userId: string,
   file: File
 ): Promise<TaskAttachment> {
   const validationError = validateFile(file);
   if (validationError) throw new Error(validationError);
 
-  const supabase = getSupabase();
+  const userId = await getSessionUserId();
+  const supabase = await createClient();
   const ext = file.name.split(".").pop() ?? "bin";
   const filePath = `${taskId}/${crypto.randomUUID()}.${ext}`;
 
@@ -364,8 +371,9 @@ export async function uploadAttachment(
   return data as TaskAttachment;
 }
 
-export async function deleteAttachment(attachmentId: string, filePath: string, taskId: string, userId: string) {
-  const supabase = getSupabase();
+export async function deleteAttachment(attachmentId: string, filePath: string, taskId: string) {
+  const userId = await getSessionUserId();
+  const supabase = await createClient();
 
   // 1) DB 메타데이터 먼저 삭제 (실패 시 사용자 입장의 진실은 그대로 보존)
   const { error } = await supabase
@@ -387,7 +395,7 @@ export async function deleteAttachment(attachmentId: string, filePath: string, t
 }
 
 export async function getAttachmentUrl(filePath: string): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const { data, error } = await supabase.storage
     .from("task-attachments")
     .createSignedUrl(filePath, 3600);
@@ -400,7 +408,7 @@ export async function getAttachmentUrls(
   filePaths: string[]
 ): Promise<Record<string, string>> {
   if (filePaths.length === 0) return {};
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const unique = [...new Set(filePaths)];
   const { data } = await supabase.storage
     .from("task-attachments")
@@ -420,11 +428,11 @@ export async function getAttachmentUrls(
 
 export async function addComment(
   taskId: string,
-  userId: string,
   content: string,
   metadata?: Record<string, unknown>
 ): Promise<TaskActivity> {
-  const supabase = getSupabase();
+  const userId = await getSessionUserId();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("task_activities")
     .insert({
@@ -451,7 +459,7 @@ async function sendCommentNotifications(
   content: string
 ) {
   try {
-    const supabase = getSupabase();
+    const supabase = await createClient();
     const { data: assignees } = await supabase
       .from("task_assignees")
       .select("user_id")
@@ -475,7 +483,7 @@ async function sendCommentNotifications(
 }
 
 export async function deleteActivity(activityId: string) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const { error } = await supabase
     .from("task_activities")
     .delete()

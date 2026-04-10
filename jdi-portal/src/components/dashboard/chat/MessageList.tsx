@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import Image from "next/image";
 import type { Message, ChannelWithDetails } from "@/lib/chat/types";
 import { groupMessagesByDate, formatDateDivider, formatMessageTime, parseFileContent } from "@/lib/chat/utils";
 import { getChatFileUrl } from "@/lib/chat/actions";
@@ -89,7 +90,7 @@ function GridImage({ storagePath, fileName }: { storagePath: string; fileName: s
 
 // --- ImageGroupRenderer: renders a grid of consecutive images ---
 
-function ImageGroupRenderer({ chunk, isOwn, userId }: { chunk: Extract<MessageChunk, { type: "image-group" }>; isOwn: boolean; userId: string }) {
+function ImageGroupRenderer({ chunk, isOwn }: { chunk: Extract<MessageChunk, { type: "image-group" }>; isOwn: boolean }) {
   const firstMsg = chunk.messages[0];
   const profile = firstMsg.user_profile;
   const lastMsg = chunk.messages[chunk.messages.length - 1];
@@ -119,9 +120,11 @@ function ImageGroupRenderer({ chunk, isOwn, userId }: { chunk: Extract<MessageCh
   return (
     <div className="flex items-start gap-2 sm:gap-3">
       {profile?.avatar_url ? (
-        <img
+        <Image
           src={profile.avatar_url}
           alt={profile.full_name ?? ""}
+          width={36}
+          height={36}
           className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl flex-shrink-0 object-cover"
         />
       ) : (
@@ -288,7 +291,6 @@ export default function MessageList({
                 key={`img-group-${chunk.messages[0].id}`}
                 chunk={chunk}
                 isOwn={chunk.userId === userId}
-                userId={userId}
               />
             ) : (
               <MessageItem

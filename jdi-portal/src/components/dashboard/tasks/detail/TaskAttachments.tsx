@@ -48,7 +48,7 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
       for (const file of Array.from(files)) {
         const err = validateFile(file);
         if (err) { toast.error(err); continue; }
-        await uploadAttachment(taskId, userId, file);
+        await uploadAttachment(taskId, file);
       }
       router.refresh();
     } catch (error) {
@@ -63,7 +63,7 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
   const handleDelete = async (attachment: TaskAttachment) => {
     if (!confirm(`"${attachment.file_name}" 파일을 삭제하시겠습니까?`)) return;
     try {
-      await deleteAttachment(attachment.id, attachment.file_path, taskId, userId);
+      await deleteAttachment(attachment.id, attachment.file_path, taskId);
       router.refresh();
     } catch (error) {
       console.error("첨부파일 삭제 실패:", error);

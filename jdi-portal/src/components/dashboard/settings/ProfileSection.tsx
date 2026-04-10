@@ -25,24 +25,18 @@ export default function ProfileSection({ profile, onUpdated }: ProfileSectionPro
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setFeedback({ type: "error", message: "이미지 파일만 업로드 가능합니다." });
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setFeedback({ type: "error", message: "파일 크기는 2MB 이하여야 합니다." });
-      return;
-    }
-
     setLoading(true);
     setFeedback(null);
     try {
-      const url = await uploadAvatar(profile.id, file);
+      const fd = new FormData();
+      fd.append("file", file);
+      const url = await uploadAvatar(fd);
       setAvatarPreview(url);
       setFeedback({ type: "success", message: "프로필 사진이 업데이트되었습니다." });
       onUpdated();
-    } catch {
-      setFeedback({ type: "error", message: "사진 업로드에 실패했습니다." });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "사진 업로드에 실패했습니다.";
+      setFeedback({ type: "error", message: msg });
     } finally {
       setLoading(false);
     }
@@ -56,7 +50,6 @@ export default function ProfileSection({ profile, onUpdated }: ProfileSectionPro
     setFeedback(null);
     try {
       await updateProfile({
-        userId: profile.id,
         fullName: fullName.trim(),
         department: department.trim(),
         phone: phone.trim(),
@@ -117,13 +110,13 @@ export default function ProfileSection({ profile, onUpdated }: ProfileSectionPro
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleAvatarChange}
                 className="hidden"
               />
             </div>
             <p className="text-xs text-slate-400 text-center">
-              권장 사이즈: 200x200<br />JPG, PNG 파일
+              권장 사이즈: 200x200<br />JPG, PNG, WebP 파일
             </p>
           </div>
 

@@ -1,10 +1,8 @@
-import { createClient } from "@/lib/supabase/client";
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
 import type { NotificationType } from "./types";
 import { SETTING_TYPE_MAP } from "./constants";
-
-function getSupabase() {
-  return createClient();
-}
 
 /** NotificationType → notification_settings 컬럼명 역방향 조회 */
 function getSettingKeyForType(type: NotificationType): string | null {
@@ -14,7 +12,7 @@ function getSettingKeyForType(type: NotificationType): string | null {
   return null;
 }
 
-/** 알림 생성 (실패 시 무시 — fire-and-forget) */
+/** 알림 생성 (서버 전용 — 다른 서버 액션에서만 호출) */
 export async function createNotification(params: {
   userId: string;
   type: NotificationType;
@@ -24,7 +22,7 @@ export async function createNotification(params: {
   metadata?: Record<string, unknown>;
 }) {
   try {
-    const supabase = getSupabase();
+    const supabase = await createClient();
 
     // 수신자의 알림 설정 확인
     const settingKey = getSettingKeyForType(params.type);
@@ -63,7 +61,7 @@ export async function createNotificationForMany(
 ) {
   if (userIds.length === 0) return;
   try {
-    const supabase = getSupabase();
+    const supabase = await createClient();
 
     // 수신자들의 알림 설정 확인 후 비활성화된 사용자 필터링
     const settingKey = getSettingKeyForType(params.type);
@@ -101,30 +99,44 @@ export async function createNotificationForMany(
   }
 }
 
+/** 알림 읽음 처리 — 세션 사용자 본인의 알림만 */
 export async function markAsRead(notificationId: string) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
+
   const { error } = await supabase
     .from("notifications")
     .update({ is_read: true })
-    .eq("id", notificationId);
+    .eq("id", notificationId)
+    .eq("user_id", session.user.id);
   if (error) throw error;
 }
 
-export async function markAllAsRead(userId: string) {
-  const supabase = getSupabase();
+/** 모든 알림 읽음 처리 — 세션 사용자 본인 것만 */
+export async function markAllAsRead() {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
+
   const { error } = await supabase
     .from("notifications")
     .update({ is_read: true })
-    .eq("user_id", userId)
+    .eq("user_id", session.user.id)
     .eq("is_read", false);
   if (error) throw error;
 }
 
+/** 알림 삭제 — 세션 사용자 본인의 알림만 */
 export async function deleteNotification(notificationId: string) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
+
   const { error } = await supabase
     .from("notifications")
     .delete()
-    .eq("id", notificationId);
+    .eq("id", notificationId)
+    .eq("user_id", session.user.id);
   if (error) throw error;
 }

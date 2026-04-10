@@ -171,7 +171,7 @@ export default function NotificationCenter({
   };
 
   const handleMarkAllRead = async () => {
-    await markAllAsRead(userId);
+    await markAllAsRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     onUnreadCountChange(0);
   };

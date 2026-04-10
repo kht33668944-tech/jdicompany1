@@ -109,13 +109,13 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
         await unsubscribeFromPush(userId);
         const next = { ...settings, push_enabled: false };
         setSettings(next);
-        await updateNotificationSettings(userId, { push_enabled: false });
+        await updateNotificationSettings({ push_enabled: false });
       } else {
         // ON 전환
         await subscribeToPush(userId);
         const next = { ...settings, push_enabled: true };
         setSettings(next);
-        await updateNotificationSettings(userId, { push_enabled: true });
+        await updateNotificationSettings({ push_enabled: true });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "푸시 설정 변경에 실패했습니다.");
@@ -129,7 +129,7 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
     const updated = { ...settings, [key]: !settings[key] };
     setSettings(updated);
     try {
-      await updateNotificationSettings(userId, { [key]: updated[key] });
+      await updateNotificationSettings({ [key]: updated[key] });
     } catch {
       setSettings(settings);
     }

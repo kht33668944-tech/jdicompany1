@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -30,34 +30,99 @@ interface TaskDetailData {
   activities: TaskActivity[];
 }
 
+type PanelPhase = "closed" | "opening" | "open" | "closing";
+
 export default function TaskDetailPanel({ profiles, userId }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const taskId = searchParams.get("detail");
 
   const [data, setData] = useState<TaskDetailData | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [visible, setVisible] = useState(false);
-  const [sliding, setSliding] = useState(false);
+  const [phase, setPhase] = useState<PanelPhase>("closed");
+  const [prevTaskId, setPrevTaskId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const prevTaskIdRef = useRef<string | null>(null);
 
-  // --- 함수 선언 (모든 useEffect 보다 먼저) ---
-  const closePanel = () => {
+  // 파생 상태
+  const visible = phase !== "closed";
+  const sliding = phase === "open";
+  const loading = !!taskId && !data && !error;
+
+  // taskId 변경 시 상태 조정 (렌더 중 — React 권장 패턴)
+  if (taskId !== prevTaskId) {
+    setPrevTaskId(taskId);
+    if (taskId) {
+      setPhase("opening");
+      setData(null);
+      setError(null);
+    } else if (prevTaskId) {
+      setPhase("closing");
+    }
+  }
+
+  // opening → open (rAF 비동기 콜백)
+  useEffect(() => {
+    if (phase !== "opening") return;
+    const raf = requestAnimationFrame(() => setPhase("open"));
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+
+  // closing → closed (200ms 후)
+  useEffect(() => {
+    if (phase !== "closing") return;
+    const timer = setTimeout(() => {
+      setPhase("closed");
+      setData(null);
+      setError(null);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  // taskId 변경 시 데이터 fetch
+  useEffect(() => {
+    if (!taskId) return;
+
+    let cancelled = false;
+    const supabase = createClient();
+
+    Promise.all([
+      getTaskBasic(supabase, taskId),
+      getChecklistItems(supabase, taskId),
+      getActivities(supabase, taskId),
+    ])
+      .then(([task, checklist, activities]) => {
+        if (cancelled) return;
+        if (!task) {
+          setError("할일을 찾을 수 없습니다.");
+          return;
+        }
+        task.checklist_total = checklist.length;
+        task.checklist_completed = checklist.filter((c) => c.is_completed).length;
+        task.comment_count = activities.filter((a) => a.type === "comment").length;
+        setData({ task, checklist, subtasks: [], attachments: [], activities });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("데이터를 불러오는데 실패했습니다.");
+      });
+
+    return () => { cancelled = true; };
+  }, [taskId]);
+
+  const closePanel = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("detail");
     const qs = params.toString();
     router.push(`/dashboard/tasks${qs ? `?${qs}` : ""}`, { scroll: false });
-  };
+  }, [searchParams, router]);
 
-  const navigateToTask = (newTaskId: string) => {
+  const navigateToTask = useCallback((newTaskId: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("detail", newTaskId);
     router.push(`/dashboard/tasks?${params.toString()}`, { scroll: false });
-  };
+  }, [searchParams, router]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     if (!taskId) return;
     const supabase = createClient();
     Promise.all([
@@ -73,64 +138,6 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     }).catch((err) => {
       console.warn("[TaskDetailPanel] refresh failed:", err);
     });
-  };
-
-  // --- Effects ---
-
-  // 닫기 애니메이션 (taskId 소멸 감지)
-  useEffect(() => {
-    if (prevTaskIdRef.current && !taskId) {
-      setSliding(false);
-      const timer = setTimeout(() => setVisible(false), 200);
-      prevTaskIdRef.current = null;
-      return () => clearTimeout(timer);
-    }
-    prevTaskIdRef.current = taskId;
-  }, [taskId]);
-
-  // taskId 변경 시 데이터 fetch
-  useEffect(() => {
-    if (!taskId) return;
-
-    let cancelled = false;
-    setVisible(true);
-    setLoading(true);
-    setError(null);
-
-    requestAnimationFrame(() => {
-      if (!cancelled) setSliding(true);
-    });
-
-    const supabase = createClient();
-
-    Promise.all([
-      getTaskBasic(supabase, taskId),
-      getChecklistItems(supabase, taskId),
-      getActivities(supabase, taskId),
-    ])
-      .then(([task, checklist, activities]) => {
-        if (cancelled) return;
-        if (!task) {
-          setError("할일을 찾을 수 없습니다.");
-          setLoading(false);
-          return;
-        }
-        task.checklist_total = checklist.length;
-        task.checklist_completed = checklist.filter((c) => c.is_completed).length;
-        task.comment_count = activities.filter((a) => a.type === "comment").length;
-
-        setData({ task, checklist, subtasks: [], attachments: [], activities });
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setError("데이터를 불러오는데 실패했습니다.");
-        setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, [taskId]);
 
   // ESC 키로 닫기
@@ -141,7 +148,7 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  });
+  }, [visible, closePanel]);
 
   // body scroll lock
   useEffect(() => {
@@ -150,16 +157,13 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     } else {
       document.body.style.overflow = "";
     }
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return () => { document.body.style.overflow = ""; };
   }, [visible]);
 
   if (!visible) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
       <div
         className={`absolute inset-0 bg-black transition-opacity duration-200 ${
           sliding ? "opacity-30" : "opacity-0"
@@ -167,8 +171,6 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
         onClick={closePanel}
         aria-hidden="true"
       />
-
-      {/* Panel */}
       <div
         ref={panelRef}
         role="dialog"

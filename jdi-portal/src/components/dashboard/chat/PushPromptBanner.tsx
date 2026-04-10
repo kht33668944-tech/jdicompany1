@@ -34,7 +34,7 @@ export default function PushPromptBanner({ userId }: PushPromptBannerProps) {
     setBusy(true);
     try {
       await subscribeToPush(userId);
-      await updateNotificationSettings(userId, { push_enabled: true, chat_message_notify: true });
+      await updateNotificationSettings({ push_enabled: true, chat_message_notify: true });
       dismiss();
     } catch {
       // 거부됐거나 실패해도 배너는 닫음 — 설정에서 다시 켤 수 있음

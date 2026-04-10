@@ -11,11 +11,10 @@ import { getErrorMessage } from "@/lib/utils/errors";
 import type { HireDateChangeRequest } from "@/lib/attendance/types";
 
 interface Props {
-  adminId: string;
   requests: HireDateChangeRequest[];
 }
 
-export default function AdminHireDateRequests({ adminId, requests }: Props) {
+export default function AdminHireDateRequests({ requests }: Props) {
   const router = useRouter();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -26,7 +25,7 @@ export default function AdminHireDateRequests({ adminId, requests }: Props) {
     setLoading(true);
     setError(null);
     try {
-      await approveHireDateChangeRequest(id, adminId);
+      await approveHireDateChangeRequest(id);
       router.refresh();
     } catch (e) {
       setError(getErrorMessage(e, "승인에 실패했습니다."));
@@ -40,7 +39,7 @@ export default function AdminHireDateRequests({ adminId, requests }: Props) {
     setLoading(true);
     setError(null);
     try {
-      await rejectHireDateChangeRequest(id, adminId, reason);
+      await rejectHireDateChangeRequest(id, reason);
       setRejectingId(null);
       setReason("");
       router.refresh();

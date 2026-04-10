@@ -155,7 +155,7 @@ export default function TaskDetailClient({
     setSaving(true);
     setFeedback(null);
     try {
-      await updateTask(task.id, userId, {
+      await updateTask(task.id, {
         title: title.trim(),
         description: description.trim() || null,
         status,
@@ -196,7 +196,7 @@ export default function TaskDetailClient({
 
   const handleAddAssignee = async (assigneeUserId: string) => {
     try {
-      await addAssignee(task.id, assigneeUserId, userId);
+      await addAssignee(task.id, assigneeUserId);
       if (mode === "panel" && onRefresh) {
         onRefresh();
       } else {
@@ -209,7 +209,7 @@ export default function TaskDetailClient({
 
   const handleRemoveAssignee = async (assigneeUserId: string) => {
     try {
-      await removeAssignee(task.id, assigneeUserId, userId);
+      await removeAssignee(task.id, assigneeUserId);
       if (mode === "panel" && onRefresh) {
         onRefresh();
       } else {

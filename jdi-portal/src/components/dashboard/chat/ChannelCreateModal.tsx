@@ -1,22 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, MagnifyingGlass, XCircle } from "phosphor-react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
-import { createChannel, getAllProfiles } from "@/lib/chat/actions";
+import { createChannel } from "@/lib/chat/actions";
 import type { Channel } from "@/lib/chat/types";
 
 interface ChannelCreateModalProps {
   onClose: () => void;
   userId: string;
   onCreated: (channel: Channel) => void;
+  profiles: Profile[];
 }
 
 interface Profile {
   id: string;
   full_name: string;
-  avatar_url: string | null;
+  avatar_url?: string | null;
   department: string | null;
 }
 
@@ -29,21 +30,15 @@ function getAvatarColor(index: number) {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 }
 
-export default function ChannelCreateModal({ onClose, userId, onCreated }: ChannelCreateModalProps) {
+export default function ChannelCreateModal({ onClose, userId, onCreated, profiles }: ChannelCreateModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
-  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    getAllProfiles().then((data) => {
-      setProfiles(data.filter((p) => p.id !== userId));
-    });
-  }, [userId]);
-
-  const filteredProfiles = profiles.filter((p) =>
+  const otherProfiles = profiles.filter((p) => p.id !== userId);
+  const filteredProfiles = otherProfiles.filter((p) =>
     p.full_name.includes(search) || (p.department && p.department.includes(search))
   );
 
@@ -80,7 +75,7 @@ export default function ChannelCreateModal({ onClose, userId, onCreated }: Chann
     }
   }
 
-  const selectedProfiles = profiles.filter((p) => selectedIds.has(p.id));
+  const selectedProfiles = otherProfiles.filter((p) => selectedIds.has(p.id));
 
   return (
     <ModalContainer onClose={onClose} maxWidth="max-w-[480px]" className="!p-0 !rounded-[32px] overflow-hidden">

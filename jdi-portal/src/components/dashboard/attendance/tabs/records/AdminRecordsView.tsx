@@ -8,11 +8,16 @@ import type { AttendanceRecord, Profile, WorkSchedule } from "@/lib/attendance/t
 import type { AttendanceStats } from "@/lib/attendance/stats";
 import { getWorkSchedulesForUser } from "@/lib/attendance/queries";
 import { getMonthRange } from "@/lib/utils/date";
+import dynamic from "next/dynamic";
 import RecordsFilter from "./RecordsFilter";
 import EmployeeCard, { getAvatarColor } from "./EmployeeCard";
 import RecordsSummaryCards from "./RecordsSummaryCards";
 import RecordsDetailTable from "./RecordsDetailTable";
-import AttendanceCharts from "./AttendanceCharts";
+
+const AttendanceCharts = dynamic(() => import("./AttendanceCharts"), {
+  loading: () => <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="glass-card rounded-2xl h-64 animate-pulse" /><div className="glass-card rounded-2xl h-64 animate-pulse" /></div>,
+  ssr: false,
+});
 
 interface AdminRecordsViewProps {
   profile: Profile;
@@ -75,8 +80,14 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
       .order("work_date", { ascending: false });
 
     if (!error && data) {
+      const byUser = new Map<string, typeof data>();
+      for (const r of data) {
+        const arr = byUser.get(r.user_id) ?? [];
+        arr.push(r);
+        byUser.set(r.user_id, arr);
+      }
       for (const p of targetProfiles) {
-        const records = data.filter((r) => r.user_id === p.id);
+        const records = byUser.get(p.id) ?? [];
         newRecords.set(p.id, records);
         newStats.set(p.id, calcAttendanceStats(records, p.id === profile.id ? workSchedules : []));
       }
@@ -85,7 +96,7 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
     setEmployeeRecords(newRecords);
     setEmployeeStats(newStats);
     setLoading(false);
-  }, [startDate, endDate, allProfiles, profile, isAdmin]);
+  }, [startDate, endDate, allProfiles, profile, isAdmin, workSchedules]);
 
   const fetchPrevStats = useCallback(async (userId?: string) => {
     const targetUserId = userId ?? selectedUserId;
@@ -112,8 +123,7 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, allProfiles, profile, workSchedules, employeeSchedules]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchAllRecords(); fetchPrevStats(); }, []);
+  useEffect(() => { fetchAllRecords(); fetchPrevStats(); }, [fetchAllRecords, fetchPrevStats]);
 
   useEffect(() => {
     if (selectedUserId === profile.id) {

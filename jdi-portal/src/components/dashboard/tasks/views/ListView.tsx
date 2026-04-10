@@ -73,7 +73,7 @@ function MobileEditSheet({
 
   const handlePriority = async (priority: TaskPriority) => {
     try {
-      await updateTask(task.id, userId, { priority });
+      await updateTask(task.id, { priority });
       router.refresh();
     } catch (error) {
       console.error("우선순위 변경 실패:", error);
@@ -82,7 +82,7 @@ function MobileEditSheet({
 
   const handleCategory = async (category: string | null) => {
     try {
-      await updateTask(task.id, userId, { category });
+      await updateTask(task.id, { category });
       router.refresh();
     } catch (error) {
       console.error("카테고리 변경 실패:", error);
@@ -91,7 +91,7 @@ function MobileEditSheet({
 
   const handleDueDate = async (date: string | null) => {
     try {
-      await updateTask(task.id, userId, { dueDate: date });
+      await updateTask(task.id, { dueDate: date });
       router.refresh();
     } catch (error) {
       console.error("마감일 변경 실패:", error);
@@ -108,9 +108,9 @@ function MobileEditSheet({
     });
     try {
       if (isAssigned) {
-        await removeAssignee(task.id, assigneeId, userId);
+        await removeAssignee(task.id, assigneeId);
       } else {
-        await addAssignee(task.id, assigneeId, userId);
+        await addAssignee(task.id, assigneeId);
       }
       router.refresh();
     } catch (error) {

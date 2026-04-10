@@ -53,11 +53,9 @@ export default function AdminTab({
           requests={pendingWorkScheduleChangeRequests}
         />
         <AdminHireDateRequests
-          adminId={adminId}
           requests={pendingHireDateChangeRequests}
         />
         <AdminIpChangeRequests
-          adminId={adminId}
           requests={pendingIpChangeRequests}
         />
       </div>

@@ -87,7 +87,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
   const handlePriorityChange = async (priority: TaskPriority) => {
     setEditingField(null);
     try {
-      await updateTask(task.id, userId, { priority });
+      await updateTask(task.id, { priority });
       router.refresh();
     } catch (error) {
       console.error("우선순위 변경 실패:", error);
@@ -97,7 +97,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
   const handleCategoryChange = async (category: string | null) => {
     setEditingField(null);
     try {
-      await updateTask(task.id, userId, { category });
+      await updateTask(task.id, { category });
       router.refresh();
     } catch (error) {
       console.error("카테고리 변경 실패:", error);
@@ -106,7 +106,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
 
   const handleDueDateChange = async (dueDate: string | null) => {
     try {
-      await updateTask(task.id, userId, { dueDate });
+      await updateTask(task.id, { dueDate });
       router.refresh();
     } catch (error) {
       console.error("마감일 변경 실패:", error);
@@ -115,7 +115,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
 
   const handleStartDateChange = async (startDate: string | null) => {
     try {
-      await updateTask(task.id, userId, { startDate });
+      await updateTask(task.id, { startDate });
       router.refresh();
     } catch (error) {
       console.error("시작일 변경 실패:", error);
@@ -131,9 +131,9 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     setOptimisticOverride(next);
     try {
       if (isAssigned) {
-        await removeAssignee(task.id, assigneeId, userId);
+        await removeAssignee(task.id, assigneeId);
       } else {
-        await addAssignee(task.id, assigneeId, userId);
+        await addAssignee(task.id, assigneeId);
       }
       router.refresh();
       // 서버 응답 반영 후 override 해제 → serverAssigneeIds 자동 사용

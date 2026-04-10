@@ -6,7 +6,6 @@ import { formatDate, formatTime, formatMinutes } from "@/lib/utils/date";
 import { timeStringToMinutes, getScheduleForDate } from "@/lib/attendance/stats";
 import type { AttendanceRecord, WorkSchedule } from "@/lib/attendance/types";
 import CorrectionRequestModal from "../../CorrectionRequestModal";
-import * as XLSX from "xlsx";
 
 interface RecordsDetailTableProps {
   records: AttendanceRecord[];
@@ -44,7 +43,8 @@ export default function RecordsDetailTable({
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [showMissingModal, setShowMissingModal] = useState(false);
 
-  const handleExcelDownload = () => {
+  const handleExcelDownload = async () => {
+    const XLSX = await import("xlsx");
     const data = records.map((record) => {
       const status = getRecordStatus(record, workSchedules);
       return {

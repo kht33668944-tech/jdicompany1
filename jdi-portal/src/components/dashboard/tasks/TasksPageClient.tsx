@@ -8,7 +8,7 @@ import type { TaskWithDetails, TaskViewId, TaskFilterState } from "@/lib/tasks/t
 import { TASK_VIEWS, DEFAULT_FILTER_STATE } from "@/lib/tasks/constants";
 import { filterTasks, sortTasks, groupTasks, computeSummary, buildTaskTree } from "@/lib/tasks/utils";
 import { getTasksWithDetails } from "@/lib/tasks/queries";
-import { getCachedTasks, cacheTasks } from "@/lib/tasks/tasksCache";
+import { cacheTasks } from "@/lib/tasks/tasksCache";
 import { createClient } from "@/lib/supabase/client";
 import TaskSummaryPanel from "./TaskSummaryPanel";
 import TaskFilters from "./TaskFilters";
@@ -21,14 +21,13 @@ import TaskDetailPanel from "./TaskDetailPanel";
 interface Props {
   profiles: Profile[];
   userId: string;
-  /** SSR 호출마다 새 값 — router.refresh() 후 client re-fetch 트리거 */
-  refreshSignal: number;
+  initialTasks: TaskWithDetails[];
 }
 
 const VIEW_STORAGE_KEY = "tasks-active-view";
 const FILTER_STORAGE_KEY = "tasks-filters";
 
-export default function TasksPageClient({ profiles, userId, refreshSignal }: Props) {
+export default function TasksPageClient({ profiles, userId, initialTasks }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // SSR/CSR hydration mismatch 방지 — 항상 기본값으로 시작 후 mount 시 localStorage 로드
@@ -37,22 +36,24 @@ export default function TasksPageClient({ profiles, userId, refreshSignal }: Pro
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [allTasks, setAllTasks] = useState<TaskWithDetails[]>([]);
+  const [allTasks, setAllTasks] = useState<TaskWithDetails[]>(initialTasks);
   // fresh fetch 가 적용된 후 늦게 도착한 IDB 캐시가 빈 fresh 를 stale 로 덮어쓰는 race 차단
-  const freshLoadedRef = useRef(false);
+  const freshLoadedRef = useRef(initialTasks.length > 0);
 
-  // mount 후 localStorage 에서 사용자 설정 복원
+  // mount 후 localStorage 에서 사용자 설정 복원 (hydration 이후 비동기 적용)
   useEffect(() => {
-    try {
-      const savedView = window.localStorage.getItem(VIEW_STORAGE_KEY) as TaskViewId | null;
-      if (savedView) setActiveView(savedView);
-      const savedFilters = window.localStorage.getItem(FILTER_STORAGE_KEY);
-      if (savedFilters) {
-        setFilters({ ...DEFAULT_FILTER_STATE, ...JSON.parse(savedFilters) });
+    requestAnimationFrame(() => {
+      try {
+        const savedView = window.localStorage.getItem(VIEW_STORAGE_KEY) as TaskViewId | null;
+        if (savedView) setActiveView(savedView);
+        const savedFilters = window.localStorage.getItem(FILTER_STORAGE_KEY);
+        if (savedFilters) {
+          setFilters({ ...DEFAULT_FILTER_STATE, ...JSON.parse(savedFilters) });
+        }
+      } catch {
+        // 파싱 실패 무시 — 기본값 유지
       }
-    } catch {
-      // 파싱 실패 무시 — 기본값 유지
-    }
+    });
   }, []);
 
   const refreshTasks = useCallback(async () => {
@@ -67,24 +68,12 @@ export default function TasksPageClient({ profiles, userId, refreshSignal }: Pro
     }
   }, []);
 
+  // 마운트 시 백그라운드 refresh (서버 데이터 이후 최신화)
   useEffect(() => {
-    let cancelled = false;
-
-    void getCachedTasks().then((cached) => {
-      if (cancelled || freshLoadedRef.current || !cached || cached.length === 0) return;
-      setAllTasks(cached);
-    });
-
-    void refreshTasks().finally(() => {
-      if (cancelled) freshLoadedRef.current = false;
-    });
-
-    return () => {
-      cancelled = true;
-    };
-    // refreshSignal 변화도 같은 effect 로 처리 — 첫 mount + router.refresh 통합
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshSignal]);
+    // refreshTasks는 async — setState는 Promise chain 내에서 비동기 호출됨
+    const id = requestAnimationFrame(() => void refreshTasks());
+    return () => cancelAnimationFrame(id);
+  }, [refreshTasks]);
 
   useEffect(() => {
     window.localStorage.setItem(VIEW_STORAGE_KEY, activeView);
@@ -101,7 +90,7 @@ export default function TasksPageClient({ profiles, userId, refreshSignal }: Pro
   useEffect(() => {
     // 패널이 열린 상태에서 닫힌 경우에만 refresh
     if (prevDetailRef.current && !detailId) {
-      void refreshTasks();
+      requestAnimationFrame(() => void refreshTasks());
     }
     prevDetailRef.current = detailId;
   }, [detailId, refreshTasks]);

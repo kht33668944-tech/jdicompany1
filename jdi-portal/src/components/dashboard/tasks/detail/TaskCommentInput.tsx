@@ -56,7 +56,7 @@ export default function TaskCommentInput({ taskId, userId, mode = "page", onRefr
       let metadata: Record<string, unknown> | undefined;
       if (files.length > 0) {
         const uploaded = await Promise.all(
-          files.map((f) => uploadAttachment(taskId, userId, f))
+          files.map((f) => uploadAttachment(taskId, f))
         );
         metadata = {
           attachments: uploaded.map((a) => ({
@@ -68,7 +68,7 @@ export default function TaskCommentInput({ taskId, userId, mode = "page", onRefr
           })),
         };
       }
-      await addComment(taskId, userId, content.trim() || "파일을 첨부했습니다.", metadata);
+      await addComment(taskId, content.trim() || "파일을 첨부했습니다.", metadata);
       setContent("");
       setFiles([]);
       if (mode === "panel" && onRefresh) {
