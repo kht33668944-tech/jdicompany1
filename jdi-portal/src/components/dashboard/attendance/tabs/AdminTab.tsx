@@ -16,7 +16,6 @@ import type {
 } from "@/lib/attendance/types";
 
 interface AdminTabProps {
-  adminId: string;
   allTodayAttendance: AttendanceWithProfile[];
   allProfiles: Profile[];
   pendingVacationRequests: VacationRequest[];
@@ -28,7 +27,6 @@ interface AdminTabProps {
 }
 
 export default function AdminTab({
-  adminId,
   allTodayAttendance,
   allProfiles,
   pendingVacationRequests,
@@ -43,13 +41,11 @@ export default function AdminTab({
       <AdminAttendanceTable todayAttendance={allTodayAttendance} allProfiles={allProfiles} />
       <div className="space-y-6">
         <AdminVacationRequests
-          adminId={adminId}
           vacationRequests={pendingVacationRequests}
           cancelRequests={cancelVacationRequests}
           correctionRequests={pendingCorrectionRequests}
         />
         <AdminWorkScheduleRequests
-          adminId={adminId}
           requests={pendingWorkScheduleChangeRequests}
         />
         <AdminHireDateRequests

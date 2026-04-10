@@ -12,7 +12,6 @@ interface RecordsDetailTableProps {
   employeeName: string;
   periodLabel: string;
   workSchedules: WorkSchedule[];
-  userId: string;
   isOwnRecord: boolean;
 }
 
@@ -37,7 +36,6 @@ export default function RecordsDetailTable({
   employeeName,
   periodLabel,
   workSchedules,
-  userId,
   isOwnRecord,
 }: RecordsDetailTableProps) {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
@@ -146,7 +144,6 @@ export default function RecordsDetailTable({
 
       {selectedRecord && (
         <CorrectionRequestModal
-          userId={userId}
           record={selectedRecord}
           onClose={() => setSelectedRecord(null)}
         />
@@ -154,7 +151,6 @@ export default function RecordsDetailTable({
 
       {showMissingModal && (
         <CorrectionRequestModal
-          userId={userId}
           onClose={() => setShowMissingModal(false)}
         />
       )}

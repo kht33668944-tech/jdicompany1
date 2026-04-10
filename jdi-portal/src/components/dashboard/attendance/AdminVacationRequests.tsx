@@ -17,14 +17,12 @@ import { getErrorMessage } from "@/lib/utils/errors";
 import type { CorrectionRequest, VacationRequest } from "@/lib/attendance/types";
 
 interface AdminVacationRequestsProps {
-  adminId: string;
   vacationRequests: VacationRequest[];
   cancelRequests: VacationRequest[];
   correctionRequests: CorrectionRequest[];
 }
 
 export default function AdminVacationRequests({
-  adminId,
   vacationRequests,
   cancelRequests,
   correctionRequests,
@@ -39,7 +37,7 @@ export default function AdminVacationRequests({
     setLoading(true);
     setFeedback(null);
     try {
-      await approveVacationRequest(id, adminId);
+      await approveVacationRequest(id);
       router.refresh();
     } catch (error) {
       setFeedback(getErrorMessage(error, "휴가 요청 승인에 실패했습니다."));
@@ -53,7 +51,7 @@ export default function AdminVacationRequests({
     setLoading(true);
     setFeedback(null);
     try {
-      await rejectVacationRequest(id, adminId, rejectReason);
+      await rejectVacationRequest(id, rejectReason);
       setRejectingId(null);
       setRejectReason("");
       router.refresh();
@@ -69,7 +67,7 @@ export default function AdminVacationRequests({
     setLoading(true);
     setFeedback(null);
     try {
-      await cancelApprovedVacation(id, adminId);
+      await cancelApprovedVacation(id);
       router.refresh();
     } catch (error) {
       setFeedback(getErrorMessage(error, "휴가 취소에 실패했습니다."));
@@ -82,7 +80,7 @@ export default function AdminVacationRequests({
     setLoading(true);
     setFeedback(null);
     try {
-      await rejectVacationCancel(id, adminId);
+      await rejectVacationCancel(id);
       router.refresh();
     } catch (error) {
       setFeedback(getErrorMessage(error, "취소 요청 거부에 실패했습니다."));
@@ -95,7 +93,7 @@ export default function AdminVacationRequests({
     setLoading(true);
     setFeedback(null);
     try {
-      await approveCorrectionRequest(id, adminId);
+      await approveCorrectionRequest(id);
       router.refresh();
     } catch (error) {
       setFeedback(getErrorMessage(error, "정정 요청 승인에 실패했습니다."));
@@ -108,7 +106,7 @@ export default function AdminVacationRequests({
     setLoading(true);
     setFeedback(null);
     try {
-      await rejectCorrectionRequest(id, adminId);
+      await rejectCorrectionRequest(id);
       router.refresh();
     } catch (error) {
       setFeedback(getErrorMessage(error, "정정 요청 반려에 실패했습니다."));

@@ -1,8 +1,13 @@
-import { createClient } from "@/lib/supabase/client";
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
 import { createNotification } from "@/lib/notifications/actions";
 
-function getSupabase() {
-  return createClient();
+async function getSessionUserId() {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
+  return { supabase, userId: session.user.id };
 }
 
 export async function createSchedule(params: {
@@ -14,10 +19,9 @@ export async function createSchedule(params: {
   isAllDay: boolean;
   location?: string;
   visibility?: string;
-  createdBy: string;
   participantIds?: string[];
 }) {
-  const supabase = getSupabase();
+  const { supabase, userId } = await getSessionUserId();
 
   const { data, error } = await supabase
     .from("schedules")
@@ -30,7 +34,7 @@ export async function createSchedule(params: {
       is_all_day: params.isAllDay,
       location: params.location || null,
       visibility: params.visibility || "company",
-      created_by: params.createdBy,
+      created_by: userId,
     })
     .select()
     .single();
@@ -42,7 +46,7 @@ export async function createSchedule(params: {
       await setParticipants(data.id, params.participantIds);
 
       // 알림: 참여자들에게 (생성자 제외)
-      const notifyIds = params.participantIds.filter((id) => id !== params.createdBy);
+      const notifyIds = params.participantIds.filter((id) => id !== userId);
       for (const pid of notifyIds) {
         await createNotification({
           userId: pid,
@@ -76,7 +80,7 @@ export async function updateSchedule(
     visibility?: string;
   }
 ) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
 
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -105,13 +109,13 @@ export async function updateSchedule(
 }
 
 export async function deleteSchedule(scheduleId: string) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
   const { error } = await supabase.from("schedules").delete().eq("id", scheduleId);
   if (error) throw error;
 }
 
 export async function setParticipants(scheduleId: string, userIds: string[]) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
 
   // 기존 참여자 삭제
   const { error: deleteError } = await supabase
@@ -152,7 +156,7 @@ export async function updateScheduleWithParticipants(
   },
   participantIds: string[] | null
 ) {
-  const supabase = getSupabase();
+  const supabase = await createClient();
 
   // 변경된 필드만 JSONB 로 보냄 (DB 함수가 transmitted key 만 반영)
   const updates: Record<string, unknown> = {};

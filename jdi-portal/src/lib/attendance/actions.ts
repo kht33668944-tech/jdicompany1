@@ -1,23 +1,29 @@
-import { createClient } from "@/lib/supabase/client";
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
 import type { CorrectionRequest } from "./types";
 import { toDateString } from "@/lib/utils/date";
 import type { VacationType } from "./types";
 import { createNotification } from "@/lib/notifications/actions";
 
-function getSupabase() {
-  return createClient();
+async function getSessionUserId() {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
+  return { supabase, userId: session.user.id };
 }
 
-async function verifyAdmin(supabase: ReturnType<typeof getSupabase>, adminId: string) {
+async function requireAdmin() {
+  const { supabase, userId } = await getSessionUserId();
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", adminId)
+    .eq("id", userId)
     .single();
-
   if (profile?.role !== "admin") {
     throw new Error("권한이 없습니다: 관리자만 가능합니다.");
   }
+  return { supabase, userId };
 }
 
 export async function checkIn(userId: string) {
@@ -35,18 +41,17 @@ export async function checkOut(userId: string) {
 }
 
 export async function submitVacationRequest(params: {
-  userId: string;
   vacationType: VacationType;
   startDate: string;
   endDate: string;
   daysCount: number;
   reason: string;
 }) {
-  const supabase = getSupabase();
+  const { supabase, userId } = await getSessionUserId();
   const { data, error } = await supabase
     .from("vacation_requests")
     .insert({
-      user_id: params.userId,
+      user_id: userId,
       vacation_type: params.vacationType,
       start_date: params.startDate,
       end_date: params.endDate,
@@ -60,7 +65,7 @@ export async function submitVacationRequest(params: {
 }
 
 export async function cancelVacationRequest(requestId: string) {
-  const supabase = getSupabase();
+  const { supabase } = await getSessionUserId();
   const { error } = await supabase
     .from("vacation_requests")
     .delete()
@@ -70,25 +75,23 @@ export async function cancelVacationRequest(requestId: string) {
 }
 
 export async function requestVacationCancel(requestId: string) {
-  const supabase = getSupabase();
+  const { supabase } = await getSessionUserId();
   const { error } = await supabase.rpc("request_vacation_cancel", {
     p_request_id: requestId,
   });
   if (error) throw error;
 }
 
-export async function cancelApprovedVacation(requestId: string, adminId: string) {
-  const supabase = getSupabase();
-  await verifyAdmin(supabase, adminId);
+export async function cancelApprovedVacation(requestId: string) {
+  const { supabase, userId } = await requireAdmin();
   const { error } = await supabase.rpc("cancel_approved_vacation", {
     p_request_id: requestId,
-    p_admin_id: adminId,
+    p_admin_id: userId,
   });
   if (error) throw error;
 }
 
 export async function submitCorrectionRequest(params: {
-  userId: string;
   attendanceRecordId: string | null;
   targetDate: string;
   requestType: CorrectionRequest["request_type"];
@@ -96,11 +99,11 @@ export async function submitCorrectionRequest(params: {
   requestedCheckOut: string | null;
   reason: string;
 }) {
-  const supabase = getSupabase();
+  const { supabase, userId } = await getSessionUserId();
   const { data, error } = await supabase
     .from("correction_requests")
     .insert({
-      user_id: params.userId,
+      user_id: userId,
       attendance_record_id: params.attendanceRecordId,
       target_date: params.targetDate,
       request_type: params.requestType,
@@ -114,12 +117,11 @@ export async function submitCorrectionRequest(params: {
   return data;
 }
 
-export async function approveVacationRequest(requestId: string, adminId: string) {
-  const supabase = getSupabase();
-  await verifyAdmin(supabase, adminId);
+export async function approveVacationRequest(requestId: string) {
+  const { supabase, userId } = await requireAdmin();
   const { error } = await supabase.rpc("approve_vacation_request", {
     p_request_id: requestId,
-    p_admin_id: adminId,
+    p_admin_id: userId,
   });
   if (error) throw error;
 
@@ -142,11 +144,9 @@ export async function approveVacationRequest(requestId: string, adminId: string)
 
 export async function rejectVacationRequest(
   requestId: string,
-  adminId: string,
   rejectReason: string
 ) {
-  const supabase = getSupabase();
-  await verifyAdmin(supabase, adminId);
+  const { supabase, userId } = await requireAdmin();
 
   // 신청자 정보 먼저 조회
   const { data: req } = await supabase
@@ -159,7 +159,7 @@ export async function rejectVacationRequest(
     .from("vacation_requests")
     .update({
       status: "반려",
-      reviewed_by: adminId,
+      reviewed_by: userId,
       reviewed_at: new Date().toISOString(),
       reject_reason: rejectReason,
       updated_at: new Date().toISOString(),
@@ -180,11 +180,8 @@ export async function rejectVacationRequest(
   }
 }
 
-export async function approveCorrectionRequest(
-  requestId: string,
-  adminId: string
-) {
-  const supabase = getSupabase();
+export async function approveCorrectionRequest(requestId: string) {
+  const { supabase } = await requireAdmin();
   // 정정 승인 + attendance_records 반영을 RPC 한 트랜잭션으로 처리
   // (admin 권한 검사도 RPC 내부에서 수행)
   const { error } = await supabase.rpc("approve_correction_request", {
@@ -193,17 +190,13 @@ export async function approveCorrectionRequest(
   if (error) throw error;
 }
 
-export async function rejectVacationCancel(
-  requestId: string,
-  adminId: string
-) {
-  const supabase = getSupabase();
-  await verifyAdmin(supabase, adminId);
+export async function rejectVacationCancel(requestId: string) {
+  const { supabase, userId } = await requireAdmin();
   const { data, error } = await supabase
     .from("vacation_requests")
     .update({
       status: "승인",
-      reviewed_by: adminId,
+      reviewed_by: userId,
       reviewed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -216,17 +209,13 @@ export async function rejectVacationCancel(
   }
 }
 
-export async function rejectCorrectionRequest(
-  requestId: string,
-  adminId: string
-) {
-  const supabase = getSupabase();
-  await verifyAdmin(supabase, adminId);
+export async function rejectCorrectionRequest(requestId: string) {
+  const { supabase, userId } = await requireAdmin();
   const { error } = await supabase
     .from("correction_requests")
     .update({
       status: "반려",
-      reviewed_by: adminId,
+      reviewed_by: userId,
       reviewed_at: new Date().toISOString(),
     })
     .eq("id", requestId)
@@ -239,7 +228,7 @@ export async function setInitialWorkSchedule(
   startTime: string,
   endTime: string
 ) {
-  const supabase = getSupabase();
+  const { supabase } = await getSessionUserId();
   const { data, error } = await supabase.rpc("set_initial_work_schedule", {
     p_start: startTime,
     p_end: endTime,
@@ -255,7 +244,7 @@ export async function submitWorkScheduleChangeRequest(params: {
   effectiveFrom: string;
   reason: string;
 }) {
-  const supabase = getSupabase();
+  const { supabase } = await getSessionUserId();
   const { data, error } = await supabase.rpc(
     "submit_work_schedule_change_request",
     {
@@ -293,7 +282,7 @@ export async function submitWorkScheduleChangeRequest(params: {
 
 /** 본인 대기중 요청 취소 */
 export async function cancelMyWorkScheduleChangeRequest(requestId: string) {
-  const supabase = getSupabase();
+  const { supabase } = await getSessionUserId();
   const { error } = await supabase
     .from("work_schedule_change_requests")
     .delete()
@@ -303,11 +292,8 @@ export async function cancelMyWorkScheduleChangeRequest(requestId: string) {
 }
 
 /** 변경 요청 승인 (관리자) */
-export async function approveWorkScheduleChangeRequest(
-  requestId: string,
-  adminId: string
-) {
-  const supabase = getSupabase();
+export async function approveWorkScheduleChangeRequest(requestId: string) {
+  const { supabase } = await requireAdmin();
   const { error } = await supabase.rpc(
     "approve_work_schedule_change_request",
     { p_request_id: requestId }
@@ -339,10 +325,9 @@ export async function approveWorkScheduleChangeRequest(
 /** 변경 요청 반려 (관리자) */
 export async function rejectWorkScheduleChangeRequest(
   requestId: string,
-  adminId: string,
   rejectReason: string
 ) {
-  const supabase = getSupabase();
+  const { supabase } = await requireAdmin();
   const { data: req } = await supabase
     .from("work_schedule_change_requests")
     .select("user_id, requested_start_time, requested_end_time, effective_from")
@@ -373,7 +358,7 @@ export async function adminSetWorkSchedule(params: {
   endTime: string;
   effectiveFrom: string;
 }) {
-  const supabase = getSupabase();
+  const { supabase } = await requireAdmin();
   const { data, error } = await supabase.rpc("admin_set_work_schedule", {
     p_user_id: params.userId,
     p_start: params.startTime,

@@ -219,7 +219,6 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
                 employeeName={selectedProfile.full_name}
                 periodLabel={periodLabel}
                 workSchedules={selectedUserId === profile.id ? workSchedules : employeeSchedules}
-                userId={selectedProfile.id}
                 isOwnRecord={selectedProfile.id === profile.id || isAdmin}
               />
               <AttendanceCharts records={selectedRecords} />

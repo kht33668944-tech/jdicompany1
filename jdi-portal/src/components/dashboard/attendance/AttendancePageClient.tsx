@@ -97,7 +97,6 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
 
       {activeTab === "vacation" && (
         <VacationTab
-          userId={props.profile.id}
           vacationBalance={props.vacationBalance}
           vacationRequests={props.vacationRequests}
         />
@@ -105,7 +104,6 @@ export default function AttendancePageClient(props: AttendancePageClientProps) {
 
       {activeTab === "admin" && isAdmin && (
         <AdminTab
-          adminId={props.profile.id}
           allTodayAttendance={props.allTodayAttendance ?? []}
           allProfiles={props.allProfiles ?? []}
           pendingVacationRequests={props.pendingVacationRequests ?? []}

@@ -11,7 +11,6 @@ import { getErrorMessage } from "@/lib/utils/errors";
 import type { WorkScheduleChangeRequest } from "@/lib/attendance/types";
 
 interface Props {
-  adminId: string;
   requests: WorkScheduleChangeRequest[];
 }
 
@@ -19,7 +18,7 @@ function fmt(t: string) {
   return t.slice(0, 5);
 }
 
-export default function AdminWorkScheduleRequests({ adminId, requests }: Props) {
+export default function AdminWorkScheduleRequests({ requests }: Props) {
   const router = useRouter();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -30,7 +29,7 @@ export default function AdminWorkScheduleRequests({ adminId, requests }: Props) 
     setLoading(true);
     setError(null);
     try {
-      await approveWorkScheduleChangeRequest(id, adminId);
+      await approveWorkScheduleChangeRequest(id);
       router.refresh();
     } catch (e) {
       setError(getErrorMessage(e, "승인에 실패했습니다."));
@@ -44,7 +43,7 @@ export default function AdminWorkScheduleRequests({ adminId, requests }: Props) 
     setLoading(true);
     setError(null);
     try {
-      await rejectWorkScheduleChangeRequest(id, adminId, reason);
+      await rejectWorkScheduleChangeRequest(id, reason);
       setRejectingId(null);
       setReason("");
       router.refresh();

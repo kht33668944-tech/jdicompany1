@@ -10,7 +10,6 @@ import type { AttendanceRecord, CorrectionRequest } from "@/lib/attendance/types
 import ModalContainer from "@/components/shared/ModalContainer";
 
 interface CorrectionRequestModalProps {
-  userId: string;
   record?: AttendanceRecord | null;
   targetDate?: string;
   onClose: () => void;
@@ -18,7 +17,7 @@ interface CorrectionRequestModalProps {
 
 type RequestType = CorrectionRequest["request_type"];
 
-export default function CorrectionRequestModal({ userId, record, targetDate: initialDate, onClose }: CorrectionRequestModalProps) {
+export default function CorrectionRequestModal({ record, targetDate: initialDate, onClose }: CorrectionRequestModalProps) {
   const router = useRouter();
   const isMissingMode = !record;
   const [requestType, setRequestType] = useState<RequestType>(isMissingMode ? "기록누락" : "출근시간수정");
@@ -46,7 +45,6 @@ export default function CorrectionRequestModal({ userId, record, targetDate: ini
 
     try {
       await submitCorrectionRequest({
-        userId,
         attendanceRecordId: record?.id ?? null,
         targetDate: workDate,
         requestType,

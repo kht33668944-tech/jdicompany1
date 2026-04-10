@@ -73,7 +73,6 @@ export default function ScheduleCreateModal({
         isAllDay,
         location: location.trim() || undefined,
         visibility,
-        createdBy: userId,
         participantIds: participantIds.length > 0 ? participantIds : undefined,
       });
       onCreated();

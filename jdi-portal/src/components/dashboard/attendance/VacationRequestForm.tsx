@@ -9,7 +9,6 @@ import { getErrorMessage } from "@/lib/utils/errors";
 import type { VacationBalance, VacationType } from "@/lib/attendance/types";
 
 interface VacationRequestFormProps {
-  userId: string;
   balance: VacationBalance | null;
 }
 
@@ -21,7 +20,7 @@ const vacationTypes: { value: VacationType; label: string }[] = [
   { value: "특별휴가", label: "특별휴가" },
 ];
 
-export default function VacationRequestForm({ userId, balance }: VacationRequestFormProps) {
+export default function VacationRequestForm({ balance }: VacationRequestFormProps) {
   const router = useRouter();
   const [type, setType] = useState<VacationType>("연차");
   const [startDate, setStartDate] = useState("");
@@ -53,7 +52,6 @@ export default function VacationRequestForm({ userId, balance }: VacationRequest
     setFeedback(null);
     try {
       await submitVacationRequest({
-        userId,
         vacationType: type,
         startDate,
         endDate: effectiveEndDate,
