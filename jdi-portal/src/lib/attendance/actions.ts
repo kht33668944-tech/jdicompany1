@@ -21,17 +21,17 @@ async function verifyAdmin(supabase: ReturnType<typeof getSupabase>, adminId: st
 }
 
 export async function checkIn(userId: string) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.rpc("attendance_check_in");
-  if (error) throw error;
-  return data;
+  const res = await fetch("/api/attendance/check-in", { method: "POST" });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "출근 처리에 실패했습니다.");
+  return body;
 }
 
 export async function checkOut(userId: string) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.rpc("attendance_check_out");
-  if (error) throw error;
-  return data;
+  const res = await fetch("/api/attendance/check-out", { method: "POST" });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "퇴근 처리에 실패했습니다.");
+  return body;
 }
 
 export async function submitVacationRequest(params: {

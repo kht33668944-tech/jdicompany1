@@ -19,14 +19,15 @@ const ATTENDANCE_STATUSES = Object.keys(ATTENDANCE_STATUS_CONFIG) as AttendanceR
 const ABSENT_STATUS = ATTENDANCE_STATUSES[0];
 const WORKING_STATUS = ATTENDANCE_STATUSES[1];
 
-async function verifyIp(allowedIp: string | null): Promise<boolean> {
-  if (!allowedIp) return true; // IP 미설정 시 제한 없음
+/** 클라이언트 사전 검사 (UX용 빠른 피드백, 실제 차단은 서버 RPC에서 수행) */
+async function verifyIpQuick(allowedIp: string | null): Promise<boolean> {
+  if (!allowedIp) return true;
   try {
     const res = await fetch("/api/ip");
     const { ip } = await res.json();
     return ip === allowedIp;
   } catch {
-    return false;
+    return true; // 사전 검사 실패 시 서버에서 최종 차단
   }
 }
 
@@ -66,7 +67,7 @@ export default function CheckInOutCard({ userId, todayRecord, allowedIp }: Check
     setCheckInLoading(true);
     setFeedback(null);
     try {
-      const ipOk = await verifyIp(allowedIp);
+      const ipOk = await verifyIpQuick(allowedIp);
       if (!ipOk) {
         setFeedback({ type: "error", message: "등록된 IP에서만 출근할 수 있습니다. 설정에서 IP를 확인해주세요." });
         return;
@@ -87,7 +88,7 @@ export default function CheckInOutCard({ userId, todayRecord, allowedIp }: Check
     setCheckOutLoading(true);
     setFeedback(null);
     try {
-      const ipOk = await verifyIp(allowedIp);
+      const ipOk = await verifyIpQuick(allowedIp);
       if (!ipOk) {
         setFeedback({ type: "error", message: "등록된 IP에서만 퇴근할 수 있습니다. 설정에서 IP를 확인해주세요." });
         return;
