@@ -98,9 +98,7 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     setError(null);
 
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) setSliding(true);
-      });
+      if (!cancelled) setSliding(true);
     });
 
     const supabase = createClient();
@@ -175,7 +173,7 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        className={`absolute top-0 right-0 h-full w-full sm:w-[55%] sm:min-w-[480px] bg-slate-50 shadow-2xl transform transition-transform duration-300 ease-out overflow-hidden ${
+        className={`absolute top-0 right-0 h-full w-full sm:w-[55%] sm:min-w-[480px] bg-slate-50 shadow-2xl transform transition-transform duration-200 ease-out overflow-hidden ${
           sliding ? "translate-x-0" : "translate-x-full"
         }`}
       >

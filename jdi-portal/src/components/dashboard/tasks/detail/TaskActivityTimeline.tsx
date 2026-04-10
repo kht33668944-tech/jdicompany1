@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ChatCircleDots,
   ArrowRight,
@@ -14,7 +14,7 @@ import {
   X,
 } from "phosphor-react";
 import type { TaskActivity, ActivityType } from "@/lib/tasks/types";
-import { deleteActivity, getAttachmentUrl } from "@/lib/tasks/actions";
+import { deleteActivity, getAttachmentUrls } from "@/lib/tasks/actions";
 import { useRouter } from "next/navigation";
 import UserAvatar from "@/components/shared/UserAvatar";
 
@@ -88,32 +88,19 @@ interface AttachmentMeta {
   file_path: string;
 }
 
-function CommentAttachments({ metadata }: { metadata: Record<string, unknown> | null }) {
-  if (!metadata?.attachments) return null;
-  const attachments = metadata.attachments as AttachmentMeta[];
-  if (attachments.length === 0) return null;
-
-  const images = attachments.filter((a) => a.content_type?.startsWith("image/"));
-  const files = attachments.filter((a) => !a.content_type?.startsWith("image/"));
-
-  return (
-    <div className="mt-2 space-y-2">
-      {images.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {images.map((att) => (
-            <ImagePreview key={att.id} attachment={att} />
-          ))}
-        </div>
-      )}
-      {files.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {files.map((att) => (
-            <FileChip key={att.id} attachment={att} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+// 활동 목록에서 모든 첨부 이미지 경로 추출
+function extractAttachmentPaths(activities: TaskActivity[]): string[] {
+  const paths: string[] = [];
+  for (const a of activities) {
+    if (a.type !== "comment") continue;
+    const meta = a.metadata as Record<string, unknown> | null;
+    const atts = meta?.attachments as AttachmentMeta[] | undefined;
+    if (!atts) continue;
+    for (const att of atts) {
+      if (att.file_path) paths.push(att.file_path);
+    }
+  }
+  return paths;
 }
 
 async function downloadBlob(url: string, fileName: string) {
@@ -127,16 +114,45 @@ async function downloadBlob(url: string, fileName: string) {
   URL.revokeObjectURL(blobUrl);
 }
 
-function ImagePreview({ attachment }: { attachment: AttachmentMeta }) {
-  const [url, setUrl] = useState<string | null>(null);
+// --- 하위 컴포넌트 ---
+
+function CommentAttachments({
+  metadata,
+  urlCache,
+}: {
+  metadata: Record<string, unknown> | null;
+  urlCache: Record<string, string>;
+}) {
+  if (!metadata?.attachments) return null;
+  const attachments = metadata.attachments as AttachmentMeta[];
+  if (attachments.length === 0) return null;
+
+  const images = attachments.filter((a) => a.content_type?.startsWith("image/"));
+  const files = attachments.filter((a) => !a.content_type?.startsWith("image/"));
+
+  return (
+    <div className="mt-2 space-y-2">
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {images.map((att) => (
+            <ImagePreview key={att.id} attachment={att} url={urlCache[att.file_path] ?? null} />
+          ))}
+        </div>
+      )}
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {files.map((att) => (
+            <FileChip key={att.id} attachment={att} url={urlCache[att.file_path] ?? null} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImagePreview({ attachment, url }: { attachment: AttachmentMeta; url: string | null }) {
   const [lightbox, setLightbox] = useState(false);
   const [downloading, setDownloading] = useState(false);
-
-  useEffect(() => {
-    getAttachmentUrl(attachment.file_path)
-      .then(setUrl)
-      .catch(() => {});
-  }, [attachment.file_path]);
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -152,9 +168,7 @@ function ImagePreview({ attachment }: { attachment: AttachmentMeta }) {
   };
 
   if (!url) {
-    return (
-      <div className="w-48 h-32 bg-slate-100 rounded-xl animate-pulse" />
-    );
+    return <div className="w-48 h-32 bg-slate-100 rounded-xl animate-pulse" />;
   }
 
   return (
@@ -207,13 +221,18 @@ function ImagePreview({ attachment }: { attachment: AttachmentMeta }) {
   );
 }
 
-function FileChip({ attachment }: { attachment: AttachmentMeta }) {
+function FileChip({ attachment, url }: { attachment: AttachmentMeta; url: string | null }) {
+  const [downloading, setDownloading] = useState(false);
+
   const handleDownload = async () => {
+    if (!url || downloading) return;
+    setDownloading(true);
     try {
-      const url = await getAttachmentUrl(attachment.file_path);
       await downloadBlob(url, attachment.file_name);
     } catch {
       console.error("파일 다운로드 실패");
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -224,7 +243,8 @@ function FileChip({ attachment }: { attachment: AttachmentMeta }) {
   return (
     <button
       onClick={handleDownload}
-      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 transition-colors"
+      disabled={!url || downloading}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 transition-colors disabled:opacity-50"
     >
       <Paperclip size={12} />
       <span className="max-w-[140px] truncate">{attachment.file_name}</span>
@@ -234,8 +254,24 @@ function FileChip({ attachment }: { attachment: AttachmentMeta }) {
   );
 }
 
+// --- 메인 컴포넌트 ---
+
 export default function TaskActivityTimeline({ activities, userId }: Props) {
   const router = useRouter();
+  const [urlCache, setUrlCache] = useState<Record<string, string>>({});
+  const cacheRef = useRef<Record<string, string>>({});
+
+  // 활동 변경 시 누락된 첨부 URL만 배치로 가져오기 (캐시 유지)
+  useEffect(() => {
+    const allPaths = extractAttachmentPaths(activities);
+    const missing = allPaths.filter((p) => !cacheRef.current[p]);
+    if (missing.length === 0) return;
+
+    getAttachmentUrls(missing).then((newUrls) => {
+      cacheRef.current = { ...cacheRef.current, ...newUrls };
+      setUrlCache({ ...cacheRef.current });
+    }).catch(() => {});
+  }, [activities]);
 
   const handleDelete = async (activityId: string) => {
     try {
@@ -253,8 +289,6 @@ export default function TaskActivityTimeline({ activities, userId }: Props) {
   return (
     <div className="space-y-4">
       {activities.map((activity) => {
-        const Icon = TYPE_ICONS[activity.type];
-        const colorClass = TYPE_COLORS[activity.type];
         const isComment = activity.type === "comment";
         const canDelete = isComment && activity.user_id === userId;
 
@@ -286,7 +320,10 @@ export default function TaskActivityTimeline({ activities, userId }: Props) {
                 {getActivityDescription(activity)}
               </p>
               {isComment && (
-                <CommentAttachments metadata={activity.metadata as Record<string, unknown> | null} />
+                <CommentAttachments
+                  metadata={activity.metadata as Record<string, unknown> | null}
+                  urlCache={urlCache}
+                />
               )}
             </div>
           </div>

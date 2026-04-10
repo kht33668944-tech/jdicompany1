@@ -395,6 +395,25 @@ export async function getAttachmentUrl(filePath: string): Promise<string> {
   return data.signedUrl;
 }
 
+/** 여러 파일의 signed URL을 한 번에 가져오기 (배치) */
+export async function getAttachmentUrls(
+  filePaths: string[]
+): Promise<Record<string, string>> {
+  if (filePaths.length === 0) return {};
+  const supabase = getSupabase();
+  const unique = [...new Set(filePaths)];
+  const { data } = await supabase.storage
+    .from("task-attachments")
+    .createSignedUrls(unique, 3600);
+  const out: Record<string, string> = {};
+  for (const item of data ?? []) {
+    if (item?.path && item.signedUrl && !item.error) {
+      out[item.path] = item.signedUrl;
+    }
+  }
+  return out;
+}
+
 // ============================================================
 // 댓글 / 활동
 // ============================================================
