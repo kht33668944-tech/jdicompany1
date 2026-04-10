@@ -201,16 +201,26 @@ export default function MessageList({
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
+  const prevChannelId = useRef(channel.id);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Auto-scroll to bottom on new messages only if near bottom
+  // 채널 전환 시 스크롤 상태 리셋 + 하단으로 이동
   useEffect(() => {
-    if (isNearBottom.current && containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    if (prevChannelId.current !== channel.id) {
+      isNearBottom.current = true;
+      prevChannelId.current = channel.id;
     }
-  }, [messages]);
+    if (containerRef.current) {
+      // 렌더 완료 후 스크롤 (이미지 등 비동기 콘텐츠 대비)
+      requestAnimationFrame(() => {
+        if (isNearBottom.current && containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+      });
+    }
+  }, [channel.id, messages]);
 
-  // Initial scroll to bottom
+  // 최초 마운트 시 하단으로
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
