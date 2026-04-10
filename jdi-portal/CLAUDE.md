@@ -39,6 +39,8 @@
 |---|---|---|
 | [`supabase/CLAUDE.md`](supabase/CLAUDE.md) | 마이그레이션·RLS·Edge Function 규칙 | DB/마이그레이션/RLS 변경 시 |
 | [`src/components/dashboard/chat/CLAUDE.md`](src/components/dashboard/chat/CLAUDE.md) | Realtime 구독·캐싱·읽음 처리 | 채팅 기능 수정 시 |
+| [`src/components/dashboard/tasks/CLAUDE.md`](src/components/dashboard/tasks/CLAUDE.md) | IDB 캐시·Position RPC·패널/페이지 모드 | 할일 기능 수정 시 |
+| [`src/components/dashboard/attendance/CLAUDE.md`](src/components/dashboard/attendance/CLAUDE.md) | KST 타임존·IP 검증·승인 워크플로우 | 근태 기능 수정 시 |
 
 ### 설계/계획 문서
 
@@ -54,6 +56,8 @@
 | 1줄 수정·단순 버그픽스 | **아무것도 읽지 말고 바로 진행** |
 | DB 마이그레이션·RLS 변경 | `supabase/CLAUDE.md` |
 | 채팅 기능 수정 | `src/components/dashboard/chat/CLAUDE.md` |
+| 할일 기능 수정 | `src/components/dashboard/tasks/CLAUDE.md` |
+| 근태 기능 수정 | `src/components/dashboard/attendance/CLAUDE.md` |
 | 새 기능 전체 설계 | `docs/claude/workflow.md` → `project-guide.md` |
 | 코드리뷰 | `AGENTS.md` |
 | 보안·경로·커밋 규칙 확인 | `docs/claude/project-guide.md` |
