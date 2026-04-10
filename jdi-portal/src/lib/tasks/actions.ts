@@ -402,7 +402,8 @@ export async function getAttachmentUrl(filePath: string): Promise<string> {
 export async function addComment(
   taskId: string,
   userId: string,
-  content: string
+  content: string,
+  metadata?: Record<string, unknown>
 ): Promise<TaskActivity> {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -412,6 +413,7 @@ export async function addComment(
       user_id: userId,
       type: "comment",
       content,
+      ...(metadata ? { metadata } : {}),
     })
     .select("*, user_profile:profiles!task_activities_user_id_fkey(full_name, avatar_url)")
     .single();
