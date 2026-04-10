@@ -62,10 +62,18 @@ export default function TaskDetailClient({
 }: Props) {
   const router = useRouter();
   const [liveActivities, setLiveActivities] = useState<TaskActivity[]>(activities);
+  const activityScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLiveActivities(activities);
   }, [activities]);
+
+  // 패널 모드: 활동 목록 변경 시 맨 아래로 스크롤
+  useEffect(() => {
+    if (mode === "panel" && activityScrollRef.current) {
+      activityScrollRef.current.scrollTop = activityScrollRef.current.scrollHeight;
+    }
+  }, [liveActivities.length, mode]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -327,7 +335,7 @@ export default function TaskDetailClient({
           <div className="px-4 pt-4 pb-2 shrink-0">
             <h3 className="font-bold text-slate-700 text-sm">활동</h3>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto px-4">
+          <div ref={activityScrollRef} className="flex-1 min-h-0 overflow-y-auto px-4">
             <TaskActivityTimeline activities={liveActivities} userId={userId} />
           </div>
           <div className="px-4 py-3 border-t border-slate-100 shrink-0">
