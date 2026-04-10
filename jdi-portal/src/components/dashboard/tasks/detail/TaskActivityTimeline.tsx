@@ -77,6 +77,38 @@ function getActivityDescription(activity: TaskActivity): string {
   }
 }
 
+interface AttachmentMeta {
+  id: string;
+  file_name: string;
+  file_size: number;
+  content_type: string;
+  file_path: string;
+}
+
+function CommentAttachments({ metadata }: { metadata: Record<string, unknown> | null }) {
+  if (!metadata?.attachments) return null;
+  const attachments = metadata.attachments as AttachmentMeta[];
+  if (attachments.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      {attachments.map((att) => {
+        const isImage = att.content_type?.startsWith("image/");
+        return (
+          <div
+            key={att.id}
+            className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-md text-xs text-slate-500"
+          >
+            <Paperclip size={11} />
+            <span className="max-w-[150px] truncate">{att.file_name}</span>
+            {isImage && <span className="text-[10px] text-indigo-400">이미지</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TaskActivityTimeline({ activities, userId }: Props) {
   const router = useRouter();
 
@@ -128,6 +160,9 @@ export default function TaskActivityTimeline({ activities, userId }: Props) {
               <p className={`text-sm mt-0.5 ${isComment ? "text-slate-600" : "text-slate-500"}`}>
                 {getActivityDescription(activity)}
               </p>
+              {isComment && (
+                <CommentAttachments metadata={activity.metadata as Record<string, unknown> | null} />
+              )}
             </div>
           </div>
         );
