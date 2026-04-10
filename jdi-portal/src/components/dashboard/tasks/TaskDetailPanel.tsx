@@ -6,8 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getTaskBasic,
   getChecklistItems,
-  getSubtasksBasic,
-  getAttachments,
   getActivities,
 } from "@/lib/tasks/queries";
 import type { Profile } from "@/lib/attendance/types";
@@ -65,17 +63,13 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     Promise.all([
       getTaskBasic(supabase, taskId),
       getChecklistItems(supabase, taskId),
-      getSubtasksBasic(supabase, taskId),
-      getAttachments(supabase, taskId),
       getActivities(supabase, taskId),
-    ]).then(([task, checklist, subtasks, attachments, activities]) => {
+    ]).then(([task, checklist, activities]) => {
       if (!task) return;
       task.checklist_total = checklist.length;
       task.checklist_completed = checklist.filter((c) => c.is_completed).length;
-      task.subtask_count = subtasks.length;
       task.comment_count = activities.filter((a) => a.type === "comment").length;
-      task.attachment_count = attachments.length;
-      setData({ task, checklist, subtasks, attachments, activities });
+      setData({ task, checklist, subtasks: [], attachments: [], activities });
     }).catch((err) => {
       console.warn("[TaskDetailPanel] refresh failed:", err);
     });
@@ -114,11 +108,9 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     Promise.all([
       getTaskBasic(supabase, taskId),
       getChecklistItems(supabase, taskId),
-      getSubtasksBasic(supabase, taskId),
-      getAttachments(supabase, taskId),
       getActivities(supabase, taskId),
     ])
-      .then(([task, checklist, subtasks, attachments, activities]) => {
+      .then(([task, checklist, activities]) => {
         if (cancelled) return;
         if (!task) {
           setError("할일을 찾을 수 없습니다.");
@@ -127,11 +119,9 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
         }
         task.checklist_total = checklist.length;
         task.checklist_completed = checklist.filter((c) => c.is_completed).length;
-        task.subtask_count = subtasks.length;
         task.comment_count = activities.filter((a) => a.type === "comment").length;
-        task.attachment_count = attachments.length;
 
-        setData({ task, checklist, subtasks, attachments, activities });
+        setData({ task, checklist, subtasks: [], attachments: [], activities });
         setLoading(false);
       })
       .catch(() => {

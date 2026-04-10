@@ -116,9 +116,21 @@ function CommentAttachments({ metadata }: { metadata: Record<string, unknown> | 
   );
 }
 
+async function downloadBlob(url: string, fileName: string) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(blobUrl);
+}
+
 function ImagePreview({ attachment }: { attachment: AttachmentMeta }) {
   const [url, setUrl] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     getAttachmentUrl(attachment.file_path)
@@ -128,11 +140,15 @@ function ImagePreview({ attachment }: { attachment: AttachmentMeta }) {
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = attachment.file_name;
-    a.click();
+    if (!url || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadBlob(url, attachment.file_name);
+    } catch {
+      console.error("다운로드 실패");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (!url) {
@@ -143,20 +159,21 @@ function ImagePreview({ attachment }: { attachment: AttachmentMeta }) {
 
   return (
     <>
-      <div className="relative group cursor-pointer" onClick={() => setLightbox(true)}>
+      <div className="inline-flex flex-col gap-1">
         <img
           src={url}
           alt={attachment.file_name}
-          className="max-w-48 max-h-40 rounded-xl object-cover border border-slate-200"
+          className="max-w-48 max-h-40 rounded-xl object-cover border border-slate-200 cursor-pointer hover:brightness-95 transition-all"
+          onClick={() => setLightbox(true)}
         />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-xl transition-all flex items-center justify-center">
-          <button
-            onClick={handleDownload}
-            className="opacity-0 group-hover:opacity-100 p-2 bg-white/90 rounded-full shadow transition-all hover:bg-white"
-          >
-            <DownloadSimple size={16} className="text-slate-700" />
-          </button>
-        </div>
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-500 transition-colors self-start"
+        >
+          <DownloadSimple size={12} />
+          <span>{downloading ? "저장 중..." : attachment.file_name}</span>
+        </button>
       </div>
 
       {lightbox && (
@@ -164,18 +181,20 @@ function ImagePreview({ attachment }: { attachment: AttachmentMeta }) {
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70"
           onClick={() => setLightbox(false)}
         >
-          <button
-            onClick={() => setLightbox(false)}
-            className="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/40 transition-colors"
-          >
-            <X size={24} className="text-white" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleDownload(e); }}
-            className="absolute top-4 right-16 p-2 bg-white/20 rounded-full hover:bg-white/40 transition-colors"
-          >
-            <DownloadSimple size={24} className="text-white" />
-          </button>
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDownload(e); }}
+              className="p-2 bg-white/20 rounded-full hover:bg-white/40 transition-colors"
+            >
+              <DownloadSimple size={24} className="text-white" />
+            </button>
+            <button
+              onClick={() => setLightbox(false)}
+              className="p-2 bg-white/20 rounded-full hover:bg-white/40 transition-colors"
+            >
+              <X size={24} className="text-white" />
+            </button>
+          </div>
           <img
             src={url}
             alt={attachment.file_name}
@@ -192,10 +211,7 @@ function FileChip({ attachment }: { attachment: AttachmentMeta }) {
   const handleDownload = async () => {
     try {
       const url = await getAttachmentUrl(attachment.file_path);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = attachment.file_name;
-      a.click();
+      await downloadBlob(url, attachment.file_name);
     } catch {
       console.error("파일 다운로드 실패");
     }
