@@ -39,7 +39,18 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
   "완료": "text-emerald-500",
 };
 
-type EditingField = "priority" | "category" | "assignee" | "dueDate" | null;
+type EditingField = "priority" | "category" | "assignee" | "period" | null;
+
+function formatPeriod(startDate: string | null | undefined, dueDate: string | null | undefined): string {
+  const fmt = (d: string) => {
+    const [, m, day] = d.split("-");
+    return `${m}.${day}`;
+  };
+  if (startDate && dueDate) return `${fmt(startDate)} ~ ${fmt(dueDate)}`;
+  if (startDate) return `${fmt(startDate)} ~`;
+  if (dueDate) return `~ ${fmt(dueDate)}`;
+  return "—";
+}
 
 export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profiles, userId }: Props) {
   const router = useRouter();
@@ -94,12 +105,20 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
   };
 
   const handleDueDateChange = async (dueDate: string | null) => {
-    setEditingField(null);
     try {
       await updateTask(task.id, userId, { dueDate });
       router.refresh();
     } catch (error) {
       console.error("마감일 변경 실패:", error);
+    }
+  };
+
+  const handleStartDateChange = async (startDate: string | null) => {
+    try {
+      await updateTask(task.id, userId, { startDate });
+      router.refresh();
+    } catch (error) {
+      console.error("시작일 변경 실패:", error);
     }
   };
 
@@ -311,26 +330,42 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
           )}
         </td>
 
-        {/* 마감일 — 인라인 수정 */}
+        {/* 기간 — 인라인 수정 */}
         <td className="px-4 py-3 relative">
-          {editingField === "dueDate" ? (
-            <div ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
-              <input
-                type="date"
-                defaultValue={task.due_date ?? ""}
-                onChange={(e) => handleDueDateChange(e.target.value || null)}
-                className="glass-input px-2 py-1 rounded-lg text-sm outline-none w-full"
-                autoFocus
-              />
-            </div>
-          ) : (
-            <span
-              onClick={openField("dueDate")}
-              className={`text-sm ${dueInfo.className} cursor-pointer hover:underline transition-colors`}
-              title="클릭하여 수정"
+          <span
+            onClick={openField("period")}
+            className={`text-sm ${dueInfo.className} cursor-pointer hover:underline transition-colors`}
+            title="클릭하여 수정"
+          >
+            {formatPeriod(task.start_date, task.due_date)}
+          </span>
+          {editingField === "period" && (
+            <div
+              ref={dropdownRef}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full right-0 mt-1 z-30 bg-white rounded-xl shadow-lg border border-slate-100 p-3 min-w-[220px]"
             >
-              {dueInfo.text || "—"}
-            </span>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">시작일</label>
+                  <input
+                    type="date"
+                    defaultValue={task.start_date ?? ""}
+                    onChange={(e) => handleStartDateChange(e.target.value || null)}
+                    className="glass-input px-2 py-1 rounded-lg text-sm outline-none w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">마감일</label>
+                  <input
+                    type="date"
+                    defaultValue={task.due_date ?? ""}
+                    onChange={(e) => handleDueDateChange(e.target.value || null)}
+                    className="glass-input px-2 py-1 rounded-lg text-sm outline-none w-full"
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </td>
 

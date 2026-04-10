@@ -414,7 +414,7 @@ export default function ListView({ groupedTasks, allTasks, onTaskClick, profiles
                       <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-24">우선순위</th>
                       <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-28">카테고리</th>
                       <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-28">담당자</th>
-                      <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-28">마감일</th>
+                      <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-36">기간</th>
                       <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-36">진행률</th>
                     </tr>
                   </thead>
