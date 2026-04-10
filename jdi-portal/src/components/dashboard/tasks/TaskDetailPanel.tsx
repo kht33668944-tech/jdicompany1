@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -108,24 +108,33 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     };
   }, [taskId]);
 
-  const closePanel = useCallback(() => {
+  // ESC 키로 닫기
+  useEffect(() => {
+    if (!visible) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("detail");
+      const qs = params.toString();
+      router.push(`/dashboard/tasks${qs ? `?${qs}` : ""}`, { scroll: false });
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [visible, router, searchParams]);
+
+  function closePanel() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("detail");
     const qs = params.toString();
     router.push(`/dashboard/tasks${qs ? `?${qs}` : ""}`, { scroll: false });
-  }, [router, searchParams]);
+  }
 
-  // 패널 내에서 다른 task로 이동 (하위 할일 등)
-  const navigateToTask = useCallback(
-    (newTaskId: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("detail", newTaskId);
-      router.push(`/dashboard/tasks?${params.toString()}`, { scroll: false });
-    },
-    [router, searchParams]
-  );
+  function navigateToTask(newTaskId: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("detail", newTaskId);
+    router.push(`/dashboard/tasks?${params.toString()}`, { scroll: false });
+  }
 
-  const handleRefresh = useCallback(() => {
+  function handleRefresh() {
     if (!taskId) return;
     const supabase = createClient();
     Promise.all([
@@ -145,17 +154,7 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     }).catch((err) => {
       console.warn("[TaskDetailPanel] refresh failed:", err);
     });
-  }, [taskId]);
-
-  // ESC 키로 닫기
-  useEffect(() => {
-    if (!visible) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closePanel();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [visible, closePanel]);
+  }
 
   // body scroll lock
   useEffect(() => {
