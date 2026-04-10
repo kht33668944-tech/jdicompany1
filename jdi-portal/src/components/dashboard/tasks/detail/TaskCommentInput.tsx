@@ -63,7 +63,7 @@ export default function TaskCommentInput({ taskId, userId, mode = "page", onRefr
             id: a.id,
             file_name: a.file_name,
             file_size: a.file_size,
-            content_type: a.content_type,
+            content_type: a.mime_type,
             file_path: a.file_path,
           })),
         };
