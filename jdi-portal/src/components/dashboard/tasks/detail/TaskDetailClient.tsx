@@ -268,9 +268,9 @@ export default function TaskDetailClient({
       )}
 
       {/* 본문 + 사이드바 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+      <div className={mode === "panel" ? "space-y-6" : "grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6"}>
         {/* 좌측: 본문 */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className={mode === "panel" ? "space-y-6" : "lg:col-span-2 space-y-6"}>
           {/* 제목 */}
           <div className="bg-white rounded-3xl shadow-sm p-6">
             {canEdit ? (
@@ -309,185 +309,189 @@ export default function TaskDetailClient({
           />
 
           {/* 서브태스크 */}
-          <TaskSubtasks
-            taskId={task.id}
-            subtasks={subtasks}
-            userId={userId}
-            profiles={profiles}
-            canEdit={canEdit}
-            mode={mode}
-            onNavigate={onNavigate}
-            onRefresh={onRefresh}
-          />
+          {mode !== "panel" && (
+            <TaskSubtasks
+              taskId={task.id}
+              subtasks={subtasks}
+              userId={userId}
+              profiles={profiles}
+              canEdit={canEdit}
+              mode={mode}
+              onNavigate={onNavigate}
+              onRefresh={onRefresh}
+            />
+          )}
 
           {/* 활동 타임라인 */}
           <div className="bg-white rounded-3xl shadow-sm p-6">
             <h3 className="font-bold text-slate-700 mb-4">활동</h3>
             <ActivityScrollArea activities={liveActivities} userId={userId} />
             <div className="mt-4 pt-4 border-t border-slate-100">
-              <TaskCommentInput taskId={task.id} userId={userId} />
+              <TaskCommentInput taskId={task.id} userId={userId} mode={mode} onRefresh={onRefresh} />
             </div>
           </div>
         </div>
 
         {/* 우측: 사이드바 */}
-        <div className="space-y-6">
-          {/* 속성 */}
-          <div className="bg-white rounded-3xl shadow-sm p-6 space-y-4">
-            <h3 className="font-bold text-slate-700">속성</h3>
+        {mode !== "panel" && (
+          <div className="space-y-6">
+            {/* 속성 */}
+            <div className="bg-white rounded-3xl shadow-sm p-6 space-y-4">
+              <h3 className="font-bold text-slate-700">속성</h3>
 
-            {/* 상태 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">상태</label>
-              {canEdit ? (
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                >
-                  {TASK_STATUSES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className={`text-sm font-medium ${TASK_STATUS_CONFIG[status].text}`}>
-                  {status}
-                </span>
-              )}
-            </div>
-
-            {/* 우선순위 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">우선순위</label>
-              {canEdit ? (
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                >
-                  {TASK_PRIORITIES.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className={`text-sm font-medium ${PRIORITY_CONFIG[priority].text}`}>
-                  {priority}
-                </span>
-              )}
-            </div>
-
-            {/* 카테고리 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">카테고리</label>
-              {canEdit ? (
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                >
-                  <option value="">없음</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="text-sm text-slate-600">{category || "없음"}</span>
-              )}
-            </div>
-
-            {/* 시작일 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">시작일</label>
-              {canEdit ? (
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                />
-              ) : (
-                <span className="text-sm text-slate-600">{startDate || "-"}</span>
-              )}
-            </div>
-
-            {/* 마감일 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">마감일</label>
-              {canEdit ? (
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                />
-              ) : (
-                <span className="text-sm text-slate-600">{dueDate || "-"}</span>
-              )}
-            </div>
-
-            {/* 담당자 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">담당자</label>
-              <div className="space-y-2">
-                {task.assignees.map((a) => (
-                  <div key={a.user_id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <UserAvatar name={a.full_name} avatarUrl={a.avatar_url} size="sm" />
-                      <span className="text-sm text-slate-600">{a.full_name}</span>
-                    </div>
-                    {canEdit && (
-                      <button
-                        onClick={() => handleRemoveAssignee(a.user_id)}
-                        className="text-slate-300 hover:text-red-500 transition-colors"
-                      >
-                        <XCircle size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {canEdit && (
+              {/* 상태 */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">상태</label>
+                {canEdit ? (
                   <select
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) handleAddAssignee(e.target.value);
-                    }}
-                    className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none text-slate-400"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                    className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
                   >
-                    <option value="">+ 담당자 추가</option>
-                    {profiles
-                      .filter((p) => !task.assignees.some((a) => a.user_id === p.id))
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>{p.full_name}</option>
-                      ))}
+                    {TASK_STATUSES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
                   </select>
+                ) : (
+                  <span className={`text-sm font-medium ${TASK_STATUS_CONFIG[status].text}`}>
+                    {status}
+                  </span>
                 )}
               </div>
-            </div>
 
-            {/* 생성자 / 생성일 */}
-            <div className="pt-3 border-t border-slate-100 space-y-2">
-              <div className="flex justify-between items-center text-xs text-slate-400">
-                <span>생성자</span>
-                <div className="flex items-center gap-1.5">
-                  <UserAvatar name={task.creator_profile.full_name} avatarUrl={task.creator_profile.avatar_url} size="xs" />
-                  <span className="text-slate-600">{task.creator_profile.full_name}</span>
+              {/* 우선순위 */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">우선순위</label>
+                {canEdit ? (
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                    className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  >
+                    {TASK_PRIORITIES.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className={`text-sm font-medium ${PRIORITY_CONFIG[priority].text}`}>
+                    {priority}
+                  </span>
+                )}
+              </div>
+
+              {/* 카테고리 */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">카테고리</label>
+                {canEdit ? (
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  >
+                    <option value="">없음</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-sm text-slate-600">{category || "없음"}</span>
+                )}
+              </div>
+
+              {/* 시작일 */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">시작일</label>
+                {canEdit ? (
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  />
+                ) : (
+                  <span className="text-sm text-slate-600">{startDate || "-"}</span>
+                )}
+              </div>
+
+              {/* 마감일 */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">마감일</label>
+                {canEdit ? (
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  />
+                ) : (
+                  <span className="text-sm text-slate-600">{dueDate || "-"}</span>
+                )}
+              </div>
+
+              {/* 담당자 */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">담당자</label>
+                <div className="space-y-2">
+                  {task.assignees.map((a) => (
+                    <div key={a.user_id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <UserAvatar name={a.full_name} avatarUrl={a.avatar_url} size="sm" />
+                        <span className="text-sm text-slate-600">{a.full_name}</span>
+                      </div>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleRemoveAssignee(a.user_id)}
+                          className="text-slate-300 hover:text-red-500 transition-colors"
+                        >
+                          <XCircle size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {canEdit && (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) handleAddAssignee(e.target.value);
+                      }}
+                      className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none text-slate-400"
+                    >
+                      <option value="">+ 담당자 추가</option>
+                      {profiles
+                        .filter((p) => !task.assignees.some((a) => a.user_id === p.id))
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>{p.full_name}</option>
+                        ))}
+                    </select>
+                  )}
                 </div>
               </div>
-              <div className="flex justify-between text-xs text-slate-400">
-                <span>생성일</span>
-                <span className="text-slate-600">{task.created_at.slice(0, 10)}</span>
+
+              {/* 생성자 / 생성일 */}
+              <div className="pt-3 border-t border-slate-100 space-y-2">
+                <div className="flex justify-between items-center text-xs text-slate-400">
+                  <span>생성자</span>
+                  <div className="flex items-center gap-1.5">
+                    <UserAvatar name={task.creator_profile.full_name} avatarUrl={task.creator_profile.avatar_url} size="xs" />
+                    <span className="text-slate-600">{task.creator_profile.full_name}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>생성일</span>
+                  <span className="text-slate-600">{task.created_at.slice(0, 10)}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* 첨부파일 */}
-          <TaskAttachments
-            taskId={task.id}
-            attachments={attachments}
-            userId={userId}
-            canEdit={canEdit}
-          />
-        </div>
+            {/* 첨부파일 */}
+            <TaskAttachments
+              taskId={task.id}
+              attachments={attachments}
+              userId={userId}
+              canEdit={canEdit}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
