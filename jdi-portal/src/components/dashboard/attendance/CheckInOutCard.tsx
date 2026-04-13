@@ -3,7 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, SignIn, SignOut } from "phosphor-react";
-import { checkIn, checkOut } from "@/lib/attendance/actions";
+async function checkIn(): Promise<AttendanceRecord> {
+  const res = await fetch("/api/attendance/check-in", { method: "POST" });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "출근 처리에 실패했습니다.");
+  return body;
+}
+
+async function checkOut(): Promise<AttendanceRecord> {
+  const res = await fetch("/api/attendance/check-out", { method: "POST" });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "퇴근 처리에 실패했습니다.");
+  return body;
+}
 import { ATTENDANCE_STATUS_CONFIG } from "@/lib/attendance/constants";
 import { formatMinutes, formatTime } from "@/lib/utils/date";
 import { getErrorMessage } from "@/lib/utils/errors";
@@ -72,7 +84,7 @@ export default function CheckInOutCard({ userId, todayRecord, allowedIp }: Check
         setFeedback({ type: "error", message: "등록된 IP에서만 출근할 수 있습니다. 설정에서 IP를 확인해주세요." });
         return;
       }
-      const record = await checkIn(userId);
+      const record = await checkIn();
       setStatus(record.status);
       setCheckInTime(record.check_in);
       setFeedback({ type: "success", message: "출근 처리가 완료되었습니다." });
@@ -93,7 +105,7 @@ export default function CheckInOutCard({ userId, todayRecord, allowedIp }: Check
         setFeedback({ type: "error", message: "등록된 IP에서만 퇴근할 수 있습니다. 설정에서 IP를 확인해주세요." });
         return;
       }
-      const record = await checkOut(userId);
+      const record = await checkOut();
       setStatus(record.status);
       setCheckOutTime(record.check_out);
       setFeedback({ type: "success", message: "퇴근 처리가 완료되었습니다." });

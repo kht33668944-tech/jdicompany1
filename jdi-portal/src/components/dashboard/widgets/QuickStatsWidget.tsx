@@ -3,7 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, CheckSquare, CalendarBlank, ChartBar } from "phosphor-react";
-import { checkIn, checkOut } from "@/lib/attendance/actions";
+async function apiCheckIn() {
+  const res = await fetch("/api/attendance/check-in", { method: "POST" });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "출근 처리에 실패했습니다.");
+  return body;
+}
+
+async function apiCheckOut() {
+  const res = await fetch("/api/attendance/check-out", { method: "POST" });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "퇴근 처리에 실패했습니다.");
+  return body;
+}
 
 interface Props {
   userId: string;
@@ -88,9 +100,9 @@ export default function QuickStatsWidget({
     setIsSubmitting(true);
     try {
       if (attendanceStatus === "미출근") {
-        await checkIn(userId);
+        await apiCheckIn();
       } else {
-        await checkOut(userId);
+        await apiCheckOut();
       }
       router.refresh();
     } finally {

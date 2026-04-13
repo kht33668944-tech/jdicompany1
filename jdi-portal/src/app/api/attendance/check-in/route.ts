@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { extractClientIp } from "@/lib/utils/ip";
 
 export async function POST(request: NextRequest) {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const clientIp = forwarded ? forwarded.split(",")[0].trim() : "unknown";
+  const clientIp = extractClientIp(request);
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("attendance_check_in", {

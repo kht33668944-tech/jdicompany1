@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { extractClientIp } from "@/lib/utils/ip";
 
 export async function GET(request: NextRequest) {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
+  const ip = extractClientIp(request);
   return NextResponse.json({ ip });
 }

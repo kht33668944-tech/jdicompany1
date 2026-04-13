@@ -26,19 +26,6 @@ async function requireAdmin() {
   return { supabase, userId };
 }
 
-export async function checkIn(userId: string) {
-  const res = await fetch("/api/attendance/check-in", { method: "POST" });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error ?? "출근 처리에 실패했습니다.");
-  return body;
-}
-
-export async function checkOut(userId: string) {
-  const res = await fetch("/api/attendance/check-out", { method: "POST" });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error ?? "퇴근 처리에 실패했습니다.");
-  return body;
-}
 
 export async function submitVacationRequest(params: {
   vacationType: VacationType;
