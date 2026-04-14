@@ -10,12 +10,19 @@ import {
   ChatCircleDots,
   Trash,
   Check,
+  CheckSquare,
+  Square,
+  Plus,
+  CaretDown,
+  CaretUp,
 } from "phosphor-react";
-import type { TaskWithDetails, TaskStatus, TaskPriority } from "@/lib/tasks/types";
+import type { TaskWithDetails, TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/tasks/types";
 import type { Profile } from "@/lib/attendance/types";
 import { PRIORITY_CONFIG, TASK_PRIORITIES, CATEGORIES } from "@/lib/tasks/constants";
 import { formatDueDate, calculateProgress } from "@/lib/tasks/utils";
-import { updateTask, deleteTask, addAssignee, removeAssignee } from "@/lib/tasks/actions";
+import { updateTask, deleteTask, addAssignee, removeAssignee, addChecklistItem, updateChecklistItem, deleteChecklistItem } from "@/lib/tasks/actions";
+import { getChecklistItems } from "@/lib/tasks/queries";
+import { createClient } from "@/lib/supabase/client";
 import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
@@ -57,6 +64,11 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
   const router = useRouter();
   const refresh = () => { if (onRefresh) onRefresh(); else refresh(); };
   const [editingField, setEditingField] = useState<EditingField>(null);
+  // 체크리스트 인라인 펼침
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklistItems, setChecklistItems] = useState<TaskChecklistItem[]>([]);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [newChecklistItem, setNewChecklistItem] = useState("");
   // 서버 상태에서 파생된 담당자 ID — task.assignees 가 바뀌면 자동 갱신 (effect 불필요)
   const serverAssigneeIds = useMemo(
     () => new Set(task.assignees.map((a) => a.user_id)),
@@ -85,6 +97,69 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
   }, [editingField]);
+
+  const fetchChecklist = async () => {
+    setChecklistLoading(true);
+    try {
+      const supabase = createClient();
+      const items = await getChecklistItems(supabase, task.id);
+      setChecklistItems(items);
+    } catch (error) {
+      console.error("체크리스트 로드 실패:", error);
+    } finally {
+      setChecklistLoading(false);
+    }
+  };
+
+  const handleToggleChecklist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!checklistOpen) {
+      setChecklistOpen(true);
+      fetchChecklist();
+    } else {
+      setChecklistOpen(false);
+    }
+  };
+
+  const handleChecklistToggleItem = async (item: TaskChecklistItem) => {
+    // optimistic update
+    setChecklistItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, is_completed: !i.is_completed } : i))
+    );
+    try {
+      await updateChecklistItem(item.id, { is_completed: !item.is_completed });
+      refresh();
+    } catch (error) {
+      console.error("체크리스트 토글 실패:", error);
+      // revert
+      setChecklistItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, is_completed: item.is_completed } : i))
+      );
+    }
+  };
+
+  const handleChecklistDeleteItem = async (itemId: string) => {
+    setChecklistItems((prev) => prev.filter((i) => i.id !== itemId));
+    try {
+      await deleteChecklistItem(itemId);
+      refresh();
+    } catch (error) {
+      console.error("체크리스트 삭제 실패:", error);
+      fetchChecklist();
+    }
+  };
+
+  const handleChecklistAddItem = async () => {
+    if (!newChecklistItem.trim()) return;
+    try {
+      const added = await addChecklistItem(task.id, newChecklistItem.trim());
+      setChecklistItems((prev) => [...prev, added]);
+      setNewChecklistItem("");
+      refresh();
+    } catch (error) {
+      console.error("체크리스트 추가 실패:", error);
+    }
+  };
 
   const handlePriorityChange = async (priority: TaskPriority) => {
     setEditingField(null);
@@ -173,7 +248,20 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
         <td className={`px-4 py-3 ${isSubtask ? "pl-10" : ""}`}>
           <div className="flex items-center gap-3">
             {isSubtask && <ArrowBendDownRight size={16} className="text-slate-300" />}
-            <StatusIcon size={18} className={STATUS_COLORS[task.status]} />
+            <button
+              onClick={handleToggleChecklist}
+              className={`relative flex-shrink-0 rounded-md p-0.5 transition-all ${
+                checklistOpen ? "bg-indigo-50 ring-2 ring-indigo-200" : "hover:bg-slate-100"
+              }`}
+              title={task.checklist_total > 0 ? "체크리스트 펼치기" : "체크리스트"}
+            >
+              <StatusIcon size={18} className={STATUS_COLORS[task.status]} />
+              {task.checklist_total > 0 && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 text-white text-[7px] font-bold rounded-full flex items-center justify-center">
+                  {task.checklist_total}
+                </span>
+              )}
+            </button>
             <span
               className={`font-semibold ${
                 isSubtask ? "text-slate-500 font-medium" : "text-slate-700"
@@ -401,6 +489,112 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
           </div>
         </td>
       </tr>
+
+      {/* 체크리스트 펼침 행 */}
+      {checklistOpen && (
+        <tr>
+          <td colSpan={6} className="px-0 py-0">
+            <div className={`${isSubtask ? "ml-14" : "ml-10"} mr-4 mb-3 mt-1 bg-slate-50 rounded-2xl p-4 border border-slate-100`}>
+              {checklistLoading ? (
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <div className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+                  불러오는 중...
+                </div>
+              ) : (
+                <>
+                  {/* 진행률 바 */}
+                  {checklistItems.length > 0 && (
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            checklistItems.every((i) => i.is_completed) ? "bg-emerald-500" : "bg-indigo-500"
+                          }`}
+                          style={{
+                            width: `${checklistItems.length > 0 ? Math.round((checklistItems.filter((i) => i.is_completed).length / checklistItems.length) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold text-slate-400">
+                        {checklistItems.filter((i) => i.is_completed).length}/{checklistItems.length}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 체크리스트 항목 */}
+                  <div className="space-y-1">
+                    {checklistItems.map((item) => (
+                      <div key={item.id} className="flex items-center gap-2 group/item py-1 px-1 rounded-lg hover:bg-white transition-colors">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleChecklistToggleItem(item);
+                          }}
+                          className="flex-shrink-0"
+                        >
+                          {item.is_completed ? (
+                            <CheckSquare size={16} weight="fill" className="text-emerald-500" />
+                          ) : (
+                            <Square size={16} className="text-slate-300 hover:text-indigo-500 transition-colors" />
+                          )}
+                        </button>
+                        <span
+                          className={`flex-1 text-sm ${
+                            item.is_completed ? "line-through text-slate-400" : "text-slate-600"
+                          }`}
+                        >
+                          {item.content}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleChecklistDeleteItem(item.id);
+                          }}
+                          className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-red-500 transition-all"
+                        >
+                          <Trash size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 항목이 없을 때 */}
+                  {checklistItems.length === 0 && (
+                    <p className="text-xs text-slate-400 mb-2">체크리스트가 비어있습니다.</p>
+                  )}
+
+                  {/* 새 항목 추가 */}
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      value={newChecklistItem}
+                      onChange={(e) => setNewChecklistItem(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.stopPropagation();
+                          handleChecklistAddItem();
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="항목 추가..."
+                      className="flex-1 px-3 py-1.5 bg-white rounded-lg text-sm outline-none border border-slate-200 focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200 transition-all"
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleChecklistAddItem();
+                      }}
+                      disabled={!newChecklistItem.trim()}
+                      className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-500 disabled:opacity-40 transition-all"
+                    >
+                      <Plus size={14} weight="bold" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
 
       {subtasks?.map((child) => (
         <ListRow
