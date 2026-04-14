@@ -62,7 +62,7 @@ function formatPeriod(startDate: string | null | undefined, dueDate: string | nu
 
 export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profiles, userId, onRefresh }: Props) {
   const router = useRouter();
-  const refresh = () => { if (onRefresh) onRefresh(); else refresh(); };
+  const refresh = () => { if (onRefresh) onRefresh(); else router.refresh(); };
   const [editingField, setEditingField] = useState<EditingField>(null);
   // 체크리스트 인라인 펼침
   const [checklistOpen, setChecklistOpen] = useState(false);
@@ -181,22 +181,32 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     }
   };
 
-  const handleDueDateChange = async (dueDate: string | null) => {
-    try {
-      await updateTask(task.id, { dueDate });
-      refresh();
-    } catch (error) {
-      console.error("마감일 변경 실패:", error);
-    }
+  // 기간 수정용 로컬 상태 (controlled input + onChange 즉시 저장)
+  const [localStartDate, setLocalStartDate] = useState(task.start_date ?? "");
+  const [localDueDate, setLocalDueDate] = useState(task.due_date ?? "");
+  useEffect(() => {
+    setLocalStartDate(task.start_date ?? "");
+    setLocalDueDate(task.due_date ?? "");
+  }, [task.start_date, task.due_date]);
+
+  const handleDueDateChange = (value: string) => {
+    setLocalDueDate(value);
+    updateTask(task.id, { dueDate: value || null })
+      .then(() => refresh())
+      .catch((err) => {
+        console.error("마감일 변경 실패:", err);
+        setLocalDueDate(task.due_date ?? "");
+      });
   };
 
-  const handleStartDateChange = async (startDate: string | null) => {
-    try {
-      await updateTask(task.id, { startDate });
-      refresh();
-    } catch (error) {
-      console.error("시작일 변경 실패:", error);
-    }
+  const handleStartDateChange = (value: string) => {
+    setLocalStartDate(value);
+    updateTask(task.id, { startDate: value || null })
+      .then(() => refresh())
+      .catch((err) => {
+        console.error("시작일 변경 실패:", err);
+        setLocalStartDate(task.start_date ?? "");
+      });
   };
 
   const handleToggleAssignee = async (assigneeId: string) => {
@@ -427,7 +437,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
             className={`text-sm ${dueInfo.className} cursor-pointer hover:underline transition-colors`}
             title="클릭하여 수정"
           >
-            {formatPeriod(task.start_date, task.due_date)}
+            {formatPeriod(localStartDate || null, localDueDate || null)}
           </span>
           {editingField === "period" && (
             <div
@@ -440,8 +450,8 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">시작일</label>
                   <input
                     type="date"
-                    defaultValue={task.start_date ?? ""}
-                    onChange={(e) => handleStartDateChange(e.target.value || null)}
+                    value={localStartDate}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
                     className="glass-input px-2 py-1 rounded-lg text-sm outline-none w-full"
                   />
                 </div>
@@ -449,8 +459,8 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">마감일</label>
                   <input
                     type="date"
-                    defaultValue={task.due_date ?? ""}
-                    onChange={(e) => handleDueDateChange(e.target.value || null)}
+                    value={localDueDate}
+                    onChange={(e) => handleDueDateChange(e.target.value)}
                     className="glass-input px-2 py-1 rounded-lg text-sm outline-none w-full"
                   />
                 </div>
@@ -604,6 +614,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
           isSubtask={true}
           profiles={profiles}
           userId={userId}
+          onRefresh={onRefresh}
         />
       ))}
     </>
