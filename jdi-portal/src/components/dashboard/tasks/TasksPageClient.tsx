@@ -8,7 +8,7 @@ import type { TaskWithDetails, TaskViewId, TaskFilterState } from "@/lib/tasks/t
 import { TASK_VIEWS, DEFAULT_FILTER_STATE } from "@/lib/tasks/constants";
 import { filterTasks, sortTasks, groupTasks, computeSummary, buildTaskTree } from "@/lib/tasks/utils";
 import { getTasksWithDetails } from "@/lib/tasks/queries";
-import { cacheTasks } from "@/lib/tasks/tasksCache";
+import { cacheTasks, getCachedTasks } from "@/lib/tasks/tasksCache";
 import { createClient } from "@/lib/supabase/client";
 import TaskSummaryPanel from "./TaskSummaryPanel";
 import TaskFilters from "./TaskFilters";
@@ -68,11 +68,17 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
     }
   }, []);
 
-  // 마운트 시 백그라운드 refresh (서버 데이터 이후 최신화)
+  // 마운트 시: IDB 캐시 → 즉시 표시 → 백그라운드 네트워크 fetch
   useEffect(() => {
-    // refreshTasks는 async — setState는 Promise chain 내에서 비동기 호출됨
+    let cancelled = false;
+    // 1) IDB 캐시가 있으면 즉시 표시 (네트워크 대기 없이 화면 렌더)
+    getCachedTasks().then((cached) => {
+      if (cancelled || freshLoadedRef.current) return;
+      if (cached && cached.length > 0) setAllTasks(cached);
+    });
+    // 2) 백그라운드에서 최신 데이터 fetch
     const id = requestAnimationFrame(() => void refreshTasks());
-    return () => cancelAnimationFrame(id);
+    return () => { cancelled = true; cancelAnimationFrame(id); };
   }, [refreshTasks]);
 
   useEffect(() => {
