@@ -202,6 +202,7 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
           onTaskClick={handleTaskClick}
           profiles={profiles}
           userId={userId}
+          onRefresh={refreshTasks}
         />
       )}
       {activeView === "calendar" && (

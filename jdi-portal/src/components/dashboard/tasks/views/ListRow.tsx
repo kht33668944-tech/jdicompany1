@@ -25,6 +25,7 @@ interface Props {
   isSubtask: boolean;
   profiles: Profile[];
   userId: string;
+  onRefresh?: () => void;
 }
 
 const STATUS_ICONS: Record<TaskStatus, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -52,8 +53,9 @@ function formatPeriod(startDate: string | null | undefined, dueDate: string | nu
   return "—";
 }
 
-export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profiles, userId }: Props) {
+export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profiles, userId, onRefresh }: Props) {
   const router = useRouter();
+  const refresh = () => { if (onRefresh) onRefresh(); else refresh(); };
   const [editingField, setEditingField] = useState<EditingField>(null);
   // 서버 상태에서 파생된 담당자 ID — task.assignees 가 바뀌면 자동 갱신 (effect 불필요)
   const serverAssigneeIds = useMemo(
@@ -88,7 +90,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     setEditingField(null);
     try {
       await updateTask(task.id, { priority });
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("우선순위 변경 실패:", error);
     }
@@ -98,7 +100,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     setEditingField(null);
     try {
       await updateTask(task.id, { category });
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("카테고리 변경 실패:", error);
     }
@@ -107,7 +109,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
   const handleDueDateChange = async (dueDate: string | null) => {
     try {
       await updateTask(task.id, { dueDate });
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("마감일 변경 실패:", error);
     }
@@ -116,7 +118,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
   const handleStartDateChange = async (startDate: string | null) => {
     try {
       await updateTask(task.id, { startDate });
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("시작일 변경 실패:", error);
     }
@@ -135,7 +137,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
       } else {
         await addAssignee(task.id, assigneeId);
       }
-      router.refresh();
+      refresh();
       // 서버 응답 반영 후 override 해제 → serverAssigneeIds 자동 사용
       setOptimisticOverride(null);
     } catch (error) {
@@ -150,7 +152,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     if (!confirm("정말 삭제하시겠습니까?")) return;
     try {
       await deleteTask(task.id);
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("삭제 실패:", error);
     }

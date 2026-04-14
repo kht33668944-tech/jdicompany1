@@ -28,6 +28,7 @@ interface Props {
   onTaskClick: (taskId: string) => void;
   profiles: Profile[];
   userId: string;
+  onRefresh?: () => void;
 }
 
 const STATUS_ICONS: Record<TaskStatus, React.ComponentType<IconProps>> = {
@@ -42,13 +43,16 @@ function MobileEditSheet({
   profiles,
   userId,
   onClose,
+  onRefresh,
 }: {
   task: TaskWithDetails;
   profiles: Profile[];
   userId: string;
   onClose: () => void;
+  onRefresh?: () => void;
 }) {
   const router = useRouter();
+  const refresh = () => { if (onRefresh) onRefresh(); else router.refresh(); };
   const sheetRef = useRef<HTMLDivElement>(null);
   const [localAssigneeIds, setLocalAssigneeIds] = useState(
     () => new Set(task.assignees.map((a) => a.user_id))
@@ -74,7 +78,7 @@ function MobileEditSheet({
   const handlePriority = async (priority: TaskPriority) => {
     try {
       await updateTask(task.id, { priority });
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("우선순위 변경 실패:", error);
     }
@@ -83,7 +87,7 @@ function MobileEditSheet({
   const handleCategory = async (category: string | null) => {
     try {
       await updateTask(task.id, { category });
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("카테고리 변경 실패:", error);
     }
@@ -92,7 +96,7 @@ function MobileEditSheet({
   const handleDueDate = async (date: string | null) => {
     try {
       await updateTask(task.id, { dueDate: date });
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("마감일 변경 실패:", error);
     }
@@ -112,7 +116,7 @@ function MobileEditSheet({
       } else {
         await addAssignee(task.id, assigneeId);
       }
-      router.refresh();
+      refresh();
     } catch (error) {
       console.error("담당자 변경 실패:", error);
       setLocalAssigneeIds(new Set(task.assignees.map((a) => a.user_id)));
@@ -123,7 +127,7 @@ function MobileEditSheet({
     if (!confirm("정말 삭제하시겠습니까?")) return;
     try {
       await deleteTask(task.id);
-      router.refresh();
+      refresh();
       onClose();
     } catch (error) {
       console.error("삭제 실패:", error);
@@ -245,6 +249,7 @@ function MobileTaskCard({
   isSubtask,
   profiles,
   userId,
+  onRefresh,
 }: {
   task: TaskWithDetails;
   subtasks?: TaskWithDetails[];
@@ -252,6 +257,7 @@ function MobileTaskCard({
   isSubtask: boolean;
   profiles: Profile[];
   userId: string;
+  onRefresh?: () => void;
 }) {
   const [showSheet, setShowSheet] = useState(false);
   const StatusIcon = STATUS_ICONS[task.status];
@@ -338,6 +344,7 @@ function MobileTaskCard({
           profiles={profiles}
           userId={userId}
           onClose={() => setShowSheet(false)}
+          onRefresh={onRefresh}
         />
       )}
 
@@ -356,7 +363,7 @@ function MobileTaskCard({
 }
 
 /* ─── List View ─── */
-export default function ListView({ groupedTasks, allTasks, onTaskClick, profiles, userId }: Props) {
+export default function ListView({ groupedTasks, allTasks, onTaskClick, profiles, userId, onRefresh }: Props) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set(["완료"]));
 
   const toggleGroup = (key: string) => {
@@ -428,6 +435,7 @@ export default function ListView({ groupedTasks, allTasks, onTaskClick, profiles
                         isSubtask={false}
                         profiles={profiles}
                         userId={userId}
+                        onRefresh={onRefresh}
                       />
                     ))}
                   </tbody>
@@ -444,6 +452,7 @@ export default function ListView({ groupedTasks, allTasks, onTaskClick, profiles
                       isSubtask={false}
                       profiles={profiles}
                       userId={userId}
+                      onRefresh={onRefresh}
                     />
                   ))}
                 </div>
