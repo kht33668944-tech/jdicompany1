@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
-import type { AttendanceRecord } from "@/lib/attendance/types";
-import type { TaskWithDetails } from "@/lib/tasks/types";
-import type { ScheduleWithProfile } from "@/lib/schedule/types";
-import type { RecentActivity } from "@/lib/dashboard/queries";
+import { useState, useEffect, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { getDashboardData, type DashboardData } from "@/lib/dashboard/queries";
 import QuickStatsWidget from "./widgets/QuickStatsWidget";
 import MyTasksWidget from "./widgets/MyTasksWidget";
 import TodayScheduleWidget from "./widgets/TodayScheduleWidget";
@@ -13,31 +11,23 @@ import RecentActivityWidget from "./widgets/RecentActivityWidget";
 interface Props {
   userId: string;
   userName: string;
-  todayRecord: AttendanceRecord | null;
-  weeklyMinutes: number;
-  myTasks: TaskWithDetails[];
-  allTasksForUser: TaskWithDetails[]; // includes completed for stats
-  todaySchedules: ScheduleWithProfile[];
-  recentActivities: RecentActivity[];
-  nextScheduleMinutes: number | null;
 }
 
-export default function DashboardClient({
-  userId,
-  userName,
-  todayRecord,
-  weeklyMinutes,
-  myTasks,
-  allTasksForUser,
-  todaySchedules,
-  recentActivities,
-  nextScheduleMinutes,
-}: Props) {
-  const status = todayRecord?.status ?? "미출근";
-  const totalTasks = allTasksForUser.length;
+export default function DashboardClient({ userId, userName }: Props) {
+  const [data, setData] = useState<DashboardData | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    getDashboardData(supabase, userId, userName)
+      .then(setData)
+      .catch(console.error);
+  }, [userId, userName]);
+
+  const status = data?.todayRecord?.status ?? "미출근";
+  const totalTasks = data?.allTasksForUser.length ?? 0;
+  const myTasks = data?.myTasks ?? [];
   const completedTasks = totalTasks - myTasks.length;
 
-  // Count urgent/high priority from incomplete tasks
   const urgentCount = myTasks.filter((t) => t.priority === "긴급").length;
   const highCount = myTasks.filter((t) => t.priority === "높음").length;
 
@@ -72,25 +62,25 @@ export default function DashboardClient({
       <QuickStatsWidget
         userId={userId}
         attendanceStatus={status}
-        checkInTime={todayRecord?.check_in ?? null}
-        checkOutTime={todayRecord?.check_out ?? null}
+        checkInTime={data?.todayRecord?.check_in ?? null}
+        checkOutTime={data?.todayRecord?.check_out ?? null}
         taskTotal={totalTasks}
         taskCompleted={completedTasks}
         urgentCount={urgentCount}
         highCount={highCount}
-        todayScheduleCount={todaySchedules.length}
-        nextScheduleMinutes={nextScheduleMinutes}
-        weeklyMinutes={weeklyMinutes}
+        todayScheduleCount={data?.todaySchedules.length ?? 0}
+        nextScheduleMinutes={data?.nextScheduleMinutes ?? null}
+        weeklyMinutes={data?.weeklyMinutes ?? 0}
       />
 
       {/* 중단: 2열 위젯 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <MyTasksWidget tasks={myTasks} />
-        <TodayScheduleWidget schedules={todaySchedules} />
+        <TodayScheduleWidget schedules={data?.todaySchedules ?? []} />
       </div>
 
       {/* 하단: 활동 피드 */}
-      <RecentActivityWidget activities={recentActivities} />
+      <RecentActivityWidget activities={data?.recentActivities ?? []} />
     </div>
   );
 }
