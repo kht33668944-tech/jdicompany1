@@ -189,24 +189,26 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     setLocalDueDate(task.due_date ?? "");
   }, [task.start_date, task.due_date]);
 
-  const handleDueDateChange = (value: string) => {
+  const handleDueDateChange = async (value: string) => {
     setLocalDueDate(value);
-    updateTask(task.id, { dueDate: value || null })
-      .then(() => refresh())
-      .catch((err) => {
-        console.error("마감일 변경 실패:", err);
-        setLocalDueDate(task.due_date ?? "");
-      });
+    try {
+      await updateTask(task.id, { dueDate: value || null });
+      refresh();
+    } catch (err) {
+      console.error("마감일 변경 실패:", err);
+      setLocalDueDate(task.due_date ?? "");
+    }
   };
 
-  const handleStartDateChange = (value: string) => {
+  const handleStartDateChange = async (value: string) => {
     setLocalStartDate(value);
-    updateTask(task.id, { startDate: value || null })
-      .then(() => refresh())
-      .catch((err) => {
-        console.error("시작일 변경 실패:", err);
-        setLocalStartDate(task.start_date ?? "");
-      });
+    try {
+      await updateTask(task.id, { startDate: value || null });
+      refresh();
+    } catch (err) {
+      console.error("시작일 변경 실패:", err);
+      setLocalStartDate(task.start_date ?? "");
+    }
   };
 
   const handleToggleAssignee = async (assigneeId: string) => {
