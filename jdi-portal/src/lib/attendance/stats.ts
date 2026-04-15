@@ -119,7 +119,7 @@ export function calcAttendanceStats(
 
   return {
     totalDays,
-    avgWorkMinutes: Math.round(totalWorkMinutes / totalDays),
+    avgWorkMinutes: checkOutCount > 0 ? Math.round(totalWorkMinutes / checkOutCount) : 0,
     onTimeRate: Math.round((normalCount / totalDays) * 100),
     avgLateMinutes: lateCount > 0 ? Math.round(totalLateMinutes / lateCount) : 0,
     avgCheckInMinutes: Math.round(totalCheckInMinutes / totalDays),
