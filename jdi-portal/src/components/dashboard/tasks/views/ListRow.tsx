@@ -18,7 +18,7 @@ import {
 } from "phosphor-react";
 import type { TaskWithDetails, TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/tasks/types";
 import type { Profile } from "@/lib/attendance/types";
-import { PRIORITY_CONFIG, TASK_PRIORITIES, CATEGORIES } from "@/lib/tasks/constants";
+import { PRIORITY_CONFIG, TASK_PRIORITIES, CATEGORIES, TASK_STATUSES, TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
 import { formatDueDate, calculateProgress } from "@/lib/tasks/utils";
 import { updateTask, deleteTask, addAssignee, removeAssignee, addChecklistItem, updateChecklistItem, deleteChecklistItem } from "@/lib/tasks/actions";
 import { getChecklistItems } from "@/lib/tasks/queries";
@@ -47,7 +47,7 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
   "완료": "text-emerald-500",
 };
 
-type EditingField = "priority" | "category" | "assignee" | "period" | null;
+type EditingField = "status" | "priority" | "category" | "assignee" | "period" | null;
 
 function formatPeriod(startDate: string | null | undefined, dueDate: string | null | undefined): string {
   const fmt = (d: string) => {
@@ -158,6 +158,17 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
       refresh();
     } catch (error) {
       console.error("체크리스트 추가 실패:", error);
+    }
+  };
+
+  const handleStatusChange = async (status: TaskStatus) => {
+    setEditingField(null);
+    if (status === task.status) return;
+    try {
+      await updateTask(task.id, { status });
+      refresh();
+    } catch (error) {
+      console.error("진행상태 변경 실패:", error);
     }
   };
 
@@ -288,6 +299,46 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
               </div>
             )}
           </div>
+        </td>
+
+        {/* 진행상태 — 인라인 수정 */}
+        <td className="px-4 py-3 relative">
+          <div onClick={openField("status")} title="클릭하여 수정">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2 py-1 ${TASK_STATUS_CONFIG[task.status].bg} ${TASK_STATUS_CONFIG[task.status].text} text-[11px] font-bold rounded-md cursor-pointer hover:ring-2 hover:ring-indigo-200 transition-all`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${TASK_STATUS_CONFIG[task.status].dot}`} />
+              {task.status}
+            </span>
+          </div>
+          {editingField === "status" && (
+            <div
+              ref={dropdownRef}
+              className="absolute top-full left-2 mt-1 z-30 bg-white rounded-xl shadow-lg border border-slate-100 py-1 min-w-[120px]"
+            >
+              {TASK_STATUSES.map((s) => {
+                const sc = TASK_STATUS_CONFIG[s];
+                return (
+                  <button
+                    key={s}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStatusChange(s);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                      task.status === s ? "bg-slate-50" : ""
+                    }`}
+                  >
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold ${sc.bg} ${sc.text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                      {s}
+                    </span>
+                    {task.status === s && <Check size={14} className="text-indigo-600 ml-auto" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </td>
 
         {/* 우선순위 — 인라인 수정 */}
@@ -505,7 +556,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
       {/* 체크리스트 펼침 행 */}
       {checklistOpen && (
         <tr>
-          <td colSpan={6} className="px-0 py-0">
+          <td colSpan={7} className="px-0 py-0">
             <div className={`${isSubtask ? "ml-14" : "ml-10"} mr-4 mb-3 mt-1 bg-slate-50 rounded-2xl p-4 border border-slate-100`}>
               {checklistLoading ? (
                 <div className="flex items-center gap-2 text-sm text-slate-400">

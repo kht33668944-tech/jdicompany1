@@ -418,6 +418,7 @@ export default function ListView({ groupedTasks, allTasks, onTaskClick, profiles
                   <thead>
                     <tr className="border-b border-slate-50">
                       <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase">할일명</th>
+                      <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-24">진행상태</th>
                       <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-24">우선순위</th>
                       <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-28">카테고리</th>
                       <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase w-28">담당자</th>
