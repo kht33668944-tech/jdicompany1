@@ -30,6 +30,13 @@
 - 요청 상태: `"대기중"` → `"승인"` / `"반려"`, 승인 후 `"취소요청"` → `"취소"` 가능
 - Admin 액션은 `requireAdmin()` 체크 필수
 
+## 점심시간 공제
+
+- `attendance_records.total_minutes` GENERATED 컬럼에서 자동 처리
+- 정책: `check_out - check_in > 240분`일 때만 -60분
+- 클라이언트는 이 컬럼값을 그대로 소비 (별도 공제 로직 없음)
+- 정책 변경 시 migration 065 식만 수정
+
 ## 데이터 페칭
 
 - `page.tsx`에서 admin/일반 분기하여 `Promise.all()` 병렬 fetch
