@@ -66,11 +66,6 @@ export default function EmployeeCard({
                   지각 {stats.lateCount}
                 </span>
               )}
-              {stats.earlyLeaveCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-600">
-                  조퇴 {stats.earlyLeaveCount}
-                </span>
-              )}
             </div>
           </div>
           <div className="flex gap-6 mt-2 text-xs text-slate-500">
