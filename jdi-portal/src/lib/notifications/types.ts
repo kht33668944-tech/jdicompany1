@@ -17,7 +17,9 @@ export type NotificationType =
   | "hire_date_rejected"
   | "ip_change_requested"
   | "ip_change_approved"
-  | "ip_change_rejected";
+  | "ip_change_rejected"
+  | "report_submitted"
+  | "report_status_changed";
 
 export interface Notification {
   id: string;

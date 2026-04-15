@@ -17,6 +17,7 @@ import {
   Checks,
   ChatCircle,
   WifiHigh,
+  Bug,
 } from "phosphor-react";
 import { createClient } from "@/lib/supabase/client";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
@@ -52,6 +53,8 @@ const TYPE_ICONS: Record<NotificationType, React.ElementType> = {
   ip_change_requested: WifiHigh,
   ip_change_approved: CheckCircle,
   ip_change_rejected: XCircle,
+  report_submitted: Bug,
+  report_status_changed: ArrowsClockwise,
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -74,6 +77,8 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   ip_change_requested: "text-violet-500 bg-violet-50",
   ip_change_approved: "text-emerald-500 bg-emerald-50",
   ip_change_rejected: "text-red-500 bg-red-50",
+  report_submitted: "text-rose-500 bg-rose-50",
+  report_status_changed: "text-amber-500 bg-amber-50",
 };
 
 interface NotificationCenterProps {

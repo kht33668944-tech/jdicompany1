@@ -112,6 +112,8 @@ const SETTING_KEY_BY_TYPE: Record<string, string> = {
   system_announce: "system_announce",
   signup_pending: "system_announce",
   chat_message: "chat_message_notify",
+  report_submitted: "system_announce",
+  report_status_changed: "system_announce",
 };
 
 // ============================================================

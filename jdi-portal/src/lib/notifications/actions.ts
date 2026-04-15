@@ -99,6 +99,61 @@ export async function createNotificationForMany(
   }
 }
 
+/** 오류접수 제출 — 개발자 전원에게 알림 (작성자 제외) */
+export async function notifyReportSubmitted(params: {
+  reportId: string;
+  title: string;
+  authorId: string;
+}) {
+  try {
+    const supabase = await createClient();
+    const { data: devs } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "developer")
+      .neq("id", params.authorId);
+    if (!devs || devs.length === 0) return;
+    await createNotificationForMany(
+      devs.map((d) => d.id),
+      {
+        type: "report_submitted",
+        title: "새 오류접수",
+        body: params.title,
+        link: `/dashboard/reports`,
+      }
+    );
+  } catch {
+    // ignore
+  }
+}
+
+/** 오류접수 상태 변경 — 작성자에게 알림 (본인이 변경하면 스킵) */
+export async function notifyReportStatusChanged(params: {
+  reportId: string;
+  newStatus: string;
+}) {
+  try {
+    const supabase = await createClient();
+    const { data: report } = await supabase
+      .from("reports")
+      .select("user_id, title")
+      .eq("id", params.reportId)
+      .single();
+    if (!report) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id === report.user_id) return;
+    await createNotification({
+      userId: report.user_id,
+      type: "report_status_changed",
+      title: `오류접수가 "${params.newStatus}" 상태로 변경되었습니다`,
+      body: report.title,
+      link: `/dashboard/reports`,
+    });
+  } catch {
+    // ignore
+  }
+}
+
 /** 알림 읽음 처리 — 세션 사용자 본인의 알림만 */
 export async function markAsRead(notificationId: string) {
   const supabase = await createClient();

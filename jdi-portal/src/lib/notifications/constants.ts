@@ -23,6 +23,8 @@ export const NOTIFICATION_TYPE_CONFIG: Record<
   ip_change_requested: { label: "IP 변경 요청", icon: "WifiHigh", color: "text-violet-500" },
   ip_change_approved: { label: "IP 변경 승인", icon: "CheckCircle", color: "text-emerald-500" },
   ip_change_rejected: { label: "IP 변경 반려", icon: "XCircle", color: "text-red-500" },
+  report_submitted: { label: "새 오류접수", icon: "Bug", color: "text-rose-500" },
+  report_status_changed: { label: "오류접수 처리 상태", icon: "ArrowsClockwise", color: "text-amber-500" },
 };
 
 /** notification_settings 컬럼 → NotificationType[] 매핑 */
@@ -30,6 +32,6 @@ export const SETTING_TYPE_MAP: Record<string, NotificationType[]> = {
   vacation_notify: ["vacation_approved", "vacation_rejected"],
   schedule_remind: ["schedule_invite"],
   task_deadline: ["task_deadline", "task_assigned", "task_comment", "task_status_changed"],
-  system_announce: ["system_announce", "signup_pending"],
+  system_announce: ["system_announce", "signup_pending", "report_submitted", "report_status_changed"],
   chat_message_notify: ["chat_message"],
 };

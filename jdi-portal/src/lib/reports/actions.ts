@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import type { ReportType, ReportPage, ReportStatus, ReportAttachment } from "./types";
 import { validateFile } from "@/lib/utils/upload";
+import { notifyReportSubmitted, notifyReportStatusChanged } from "@/lib/notifications/actions";
 
 function getSupabase() {
   return createClient();
@@ -28,6 +29,11 @@ export async function createReport(params: {
     .single();
 
   if (error) throw error;
+  notifyReportSubmitted({
+    reportId: data.id,
+    title: params.title,
+    authorId: params.userId,
+  }).catch(() => {});
   return data;
 }
 
@@ -68,6 +74,7 @@ export async function updateReportStatus(reportId: string, status: ReportStatus)
     .eq("id", reportId);
 
   if (error) throw error;
+  notifyReportStatusChanged({ reportId, newStatus: status }).catch(() => {});
 }
 
 export async function deleteReport(reportId: string) {

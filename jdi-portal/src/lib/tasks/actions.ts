@@ -460,15 +460,19 @@ async function sendCommentNotifications(
 ) {
   try {
     const supabase = await createClient();
-    const { data: assignees } = await supabase
-      .from("task_assignees")
-      .select("user_id")
-      .eq("task_id", taskId)
-      .neq("user_id", userId);
+    const [assigneesRes, taskRes] = await Promise.all([
+      supabase.from("task_assignees").select("user_id").eq("task_id", taskId),
+      supabase.from("tasks").select("created_by").eq("id", taskId).single(),
+    ]);
 
-    if (assignees && assignees.length > 0) {
+    const recipients = new Set<string>();
+    (assigneesRes.data ?? []).forEach((a) => recipients.add(a.user_id));
+    if (taskRes.data?.created_by) recipients.add(taskRes.data.created_by);
+    recipients.delete(userId);
+
+    if (recipients.size > 0) {
       await createNotificationForMany(
-        assignees.map((a) => a.user_id),
+        Array.from(recipients),
         {
           type: "task_comment",
           title: "할일에 새 댓글이 달렸습니다",
