@@ -49,7 +49,7 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
     }
   };
 
-  const handleRoleChange = async (userId: string, role: "employee" | "admin") => {
+  const handleRoleChange = async (userId: string, role: "employee" | "admin" | "developer") => {
     setLoading(true);
     setFeedback(null);
     try {
@@ -252,11 +252,12 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
                 <td className="py-4 px-2">
                   <select
                     value={p.role}
-                    onChange={(e) => handleRoleChange(p.id, e.target.value as "employee" | "admin")}
+                    onChange={(e) => handleRoleChange(p.id, e.target.value as "employee" | "admin" | "developer")}
                     disabled={loading}
                     className="text-xs bg-slate-50 border-none rounded-lg px-2 py-1 focus:ring-0 cursor-pointer font-medium"
                   >
                     <option value="admin">관리자</option>
+                    <option value="developer">개발자</option>
                     <option value="employee">사용자</option>
                   </select>
                 </td>

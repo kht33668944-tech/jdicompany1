@@ -181,7 +181,7 @@ export default function ReportsPageClient({
               report={report}
               onClick={() => setSelectedReport(report)}
               onStatusChange={handleStatusChange}
-              isAdmin={userRole === "admin"}
+              isAdmin={userRole === "admin" || userRole === "developer"}
             />
           ))
         )}

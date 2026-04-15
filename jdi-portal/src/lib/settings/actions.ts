@@ -341,7 +341,7 @@ export async function rejectIpChangeRequest(
 
 export async function updateUserRole(
   userId: string,
-  role: "employee" | "admin"
+  role: "employee" | "admin" | "developer"
 ) {
   await requireAdmin();
   const supabase = await createClient();

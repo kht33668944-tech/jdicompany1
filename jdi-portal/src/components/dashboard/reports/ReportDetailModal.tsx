@@ -79,6 +79,7 @@ export default function ReportDetailModal({
 
   const isAuthor = report?.user_id === userId;
   const isAdmin = userRole === "admin";
+  const canManageStatus = userRole === "admin" || userRole === "developer";
 
   useEffect(() => {
     if (!open || !report) return;
@@ -384,8 +385,8 @@ export default function ReportDetailModal({
             </div>
           )}
 
-          {/* Admin: status change */}
-          {!editing && isAdmin && (
+          {/* Admin/Developer: status change */}
+          {!editing && canManageStatus && (
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-slate-700">처리 상태 변경</h4>
               <div className="relative w-48">
