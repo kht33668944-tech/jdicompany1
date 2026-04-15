@@ -1,8 +1,8 @@
 "use client";
 
-import { Briefcase, ClockAfternoon, CheckCircle, Warning } from "phosphor-react";
+import { Briefcase, ClockAfternoon, Scales, Warning } from "phosphor-react";
 import type { AttendanceStats } from "@/lib/attendance/stats";
-import { formatMinutes } from "@/lib/utils/date";
+import { formatMinutes, formatSignedMinutes } from "@/lib/utils/date";
 
 interface RecordsSummaryCardsProps {
   stats: AttendanceStats;
@@ -11,8 +11,11 @@ interface RecordsSummaryCardsProps {
 
 export default function RecordsSummaryCards({ stats, prevStats }: RecordsSummaryCardsProps) {
   const daysDiff = prevStats ? stats.totalDays - prevStats.totalDays : null;
-  const onTimeRateDiff = prevStats ? stats.onTimeRate - prevStats.onTimeRate : null;
   const lateTimeDiff = prevStats ? stats.avgLateMinutes - prevStats.avgLateMinutes : null;
+
+  const diffLabel = formatSignedMinutes(stats.totalDiffMinutes);
+  const diffIsPositive = stats.totalDiffMinutes > 0;
+  const diffIsZero = stats.totalDiffMinutes === 0;
 
   const cards = [
     {
@@ -32,15 +35,17 @@ export default function RecordsSummaryCards({ stats, prevStats }: RecordsSummary
       diffPositive: null,
       icon: ClockAfternoon,
       iconColor: "text-emerald-500",
+      valueColor: null as string | null,
     },
     {
-      label: "정상 출근률",
-      value: `${stats.onTimeRate}`,
-      unit: "%",
-      diff: onTimeRateDiff !== null ? `전월 대비 ${Math.abs(onTimeRateDiff)}% ${onTimeRateDiff >= 0 ? "증가" : "감소"}` : null,
-      diffPositive: onTimeRateDiff !== null ? onTimeRateDiff >= 0 : null,
-      icon: CheckCircle,
-      iconColor: "text-blue-500",
+      label: "누적 초과/부족",
+      value: diffLabel,
+      unit: "",
+      diff: null,
+      diffPositive: null,
+      icon: Scales,
+      iconColor: diffIsZero ? "text-slate-400" : diffIsPositive ? "text-emerald-500" : "text-red-500",
+      valueColor: diffIsZero ? "text-slate-600" : diffIsPositive ? "text-emerald-600" : "text-red-600",
     },
     {
       label: "평균 지각시간",
@@ -66,7 +71,7 @@ export default function RecordsSummaryCards({ stats, prevStats }: RecordsSummary
               <Icon size={18} className={card.iconColor} />
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold text-slate-800">{card.value}</span>
+              <span className={`text-2xl font-bold ${("valueColor" in card && card.valueColor) || "text-slate-800"}`}>{card.value}</span>
               {card.unit && <span className="text-sm text-slate-500">{card.unit}</span>}
             </div>
             {card.diff && (

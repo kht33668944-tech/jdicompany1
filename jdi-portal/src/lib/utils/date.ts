@@ -70,6 +70,18 @@ export function formatMinutes(minutes: number | null): string {
   return `${h}시간 ${m}분`;
 }
 
+/** 부호 있는 분을 "+1시간 30분" / "-45분" / "정시" 로 포맷 */
+export function formatSignedMinutes(minutes: number): string {
+  if (minutes === 0) return "정시";
+  const sign = minutes > 0 ? "+" : "-";
+  const abs = Math.abs(minutes);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  if (h === 0) return `${sign}${m}분`;
+  if (m === 0) return `${sign}${h}시간`;
+  return `${sign}${h}시간 ${m}분`;
+}
+
 export function formatDate(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
     timeZone: APP_TIME_ZONE,

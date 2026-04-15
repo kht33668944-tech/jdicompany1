@@ -129,6 +129,25 @@ export async function getCorrectionRequests(
   return data ?? [];
 }
 
+/** 기간 내 겹치는 승인된 휴가를 사용자 단위로 조회. */
+export async function getApprovedVacationsByRange(
+  supabase: SupabaseClient,
+  userIds: string[],
+  startDate: string,
+  endDate: string
+): Promise<VacationRequest[]> {
+  if (userIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("vacation_requests")
+    .select("*")
+    .in("user_id", userIds)
+    .eq("status", "승인")
+    .lte("start_date", endDate)
+    .gte("end_date", startDate);
+  if (error) throw error;
+  return (data as VacationRequest[]) ?? [];
+}
+
 export async function getEmployeeRecordsByRange(
   supabase: SupabaseClient,
   userId: string,

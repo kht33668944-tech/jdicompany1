@@ -1,4 +1,10 @@
-import type { AttendanceRecord } from "./types";
+import type { AttendanceRecord, VacationType } from "./types";
+
+/** 날짜 → 휴가 타입 매핑 (승인된 휴가에서 해당 기간 펼침) */
+export type VacationByDate = Record<string, VacationType>;
+
+const LUNCH_MINUTES = 60;
+const LUNCH_THRESHOLD = 240; // 4시간 초과 시 점심 공제
 
 const DEFAULT_WORK_START = "09:00:00";
 const DEFAULT_WORK_END = "18:00:00";
@@ -62,17 +68,75 @@ export interface AttendanceStats {
   normalCount: number;
   lateCount: number;
   earlyLeaveCount: number;
+  /** 기간 내 누적 초과(+) / 부족(-) 근무 분. 퇴근 완료된 날 + 반차만 합산. */
+  totalDiffMinutes: number;
 }
 
 export const EMPTY_STATS: AttendanceStats = {
   totalDays: 0, avgWorkMinutes: 0, onTimeRate: 0,
   avgLateMinutes: 0, avgCheckInMinutes: 0, avgCheckOutMinutes: 0,
   normalCount: 0, lateCount: 0, earlyLeaveCount: 0,
+  totalDiffMinutes: 0,
 };
+
+/**
+ * 해당 날의 기준 근무시간(분). 점심 60분 제외.
+ * 반차는 4시간 고정(점심 없음). 종일 휴가는 0 반환(diff 계산 제외 용도).
+ */
+export function calcDayStandardMinutes(
+  workStart: string,
+  workEnd: string,
+  vacationType?: VacationType
+): number {
+  if (vacationType === "연차" || vacationType === "병가" || vacationType === "특별휴가") {
+    return 0;
+  }
+  if (vacationType === "반차-오전" || vacationType === "반차-오후") {
+    return 240;
+  }
+  return timeStringToMinutes(workEnd) - timeStringToMinutes(workStart) - LUNCH_MINUTES;
+}
+
+/**
+ * 해당 날의 실제 근무시간(분).
+ * 반차 날은 DB total_minutes가 점심 공제된 값일 수 있으므로 raw(check_out - check_in)로 재계산.
+ * 일반 날은 DB total_minutes 사용(이미 점심 공제됨).
+ */
+export function calcDayActualMinutes(
+  record: AttendanceRecord,
+  vacationType?: VacationType
+): number | null {
+  if (!record.check_in || !record.check_out) return null;
+  if (vacationType === "반차-오전" || vacationType === "반차-오후") {
+    const inMs = new Date(record.check_in).getTime();
+    const outMs = new Date(record.check_out).getTime();
+    return Math.round((outMs - inMs) / 60000);
+  }
+  return record.total_minutes ?? null;
+}
+
+/** 기간 내 승인된 휴가를 날짜별 맵으로 펼친다. */
+export function expandVacationsByDate(
+  vacations: { vacation_type: VacationType; start_date: string; end_date: string }[]
+): VacationByDate {
+  const map: VacationByDate = {};
+  for (const v of vacations) {
+    let cursor = v.start_date;
+    while (cursor <= v.end_date) {
+      map[cursor] = v.vacation_type;
+      // 다음 날로 이동
+      const d = new Date(`${cursor}T12:00:00+09:00`);
+      d.setDate(d.getDate() + 1);
+      cursor = d.toISOString().slice(0, 10);
+    }
+  }
+  return map;
+}
 
 export function calcAttendanceStats(
   records: AttendanceRecord[],
-  schedules: WorkScheduleEntry[]
+  schedules: WorkScheduleEntry[],
+  vacationsByDate: VacationByDate = {}
 ): AttendanceStats {
   const checkedInRecords = records.filter((r) => r.check_in);
   const totalDays = checkedInRecords.length;
@@ -86,11 +150,13 @@ export function calcAttendanceStats(
   let lateCount = 0;
   let totalLateMinutes = 0;
   let earlyLeaveCount = 0;
+  let totalDiffMinutes = 0;
 
   for (const record of checkedInRecords) {
     const { workStart, workEnd } = getScheduleForDate(schedules, record.work_date);
     const workStartMin = timeStringToMinutes(workStart);
     const workEndMin = timeStringToMinutes(workEnd);
+    const vacType = vacationsByDate[record.work_date];
 
     const checkInMin = extractTimeMinutes(record.check_in!);
     totalCheckInMinutes += checkInMin;
@@ -108,6 +174,10 @@ export function calcAttendanceStats(
       if (checkOutMin < workEndMin) {
         earlyLeaveCount++;
       }
+
+      const actual = calcDayActualMinutes(record, vacType) ?? 0;
+      const standard = calcDayStandardMinutes(workStart, workEnd, vacType);
+      totalDiffMinutes += actual - standard;
     }
 
     if (record.total_minutes) {
@@ -127,6 +197,7 @@ export function calcAttendanceStats(
     normalCount,
     lateCount,
     earlyLeaveCount,
+    totalDiffMinutes,
   };
 }
 

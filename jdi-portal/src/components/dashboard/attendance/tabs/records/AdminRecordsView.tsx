@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Users } from "phosphor-react";
 import { createClient } from "@/lib/supabase/client";
-import { calcAttendanceStats, EMPTY_STATS } from "@/lib/attendance/stats";
-import type { AttendanceRecord, Profile, WorkSchedule } from "@/lib/attendance/types";
-import type { AttendanceStats } from "@/lib/attendance/stats";
-import { getWorkSchedulesForUser } from "@/lib/attendance/queries";
+import { calcAttendanceStats, EMPTY_STATS, expandVacationsByDate } from "@/lib/attendance/stats";
+import type { AttendanceRecord, Profile, WorkSchedule, VacationRequest } from "@/lib/attendance/types";
+import type { AttendanceStats, VacationByDate } from "@/lib/attendance/stats";
+import { getWorkSchedulesForUser, getApprovedVacationsByRange } from "@/lib/attendance/queries";
 import { getMonthRange } from "@/lib/utils/date";
 import dynamic from "next/dynamic";
 import RecordsFilter from "./RecordsFilter";
@@ -39,6 +39,7 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
   const [selectedUserId, setSelectedUserId] = useState(profile.id);
   const [employeeRecords, setEmployeeRecords] = useState<Map<string, AttendanceRecord[]>>(new Map());
   const [employeeStats, setEmployeeStats] = useState<Map<string, AttendanceStats>>(new Map());
+  const [employeeVacations, setEmployeeVacations] = useState<Map<string, VacationByDate>>(new Map());
   const [prevStats, setPrevStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [employeeSchedules, setEmployeeSchedules] = useState<WorkSchedule[]>([]);
@@ -67,18 +68,30 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
     const supabase = createClient();
     const newRecords = new Map<string, AttendanceRecord[]>();
     const newStats = new Map<string, AttendanceStats>();
+    const newVacations = new Map<string, VacationByDate>();
 
     const targetProfiles = isAdmin ? allProfiles : [profile];
     const ids = targetProfiles.map((p) => p.id);
 
-    const { data, error } = await supabase
-      .from("attendance_records")
-      .select("*")
-      .in("user_id", ids)
-      .gte("work_date", startDate)
-      .lte("work_date", endDate)
-      .order("work_date", { ascending: false });
+    const [recordsResult, vacations] = await Promise.all([
+      supabase
+        .from("attendance_records")
+        .select("*")
+        .in("user_id", ids)
+        .gte("work_date", startDate)
+        .lte("work_date", endDate)
+        .order("work_date", { ascending: false }),
+      getApprovedVacationsByRange(supabase, ids, startDate, endDate),
+    ]);
 
+    const vacationsByUser = new Map<string, VacationRequest[]>();
+    for (const v of vacations) {
+      const arr = vacationsByUser.get(v.user_id) ?? [];
+      arr.push(v);
+      vacationsByUser.set(v.user_id, arr);
+    }
+
+    const { data, error } = recordsResult;
     if (!error && data) {
       const byUser = new Map<string, typeof data>();
       for (const r of data) {
@@ -88,13 +101,16 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
       }
       for (const p of targetProfiles) {
         const records = byUser.get(p.id) ?? [];
+        const vacMap = expandVacationsByDate(vacationsByUser.get(p.id) ?? []);
         newRecords.set(p.id, records);
-        newStats.set(p.id, calcAttendanceStats(records, p.id === profile.id ? workSchedules : []));
+        newVacations.set(p.id, vacMap);
+        newStats.set(p.id, calcAttendanceStats(records, p.id === profile.id ? workSchedules : [], vacMap));
       }
     }
 
     setEmployeeRecords(newRecords);
     setEmployeeStats(newStats);
+    setEmployeeVacations(newVacations);
     setLoading(false);
   }, [startDate, endDate, allProfiles, profile, isAdmin, workSchedules]);
 
@@ -109,16 +125,20 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
 
     const targetProfile = allProfiles.find((p) => p.id === targetUserId) ?? profile;
 
-    const { data } = await supabase
-      .from("attendance_records")
-      .select("*")
-      .eq("user_id", targetUserId)
-      .gte("work_date", prevRange.start)
-      .lte("work_date", prevRange.end);
+    const [{ data }, prevVacations] = await Promise.all([
+      supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("user_id", targetUserId)
+        .gte("work_date", prevRange.start)
+        .lte("work_date", prevRange.end),
+      getApprovedVacationsByRange(supabase, [targetUserId], prevRange.start, prevRange.end),
+    ]);
 
     if (data) {
       const schedulesForTarget = targetProfile.id === profile.id ? workSchedules : employeeSchedules;
-      setPrevStats(calcAttendanceStats(data, schedulesForTarget));
+      const vacMap = expandVacationsByDate(prevVacations);
+      setPrevStats(calcAttendanceStats(data, schedulesForTarget, vacMap));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, allProfiles, profile, workSchedules, employeeSchedules]);
@@ -220,6 +240,9 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
                 periodLabel={periodLabel}
                 workSchedules={selectedUserId === profile.id ? workSchedules : employeeSchedules}
                 isOwnRecord={selectedProfile.id === profile.id || isAdmin}
+                vacationsByDate={employeeVacations.get(selectedUserId) ?? {}}
+                rangeStart={startDate}
+                rangeEnd={endDate}
               />
               <AttendanceCharts records={selectedRecords} />
             </>
