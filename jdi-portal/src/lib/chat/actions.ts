@@ -81,9 +81,23 @@ export async function updateChannel(
 
 export async function deleteChannel(channelId: string): Promise<void> {
   const supabase = getSupabase();
-  // SECURITY DEFINER RPC — 권한 체크와 명확한 에러 메시지를 DB에서 처리
-  // (기존 .from("channels").delete()는 RLS 침묵 실패 시 오류 없이 0 rows 반환되어
-  //  사용자는 성공한 것처럼 보이지만 실제로는 삭제가 안 되는 문제가 있었음)
+
+  // 1. 첨부파일 정리 — Supabase가 storage.objects 직접 DELETE를 차단하므로
+  //    반드시 Storage API(.remove())를 통해 삭제해야 한다.
+  //    (마이그레이션 071에서 DB 트리거 제거됨)
+  try {
+    const { data: objects } = await supabase.storage
+      .from("chat-attachments")
+      .list(channelId, { limit: 1000 });
+    if (objects && objects.length > 0) {
+      const paths = objects.map((o) => `${channelId}/${o.name}`);
+      await supabase.storage.from("chat-attachments").remove(paths);
+    }
+  } catch {
+    // 파일 정리는 실패해도 채널 삭제는 진행 (orphan 파일은 허용)
+  }
+
+  // 2. 채널 삭제 — SECURITY DEFINER RPC 로 권한 체크 + 명확한 에러 메시지 제공
   const { error } = await supabase.rpc("delete_chat_channel", {
     p_channel_id: channelId,
   });
