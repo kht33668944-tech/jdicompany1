@@ -9,10 +9,20 @@
  * 캐시 버전: 코드 변경 시 CACHE_VERSION 을 올리면 구버전 자동 삭제
  */
 
-const CACHE_VERSION = "jdi-v2-push";
+const CACHE_VERSION = "jdi-v3-dev-skip";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGES_CACHE = `${CACHE_VERSION}-pages`;
 const OFFLINE_URL = "/offline";
+
+// dev 서버(localhost)에서는 캐싱을 완전히 건너뛴다.
+// — 이유: dev 에서 HTML 을 캐시하면 서버 번들과 브라우저가 불일치해
+//   하이드레이션 미스매치(특히 탭 이동 후 재개 시점)가 발생한다.
+const IS_DEV_HOST =
+  self.location.hostname === "localhost" ||
+  self.location.hostname === "127.0.0.1" ||
+  self.location.hostname.startsWith("172.") ||
+  self.location.hostname.startsWith("192.168.") ||
+  self.location.hostname.startsWith("10.");
 
 // 설치 시 오프라인 페이지 미리 캐시
 self.addEventListener("install", (event) => {
@@ -71,6 +81,10 @@ function isNoCache(url, request) {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
+
+  // dev 호스트는 SW 가 아무것도 가로채지 않는다 — 브라우저가 직접 fetch.
+  // (HTML 캐시 때문에 서버 번들과 클라이언트 렌더가 불일치하는 문제 방지)
+  if (IS_DEV_HOST) return;
 
   const url = new URL(request.url);
   // 외부 origin 은 패스
