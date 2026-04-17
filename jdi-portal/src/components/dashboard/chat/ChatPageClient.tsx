@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { getMessages as fetchMessages, getChannelById } from "@/lib/chat/queries";
-import { ensureMemoChannel, markAsRead } from "@/lib/chat/actions";
+import { ensureMemoChannel, markAsRead, getAllProfiles } from "@/lib/chat/actions";
+import { openOrCreateDm } from "@/lib/chat/dm";
 import { parseFileContent } from "@/lib/chat/utils";
 import {
   getCachedMessages,
@@ -12,7 +13,7 @@ import {
   upsertCachedMessage,
 } from "@/lib/chat/messageCache";
 import { showDesktopNotification } from "@/lib/notifications/desktop";
-import type { ChannelWithDetails, Message, Channel } from "@/lib/chat/types";
+import type { ChannelWithDetails, Message, Channel, ApprovedProfile } from "@/lib/chat/types";
 import ChannelList from "./ChannelList";
 import ChatRoom from "./ChatRoom";
 import EmptyState from "./EmptyState";
@@ -62,6 +63,8 @@ function ChatPageClientInner({
   const [mobileShowChat, setMobileShowChat] = useState(!!initialChannel);
   const [mutedChannels, setMutedChannels] = useState<Set<string>>(new Set());
   const [favoriteChannels, setFavoriteChannels] = useState<Set<string>>(new Set());
+  const [people, setPeople] = useState<ApprovedProfile[]>([]);
+  const [pendingDmForPartner, setPendingDmForPartner] = useState<string | null>(null);
   const onlineUsers = usePresence(userId);
   // 현재 선택된 채널의 멤버 ID 셋 — 채널별 온라인 인원 계산용
   const [selectedChannelMemberIds, setSelectedChannelMemberIds] = useState<Set<string>>(new Set());
@@ -144,6 +147,21 @@ function ChatPageClientInner({
     setSelectedChannelMemberIds(new Set());
   }, [selectedChannel]);
 
+  // DM별 안읽은 수를 상대방 id → count 로 매핑 (직원 목록 뱃지에 사용)
+  const dmUnreadByPartner = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const ch of channels) {
+      if (ch.type !== "dm") continue;
+      if (!ch.dm_partner_id) continue;
+      if (ch.unread_count > 0) map.set(ch.dm_partner_id, ch.unread_count);
+    }
+    return map;
+  }, [channels]);
+
+  const selectedDmPartnerId = selectedChannel?.type === "dm"
+    ? selectedChannel.dm_partner_id ?? null
+    : null;
+
   // 현재 채널 멤버 중 온라인인 사람 수 (전체 온라인 X)
   const channelOnlineCount = useMemo(() => {
     if (selectedChannelMemberIds.size === 0) return 0;
@@ -153,6 +171,15 @@ function ChatPageClientInner({
     }
     return count;
   }, [selectedChannelMemberIds, onlineUsers]);
+
+  // 직원 목록 로드 (본인 제외, 승인된 사용자만)
+  useEffect(() => {
+    getAllProfiles()
+      .then((list) => {
+        setPeople(list.filter((p) => p.id !== userId));
+      })
+      .catch(() => { /* silent — 직원 섹션만 비어 보임 */ });
+  }, [userId]);
 
   // Ensure memo channel exists on mount
   useEffect(() => {
@@ -371,6 +398,58 @@ function ChatPageClientInner({
     []
   );
 
+  const handleSelectPerson = useCallback(
+    async (person: ApprovedProfile) => {
+      // 이미 채널 있으면 즉시 선택 (RPC 왕복 없이)
+      const existing = channelsRef.current.find(
+        (ch) => ch.type === "dm" && ch.dm_partner_id === person.id
+      );
+      if (existing) {
+        handleSelectChannel(existing);
+        return;
+      }
+
+      if (pendingDmForPartner === person.id) return;
+      setPendingDmForPartner(person.id);
+
+      try {
+        const channelId = await openOrCreateDm(person.id);
+        const supabase = createClient();
+        const { data: ch } = await supabase
+          .from("channels")
+          .select("*")
+          .eq("id", channelId)
+          .single();
+
+        if (!ch) throw new Error("채널을 찾을 수 없습니다.");
+
+        const withDetails: ChannelWithDetails = {
+          ...(ch as Channel),
+          members: [],
+          member_count: 2,
+          last_message: null,
+          unread_count: 0,
+          dm_partner_id: person.id,
+          members_preview: [
+            { id: person.id, full_name: person.full_name, avatar_url: person.avatar_url },
+          ],
+        };
+
+        setChannels((prev) => {
+          if (prev.some((c) => c.id === withDetails.id)) return prev;
+          return [withDetails, ...prev];
+        });
+        handleSelectChannel(withDetails);
+      } catch (err) {
+        console.error("DM 열기 실패:", err);
+        toast.error("대화방을 열지 못했습니다.");
+      } finally {
+        setPendingDmForPartner(null);
+      }
+    },
+    [handleSelectChannel, pendingDmForPartner]
+  );
+
   const handleCreateChannel = useCallback(() => {
     setShowCreateModal(true);
   }, []);
@@ -427,7 +506,7 @@ function ChatPageClientInner({
     });
   }, []);
 
-  const hasChannels = channels.length > 0;
+  const hasSidebarContent = channels.length > 0 || people.length > 0;
 
   return (
     <>
@@ -439,13 +518,18 @@ function ChatPageClientInner({
             mobileShowChat ? "hidden md:flex" : "flex"
           } w-full md:w-auto`}
         >
-          {hasChannels ? (
+          {hasSidebarContent ? (
             <ChannelList
               channels={channels}
+              people={people}
+              onlineUserIds={onlineUsers}
+              dmUnreadByPartner={dmUnreadByPartner}
               selectedChannelId={selectedChannel?.id}
+              selectedPartnerId={selectedDmPartnerId ?? undefined}
               mutedChannels={mutedChannels}
               favoriteChannels={favoriteChannels}
               onSelectChannel={handleSelectChannel}
+              onSelectPerson={handleSelectPerson}
               onCreateClick={handleCreateChannel}
             />
           ) : (
