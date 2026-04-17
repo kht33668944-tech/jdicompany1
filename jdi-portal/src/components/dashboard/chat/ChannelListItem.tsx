@@ -111,14 +111,12 @@ export default function ChannelListItem({
                 {channel.unread_count > 99 ? "99+" : channel.unread_count}
               </span>
             )}
+            {!isDm && groupMembers.length > 0 && (
+              <AvatarStack members={groupMembers} totalCount={groupTotalOthers} max={3} size={18} />
+            )}
           </div>
         </div>
         <p className="text-xs text-slate-400 truncate mt-0.5">{lastMsgPreview}</p>
-        {!isDm && groupMembers.length > 0 && (
-          <div className="mt-1">
-            <AvatarStack members={groupMembers} totalCount={groupTotalOthers} max={3} size={18} />
-          </div>
-        )}
       </div>
     </button>
   );
