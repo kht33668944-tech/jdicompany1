@@ -67,6 +67,7 @@ export default function ChannelCreateModal({ onClose, userId, onCreated }: Chann
     setSubmitting(true);
     try {
       const channel = await createChannel({
+        type: "group",
         name: name.trim(),
         description: description.trim(),
         memberIds: Array.from(selectedIds),
@@ -89,7 +90,7 @@ export default function ChannelCreateModal({ onClose, userId, onCreated }: Chann
     <ModalContainer onClose={onClose} maxWidth="max-w-[480px]" className="!p-0 !rounded-[32px] overflow-hidden">
       {/* Header */}
       <div className="px-8 pt-8 pb-4 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-900">새 채널 만들기</h2>
+        <h2 className="text-2xl font-bold text-slate-900">새 그룹 만들기</h2>
         <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
           <X size={24} />
         </button>
