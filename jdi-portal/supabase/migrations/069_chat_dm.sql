@@ -61,14 +61,21 @@ BEGIN
     RETURN v_channel_id;
   END IF;
 
-  INSERT INTO public.channels (name, description, type, created_by, dm_pair_key)
-    VALUES ('', '', 'dm', v_user_id, v_pair_key)
-    RETURNING id INTO v_channel_id;
+  BEGIN
+    INSERT INTO public.channels (name, description, type, created_by, dm_pair_key)
+      VALUES ('', '', 'dm', v_user_id, v_pair_key)
+      RETURNING id INTO v_channel_id;
 
-  INSERT INTO public.channel_members (channel_id, user_id, role)
-    VALUES
-      (v_channel_id, v_user_id, 'owner'),
-      (v_channel_id, p_target_user_id, 'member');
+    INSERT INTO public.channel_members (channel_id, user_id, role)
+      VALUES
+        (v_channel_id, v_user_id, 'owner'),
+        (v_channel_id, p_target_user_id, 'member');
+  EXCEPTION WHEN unique_violation THEN
+    -- 동시 호출로 다른 트랜잭션이 먼저 채널을 만들었다면 그 채널 반환
+    SELECT id INTO v_channel_id
+      FROM public.channels
+     WHERE type = 'dm' AND dm_pair_key = v_pair_key;
+  END;
 
   RETURN v_channel_id;
 END;
@@ -205,29 +212,34 @@ BEGIN
   SELECT full_name INTO v_sender_name FROM public.profiles WHERE id = NEW.user_id;
   SELECT name, type INTO v_channel_name, v_channel_type FROM public.channels WHERE id = NEW.channel_id;
 
-  FOR v_token IN
-    SELECT DISTINCT (regexp_matches(NEW.content, '@\[[^|\]]+\|([0-9a-f-]{36})\]', 'g'))[1]::uuid AS mentioned_user
-  LOOP
-    IF v_token.mentioned_user = NEW.user_id THEN
-      CONTINUE;
-    END IF;
-    IF NOT EXISTS (
-      SELECT 1 FROM public.channel_members
-       WHERE channel_id = NEW.channel_id AND user_id = v_token.mentioned_user
-    ) THEN
-      CONTINUE;
-    END IF;
+  BEGIN
+    FOR v_token IN
+      SELECT DISTINCT (regexp_matches(NEW.content, '@\[[^|\]]+\|([0-9a-f-]{36})\]', 'g'))[1]::uuid AS mentioned_user
+    LOOP
+      IF v_token.mentioned_user = NEW.user_id THEN
+        CONTINUE;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM public.channel_members
+         WHERE channel_id = NEW.channel_id AND user_id = v_token.mentioned_user
+      ) THEN
+        CONTINUE;
+      END IF;
 
-    INSERT INTO public.notifications (user_id, type, title, body, link, metadata)
-    VALUES (
-      v_token.mentioned_user,
-      'chat_mention',
-      COALESCE(v_sender_name, '누군가') || '님이 회원님을 언급했습니다',
-      substring(NEW.content from 1 for 200),
-      '/dashboard/chat/' || NEW.channel_id::text,
-      jsonb_build_object('channel_id', NEW.channel_id, 'message_id', NEW.id)
-    );
-  END LOOP;
+      INSERT INTO public.notifications (user_id, type, title, body, link, metadata)
+      VALUES (
+        v_token.mentioned_user,
+        'chat_mention',
+        COALESCE(v_sender_name, '누군가') || '님이 회원님을 언급했습니다',
+        regexp_replace(substring(NEW.content from 1 for 200), '@\[([^|\]]+)\|[0-9a-f-]{36}\]', '@\1', 'g'),
+        '/dashboard/chat/' || NEW.channel_id::text,
+        jsonb_build_object('channel_id', NEW.channel_id, 'message_id', NEW.id)
+      );
+    END LOOP;
+  EXCEPTION WHEN OTHERS THEN
+    -- 알림 실패는 메시지 전송을 막지 않는다
+    NULL;
+  END;
 
   RETURN NEW;
 END;
