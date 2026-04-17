@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { Message, MessageReaction } from "@/lib/chat/types";
 import { formatMessageTime, formatFileSize, parseFileContent } from "@/lib/chat/utils";
 import { getChatFileUrl, toggleReaction, getReactions } from "@/lib/chat/actions";
+import { parseMessageContent } from "@/lib/chat/mentions";
 import { useChatFileUrls } from "./ChatFileUrlsContext";
 import ReadReceiptModal from "./ReadReceiptModal";
 
@@ -366,14 +367,41 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
   // 텍스트 메시지
   return (
     <div className="inline-block">
-      {isReply && (
-        <div className={`flex items-center gap-1 mb-1 text-[10px] ${isOwn ? "justify-end text-blue-300" : "text-slate-400"}`}>
-          <ArrowBendUpLeft size={10} />
-          <span>답장됨</span>
-        </div>
+      {isReply && message.parent_message_id && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const target = document.querySelector<HTMLElement>(`[data-message-id="${message.parent_message_id}"]`);
+            if (target) {
+              target.scrollIntoView({ behavior: "smooth", block: "center" });
+              target.classList.add("ring-2", "ring-blue-400");
+              setTimeout(() => target.classList.remove("ring-2", "ring-blue-400"), 1500);
+            }
+          }}
+          className={`flex items-start gap-1 mb-1 max-w-full text-left text-[11px] px-2 py-1 rounded-lg border-l-2 ${
+            isOwn ? "border-blue-200 bg-blue-500/20 text-blue-100" : "border-blue-400 bg-slate-50 text-slate-500"
+          } hover:opacity-80 transition-opacity`}
+        >
+          <ArrowBendUpLeft size={10} className="mt-0.5 flex-shrink-0" />
+          <span className="truncate">원본 메시지로 이동</span>
+        </button>
       )}
-      <div className={`inline-block px-3 py-2 sm:px-4 sm:py-2.5 ${isOwn ? "bg-blue-600 text-white rounded-2xl rounded-tr-md" : "bg-white border border-slate-100 rounded-2xl rounded-tl-md text-slate-700 shadow-sm"} text-[13px] sm:text-sm leading-relaxed`}>
-        {message.content}
+      <div className={`inline-block whitespace-pre-wrap px-3 py-2 sm:px-4 sm:py-2.5 ${isOwn ? "bg-blue-600 text-white rounded-2xl rounded-tr-md" : "bg-white border border-slate-100 rounded-2xl rounded-tl-md text-slate-700 shadow-sm"} text-[13px] sm:text-sm leading-relaxed`}>
+        {parseMessageContent(message.content).map((seg, i) =>
+          seg.type === "text" ? (
+            <span key={i}>{seg.text}</span>
+          ) : (
+            <span
+              key={i}
+              className={`inline-flex items-center px-1 rounded font-medium ${
+                isOwn ? "bg-blue-500/40 text-white" : "bg-blue-100 text-blue-700"
+              }`}
+            >
+              @{seg.displayName}
+            </span>
+          )
+        )}
         {message.is_edited && (
           <span className={`text-[10px] ml-1 ${isOwn ? "text-blue-200" : "text-slate-400"}`}>(수정됨)</span>
         )}

@@ -293,16 +293,17 @@ export default function MessageList({
                 isOwn={chunk.userId === userId}
               />
             ) : (
-              <MessageItem
-                key={chunk.message.id}
-                message={chunk.message}
-                isOwn={chunk.message.user_id === userId}
-                userId={userId}
-                onEdit={onEditMessage}
-                onDelete={onDeleteMessage}
-                onReply={onReplyMessage}
-                onPin={onPinMessage}
-              />
+              <div key={chunk.message.id} data-message-id={chunk.message.id}>
+                <MessageItem
+                  message={chunk.message}
+                  isOwn={chunk.message.user_id === userId}
+                  userId={userId}
+                  onEdit={onEditMessage}
+                  onDelete={onDeleteMessage}
+                  onReply={onReplyMessage}
+                  onPin={onPinMessage}
+                />
+              </div>
             )
           )}
         </div>
