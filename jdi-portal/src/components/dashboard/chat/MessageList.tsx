@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import type { Message, ChannelWithDetails } from "@/lib/chat/types";
 import { groupMessagesByDate, formatDateDivider, formatMessageTime, parseFileContent } from "@/lib/chat/utils";
@@ -252,6 +252,12 @@ export default function MessageList({
     }
   }
 
+  const messagesById = useMemo(() => {
+    const map = new Map<string, Message>();
+    for (const m of messages) map.set(m.id, m);
+    return map;
+  }, [messages]);
+
   if (messages.length === 0) {
     if (loading) return <MessageSkeleton />;
     return (
@@ -298,6 +304,7 @@ export default function MessageList({
                   message={chunk.message}
                   isOwn={chunk.message.user_id === userId}
                   userId={userId}
+                  parentMessage={chunk.message.parent_message_id ? messagesById.get(chunk.message.parent_message_id) ?? null : null}
                   onEdit={onEditMessage}
                   onDelete={onDeleteMessage}
                   onReply={onReplyMessage}

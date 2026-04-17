@@ -16,10 +16,22 @@ interface MessageItemProps {
   message: Message;
   isOwn: boolean;
   userId: string;
+  parentMessage?: Message | null;
   onEdit?: (message: Message) => void;
   onDelete?: (message: Message) => void;
   onReply?: (message: Message) => void;
   onPin?: (message: Message) => void;
+}
+
+function getParentPreview(parent: Message | null | undefined): string {
+  if (!parent) return "원본 메시지로 이동";
+  if (parent.is_deleted) return "삭제된 메시지";
+  if (parent.type === "image") return "사진";
+  if (parent.type === "file") {
+    const f = parseFileContent(parent.content);
+    return f ? f.name : "파일";
+  }
+  return parent.content;
 }
 
 interface ContextMenuState {
@@ -342,8 +354,10 @@ function ChatFile({ storagePath, fileName, fileSize }: { storagePath: string; fi
 }
 
 /** 메시지 본문 렌더링 (텍스트/이미지/파일) */
-function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }) {
+function MessageContent({ message, isOwn, parentMessage }: { message: Message; isOwn: boolean; parentMessage?: Message | null }) {
   const isReply = !!message.parent_message_id;
+  const parentName = parentMessage?.user_profile?.full_name ?? "";
+  const parentPreview = getParentPreview(parentMessage);
 
   if (message.is_deleted) {
     return (
@@ -364,9 +378,11 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
     }
   }
 
-  // 텍스트 메시지
+  // 텍스트 메시지 — Discord 스타일: 버블 위에 떠 있는 가벼운 인라인 답글 라인
+  const parentAvatar = parentMessage?.user_profile?.avatar_url ?? null;
+
   return (
-    <div className="inline-block">
+    <div className="inline-flex flex-col max-w-full">
       {isReply && message.parent_message_id && (
         <button
           type="button"
@@ -379,15 +395,37 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
               setTimeout(() => target.classList.remove("ring-2", "ring-blue-400"), 1500);
             }
           }}
-          className={`flex items-start gap-1 mb-1 max-w-full text-left text-[11px] px-2 py-1 rounded-lg border-l-2 ${
-            isOwn ? "border-blue-200 bg-blue-500/20 text-blue-100" : "border-blue-400 bg-slate-50 text-slate-500"
-          } hover:opacity-80 transition-opacity`}
+          className={`group flex items-center gap-1 mb-0.5 px-2 max-w-full overflow-hidden hover:opacity-100 opacity-75 transition-opacity ${
+            isOwn ? "self-end flex-row-reverse" : "self-start"
+          }`}
         >
-          <ArrowBendUpLeft size={10} className="mt-0.5 flex-shrink-0" />
-          <span className="truncate">원본 메시지로 이동</span>
+          {/* 곡선 커넥터 */}
+          <svg
+            width="14"
+            height="10"
+            viewBox="0 0 14 10"
+            className="flex-shrink-0 text-slate-300"
+            fill="none"
+            style={isOwn ? { transform: "scaleX(-1)" } : undefined}
+          >
+            <path d="M1 9 V4 Q1 1 4 1 H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          {parentAvatar && (
+            <img
+              src={parentAvatar}
+              alt={parentName}
+              className="w-4 h-4 rounded-full flex-shrink-0 object-cover"
+            />
+          )}
+          <span className="text-[11px] font-semibold text-slate-600 flex-shrink-0">
+            {parentName || "답장"}
+          </span>
+          <span className="text-[11px] text-slate-400 truncate min-w-0">
+            {parentPreview}
+          </span>
         </button>
       )}
-      <div className={`inline-block whitespace-pre-wrap px-3 py-2 sm:px-4 sm:py-2.5 ${isOwn ? "bg-blue-600 text-white rounded-2xl rounded-tr-md" : "bg-white border border-slate-100 rounded-2xl rounded-tl-md text-slate-700 shadow-sm"} text-[13px] sm:text-sm leading-relaxed`}>
+      <div className={`inline-block whitespace-pre-wrap px-3 py-2 sm:px-4 sm:py-2.5 ${isOwn ? "bg-blue-600 text-white rounded-2xl rounded-tr-md self-end" : "bg-white border border-slate-100 rounded-2xl rounded-tl-md text-slate-700 shadow-sm self-start"} text-[13px] sm:text-sm leading-relaxed`}>
         {parseMessageContent(message.content).map((seg, i) =>
           seg.type === "text" ? (
             <span key={i}>{seg.text}</span>
@@ -414,6 +452,7 @@ export default function MessageItem({
   message,
   isOwn,
   userId,
+  parentMessage,
   onEdit,
   onDelete,
   onReply,
@@ -507,7 +546,7 @@ export default function MessageItem({
               onContextMenu={handleContextMenu}
               {...touchHandlers}
             >
-              <MessageContent message={message} isOwn />
+              <MessageContent message={message} isOwn parentMessage={parentMessage} />
             </div>
             {!message.is_deleted && (
               <ReactionBar message={message} userId={userId} />
@@ -587,7 +626,7 @@ export default function MessageItem({
             onContextMenu={handleContextMenu}
             {...touchHandlers}
           >
-            <MessageContent message={message} isOwn={false} />
+            <MessageContent message={message} isOwn={false} parentMessage={parentMessage} />
           </div>
           {!message.is_deleted && (
             <ReactionBar message={message} userId={userId} />

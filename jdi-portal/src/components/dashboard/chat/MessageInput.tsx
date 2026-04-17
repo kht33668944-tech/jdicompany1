@@ -250,12 +250,12 @@ export default function MessageInput({
         </div>
       )}
       {replyingTo && (
-        <div className="flex items-center justify-between px-3 py-2 mb-2 bg-slate-50 border-l-2 border-blue-500 rounded-xl text-sm">
+        <div className="flex items-center justify-between px-3 py-2 mb-2 bg-blue-50 border-l-4 border-blue-500 rounded-xl text-sm">
           <div className="flex-1 min-w-0">
-            <span className="text-blue-600 font-medium text-xs">{replyingTo.user_profile?.full_name}에게 답장</span>
-            <p className="text-slate-500 text-xs truncate">{replyingTo.type === "image" ? "사진" : replyingTo.content}</p>
+            <span className="text-blue-700 font-semibold text-xs">{replyingTo.user_profile?.full_name}에게 답장</span>
+            <p className="text-slate-800 text-xs truncate font-medium">{replyingTo.type === "image" ? "사진" : replyingTo.content}</p>
           </div>
-          <button onClick={onCancelReply} className="text-slate-400 hover:text-slate-600 ml-2" aria-label="답장 취소">
+          <button onClick={onCancelReply} className="text-slate-500 hover:text-slate-700 ml-2" aria-label="답장 취소">
             <X size={16} />
           </button>
         </div>
