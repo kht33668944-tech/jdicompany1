@@ -1,4 +1,4 @@
-export type ChannelType = "group" | "memo";
+export type ChannelType = "group" | "memo" | "dm";
 export type MessageType = "text" | "file" | "image" | "system";
 export type ChannelMemberRole = "owner" | "member";
 
@@ -10,6 +10,7 @@ export interface Channel {
   created_by: string;
   created_at: string;
   updated_at: string;
+  dm_pair_key?: string | null;
 }
 
 export interface ChannelMember {
@@ -61,7 +62,13 @@ export interface MessageReadReceipt {
 export interface MessageReaction {
   emoji: string;
   count: number;
-  reacted: boolean; // current user reacted with this emoji
+  reacted: boolean;
+}
+
+export interface MemberPreview {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
 }
 
 export interface ChannelWithDetails extends Channel {
@@ -74,4 +81,13 @@ export interface ChannelWithDetails extends Channel {
     type: MessageType;
   } | null;
   unread_count: number;
+  members_preview?: MemberPreview[];
+  dm_partner_id?: string | null;
+}
+
+export interface ApprovedProfile {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  department: string | null;
 }
