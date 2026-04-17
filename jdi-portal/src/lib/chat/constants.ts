@@ -5,6 +5,7 @@ export const MESSAGES_PER_PAGE = 30;
 export const CHANNEL_TYPE_CONFIG: Record<ChannelType, { label: string }> = {
   group: { label: "그룹 채널" },
   memo: { label: "나만의 메모" },
+  dm: { label: "1:1 대화" },
 };
 
 export const MESSAGE_TYPE_CONFIG: Record<MessageType, { label: string }> = {
