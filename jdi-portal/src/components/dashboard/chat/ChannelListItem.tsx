@@ -3,6 +3,7 @@
 import { Notebook, BellSlash, Star } from "phosphor-react";
 import type { ChannelWithDetails } from "@/lib/chat/types";
 import { formatChannelTime, parseFileContent } from "@/lib/chat/utils";
+import AvatarStack from "./AvatarStack";
 
 interface ChannelListItemProps {
   channel: ChannelWithDetails;
@@ -67,7 +68,12 @@ export default function ChannelListItem({
     );
   }
 
-  const initial = channel.name.charAt(0).toUpperCase();
+  const isDm = channel.type === "dm";
+  const dmPartner = isDm ? channel.members_preview?.[0] ?? null : null;
+  const displayName = isDm ? dmPartner?.full_name ?? "(알 수 없음)" : channel.name;
+  const initial = displayName.charAt(0).toUpperCase();
+  const groupMembers = !isDm ? channel.members_preview ?? [] : [];
+  const groupTotalOthers = !isDm ? Math.max(0, (channel.member_count ?? 0) - 1) : 0;
 
   return (
     <button
@@ -79,14 +85,19 @@ export default function ChannelListItem({
       {isSelected && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full" />
       )}
-      <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center flex-shrink-0 text-sm font-bold text-slate-600">
-        {initial}
+      <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center flex-shrink-0 text-sm font-bold text-slate-600 overflow-hidden">
+        {isDm && dmPartner?.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={dmPartner.avatar_url} alt={dmPartner.full_name} className="w-full h-full object-cover" />
+        ) : (
+          initial
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1 min-w-0">
             <p className={`text-sm truncate ${isSelected ? "font-bold text-slate-800" : "font-semibold text-slate-700"}`}>
-              {channel.name}
+              {displayName}
             </p>
             {isFavorite && <Star size={13} weight="fill" className="text-amber-400 flex-shrink-0" />}
             {isMuted && <BellSlash size={13} className="text-slate-400 flex-shrink-0" />}
@@ -103,6 +114,11 @@ export default function ChannelListItem({
           </div>
         </div>
         <p className="text-xs text-slate-400 truncate mt-0.5">{lastMsgPreview}</p>
+        {!isDm && groupMembers.length > 0 && (
+          <div className="mt-1">
+            <AvatarStack members={groupMembers} totalCount={groupTotalOthers} max={3} size={18} />
+          </div>
+        )}
       </div>
     </button>
   );
