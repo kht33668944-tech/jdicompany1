@@ -80,9 +80,13 @@ export async function updateChannel(
 }
 
 export async function deleteChannel(channelId: string): Promise<void> {
-  await assertNotMemoChannel(channelId, "삭제");
   const supabase = getSupabase();
-  const { error } = await supabase.from("channels").delete().eq("id", channelId);
+  // SECURITY DEFINER RPC — 권한 체크와 명확한 에러 메시지를 DB에서 처리
+  // (기존 .from("channels").delete()는 RLS 침묵 실패 시 오류 없이 0 rows 반환되어
+  //  사용자는 성공한 것처럼 보이지만 실제로는 삭제가 안 되는 문제가 있었음)
+  const { error } = await supabase.rpc("delete_chat_channel", {
+    p_channel_id: channelId,
+  });
   if (error) throw error;
 }
 

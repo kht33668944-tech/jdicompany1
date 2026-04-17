@@ -216,8 +216,10 @@ export default function ChannelSettingsDrawer({
       await deleteChannel(channel.id);
       toast.success("채널이 삭제되었습니다.");
       onChannelDeleted();
-    } catch {
-      toast.error("삭제에 실패했습니다.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "삭제에 실패했습니다.";
+      console.error("[deleteChannel]", err);
+      toast.error(message);
     }
   }
 
