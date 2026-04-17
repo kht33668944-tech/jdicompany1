@@ -5,6 +5,9 @@ import { PaperPlaneRight, Paperclip, X, Image as ImageIcon } from "phosphor-reac
 import { toast } from "sonner";
 import type { Message } from "@/lib/chat/types";
 import { validateFile } from "@/lib/utils/upload";
+import type { MemberPreview } from "@/lib/chat/types";
+import { serializeMention } from "@/lib/chat/mentions";
+import MentionPicker from "./MentionPicker";
 
 interface MessageInputProps {
   onSend: (content: string) => Promise<void>;
@@ -16,6 +19,7 @@ interface MessageInputProps {
   externalFiles?: File[];
   onExternalFilesConsumed?: () => void;
   onTyping?: () => void;
+  channelMembers?: MemberPreview[];
 }
 
 export default function MessageInput({
@@ -28,6 +32,7 @@ export default function MessageInput({
   externalFiles,
   onExternalFilesConsumed,
   onTyping,
+  channelMembers = [],
 }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
@@ -35,6 +40,36 @@ export default function MessageInput({
   const [previewUrls, setPreviewUrls] = useState<Map<string, string>>(new Map());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [mentionActive, setMentionActive] = useState(0);
+
+  const filteredMentionCandidates = mentionOpen
+    ? channelMembers
+        .filter((m) => m.full_name.toLowerCase().includes(mentionQuery))
+        .slice(0, 8)
+    : [];
+
+  function handleInsertMention(member: MemberPreview) {
+    if (mentionStart === null) return;
+    const token = serializeMention(member.full_name, member.id) + " ";
+    const before = content.slice(0, mentionStart);
+    const after = content.slice(mentionStart + 1 + mentionQuery.length);
+    const next = before + token + after;
+    setContent(next);
+    setMentionOpen(false);
+    setMentionStart(null);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        const caret = (before + token).length;
+        el.focus();
+        el.setSelectionRange(caret, caret);
+      }
+    });
+  }
 
   // Prefill when entering edit mode
   useEffect(() => {
@@ -72,16 +107,57 @@ export default function MessageInput({
   }, [pendingFiles]);
 
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setContent(e.target.value);
+    const value = e.target.value;
+    setContent(value);
     const el = textareaRef.current;
     if (el) {
       el.style.height = "auto";
       el.style.height = el.scrollHeight + "px";
     }
     onTyping?.();
+
+    const caret = e.target.selectionStart ?? value.length;
+    const upto = value.slice(0, caret);
+    const atIdx = upto.lastIndexOf("@");
+    if (atIdx >= 0) {
+      const tail = upto.slice(atIdx + 1);
+      if (!/\s/.test(tail) && tail.length <= 20) {
+        setMentionOpen(true);
+        setMentionQuery(tail.toLowerCase());
+        setMentionStart(atIdx);
+        setMentionActive(0);
+        return;
+      }
+    }
+    setMentionOpen(false);
+    setMentionStart(null);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    if (mentionOpen && filteredMentionCandidates.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionActive((i) => (i + 1) % filteredMentionCandidates.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionActive((i) =>
+          (i - 1 + filteredMentionCandidates.length) % filteredMentionCandidates.length
+        );
+        return;
+      }
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleInsertMention(filteredMentionCandidates[mentionActive]);
+        return;
+      }
+      if (e.key === "Escape") {
+        setMentionOpen(false);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -224,7 +300,15 @@ export default function MessageInput({
         </div>
       )}
 
-      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-1.5">
+      <div className="relative flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-1.5">
+        {mentionOpen && filteredMentionCandidates.length > 0 && (
+          <MentionPicker
+            candidates={filteredMentionCandidates}
+            activeIndex={mentionActive}
+            onSelect={handleInsertMention}
+            onClose={() => setMentionOpen(false)}
+          />
+        )}
         <input
           ref={fileInputRef}
           type="file"

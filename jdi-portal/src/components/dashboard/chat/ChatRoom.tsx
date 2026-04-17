@@ -419,6 +419,7 @@ export default function ChatRoom({
         externalFiles={droppedFiles}
         onExternalFilesConsumed={() => setDroppedFiles([])}
         onTyping={broadcastTyping}
+        channelMembers={channel.members_preview ?? []}
       />
       <ChatDrawer
         open={showDrawer}
