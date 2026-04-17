@@ -2,16 +2,29 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import ChatPageClient from "@/components/dashboard/chat/ChatPageClient";
 import { getChannels } from "@/lib/chat/queries";
-import type { ChannelWithDetails } from "@/lib/chat/types";
+import type { ChannelWithDetails, ApprovedProfile } from "@/lib/chat/types";
 
 export default async function ChatPage() {
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
 
   let channels: ChannelWithDetails[] = [];
+  let people: ApprovedProfile[] = [];
 
   try {
-    channels = await getChannels(auth.supabase, auth.user.id);
+    // 채널과 직원 목록을 병렬 fetch — SSR 단계에서 둘 다 준비해 사이드바 늦게 뜨는 문제 방지
+    const [channelsResult, profilesResult] = await Promise.all([
+      getChannels(auth.supabase, auth.user.id),
+      auth.supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url, department")
+        .eq("is_approved", true)
+        .order("full_name"),
+    ]);
+    channels = channelsResult;
+    people = ((profilesResult.data ?? []) as ApprovedProfile[]).filter(
+      (p) => p.id !== auth.user.id
+    );
   } catch {
     return (
       <div className="rounded-2xl bg-red-50 border border-red-200 p-6 text-center">
@@ -24,6 +37,7 @@ export default async function ChatPage() {
   return (
     <ChatPageClient
       initialChannels={channels}
+      initialPeople={people}
       userId={auth.user.id}
       userName={auth.profile.full_name}
       userAvatar={auth.profile.avatar_url}

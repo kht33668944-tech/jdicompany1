@@ -30,6 +30,7 @@ interface ChatPageClientProps {
   initialChannels: ChannelWithDetails[];
   initialChannel?: ChannelWithDetails;
   initialMessages?: Message[];
+  initialPeople?: ApprovedProfile[];
   userId: string;
   userName: string;
   userAvatar?: string | null;
@@ -47,6 +48,7 @@ function ChatPageClientInner({
   initialChannels,
   initialChannel,
   initialMessages,
+  initialPeople,
   userId,
   userName,
   userAvatar,
@@ -63,7 +65,7 @@ function ChatPageClientInner({
   const [mobileShowChat, setMobileShowChat] = useState(!!initialChannel);
   const [mutedChannels, setMutedChannels] = useState<Set<string>>(new Set());
   const [favoriteChannels, setFavoriteChannels] = useState<Set<string>>(new Set());
-  const [people, setPeople] = useState<ApprovedProfile[]>([]);
+  const [people, setPeople] = useState<ApprovedProfile[]>(initialPeople ?? []);
   const [pendingDmForPartner, setPendingDmForPartner] = useState<string | null>(null);
   const onlineUsers = usePresence(userId);
   // 현재 선택된 채널의 멤버 ID 셋 — 채널별 온라인 인원 계산용
