@@ -14,6 +14,25 @@
   --color-brand-900: #1e3a8a;
 }
 
+/* 캘린더 주말/공휴일 색상 — 다크모드 대비해 변수로 관리 */
+:root {
+  --cal-sunday-bg: rgba(254, 226, 226, 0.35);
+  --cal-sunday-text: #f87171;
+  --cal-saturday-bg: rgba(219, 234, 254, 0.35);
+  --cal-saturday-text: #60a5fa;
+  --cal-holiday-label: #ef4444;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cal-sunday-bg: rgba(127, 29, 29, 0.22);
+    --cal-sunday-text: #fca5a5;
+    --cal-saturday-bg: rgba(30, 58, 138, 0.22);
+    --cal-saturday-text: #93c5fd;
+    --cal-holiday-label: #fca5a5;
+  }
+}
+
 @keyframes fade-in-up {
   0% { opacity: 0; transform: translateY(20px); }
   100% { opacity: 1; transform: translateY(0); }

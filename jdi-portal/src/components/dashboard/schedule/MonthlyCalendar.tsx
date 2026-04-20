@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { CaretLeft, CaretRight, Lock } from "phosphor-react";
 import { getDaysInMonth, getFirstDayOfMonth, getMonthRange, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { getCategoryStyle } from "@/lib/schedule/constants";
+import { getHolidayName, isRedDay } from "@/lib/schedule/holidays";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 
 interface MonthlyCalendarProps {
@@ -223,31 +224,54 @@ export default function MonthlyCalendar({
               const singles = week.singleEvents.get(cell.dateStr) ?? [];
               const hiddenBars = week.hiddenBarCounts[col];
               const extraCount = hiddenBars + Math.max(0, singles.length - MAX_VISIBLE_LANES);
+              const holidayName = getHolidayName(cell.dateStr);
+              const isRed = isRedDay(cell.dateStr, cell.dow);
+              const isSat = cell.dow === 6;
+
+              const dayBgStyle = isSelected
+                ? undefined
+                : isRed
+                  ? { backgroundColor: "var(--cal-sunday-bg)" }
+                  : isSat
+                    ? { backgroundColor: "var(--cal-saturday-bg)" }
+                    : undefined;
+
+              const dayNumColor = isToday
+                ? ""
+                : isRed
+                  ? "text-red-400"
+                  : isSat
+                    ? "text-blue-400"
+                    : "text-slate-700";
 
               return (
                 <div
                   key={col}
                   onClick={() => onDateSelect(cell.dateStr)}
                   onDoubleClick={() => onDateDoubleClick(cell.dateStr)}
+                  style={dayBgStyle}
                   className={`min-h-[120px] p-2 rounded-xl text-left transition-all duration-150 hover:bg-slate-50 cursor-pointer ${
                     isSelected ? "ring-2 ring-brand-400 bg-brand-50/30" : ""
                   }`}
                 >
-                  {/* 날짜 숫자 */}
-                  <div className="flex justify-start mb-1.5">
+                  {/* 날짜 숫자 + 공휴일명 */}
+                  <div className="flex items-center justify-between gap-1 mb-1.5 min-h-[28px]">
                     <span
                       className={`inline-flex items-center justify-center text-sm font-bold ${
-                        isToday
-                          ? "bg-brand-500 text-white rounded-full w-7 h-7"
-                          : cell.dow === 0
-                            ? "text-red-400"
-                            : cell.dow === 6
-                              ? "text-blue-400"
-                              : "text-slate-700"
+                        isToday ? "bg-brand-500 text-white rounded-full w-7 h-7" : dayNumColor
                       }`}
                     >
                       {cell.day}
                     </span>
+                    {holidayName && (
+                      <span
+                        className="text-[10px] font-semibold truncate leading-tight"
+                        style={{ color: "var(--cal-holiday-label)" }}
+                        title={holidayName}
+                      >
+                        {holidayName}
+                      </span>
+                    )}
                   </div>
 
                   {/* multi-day 바 공간 확보 */}

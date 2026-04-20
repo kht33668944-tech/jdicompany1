@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { CaretLeft, CaretRight, Lock } from "phosphor-react";
 import { addDays, toDateString, toDateStringFromTimestamp, formatTime, getHourFromTimestamp } from "@/lib/utils/date";
 import { getCategoryStyle } from "@/lib/schedule/constants";
+import { getHolidayName, isRedDay } from "@/lib/schedule/holidays";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 
 interface WeeklyViewProps {
@@ -102,34 +103,62 @@ export default function WeeklyView({
               const isToday = day === todayStr;
               const isSelected = day === selectedDate;
               const dayNum = day.slice(8, 10);
+              const holidayName = getHolidayName(day);
+              const isRed = isRedDay(day, i);
+              const isSat = i === 6;
+
+              const headerBgStyle = isSelected
+                ? undefined
+                : isRed
+                  ? { backgroundColor: "var(--cal-sunday-bg)" }
+                  : isSat
+                    ? { backgroundColor: "var(--cal-saturday-bg)" }
+                    : undefined;
+
+              const labelColor = isRed
+                ? "text-red-400"
+                : isSat
+                  ? "text-blue-400"
+                  : "text-slate-400";
+
+              const dayNumColor = isToday
+                ? ""
+                : isRed
+                  ? "text-red-400"
+                  : isSat
+                    ? "text-blue-400"
+                    : "text-slate-700";
+
               return (
                 <button
                   key={day}
                   onClick={() => onDateSelect(day)}
+                  style={headerBgStyle}
                   className={`p-2 text-center rounded-xl transition-colors ${
                     isSelected ? "bg-brand-50" : "hover:bg-slate-50"
                   }`}
                 >
-                  <div
-                    className={`text-xs font-semibold ${
-                      i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-slate-400"
-                    }`}
-                  >
+                  <div className={`text-xs font-semibold ${labelColor}`}>
                     {DAY_LABELS[i]}
                   </div>
                   <div
                     className={`text-sm font-bold mt-1 ${
                       isToday
                         ? "bg-brand-500 text-white rounded-full w-7 h-7 flex items-center justify-center mx-auto"
-                        : i === 0
-                          ? "text-red-400"
-                          : i === 6
-                            ? "text-blue-400"
-                            : "text-slate-700"
+                        : dayNumColor
                     }`}
                   >
                     {Number(dayNum)}
                   </div>
+                  {holidayName && (
+                    <div
+                      className="text-[10px] font-semibold mt-0.5 truncate leading-tight"
+                      style={{ color: "var(--cal-holiday-label)" }}
+                      title={holidayName}
+                    >
+                      {holidayName}
+                    </div>
+                  )}
                 </button>
               );
             })}

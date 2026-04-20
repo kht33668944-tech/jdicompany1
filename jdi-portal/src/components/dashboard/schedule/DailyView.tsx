@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { CaretLeft, CaretRight, MapPin, Monitor, Lock } from "phosphor-react";
 import { addDays, toDateString, toDateStringFromTimestamp, formatTime, getHourFromTimestamp } from "@/lib/utils/date";
 import { getCategoryStyle } from "@/lib/schedule/constants";
+import { getHolidayName, isRedDay } from "@/lib/schedule/holidays";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 
 interface DailyViewProps {
@@ -25,6 +26,10 @@ function formatDateHeader(dateStr: string): string {
   });
 }
 
+function getDow(dateStr: string): number {
+  return new Date(`${dateStr}T12:00:00+09:00`).getDay();
+}
+
 export default function DailyView({
   schedules,
   selectedDate,
@@ -33,6 +38,16 @@ export default function DailyView({
 }: DailyViewProps) {
   const todayStr = toDateString();
   const isToday = selectedDate === todayStr;
+  const dow = getDow(selectedDate);
+  const holidayName = getHolidayName(selectedDate);
+  const isRed = isRedDay(selectedDate, dow);
+  const isSat = dow === 6;
+
+  const headerColor = isRed
+    ? "text-red-500"
+    : isSat
+      ? "text-blue-500"
+      : "text-slate-800";
 
   const { allDayEvents, timedEvents } = useMemo(() => {
     const allDay: ScheduleWithProfile[] = [];
@@ -70,8 +85,18 @@ export default function DailyView({
           <CaretLeft size={20} />
         </button>
         <div className="text-center">
-          <h3 className="text-lg font-bold text-slate-800">{formatDateHeader(selectedDate)}</h3>
-          {isToday && <span className="text-xs text-brand-600 font-medium">오늘</span>}
+          <h3 className={`text-lg font-bold ${headerColor}`}>{formatDateHeader(selectedDate)}</h3>
+          <div className="flex items-center justify-center gap-2 mt-0.5">
+            {isToday && <span className="text-xs text-brand-600 font-medium">오늘</span>}
+            {holidayName && (
+              <span
+                className="text-xs font-semibold"
+                style={{ color: "var(--cal-holiday-label)" }}
+              >
+                {holidayName}
+              </span>
+            )}
+          </div>
         </div>
         <button
           onClick={nextDay}
