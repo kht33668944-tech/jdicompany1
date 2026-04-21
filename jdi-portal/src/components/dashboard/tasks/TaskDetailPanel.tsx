@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   getTaskBasic,
@@ -20,6 +19,10 @@ import TaskDetailClient from "./detail/TaskDetailClient";
 interface Props {
   profiles: Profile[];
   userId: string;
+  taskId: string | null;
+  initialTask: TaskWithDetails | null;
+  onClose: () => void;
+  onNavigate: (taskId: string) => void;
 }
 
 interface TaskDetailData {
@@ -32,18 +35,20 @@ interface TaskDetailData {
 
 type PanelPhase = "closed" | "opening" | "open" | "closing";
 
-export default function TaskDetailPanel({ profiles, userId }: Props) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const taskId = searchParams.get("detail");
-
+export default function TaskDetailPanel({
+  profiles,
+  userId,
+  taskId,
+  initialTask,
+  onClose,
+  onNavigate,
+}: Props) {
   const [data, setData] = useState<TaskDetailData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<PanelPhase>("closed");
   const [prevTaskId, setPrevTaskId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // 파생 상태
   const visible = phase !== "closed";
   const sliding = phase === "open";
   const loading = !!taskId && !data && !error;
@@ -53,8 +58,19 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     setPrevTaskId(taskId);
     if (taskId) {
       setPhase("opening");
-      setData(null);
       setError(null);
+      // allTasks 캐시에서 즉시 시드 → 제목/담당자/기간 즉시 표시
+      if (initialTask && initialTask.id === taskId) {
+        setData({
+          task: initialTask,
+          checklist: [],
+          subtasks: [],
+          attachments: [],
+          activities: [],
+        });
+      } else {
+        setData(null);
+      }
     } else if (prevTaskId) {
       setPhase("closing");
     }
@@ -78,20 +94,44 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
     return () => clearTimeout(timer);
   }, [phase]);
 
-  // taskId 변경 시 데이터 fetch
+  // 딥링크 대응: 렌더 시점엔 initialTask 가 없었지만 allTasks 로딩 후 도착한 경우 시드
+  useEffect(() => {
+    if (!taskId || data) return;
+    if (initialTask && initialTask.id === taskId) {
+      setData({
+        task: initialTask,
+        checklist: [],
+        subtasks: [],
+        attachments: [],
+        activities: [],
+      });
+    }
+  }, [taskId, initialTask, data]);
+
+  // taskId 변경 시 체크리스트 + 활동 백그라운드 fetch
+  // (initialTask 가 있으면 task 재조회 생략 — 가장 느린 경로 차단)
   useEffect(() => {
     if (!taskId) return;
 
     let cancelled = false;
     const supabase = createClient();
 
-    Promise.all([
-      getTaskBasic(supabase, taskId),
+    const hasCachedTask = !!initialTask && initialTask.id === taskId;
+    const promises: Promise<unknown>[] = [
       getChecklistItems(supabase, taskId),
       getActivities(supabase, taskId),
-    ])
-      .then(([task, checklist, activities]) => {
+    ];
+    if (!hasCachedTask) promises.push(getTaskBasic(supabase, taskId));
+
+    Promise.all(promises)
+      .then((results) => {
         if (cancelled) return;
+        const checklist = results[0] as TaskChecklistItem[];
+        const activities = results[1] as TaskActivity[];
+        const fetchedTask = hasCachedTask
+          ? null
+          : (results[2] as TaskWithDetails | null);
+        const task = fetchedTask ?? (hasCachedTask ? initialTask : null);
         if (!task) {
           setError("할일을 찾을 수 없습니다.");
           return;
@@ -107,20 +147,9 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
       });
 
     return () => { cancelled = true; };
+    // allTasks 백그라운드 갱신으로 initialTask 참조가 바뀌어도 재fetch 하지 않음
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
-
-  const closePanel = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("detail");
-    const qs = params.toString();
-    router.push(`/dashboard/tasks${qs ? `?${qs}` : ""}`, { scroll: false });
-  }, [searchParams, router]);
-
-  const navigateToTask = useCallback((newTaskId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("detail", newTaskId);
-    router.push(`/dashboard/tasks?${params.toString()}`, { scroll: false });
-  }, [searchParams, router]);
 
   const handleRefresh = useCallback(() => {
     if (!taskId) return;
@@ -144,11 +173,11 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
   useEffect(() => {
     if (!visible) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closePanel();
+      if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [visible, closePanel]);
+  }, [visible, onClose]);
 
   // body scroll lock
   useEffect(() => {
@@ -168,7 +197,7 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
         className={`absolute inset-0 bg-black transition-opacity duration-200 ${
           sliding ? "opacity-30" : "opacity-0"
         }`}
-        onClick={closePanel}
+        onClick={onClose}
         aria-hidden="true"
       />
       <div
@@ -203,7 +232,7 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
             <div className="flex flex-col items-center justify-center h-64 gap-4">
               <p className="text-sm text-red-500">{error}</p>
               <button
-                onClick={closePanel}
+                onClick={onClose}
                 className="px-4 py-2 text-sm font-medium text-slate-600 bg-white rounded-xl shadow-sm hover:bg-slate-50"
               >
                 닫기
@@ -211,7 +240,7 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
             </div>
           )}
 
-          {!loading && !error && data && (
+          {!error && data && (
             <TaskDetailClient
               task={data.task}
               checklist={data.checklist}
@@ -221,8 +250,8 @@ export default function TaskDetailPanel({ profiles, userId }: Props) {
               profiles={profiles}
               userId={userId}
               mode="panel"
-              onClose={closePanel}
-              onNavigate={navigateToTask}
+              onClose={onClose}
+              onNavigate={onNavigate}
               onRefresh={handleRefresh}
             />
           )}

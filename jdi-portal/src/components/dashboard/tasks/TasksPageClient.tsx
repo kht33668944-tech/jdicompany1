@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { MagnifyingGlass, Plus } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskWithDetails, TaskViewId, TaskFilterState } from "@/lib/tasks/types";
@@ -28,13 +27,14 @@ const VIEW_STORAGE_KEY = "tasks-active-view";
 const FILTER_STORAGE_KEY = "tasks-filters";
 
 export default function TasksPageClient({ profiles, userId, initialTasks }: Props) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   // SSR/CSR hydration mismatch 방지 — 항상 기본값으로 시작 후 mount 시 localStorage 로드
   const [activeView, setActiveView] = useState<TaskViewId>("list");
   const [filters, setFilters] = useState<TaskFilterState>(DEFAULT_FILTER_STATE);
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // 상세 패널은 Next 라우터 대신 로컬 상태 + history.replaceState 로 관리
+  // → 서버 컴포넌트 재실행 없이 즉시 열림 (다른 페이지/탭 내비게이션엔 영향 없음)
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
 
   const [allTasks, setAllTasks] = useState<TaskWithDetails[]>(initialTasks);
   // fresh fetch 가 적용된 후 늦게 도착한 IDB 캐시가 빈 fresh 를 stale 로 덮어쓰는 race 차단
@@ -89,17 +89,38 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
     window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
   }, [filters]);
 
-  // detail 파라미터 감시 — 패널이 닫힐 때 목록 갱신
-  const detailId = searchParams.get("detail");
-  const prevDetailRef = useRef<string | null>(null);
-
+  // 딥링크 대응: 초기 URL 의 ?detail=xxx 를 1회 동기화
+  // rAF 로 지연 — hydration 후 비동기 적용 (cascading render 방지)
   useEffect(() => {
-    // 패널이 열린 상태에서 닫힌 경우에만 refresh
-    if (prevDetailRef.current && !detailId) {
+    const raf = requestAnimationFrame(() => {
+      const params = new URLSearchParams(window.location.search);
+      const d = params.get("detail");
+      if (d) setDetailTaskId(d);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // URL ?detail= 동기화 (history API — 서버 내비게이션 없음)
+  const setDetailInUrl = useCallback((id: string | null) => {
+    const params = new URLSearchParams(window.location.search);
+    if (id) params.set("detail", id);
+    else params.delete("detail");
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${qs ? `?${qs}` : ""}`
+    );
+  }, []);
+
+  // 패널이 닫힐 때 목록 갱신
+  const prevDetailRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevDetailRef.current && !detailTaskId) {
       requestAnimationFrame(() => void refreshTasks());
     }
-    prevDetailRef.current = detailId;
-  }, [detailId, refreshTasks]);
+    prevDetailRef.current = detailTaskId;
+  }, [detailTaskId, refreshTasks]);
 
   const summary = useMemo(() => computeSummary(allTasks), [allTasks]);
 
@@ -129,11 +150,21 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
   // 서브태스크를 부모에 매핑
   const tasksWithChildren = useMemo(() => buildTaskTree(processedTasks), [processedTasks]);
 
-  const handleTaskClick = (taskId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("detail", taskId);
-    router.push(`/dashboard/tasks?${params.toString()}`, { scroll: false });
-  };
+  const handleTaskClick = useCallback((taskId: string) => {
+    setDetailTaskId(taskId);
+    setDetailInUrl(taskId);
+  }, [setDetailInUrl]);
+
+  const handleClosePanel = useCallback(() => {
+    setDetailTaskId(null);
+    setDetailInUrl(null);
+  }, [setDetailInUrl]);
+
+  // 클릭한 할일을 allTasks 에서 즉시 찾아 패널에 시드 → 제목/담당자/기간 즉시 표시
+  const initialTask = useMemo(
+    () => (detailTaskId ? allTasks.find((t) => t.id === detailTaskId) ?? null : null),
+    [detailTaskId, allTasks]
+  );
 
   return (
     <div className="space-y-8">
@@ -228,7 +259,14 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
       )}
 
       {/* 상세 패널 */}
-      <TaskDetailPanel profiles={profiles} userId={userId} />
+      <TaskDetailPanel
+        profiles={profiles}
+        userId={userId}
+        taskId={detailTaskId}
+        initialTask={initialTask}
+        onClose={handleClosePanel}
+        onNavigate={handleTaskClick}
+      />
     </div>
   );
 }
