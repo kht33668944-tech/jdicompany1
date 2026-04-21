@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ChatCircleDots,
   ArrowRight,
@@ -256,22 +256,44 @@ function FileChip({ attachment, url }: { attachment: AttachmentMeta; url: string
 
 // --- 메인 컴포넌트 ---
 
+// 모듈 레벨 캐시 — 패널 재오픈/다른 할일 탐색 시에도 서명 URL 재활용
+// 서명 URL 은 1시간 유효 → 안전 마진으로 58분 TTL
+const URL_TTL_MS = 58 * 60 * 1000;
+const attachmentUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
 export default function TaskActivityTimeline({ activities, userId }: Props) {
   const router = useRouter();
-  const [urlCache, setUrlCache] = useState<Record<string, string>>({});
-  const cacheRef = useRef<Record<string, string>>({});
+  const [version, bumpVersion] = useState(0);
 
-  // 활동 변경 시 누락된 첨부 URL만 배치로 가져오기 (캐시 유지)
+  // 활동 변경 시 누락/만료된 첨부 URL만 배치로 가져오기
   useEffect(() => {
+    const now = Date.now();
     const allPaths = extractAttachmentPaths(activities);
-    const missing = allPaths.filter((p) => !cacheRef.current[p]);
+    const missing = allPaths.filter((p) => {
+      const e = attachmentUrlCache.get(p);
+      return !e || e.expiresAt <= now;
+    });
     if (missing.length === 0) return;
 
     getAttachmentUrls(missing).then((newUrls) => {
-      cacheRef.current = { ...cacheRef.current, ...newUrls };
-      setUrlCache({ ...cacheRef.current });
+      const expiresAt = Date.now() + URL_TTL_MS;
+      for (const [p, u] of Object.entries(newUrls)) {
+        attachmentUrlCache.set(p, { url: u, expiresAt });
+      }
+      bumpVersion((v) => v + 1);
     }).catch(() => {});
   }, [activities]);
+
+  // 렌더용 URL 맵 — 만료 체크는 useEffect 에서 처리하므로 렌더는 순수하게 노출만
+  // 의존성 activities/version 은 외부 Map 변경을 반영하기 위한 의도적 트리거
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const urlCache = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [path, entry] of attachmentUrlCache) {
+      out[path] = entry.url;
+    }
+    return out;
+  }, [activities, version]);
 
   const handleDelete = async (activityId: string) => {
     try {

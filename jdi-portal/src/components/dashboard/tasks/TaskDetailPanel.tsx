@@ -4,8 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getTaskBasic,
-  getChecklistItems,
-  getActivities,
+  getTaskDetails,
 } from "@/lib/tasks/queries";
 import type { Profile } from "@/lib/attendance/types";
 import type {
@@ -15,6 +14,13 @@ import type {
   TaskActivity,
 } from "@/lib/tasks/types";
 import TaskDetailClient from "./detail/TaskDetailClient";
+
+// 세션 내 패널 재오픈 즉시 표시용 — 같은 할일을 다시 열면 캐시 히트로 네트워크 대기 없이 렌더
+// 이후 백그라운드 fetch 로 최신 상태로 덮어씀 (stale-while-revalidate)
+const taskDetailsMemCache = new Map<
+  string,
+  { checklist: TaskChecklistItem[]; activities: TaskActivity[] }
+>();
 
 interface Props {
   profiles: Profile[];
@@ -60,13 +66,21 @@ export default function TaskDetailPanel({
       setPhase("opening");
       setError(null);
       // allTasks 캐시에서 즉시 시드 → 제목/담당자/기간 즉시 표시
+      // 체크리스트/활동도 메모리 캐시가 있으면 함께 시드 → 재오픈 시 로딩 플래시 제거
+      const cached = taskDetailsMemCache.get(taskId);
       if (initialTask && initialTask.id === taskId) {
+        const seedTask = { ...initialTask };
+        if (cached) {
+          seedTask.checklist_total = cached.checklist.length;
+          seedTask.checklist_completed = cached.checklist.filter((c) => c.is_completed).length;
+          seedTask.comment_count = cached.activities.filter((a) => a.type === "comment").length;
+        }
         setData({
-          task: initialTask,
-          checklist: [],
+          task: seedTask,
+          checklist: cached?.checklist ?? [],
           subtasks: [],
           attachments: [],
-          activities: [],
+          activities: cached?.activities ?? [],
         });
       } else {
         setData(null);
@@ -108,7 +122,7 @@ export default function TaskDetailPanel({
     }
   }, [taskId, initialTask, data]);
 
-  // taskId 변경 시 체크리스트 + 활동 백그라운드 fetch
+  // taskId 변경 시 체크리스트 + 활동 단일 RPC 로 백그라운드 fetch
   // (initialTask 가 있으면 task 재조회 생략 — 가장 느린 경로 차단)
   useEffect(() => {
     if (!taskId) return;
@@ -117,28 +131,24 @@ export default function TaskDetailPanel({
     const supabase = createClient();
 
     const hasCachedTask = !!initialTask && initialTask.id === taskId;
-    const promises: Promise<unknown>[] = [
-      getChecklistItems(supabase, taskId),
-      getActivities(supabase, taskId),
-    ];
-    if (!hasCachedTask) promises.push(getTaskBasic(supabase, taskId));
+    const detailsPromise = getTaskDetails(supabase, taskId);
+    const taskPromise = hasCachedTask
+      ? Promise.resolve<TaskWithDetails | null>(initialTask)
+      : getTaskBasic(supabase, taskId);
 
-    Promise.all(promises)
-      .then((results) => {
+    Promise.all([detailsPromise, taskPromise])
+      .then(([details, fetchedTask]) => {
         if (cancelled) return;
-        const checklist = results[0] as TaskChecklistItem[];
-        const activities = results[1] as TaskActivity[];
-        const fetchedTask = hasCachedTask
-          ? null
-          : (results[2] as TaskWithDetails | null);
         const task = fetchedTask ?? (hasCachedTask ? initialTask : null);
         if (!task) {
           setError("할일을 찾을 수 없습니다.");
           return;
         }
+        const { checklist, activities } = details;
         task.checklist_total = checklist.length;
         task.checklist_completed = checklist.filter((c) => c.is_completed).length;
         task.comment_count = activities.filter((a) => a.type === "comment").length;
+        taskDetailsMemCache.set(taskId, { checklist, activities });
         setData({ task, checklist, subtasks: [], attachments: [], activities });
       })
       .catch(() => {
@@ -156,13 +166,14 @@ export default function TaskDetailPanel({
     const supabase = createClient();
     Promise.all([
       getTaskBasic(supabase, taskId),
-      getChecklistItems(supabase, taskId),
-      getActivities(supabase, taskId),
-    ]).then(([task, checklist, activities]) => {
+      getTaskDetails(supabase, taskId),
+    ]).then(([task, details]) => {
       if (!task) return;
+      const { checklist, activities } = details;
       task.checklist_total = checklist.length;
       task.checklist_completed = checklist.filter((c) => c.is_completed).length;
       task.comment_count = activities.filter((a) => a.type === "comment").length;
+      taskDetailsMemCache.set(taskId, { checklist, activities });
       setData({ task, checklist, subtasks: [], attachments: [], activities });
     }).catch((err) => {
       console.warn("[TaskDetailPanel] refresh failed:", err);

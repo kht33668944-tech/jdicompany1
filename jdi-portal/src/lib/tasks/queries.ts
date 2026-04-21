@@ -222,6 +222,23 @@ export async function getActivities(
   return (data as TaskActivity[]) ?? [];
 }
 
+/** 체크리스트 + 활동을 한 번의 RPC 로 조회 (왕복 2회 → 1회) */
+export async function getTaskDetails(
+  supabase: SupabaseClient,
+  taskId: string
+): Promise<{ checklist: TaskChecklistItem[]; activities: TaskActivity[] }> {
+  const { data, error } = await supabase.rpc("get_task_details", { p_task_id: taskId });
+  if (error) throw error;
+  const payload = (data ?? {}) as {
+    checklist?: TaskChecklistItem[];
+    activities?: TaskActivity[];
+  };
+  return {
+    checklist: payload.checklist ?? [],
+    activities: payload.activities ?? [],
+  };
+}
+
 /** 상세 페이지용 — 카운트 쿼리 없이 태스크 + 담당자만 조회 */
 export async function getTaskBasic(supabase: SupabaseClient, id: string): Promise<TaskWithDetails | null> {
   const [taskResult, assigneeMap] = await Promise.all([
