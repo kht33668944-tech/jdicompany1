@@ -22,7 +22,7 @@ import ChannelSettingsDrawer from "./ChannelSettingsDrawer";
 import { ChatFileUrlsProvider, useChatFileUrls } from "./ChatFileUrlsContext";
 import PushPromptBanner from "./PushPromptBanner";
 import { touchChannelSeen } from "@/lib/push/actions";
-import { usePresence } from "./hooks/usePresence";
+import { useWorkingUsers } from "./hooks/useWorkingUsers";
 import { useMembershipSync } from "./hooks/useMembershipSync";
 import { useChannelMetaSync } from "./hooks/useChannelMetaSync";
 
@@ -67,7 +67,8 @@ function ChatPageClientInner({
   const [favoriteChannels, setFavoriteChannels] = useState<Set<string>>(new Set());
   const [people, setPeople] = useState<ApprovedProfile[]>(initialPeople ?? []);
   const [pendingDmForPartner, setPendingDmForPartner] = useState<string | null>(null);
-  const onlineUsers = usePresence(userId);
+  // 온라인 = 오늘(KST) 근무중(출근했고 아직 퇴근하지 않은) 직원
+  const onlineUsers = useWorkingUsers();
   // 현재 선택된 채널의 멤버 ID 셋 — 채널별 온라인 인원 계산용
   const [selectedChannelMemberIds, setSelectedChannelMemberIds] = useState<Set<string>>(new Set());
 
