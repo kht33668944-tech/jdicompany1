@@ -174,7 +174,35 @@ export async function approveCorrectionRequest(requestId: string) {
   const { error } = await supabase.rpc("approve_correction_request", {
     p_request_id: requestId,
   });
-  if (error) throw error;
+  if (error) {
+    console.error("[approveCorrectionRequest] RPC 실패:", {
+      requestId,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    // 프로덕션에서도 메시지가 보이도록 원인을 한국어로 감싸서 rethrow
+    throw new Error(
+      `정정 요청 승인 실패 (${error.code ?? "unknown"}): ${error.message}`
+    );
+  }
+
+  // 신청자에게 알림
+  const { data: req } = await supabase
+    .from("correction_requests")
+    .select("user_id, target_date, request_type")
+    .eq("id", requestId)
+    .single();
+  if (req) {
+    await createNotification({
+      userId: req.user_id,
+      type: "system_announce",
+      title: "출퇴근 정정이 승인되었습니다",
+      body: `${req.target_date} ${req.request_type}`,
+      link: "/dashboard/attendance",
+    });
+  }
 }
 
 export async function rejectVacationCancel(requestId: string) {
@@ -198,6 +226,13 @@ export async function rejectVacationCancel(requestId: string) {
 
 export async function rejectCorrectionRequest(requestId: string) {
   const { supabase, userId } = await requireAdmin();
+
+  const { data: req } = await supabase
+    .from("correction_requests")
+    .select("user_id, target_date, request_type")
+    .eq("id", requestId)
+    .single();
+
   const { error } = await supabase
     .from("correction_requests")
     .update({
@@ -207,7 +242,28 @@ export async function rejectCorrectionRequest(requestId: string) {
     })
     .eq("id", requestId)
     .eq("status", "대기중");
-  if (error) throw error;
+  if (error) {
+    console.error("[rejectCorrectionRequest] UPDATE 실패:", {
+      requestId,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(
+      `정정 요청 반려 실패 (${error.code ?? "unknown"}): ${error.message}`
+    );
+  }
+
+  if (req) {
+    await createNotification({
+      userId: req.user_id,
+      type: "system_announce",
+      title: "출퇴근 정정이 반려되었습니다",
+      body: `${req.target_date} ${req.request_type}`,
+      link: "/dashboard/attendance",
+    });
+  }
 }
 
 /** 첫 근무시간 설정 (이력에 비-시드 행이 없을 때만 가능) */
