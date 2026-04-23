@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { ChannelWithDetails, Message } from "@/lib/chat/types";
 import { sendMessage, editMessage, deleteMessage, markAsRead, uploadChatFile, pinMessage, unpinMessage, getPinnedMessages } from "@/lib/chat/actions";
+import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import { isImageFile } from "@/lib/chat/utils";
 import { getMessages } from "@/lib/chat/queries";
 import { Paperclip } from "phosphor-react";
@@ -270,8 +271,9 @@ export default function ChatRoom({
 
   async function handleFileUpload(file: File) {
     try {
-      const result = await uploadChatFile(channel.id, file);
-      const msgType = isImageFile(file.type) ? "image" : "file";
+      const processed = await resizeImageIfNeeded(file);
+      const result = await uploadChatFile(channel.id, processed);
+      const msgType = isImageFile(processed.type) ? "image" : "file";
       const content = JSON.stringify({
         path: result.path,
         name: result.fileName,
