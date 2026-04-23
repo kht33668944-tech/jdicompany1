@@ -76,6 +76,13 @@ export default function QuickStatsWidget({
   const router = useRouter();
   const [elapsed, setElapsed] = useState<string>("0h 0m");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 서버(싱가포르)와 브라우저(한국)의 자정 경계 시각차로 getDay() 결과가 달라져
+  // hydration mismatch를 일으키지 않도록 마운트 후에만 요일 인덱스를 계산
+  const [todayIndex, setTodayIndex] = useState<number>(-1);
+
+  useEffect(() => {
+    setTodayIndex(getTodayWeekdayIndex());
+  }, []);
 
   const updateElapsed = useCallback(() => {
     if (attendanceStatus === "근무중" && checkInTime) {
@@ -114,7 +121,6 @@ export default function QuickStatsWidget({
   const circumference = 100;
   const dashOffset = circumference - percentage;
 
-  const todayIndex = getTodayWeekdayIndex();
   const weekdayLabels = ["월", "화", "수", "목", "금"];
 
   return (

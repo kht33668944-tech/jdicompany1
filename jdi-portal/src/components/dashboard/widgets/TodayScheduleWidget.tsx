@@ -22,9 +22,12 @@ function getStatus(startTime: string, endTime: string, now: Date): Status {
 
 
 export default function TodayScheduleWidget({ schedules }: Props) {
-  const [now, setNow] = useState(() => new Date());
+  // 서버(싱가포르)와 브라우저(한국) 시각차로 hydration mismatch가 발생하지 않도록
+  // 마운트 전에는 null, 마운트 후에만 실제 시각을 사용
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
@@ -54,7 +57,7 @@ export default function TodayScheduleWidget({ schedules }: Props) {
           <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-slate-100" />
 
           {schedules.map((schedule) => {
-            const status: Status = schedule.is_all_day
+            const status: Status = (schedule.is_all_day || !now)
               ? "upcoming"
               : getStatus(schedule.start_time, schedule.end_time, now);
 
