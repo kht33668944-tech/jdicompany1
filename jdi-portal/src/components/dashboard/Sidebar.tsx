@@ -62,7 +62,7 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
             <Link
               key={item.href}
               href={item.href}
-              prefetch={true}
+              prefetch={false}
               onClick={onMobileClose}
               className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 active
