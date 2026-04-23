@@ -1,0 +1,13 @@
+{
+  "name": "jdicompany-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root wrapper so Railpack detects Node and builds jdi-portal subdirectory",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "cd jdi-portal && npm ci && npm run build",
+    "start": "cd jdi-portal && npm start"
+  }
+}
