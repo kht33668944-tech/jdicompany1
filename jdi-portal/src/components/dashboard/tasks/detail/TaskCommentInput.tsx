@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PaperPlaneRight, Paperclip, X } from "phosphor-react";
 import { addComment, uploadAttachment } from "@/lib/tasks/actions";
+import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
 
 interface Props {
   taskId: string;
@@ -56,7 +57,7 @@ export default function TaskCommentInput({ taskId, userId, mode = "page", onRefr
       let metadata: Record<string, unknown> | undefined;
       if (files.length > 0) {
         const uploaded = await Promise.all(
-          files.map((f) => uploadAttachment(taskId, f))
+          files.map(async (f) => uploadAttachment(taskId, await resizeImageIfNeeded(f)))
         );
         metadata = {
           attachments: uploaded.map((a) => ({

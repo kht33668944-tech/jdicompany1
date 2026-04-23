@@ -7,6 +7,7 @@ import { createReport, deleteReport, uploadReportAttachment } from "@/lib/report
 import type { ReportType, ReportPage } from "@/lib/reports/types";
 import { REPORT_PAGES, REPORT_PAGE_CONFIG } from "@/lib/reports/constants";
 import { validateFile } from "@/lib/utils/upload";
+import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
 
 interface ReportCreateModalProps {
   open: boolean;
@@ -94,7 +95,8 @@ export default function ReportCreateModal({ open, onClose, onCreated, userId }: 
       // 첨부 업로드 중 실패하면 생성된 report 자체를 정리 (반쪽 저장 방지)
       try {
         for (const f of files) {
-          await uploadReportAttachment(report.id, f);
+          const processed = await resizeImageIfNeeded(f);
+          await uploadReportAttachment(report.id, processed);
         }
       } catch (uploadErr) {
         await deleteReport(report.id).catch(() => {});

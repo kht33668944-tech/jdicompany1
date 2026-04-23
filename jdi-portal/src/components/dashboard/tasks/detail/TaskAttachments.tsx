@@ -6,6 +6,7 @@ import { Paperclip, Trash, DownloadSimple, Image as ImageIcon, File } from "phos
 import { uploadAttachment, deleteAttachment, getAttachmentUrl } from "@/lib/tasks/actions";
 import type { TaskAttachment } from "@/lib/tasks/types";
 import { validateFile } from "@/lib/utils/upload";
+import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import { toast } from "sonner";
 
 interface Props {
@@ -48,7 +49,8 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
       for (const file of Array.from(files)) {
         const err = validateFile(file);
         if (err) { toast.error(err); continue; }
-        await uploadAttachment(taskId, file);
+        const processed = await resizeImageIfNeeded(file);
+        await uploadAttachment(taskId, processed);
       }
       router.refresh();
     } catch (error) {

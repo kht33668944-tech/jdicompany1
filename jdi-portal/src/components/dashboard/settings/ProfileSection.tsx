@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle } from "phosphor-react";
 import { updateProfile, uploadAvatar } from "@/lib/settings/actions";
+import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import type { Profile } from "@/lib/attendance/types";
 
 interface ProfileSectionProps {
@@ -28,8 +29,9 @@ export default function ProfileSection({ profile, onUpdated }: ProfileSectionPro
     setLoading(true);
     setFeedback(null);
     try {
+      const processed = await resizeImageIfNeeded(file, { maxDim: 512, quality: 0.85 });
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", processed);
       const url = await uploadAvatar(fd);
       setAvatarPreview(url);
       setFeedback({ type: "success", message: "프로필 사진이 업데이트되었습니다." });
