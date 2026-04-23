@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getDashboardData, type DashboardData } from "@/lib/dashboard/queries";
 import QuickStatsWidget from "./widgets/QuickStatsWidget";
@@ -15,6 +15,9 @@ interface Props {
 
 export default function DashboardClient({ userId, userName }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
+  // 시간 기반 문자열은 서버(싱가포르)와 브라우저(한국)의 시각 차이로
+  // hydration mismatch를 일으켜 전체 재렌더링을 유발 → 마운트 후에만 계산
+  const [timeInfo, setTimeInfo] = useState<{ dateStr: string; greeting: string } | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -22,6 +25,20 @@ export default function DashboardClient({ userId, userName }: Props) {
       .then(setData)
       .catch(console.error);
   }, [userId, userName]);
+
+  useEffect(() => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("ko-KR", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      weekday: "long",
+    });
+    const hour = now.getHours();
+    const greeting = hour < 12 ? "좋은 아침이에요" : hour < 18 ? "좋은 오후에요" : "수고하셨습니다";
+    setTimeInfo({ dateStr, greeting });
+  }, []);
 
   const status = data?.todayRecord?.status ?? "미출근";
   const totalTasks = data?.allTasksForUser.length ?? 0;
@@ -31,19 +48,6 @@ export default function DashboardClient({ userId, userName }: Props) {
   const urgentCount = myTasks.filter((t) => t.priority === "긴급").length;
   const highCount = myTasks.filter((t) => t.priority === "높음").length;
 
-  const dateStr = useMemo(() => {
-    return new Date().toLocaleDateString("ko-KR", {
-      timeZone: "Asia/Seoul",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      weekday: "long",
-    });
-  }, []);
-
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "좋은 아침이에요" : hour < 18 ? "좋은 오후에요" : "수고하셨습니다";
-
   return (
     <div className="space-y-8">
       {/* 인사 섹션 */}
@@ -52,8 +56,8 @@ export default function DashboardClient({ userId, userName }: Props) {
           <h1 className="text-2xl font-bold text-slate-800">
             안녕하세요, {userName}님! 👋
           </h1>
-          <p className="text-slate-400 mt-1">
-            {dateStr} · {greeting}!
+          <p className="text-slate-400 mt-1 min-h-[1.25rem]">
+            {timeInfo ? `${timeInfo.dateStr} · ${timeInfo.greeting}!` : ""}
           </p>
         </div>
       </div>
