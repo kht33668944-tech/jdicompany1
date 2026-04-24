@@ -542,7 +542,7 @@ export default function MessageItem({
               </div>
             )}
             <div
-              className="inline-block cursor-default select-none"
+              className="inline-block cursor-default select-none text-left"
               onContextMenu={handleContextMenu}
               {...touchHandlers}
             >
