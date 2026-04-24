@@ -159,20 +159,20 @@ export default function RecordsDetailTable({
     XLSX.writeFile(wb, `${employeeName}_근태기록_${periodLabel.replace(/\s/g, "")}.xlsx`);
   };
 
+  const { workStart: hdrWorkStart, workEnd: hdrWorkEnd } = getScheduleForDate(workSchedules, rangeEnd);
+
   return (
     <div className="glass-card rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="text-sm font-bold text-slate-800">
-          {employeeName}님의 상세 기록 <span className="text-slate-400 font-normal">{periodLabel}</span>
-          {(() => {
-            const { workStart, workEnd } = getScheduleForDate(workSchedules, rangeEnd);
-            return (
-              <span className="ml-2 text-slate-400 font-normal">
-                · 근무 {workStart.slice(0, 5)} - {workEnd.slice(0, 5)}
-              </span>
-            );
-          })()}
-        </h4>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h4 className="text-sm font-bold text-slate-800">
+            {employeeName}님의 상세 기록
+          </h4>
+          <span className="text-xs text-slate-400 tabular-nums">{periodLabel}</span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-semibold text-slate-600 tabular-nums">
+            근무 {hdrWorkStart.slice(0, 5)}–{hdrWorkEnd.slice(0, 5)}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           {isOwnRecord && (
             <button
