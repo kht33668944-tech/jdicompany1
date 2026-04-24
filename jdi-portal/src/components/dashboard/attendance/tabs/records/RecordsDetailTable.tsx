@@ -30,6 +30,14 @@ interface DisplayRow {
   vacationType: VacationType | null;
 }
 
+function formatLateDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h && m) return `+${h}h ${m}m`;
+  if (h) return `+${h}h`;
+  return `+${m}m`;
+}
+
 function getRecordStatus(
   record: AttendanceRecord | null,
   vacationType: VacationType | null,
@@ -51,7 +59,8 @@ function getRecordStatus(
   const checkInMin = kst.getUTCHours() * 60 + kst.getUTCMinutes();
 
   if (checkInMin > workStartMinutes) {
-    return { label: "지각", color: "bg-red-50 text-red-600" };
+    const diff = checkInMin - workStartMinutes;
+    return { label: `지각 ${formatLateDuration(diff)}`, color: "bg-red-50 text-red-600" };
   }
   if (vacationType === "반차-오전" || vacationType === "반차-오후") {
     return { label: vacationType, color: "bg-purple-50 text-purple-600" };
@@ -210,7 +219,7 @@ export default function RecordsDetailTable({
                     <td className="px-4 py-3 text-slate-700">{row.record ? formatTime(row.record.check_out) : "-"}</td>
                     <td className="px-4 py-3 text-slate-700">{getWorkTimeDisplay(row)}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${status.color}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${status.color}`}>
                         {status.label}
                       </span>
                     </td>
