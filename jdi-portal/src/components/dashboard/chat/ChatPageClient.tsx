@@ -469,7 +469,10 @@ function ChatPageClientInner({
         last_message: null,
         unread_count: 0,
       };
-      setChannels((prev) => [withDetails, ...prev]);
+      setChannels((prev) => {
+        if (prev.some((ch) => ch.id === withDetails.id)) return prev;
+        return [withDetails, ...prev];
+      });
       handleSelectChannel(withDetails);
     },
     [handleSelectChannel]
