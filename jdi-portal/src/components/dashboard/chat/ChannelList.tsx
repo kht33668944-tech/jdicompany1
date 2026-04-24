@@ -112,59 +112,70 @@ export default function ChannelList({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
-        {filteredMemo && (
-          <div className="mb-3">
-            <ChannelListItem
-              channel={filteredMemo}
-              isSelected={selectedChannelId === filteredMemo.id}
-              isMemo
-              onClick={() => onSelectChannel(filteredMemo)}
-            />
-          </div>
-        )}
-
-        {favoriteGroupChannels.length > 0 && (
-          <>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1 py-1 flex items-center gap-1">
-              <Star size={11} weight="fill" className="text-amber-400" />
-              즐겨찾기
-            </p>
-            {favoriteGroupChannels.map((ch) => (
+      <div className="flex-1 min-h-0 flex flex-col">
+        {/* 상단: 나만의 메모 + 즐겨찾기 + 채널 (독립 스크롤) */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 space-y-1">
+          {filteredMemo && (
+            <div className="mb-3">
               <ChannelListItem
-                key={ch.id}
-                channel={ch}
-                isSelected={selectedChannelId === ch.id}
-                isMemo={false}
-                isMuted={mutedChannels.has(ch.id)}
-                isFavorite
-                onClick={() => onSelectChannel(ch)}
+                channel={filteredMemo}
+                isSelected={selectedChannelId === filteredMemo.id}
+                isMemo
+                onClick={() => onSelectChannel(filteredMemo)}
               />
-            ))}
-          </>
-        )}
+            </div>
+          )}
 
-        {nonFavoriteGroupChannels.length > 0 && (
-          <>
+          {favoriteGroupChannels.length > 0 && (
+            <>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1 py-1 flex items-center gap-1">
+                <Star size={11} weight="fill" className="text-amber-400" />
+                즐겨찾기
+              </p>
+              {favoriteGroupChannels.map((ch) => (
+                <ChannelListItem
+                  key={ch.id}
+                  channel={ch}
+                  isSelected={selectedChannelId === ch.id}
+                  isMemo={false}
+                  isMuted={mutedChannels.has(ch.id)}
+                  isFavorite
+                  onClick={() => onSelectChannel(ch)}
+                />
+              ))}
+            </>
+          )}
+
+          {nonFavoriteGroupChannels.length > 0 && (
+            <>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1 py-1">
+                채널
+              </p>
+              {nonFavoriteGroupChannels.map((ch) => (
+                <ChannelListItem
+                  key={ch.id}
+                  channel={ch}
+                  isSelected={selectedChannelId === ch.id}
+                  isMemo={false}
+                  isMuted={mutedChannels.has(ch.id)}
+                  onClick={() => onSelectChannel(ch)}
+                />
+              ))}
+            </>
+          )}
+
+          {nothingMatches && (
+            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+              <MagnifyingGlass size={24} className="mb-2" />
+              <p className="text-sm">검색 결과가 없습니다</p>
+            </div>
+          )}
+        </div>
+
+        {/* 하단: 직원 (독립 스크롤) */}
+        {people.length > 0 && (!q || filteredPeople.length > 0) && (
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-2 pb-4 space-y-1 border-t border-slate-100">
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1 py-1">
-              채널
-            </p>
-            {nonFavoriteGroupChannels.map((ch) => (
-              <ChannelListItem
-                key={ch.id}
-                channel={ch}
-                isSelected={selectedChannelId === ch.id}
-                isMemo={false}
-                isMuted={mutedChannels.has(ch.id)}
-                onClick={() => onSelectChannel(ch)}
-              />
-            ))}
-          </>
-        )}
-
-        {filteredPeople.length > 0 && (
-          <>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-1 py-1 mt-2">
               직원
             </p>
             {filteredPeople.map((p) => (
@@ -177,13 +188,6 @@ export default function ChannelList({
                 onClick={() => onSelectPerson(p)}
               />
             ))}
-          </>
-        )}
-
-        {nothingMatches && (
-          <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-            <MagnifyingGlass size={24} className="mb-2" />
-            <p className="text-sm">검색 결과가 없습니다</p>
           </div>
         )}
       </div>
