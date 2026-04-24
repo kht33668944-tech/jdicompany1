@@ -164,6 +164,14 @@ export default function RecordsDetailTable({
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-sm font-bold text-slate-800">
           {employeeName}님의 상세 기록 <span className="text-slate-400 font-normal">{periodLabel}</span>
+          {(() => {
+            const { workStart, workEnd } = getScheduleForDate(workSchedules, rangeEnd);
+            return (
+              <span className="ml-2 text-slate-400 font-normal">
+                · 근무 {workStart.slice(0, 5)} - {workEnd.slice(0, 5)}
+              </span>
+            );
+          })()}
         </h4>
         <div className="flex items-center gap-2">
           {isOwnRecord && (
