@@ -39,8 +39,8 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
   const [selectedUserId, setSelectedUserId] = useState(profile.id);
   const [employeeRecords, setEmployeeRecords] = useState<Map<string, AttendanceRecord[]>>(new Map());
   const [employeeStats, setEmployeeStats] = useState<Map<string, AttendanceStats>>(new Map());
+  const [employeePrevStats, setEmployeePrevStats] = useState<Map<string, AttendanceStats>>(new Map());
   const [employeeVacations, setEmployeeVacations] = useState<Map<string, VacationByDate>>(new Map());
-  const [prevStats, setPrevStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [employeeSchedules, setEmployeeSchedules] = useState<WorkSchedule[]>([]);
 
@@ -68,20 +68,36 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
     const supabase = createClient();
     const newRecords = new Map<string, AttendanceRecord[]>();
     const newStats = new Map<string, AttendanceStats>();
+    const newPrevStats = new Map<string, AttendanceStats>();
     const newVacations = new Map<string, VacationByDate>();
 
     const targetProfiles = isAdmin ? allProfiles : [profile];
     const ids = targetProfiles.map((p) => p.id);
+    if (ids.length === 0) {
+      setEmployeeRecords(newRecords);
+      setEmployeeStats(newStats);
+      setEmployeePrevStats(newPrevStats);
+      setEmployeeVacations(newVacations);
+      setLoading(false);
+      return;
+    }
+
+    // 전월 통계 비교를 위해 prev month까지 한 번에 fetch — 라운드트립 4 → 2
+    const startParts = startDate.split("-");
+    let prevYear = Number(startParts[0]);
+    let prevMonth = Number(startParts[1]) - 1;
+    if (prevMonth === 0) { prevMonth = 12; prevYear -= 1; }
+    const prevRange = getMonthRange(prevYear, prevMonth);
 
     const [recordsResult, vacations] = await Promise.all([
       supabase
         .from("attendance_records")
         .select("*")
         .in("user_id", ids)
-        .gte("work_date", startDate)
+        .gte("work_date", prevRange.start)
         .lte("work_date", endDate)
         .order("work_date", { ascending: false }),
-      getApprovedVacationsByRange(supabase, ids, startDate, endDate),
+      getApprovedVacationsByRange(supabase, ids, prevRange.start, endDate),
     ]);
 
     const vacationsByUser = new Map<string, VacationRequest[]>();
@@ -100,50 +116,33 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
         byUser.set(r.user_id, arr);
       }
       for (const p of targetProfiles) {
-        const records = byUser.get(p.id) ?? [];
+        const allRecords = byUser.get(p.id) ?? [];
+        // 정렬 유지하면서 현재/전월로 분리
+        const currentRecords = allRecords.filter(
+          (r) => r.work_date >= startDate && r.work_date <= endDate
+        );
+        const prevRecords = allRecords.filter(
+          (r) => r.work_date >= prevRange.start && r.work_date <= prevRange.end
+        );
+        // vacation은 한 번 expand해서 두 통계 모두 사용 (날짜 기반 lookup이라 안전)
         const vacMap = expandVacationsByDate(vacationsByUser.get(p.id) ?? []);
-        newRecords.set(p.id, records);
+        const schedules = p.id === profile.id ? workSchedules : [];
+
+        newRecords.set(p.id, currentRecords);
         newVacations.set(p.id, vacMap);
-        newStats.set(p.id, calcAttendanceStats(records, p.id === profile.id ? workSchedules : [], vacMap));
+        newStats.set(p.id, calcAttendanceStats(currentRecords, schedules, vacMap));
+        newPrevStats.set(p.id, calcAttendanceStats(prevRecords, schedules, vacMap));
       }
     }
 
     setEmployeeRecords(newRecords);
     setEmployeeStats(newStats);
+    setEmployeePrevStats(newPrevStats);
     setEmployeeVacations(newVacations);
     setLoading(false);
   }, [startDate, endDate, allProfiles, profile, isAdmin, workSchedules]);
 
-  const fetchPrevStats = useCallback(async (userId?: string) => {
-    const targetUserId = userId ?? selectedUserId;
-    const supabase = createClient();
-    const startParts = startDate.split("-");
-    let prevYear = Number(startParts[0]);
-    let prevMonth = Number(startParts[1]) - 1;
-    if (prevMonth === 0) { prevMonth = 12; prevYear -= 1; }
-    const prevRange = getMonthRange(prevYear, prevMonth);
-
-    const targetProfile = allProfiles.find((p) => p.id === targetUserId) ?? profile;
-
-    const [{ data }, prevVacations] = await Promise.all([
-      supabase
-        .from("attendance_records")
-        .select("*")
-        .eq("user_id", targetUserId)
-        .gte("work_date", prevRange.start)
-        .lte("work_date", prevRange.end),
-      getApprovedVacationsByRange(supabase, [targetUserId], prevRange.start, prevRange.end),
-    ]);
-
-    if (data) {
-      const schedulesForTarget = targetProfile.id === profile.id ? workSchedules : employeeSchedules;
-      const vacMap = expandVacationsByDate(prevVacations);
-      setPrevStats(calcAttendanceStats(data, schedulesForTarget, vacMap));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, allProfiles, profile, workSchedules, employeeSchedules]);
-
-  useEffect(() => { fetchAllRecords(); fetchPrevStats(); }, [fetchAllRecords, fetchPrevStats]);
+  useEffect(() => { fetchAllRecords(); }, [fetchAllRecords]);
 
   useEffect(() => {
     if (selectedUserId === profile.id) {
@@ -160,10 +159,10 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
   const selectedProfile = allProfiles.find((p) => p.id === selectedUserId) ?? profile;
   const selectedRecords = employeeRecords.get(selectedUserId) ?? [];
   const selectedStats = employeeStats.get(selectedUserId) ?? EMPTY_STATS;
+  const prevStats = employeePrevStats.get(selectedUserId) ?? null;
 
   const handleEmployeeSelect = (userId: string) => {
     setSelectedUserId(userId);
-    fetchPrevStats(userId);
     if (window.innerWidth < 1024 && detailRef.current) {
       detailRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
@@ -182,7 +181,7 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
         onDepartmentChange={setSelectedDepartment}
         onSearchChange={setSearchQuery}
-        onApply={() => { fetchAllRecords(); fetchPrevStats(); }}
+        onApply={() => { fetchAllRecords(); }}
         isAdmin={isAdmin}
       />
 
