@@ -32,6 +32,7 @@ interface AttendancePageClientProps {
   profile: Profile;
   currentYear: number;
   currentMonth: number;
+  initialData: AttendancePageData;
 }
 
 const STORAGE_KEY = "attendance-active-tab";
@@ -73,11 +74,11 @@ function CheckInOutSkeleton() {
   );
 }
 
-export default function AttendancePageClient({ profile }: AttendancePageClientProps) {
+export default function AttendancePageClient({ profile, initialData }: AttendancePageClientProps) {
   const isAdmin = profile.role === "admin";
   const [activeTab, setActiveTab] = useState<AttendanceTabId>(() => getInitialTab(isAdmin));
-  const [checkInData, setCheckInData] = useState<AttendancePageData | null>(null);
-  const [checkInLoading, setCheckInLoading] = useState(true);
+  const [checkInData, setCheckInData] = useState<AttendancePageData | null>(initialData);
+  const [checkInLoading, setCheckInLoading] = useState(false);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, activeTab);

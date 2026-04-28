@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { getDashboardData, type DashboardData } from "@/lib/dashboard/queries";
+import type { DashboardData } from "@/lib/dashboard/queries";
 import QuickStatsWidget from "./widgets/QuickStatsWidget";
 import MyTasksWidget from "./widgets/MyTasksWidget";
 import TodayScheduleWidget from "./widgets/TodayScheduleWidget";
@@ -11,20 +10,14 @@ import RecentActivityWidget from "./widgets/RecentActivityWidget";
 interface Props {
   userId: string;
   userName: string;
+  initialData: DashboardData;
 }
 
-export default function DashboardClient({ userId, userName }: Props) {
-  const [data, setData] = useState<DashboardData | null>(null);
+export default function DashboardClient({ userId, userName, initialData }: Props) {
+  const [data] = useState<DashboardData | null>(initialData);
   // 시간 기반 문자열은 서버(싱가포르)와 브라우저(한국)의 시각 차이로
   // hydration mismatch를 일으켜 전체 재렌더링을 유발 → 마운트 후에만 계산
   const [timeInfo, setTimeInfo] = useState<{ dateStr: string; greeting: string } | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    getDashboardData(supabase, userId, userName)
-      .then(setData)
-      .catch(console.error);
-  }, [userId, userName]);
 
   useEffect(() => {
     const now = new Date();

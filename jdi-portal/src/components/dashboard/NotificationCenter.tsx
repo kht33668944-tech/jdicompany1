@@ -81,7 +81,7 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   report_status_changed: "text-amber-500 bg-amber-50",
 };
 
-const INITIAL_COUNT_DELAY_MS = 2500;
+const INITIAL_COUNT_DELAY_MS = 10000;
 
 interface NotificationCenterProps {
   userId: string;

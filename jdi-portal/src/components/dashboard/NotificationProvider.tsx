@@ -12,6 +12,8 @@ interface NotificationProviderProps {
   children: React.ReactNode;
 }
 
+const REALTIME_BOOT_DELAY_MS = 10000;
+
 export default function NotificationProvider({
   userId,
   onNewNotification,
@@ -47,25 +49,29 @@ export default function NotificationProvider({
   // Realtime 구독: 본인 알림 INSERT 즉시 처리 (폴링 제거)
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          const notification = payload.new as Notification;
-          showToast(notification);
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const timer = window.setTimeout(() => {
+      channel = supabase
+        .channel(`notifications:${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const notification = payload.new as Notification;
+            showToast(notification);
+          }
+        )
+        .subscribe();
+    }, REALTIME_BOOT_DELAY_MS);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.clearTimeout(timer);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [userId, showToast]);
 

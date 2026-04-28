@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import AttendancePageClient from "@/components/dashboard/attendance/AttendancePageClient";
+import { getAttendancePageData } from "@/lib/attendance/initial-data";
 import { toDateString } from "@/lib/utils/date";
 import { getSingleValue, parseYearParam, parseMonthParam } from "@/lib/utils/params";
 
@@ -21,12 +22,14 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
   const defaultMonth = Number(today.slice(5, 7));
   const currentYear = parseYearParam(getSingleValue(query.year), defaultYear);
   const currentMonth = parseMonthParam(getSingleValue(query.month), defaultMonth);
+  const initialData = await getAttendancePageData(auth.supabase, auth.profile.id);
 
   return (
     <AttendancePageClient
       profile={auth.profile}
       currentYear={currentYear}
       currentMonth={currentMonth}
+      initialData={initialData}
     />
   );
 }
