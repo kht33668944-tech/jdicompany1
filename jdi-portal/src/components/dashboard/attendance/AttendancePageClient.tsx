@@ -3,11 +3,18 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { AttendanceTabId } from "@/lib/attendance/constants";
+import { createClient } from "@/lib/supabase/client";
+import {
+  getMyWorkScheduleChangeRequests,
+  getTodayRecord,
+  getWeekRecords,
+  getWorkSchedules,
+} from "@/lib/attendance/queries";
+import { getWeekRange } from "@/lib/utils/date";
 import TabNavigation from "./TabNavigation";
 import CheckInOutTab from "./tabs/CheckInOutTab";
-import type { Profile, AttendancePageData } from "@/lib/attendance/types";
+import type { AttendancePageData, Profile } from "@/lib/attendance/types";
 
-// 비-기본 탭은 클릭 시점에 chunk 로드 — 첫 진입 JS 번들 ↓
 const RecordsTab = dynamic(() => import("./tabs/RecordsTab"), {
   ssr: false,
   loading: () => <TabSkeleton />,
@@ -25,7 +32,6 @@ interface AttendancePageClientProps {
   profile: Profile;
   currentYear: number;
   currentMonth: number;
-  initialData: AttendancePageData;
 }
 
 const STORAGE_KEY = "attendance-active-tab";
@@ -55,33 +61,81 @@ function TabSkeleton() {
   );
 }
 
-export default function AttendancePageClient({ profile, initialData }: AttendancePageClientProps) {
+function CheckInOutSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass-card rounded-2xl h-72 animate-pulse" />
+        <div className="glass-card rounded-2xl h-72 animate-pulse" />
+      </div>
+      <div className="glass-card rounded-2xl h-44 animate-pulse" />
+    </div>
+  );
+}
+
+export default function AttendancePageClient({ profile }: AttendancePageClientProps) {
   const isAdmin = profile.role === "admin";
   const [activeTab, setActiveTab] = useState<AttendanceTabId>(() => getInitialTab(isAdmin));
+  const [checkInData, setCheckInData] = useState<AttendancePageData | null>(null);
+  const [checkInLoading, setCheckInLoading] = useState(true);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    const { start: weekStart, end: weekEnd } = getWeekRange(new Date());
+
+    setCheckInLoading(true);
+    Promise.all([
+      getTodayRecord(supabase, profile.id).catch(() => null),
+      getWeekRecords(supabase, profile.id, weekStart, weekEnd).catch(() => []),
+      getWorkSchedules(supabase, profile.id).catch(() => []),
+      getMyWorkScheduleChangeRequests(supabase, profile.id).catch(() => []),
+    ]).then(([todayRecord, weekRecords, workSchedules, myWorkScheduleChangeRequests]) => {
+      if (cancelled) return;
+      setCheckInData({
+        todayRecord,
+        weekRecords,
+        weekStart,
+        workSchedules,
+        myWorkScheduleChangeRequests,
+      });
+      setCheckInLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.id]);
+
+  const workSchedules = checkInData?.workSchedules ?? [];
 
   return (
     <div className="space-y-6">
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} isAdmin={isAdmin} />
 
       {activeTab === "checkin" && (
-        <CheckInOutTab
-          userId={profile.id}
-          isAdmin={isAdmin}
-          todayRecord={initialData.todayRecord}
-          weekRecords={initialData.weekRecords}
-          weekStart={initialData.weekStart}
-          workSchedules={initialData.workSchedules}
-          myChangeRequests={initialData.myWorkScheduleChangeRequests}
-          allowedIp={profile.allowed_ip}
-        />
+        checkInLoading || !checkInData ? (
+          <CheckInOutSkeleton />
+        ) : (
+          <CheckInOutTab
+            userId={profile.id}
+            isAdmin={isAdmin}
+            todayRecord={checkInData.todayRecord}
+            weekRecords={checkInData.weekRecords}
+            weekStart={checkInData.weekStart}
+            workSchedules={checkInData.workSchedules}
+            myChangeRequests={checkInData.myWorkScheduleChangeRequests}
+            allowedIp={profile.allowed_ip}
+          />
+        )
       )}
 
       {activeTab === "records" && (
-        <RecordsTab profile={profile} workSchedules={initialData.workSchedules} />
+        <RecordsTab profile={profile} workSchedules={workSchedules} />
       )}
 
       {activeTab === "vacation" && <VacationTab userId={profile.id} />}
