@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // @google/genai (14MB)는 서버에서 require로만 로드 — Next.js 번들에 포함 안 함
-  // → Railway 콜드스타트·메모리 사용량 감소
-  serverExternalPackages: ["@google/genai"],
   experimental: {
     // 배럴 import 최적화 — phosphor-react(58MB)·recharts·dnd가 쓰는 아이콘/모듈만 골라 번들
     // → 모든 대시보드 페이지의 초기 JS 번들 수백 KB 절감
