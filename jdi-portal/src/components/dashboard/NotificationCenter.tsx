@@ -81,6 +81,8 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   report_status_changed: "text-amber-500 bg-amber-50",
 };
 
+const INITIAL_COUNT_DELAY_MS = 2500;
+
 interface NotificationCenterProps {
   userId: string;
   unreadCount: number;
@@ -143,6 +145,7 @@ export default function NotificationCenter({
 
   // 초기 unread count fetch
   useEffect(() => {
+    let cancelled = false;
     async function fetchCount() {
       const supabase = createClient();
       const { count } = await supabase
@@ -150,9 +153,14 @@ export default function NotificationCenter({
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("is_read", false);
+      if (cancelled) return;
       onUnreadCountChange(count ?? 0);
     }
-    fetchCount();
+    const timer = window.setTimeout(fetchCount, INITIAL_COUNT_DELAY_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [userId, onUnreadCountChange]);
 
   const handleToggle = () => {

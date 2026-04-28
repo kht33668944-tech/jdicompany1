@@ -84,6 +84,8 @@ export default function AttendancePageClient({ profile }: AttendancePageClientPr
   }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab !== "checkin" || checkInData) return;
+
     let cancelled = false;
     const supabase = createClient();
     const { start: weekStart, end: weekEnd } = getWeekRange(new Date());
@@ -109,7 +111,7 @@ export default function AttendancePageClient({ profile }: AttendancePageClientPr
     return () => {
       cancelled = true;
     };
-  }, [profile.id]);
+  }, [activeTab, checkInData, profile.id]);
 
   const workSchedules = checkInData?.workSchedules ?? [];
 

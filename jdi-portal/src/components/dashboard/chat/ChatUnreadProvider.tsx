@@ -18,6 +18,7 @@ interface MembershipInfo {
 }
 
 const FETCH_DEDUP_MS = 300;
+const INITIAL_FETCH_DELAY_MS = 2500;
 
 export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnreadProviderProps) {
   const pathname = usePathname();
@@ -57,8 +58,11 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
 
   // 초기 로드 — unread 1회 + 멤버십 캐시 1회
   useEffect(() => {
-    fetchUnread();
-    loadMemberships();
+    const timer = window.setTimeout(() => {
+      fetchUnread();
+      loadMemberships();
+    }, INITIAL_FETCH_DELAY_MS);
+    return () => window.clearTimeout(timer);
   }, [fetchUnread, loadMemberships]);
 
   // markAsRead 직후 사이드바 뱃지 즉시 갱신 (realtime 지연 우회)

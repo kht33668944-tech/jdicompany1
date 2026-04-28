@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Users } from "phosphor-react";
 import { createClient } from "@/lib/supabase/client";
 import { calcAttendanceStats, EMPTY_STATS, expandVacationsByDate } from "@/lib/attendance/stats";
-import type { AttendanceRecord, Profile, WorkSchedule, VacationRequest } from "@/lib/attendance/types";
 import type { AttendanceStats, VacationByDate } from "@/lib/attendance/stats";
-import { getWorkSchedulesForUser, getApprovedVacationsByRange } from "@/lib/attendance/queries";
+import type { AttendanceRecord, Profile, VacationRequest, WorkSchedule } from "@/lib/attendance/types";
+import { getWorkSchedulesForUser } from "@/lib/attendance/queries";
 import { getMonthRange } from "@/lib/utils/date";
 import dynamic from "next/dynamic";
 import RecordsFilter from "./RecordsFilter";
@@ -15,7 +15,12 @@ import RecordsSummaryCards from "./RecordsSummaryCards";
 import RecordsDetailTable from "./RecordsDetailTable";
 
 const AttendanceCharts = dynamic(() => import("./AttendanceCharts"), {
-  loading: () => <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="glass-card rounded-2xl h-64 animate-pulse" /><div className="glass-card rounded-2xl h-64 animate-pulse" /></div>,
+  loading: () => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="glass-card rounded-2xl h-64 animate-pulse" />
+      <div className="glass-card rounded-2xl h-64 animate-pulse" />
+    </div>
+  ),
   ssr: false,
 });
 
@@ -23,6 +28,13 @@ interface AdminRecordsViewProps {
   profile: Profile;
   allProfiles: Profile[];
   workSchedules: WorkSchedule[];
+}
+
+interface RecordsApiResponse {
+  profiles: Profile[];
+  records: AttendanceRecord[];
+  vacations: VacationRequest[];
+  prevRange: { start: string; end: string };
 }
 
 export default function AdminRecordsView({ profile, allProfiles, workSchedules }: AdminRecordsViewProps) {
@@ -34,8 +46,7 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
   const [endDate, setEndDate] = useState(currentRange.end);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const profiles = useMemo(() => isAdmin ? allProfiles : [profile], [isAdmin, allProfiles, profile]);
+  const [loadedProfiles, setLoadedProfiles] = useState<Profile[]>(allProfiles);
   const [selectedUserId, setSelectedUserId] = useState(profile.id);
   const [employeeRecords, setEmployeeRecords] = useState<Map<string, AttendanceRecord[]>>(new Map());
   const [employeeStats, setEmployeeStats] = useState<Map<string, AttendanceStats>>(new Map());
@@ -46,9 +57,10 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
 
   const detailRef = useRef<HTMLDivElement>(null);
 
+  const profiles = useMemo(() => (isAdmin ? loadedProfiles : [profile]), [isAdmin, loadedProfiles, profile]);
   const departments = useMemo(
-    () => [...new Set(allProfiles.map((p) => p.department).filter(Boolean))],
-    [allProfiles]
+    () => [...new Set(loadedProfiles.map((p) => p.department).filter(Boolean))],
+    [loadedProfiles]
   );
 
   const filteredProfiles = useMemo(
@@ -65,66 +77,45 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
 
   const fetchAllRecords = useCallback(async () => {
     setLoading(true);
-    const supabase = createClient();
+
     const newRecords = new Map<string, AttendanceRecord[]>();
     const newStats = new Map<string, AttendanceStats>();
     const newPrevStats = new Map<string, AttendanceStats>();
     const newVacations = new Map<string, VacationByDate>();
 
-    const targetProfiles = isAdmin ? allProfiles : [profile];
-    const ids = targetProfiles.map((p) => p.id);
-    if (ids.length === 0) {
-      setEmployeeRecords(newRecords);
-      setEmployeeStats(newStats);
-      setEmployeePrevStats(newPrevStats);
-      setEmployeeVacations(newVacations);
-      setLoading(false);
-      return;
-    }
+    try {
+      const params = new URLSearchParams({ start: startDate, end: endDate });
+      const response = await fetch(`/api/attendance/records?${params.toString()}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`records api failed: ${response.status}`);
 
-    // 전월 통계 비교를 위해 prev month까지 한 번에 fetch — 라운드트립 4 → 2
-    const startParts = startDate.split("-");
-    let prevYear = Number(startParts[0]);
-    let prevMonth = Number(startParts[1]) - 1;
-    if (prevMonth === 0) { prevMonth = 12; prevYear -= 1; }
-    const prevRange = getMonthRange(prevYear, prevMonth);
+      const payload = (await response.json()) as RecordsApiResponse;
+      const targetProfiles = isAdmin ? payload.profiles : [profile];
+      setLoadedProfiles(targetProfiles);
 
-    const [recordsResult, vacations] = await Promise.all([
-      supabase
-        .from("attendance_records")
-        .select("*")
-        .in("user_id", ids)
-        .gte("work_date", prevRange.start)
-        .lte("work_date", endDate)
-        .order("work_date", { ascending: false }),
-      getApprovedVacationsByRange(supabase, ids, prevRange.start, endDate),
-    ]);
-
-    const vacationsByUser = new Map<string, VacationRequest[]>();
-    for (const v of vacations) {
-      const arr = vacationsByUser.get(v.user_id) ?? [];
-      arr.push(v);
-      vacationsByUser.set(v.user_id, arr);
-    }
-
-    const { data, error } = recordsResult;
-    if (!error && data) {
-      const byUser = new Map<string, typeof data>();
-      for (const r of data) {
-        const arr = byUser.get(r.user_id) ?? [];
-        arr.push(r);
-        byUser.set(r.user_id, arr);
+      const vacationsByUser = new Map<string, VacationRequest[]>();
+      for (const vacation of payload.vacations) {
+        const arr = vacationsByUser.get(vacation.user_id) ?? [];
+        arr.push(vacation);
+        vacationsByUser.set(vacation.user_id, arr);
       }
+
+      const recordsByUser = new Map<string, AttendanceRecord[]>();
+      for (const record of payload.records) {
+        const arr = recordsByUser.get(record.user_id) ?? [];
+        arr.push(record);
+        recordsByUser.set(record.user_id, arr);
+      }
+
       for (const p of targetProfiles) {
-        const allRecords = byUser.get(p.id) ?? [];
-        // 정렬 유지하면서 현재/전월로 분리
+        const allRecords = recordsByUser.get(p.id) ?? [];
         const currentRecords = allRecords.filter(
           (r) => r.work_date >= startDate && r.work_date <= endDate
         );
         const prevRecords = allRecords.filter(
-          (r) => r.work_date >= prevRange.start && r.work_date <= prevRange.end
+          (r) => r.work_date >= payload.prevRange.start && r.work_date <= payload.prevRange.end
         );
-        // vacation은 한 번 expand해서 두 통계 모두 사용 (날짜 기반 lookup이라 안전)
         const vacMap = expandVacationsByDate(vacationsByUser.get(p.id) ?? []);
         const schedules = p.id === profile.id ? workSchedules : [];
 
@@ -133,16 +124,21 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
         newStats.set(p.id, calcAttendanceStats(currentRecords, schedules, vacMap));
         newPrevStats.set(p.id, calcAttendanceStats(prevRecords, schedules, vacMap));
       }
+
+      setEmployeeRecords(newRecords);
+      setEmployeeStats(newStats);
+      setEmployeePrevStats(newPrevStats);
+      setEmployeeVacations(newVacations);
+    } catch (error) {
+      console.error("[AdminRecordsView] records api failed:", error);
+    } finally {
+      setLoading(false);
     }
+  }, [startDate, endDate, profile, isAdmin, workSchedules]);
 
-    setEmployeeRecords(newRecords);
-    setEmployeeStats(newStats);
-    setEmployeePrevStats(newPrevStats);
-    setEmployeeVacations(newVacations);
-    setLoading(false);
-  }, [startDate, endDate, allProfiles, profile, isAdmin, workSchedules]);
-
-  useEffect(() => { fetchAllRecords(); }, [fetchAllRecords]);
+  useEffect(() => {
+    fetchAllRecords();
+  }, [fetchAllRecords]);
 
   useEffect(() => {
     if (selectedUserId === profile.id) {
@@ -153,10 +149,12 @@ export default function AdminRecordsView({ profile, allProfiles, workSchedules }
     getWorkSchedulesForUser(createClient(), selectedUserId).then((data) => {
       if (!cancelled) setEmployeeSchedules(data);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedUserId, profile.id]);
 
-  const selectedProfile = allProfiles.find((p) => p.id === selectedUserId) ?? profile;
+  const selectedProfile = loadedProfiles.find((p) => p.id === selectedUserId) ?? profile;
   const selectedRecords = employeeRecords.get(selectedUserId) ?? [];
   const selectedStats = employeeStats.get(selectedUserId) ?? EMPTY_STATS;
   const prevStats = employeePrevStats.get(selectedUserId) ?? null;
