@@ -13,7 +13,8 @@ interface WeekSummaryCardProps {
 const WEEKDAYS = ["월", "화", "수", "목", "금"];
 
 export default function WeekSummaryCard({ weekRecords, weekStart }: WeekSummaryCardProps) {
-  const startDate = new Date(weekStart + "T00:00:00");
+  // SSR(UTC) vs CSR(KST) hydration mismatch 방지 — KST 정오 기준으로 고정
+  const startDate = new Date(`${weekStart}T12:00:00+09:00`);
   const todayStr = toDateString();
   const days = WEEKDAYS.map((label, i) => {
     const d = new Date(startDate);
