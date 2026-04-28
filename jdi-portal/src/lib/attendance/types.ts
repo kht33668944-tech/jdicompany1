@@ -126,3 +126,26 @@ export interface HireDateChangeRequest {
   created_at: string;
   profiles?: { full_name: string; hire_date: string | null };
 }
+
+// 근태관리 페이지(/dashboard/attendance) 의 SSR 초기 데이터.
+// page.tsx에서 한 번에 fetch해서 AttendancePageClient에 props로 넘김.
+export interface AttendancePageData {
+  // 모든 사용자
+  todayRecord: AttendanceRecord | null;
+  weekRecords: AttendanceRecord[];
+  weekStart: string;
+  vacationBalance: VacationBalance | null;
+  vacationRequests: VacationRequest[];
+  correctionRequests: CorrectionRequest[];
+  workSchedules: WorkSchedule[];
+  myWorkScheduleChangeRequests: WorkScheduleChangeRequest[];
+  // admin 전용 (일반 사용자 = null)
+  allTodayAttendance: AttendanceWithProfile[] | null;
+  allProfiles: Profile[] | null;
+  pendingVacationRequests: VacationRequest[] | null;
+  cancelVacationRequests: VacationRequest[] | null;
+  pendingCorrectionRequests: CorrectionRequest[] | null;
+  pendingWorkScheduleChangeRequests: WorkScheduleChangeRequest[] | null;
+  pendingHireDateChangeRequests: HireDateChangeRequest[] | null;
+  pendingIpChangeRequests: IpChangeRequest[] | null;
+}
