@@ -11,12 +11,13 @@
  * → 19초가 모듈 로드(recharts/phosphor-react/dnd 등)에 소비됨을 진단으로 확인.
  */
 
-export async function register() {
+export function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
-  // 1) 무거운 페이지 모듈 미리 로드 (cold start 시 한 번)
-  // import 자체가 모듈을 V8 캐시에 적재 — 결과는 버려도 됨
-  await Promise.allSettled([
+  // 1) 무거운 페이지 모듈 미리 로드 — fire-and-forget (await 금지!)
+  //    await하면 register()가 server bootstrap을 블로킹 → 첫 사용자 30초 대기.
+  //    백그라운드로 띄우면 server는 즉시 요청 받기 시작, 모듈은 곧 도착.
+  Promise.allSettled([
     import("@/components/dashboard/attendance/AttendancePageClient"),
     import("@/components/dashboard/attendance/WeekSummaryCard"),
     import("@/components/dashboard/tasks/TasksPageClient"),
@@ -24,11 +25,12 @@ export async function register() {
     import("@/components/dashboard/chat/ChatPageClient"),
     import("@/components/dashboard/reports/ReportsPageClient"),
     import("@/components/dashboard/settings/SettingsPageClient"),
-    // 라이브러리 모듈도 직접 import해 V8에 적재
     import("recharts"),
     import("phosphor-react"),
     import("@hello-pangea/dnd"),
-  ]);
+  ]).catch(() => {
+    /* warmup 실패는 silent — 첫 요청에서 자연스럽게 로드됨 */
+  });
 
   // 2) 4분마다 셀프 핑 — Supabase HTTP keep-alive + V8 모듈 캐시 유지
   // Railway는 idle 시 컨테이너를 evict 하지 않지만 Node.js 내부 캐시는 GC됨
