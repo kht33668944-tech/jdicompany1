@@ -150,8 +150,7 @@ export default function LoginCard() {
           }
 
           const nextPath = sanitizeNext(searchParams.get("next"));
-          router.push(nextPath);
-          router.refresh();
+          router.replace(nextPath);
         }
       }
     } catch {
@@ -307,7 +306,7 @@ export default function LoginCard() {
                 로그인 상태 유지
               </label>
             </div>
-            <Link href="/forgot-password" className="text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline underline-offset-4 transition-colors">
+            <Link href="/forgot-password" prefetch={false} className="text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline underline-offset-4 transition-colors">
               비밀번호를 잊으셨나요?
             </Link>
           </div>
@@ -347,6 +346,7 @@ export default function LoginCard() {
           <p className="text-sm text-slate-500 mb-3">계정이 없으신가요?</p>
           <Link
             href="/signup"
+            prefetch={false}
             className="block w-full py-3.5 px-4 rounded-xl text-base font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 transition-all duration-200"
           >
             회원가입
