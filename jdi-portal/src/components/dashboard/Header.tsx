@@ -3,13 +3,12 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import {
-  List,
-  CaretLeft,
-  GearSix,
-  SignOut,
-  WarningCircle,
-} from "phosphor-react";
+// 아이콘별 deep import — 전체 phosphor-react 배럴 로드 회피 (서버 cold-start ↓)
+import List from "phosphor-react/dist/icons/List.esm.js";
+import CaretLeft from "phosphor-react/dist/icons/CaretLeft.esm.js";
+import GearSix from "phosphor-react/dist/icons/GearSix.esm.js";
+import SignOut from "phosphor-react/dist/icons/SignOut.esm.js";
+import WarningCircle from "phosphor-react/dist/icons/WarningCircle.esm.js";
 import NotificationCenter from "./NotificationCenter";
 import ReportQuickDrawer from "./reports/ReportQuickDrawer";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";

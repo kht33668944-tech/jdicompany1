@@ -1,6 +1,10 @@
 "use client";
 
-import { Clock, CalendarBlank, Airplane, ShieldCheck } from "phosphor-react";
+// 아이콘별 deep import — 전체 phosphor-react 배럴 로드 회피
+import Clock from "phosphor-react/dist/icons/Clock.esm.js";
+import CalendarBlank from "phosphor-react/dist/icons/CalendarBlank.esm.js";
+import Airplane from "phosphor-react/dist/icons/Airplane.esm.js";
+import ShieldCheck from "phosphor-react/dist/icons/ShieldCheck.esm.js";
 import type { AttendanceTabId } from "@/lib/attendance/constants";
 
 interface Tab {

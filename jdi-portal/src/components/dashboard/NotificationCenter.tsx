@@ -2,23 +2,23 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Bell,
-  BellRinging,
-  UserPlus,
-  ChatDots,
-  ArrowsClockwise,
-  Warning,
-  CheckCircle,
-  XCircle,
-  CalendarPlus,
-  Megaphone,
-  UserCirclePlus,
-  Checks,
-  ChatCircle,
-  WifiHigh,
-  Bug,
-} from "phosphor-react";
+// 아이콘별 deep import — 전체 phosphor-react 배럴 로드 회피
+// 알림 타입이 22개라 배럴 import 시 서버 모듈 평가 비용이 가장 큼
+import Bell from "phosphor-react/dist/icons/Bell.esm.js";
+import BellRinging from "phosphor-react/dist/icons/BellRinging.esm.js";
+import UserPlus from "phosphor-react/dist/icons/UserPlus.esm.js";
+import ChatDots from "phosphor-react/dist/icons/ChatDots.esm.js";
+import ArrowsClockwise from "phosphor-react/dist/icons/ArrowsClockwise.esm.js";
+import Warning from "phosphor-react/dist/icons/Warning.esm.js";
+import CheckCircle from "phosphor-react/dist/icons/CheckCircle.esm.js";
+import XCircle from "phosphor-react/dist/icons/XCircle.esm.js";
+import CalendarPlus from "phosphor-react/dist/icons/CalendarPlus.esm.js";
+import Megaphone from "phosphor-react/dist/icons/Megaphone.esm.js";
+import UserCirclePlus from "phosphor-react/dist/icons/UserCirclePlus.esm.js";
+import Checks from "phosphor-react/dist/icons/Checks.esm.js";
+import ChatCircle from "phosphor-react/dist/icons/ChatCircle.esm.js";
+import WifiHigh from "phosphor-react/dist/icons/WifiHigh.esm.js";
+import Bug from "phosphor-react/dist/icons/Bug.esm.js";
 import { createClient } from "@/lib/supabase/client";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import { markAsRead, markAllAsRead } from "@/lib/notifications/actions";
@@ -120,6 +120,8 @@ export default function NotificationCenter({
   }, [desktopEnabled]);
 
   // 드롭다운 열릴 때 알림 목록 fetch
+  // unread 카운트는 head-only fetchCount 가 권위적 — 여기서 덮어쓰지 않음
+  // (30개 sample 기반 카운트는 미읽음 30개 이상이면 부정확)
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
@@ -133,13 +135,11 @@ export default function NotificationCenter({
 
       if (!error && data) {
         setNotifications(data as Notification[]);
-        const unread = (data as Notification[]).filter((n) => !n.is_read).length;
-        onUnreadCountChange(unread);
       }
     } finally {
       setLoading(false);
     }
-  }, [userId, onUnreadCountChange]);
+  }, [userId]);
 
   // 초기 unread count fetch
   useEffect(() => {

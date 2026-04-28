@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import type { AttendanceTabId } from "@/lib/attendance/constants";
 import TabNavigation from "./TabNavigation";
-import AdminTab from "./tabs/AdminTab";
 import CheckInOutTab from "./tabs/CheckInOutTab";
-import RecordsTab from "./tabs/RecordsTab";
-import VacationTab from "./tabs/VacationTab";
 import type { Profile, AttendancePageData } from "@/lib/attendance/types";
+
+// 비-기본 탭은 클릭 시점에 chunk 로드 — 첫 진입 JS 번들 ↓
+const RecordsTab = dynamic(() => import("./tabs/RecordsTab"), {
+  ssr: false,
+  loading: () => <TabSkeleton />,
+});
+const VacationTab = dynamic(() => import("./tabs/VacationTab"), {
+  ssr: false,
+  loading: () => <TabSkeleton />,
+});
+const AdminTab = dynamic(() => import("./tabs/AdminTab"), {
+  ssr: false,
+  loading: () => <TabSkeleton />,
+});
 
 interface AttendancePageClientProps {
   profile: Profile;
@@ -35,12 +47,17 @@ function getInitialTab(isAdmin: boolean): AttendanceTabId {
   return savedTab;
 }
 
+function TabSkeleton() {
+  return (
+    <div className="glass-card rounded-2xl p-8 text-center text-sm text-slate-400">
+      불러오는 중...
+    </div>
+  );
+}
+
 export default function AttendancePageClient({ profile, initialData }: AttendancePageClientProps) {
   const isAdmin = profile.role === "admin";
   const [activeTab, setActiveTab] = useState<AttendanceTabId>(() => getInitialTab(isAdmin));
-
-  // 데이터는 props에서 직접 사용 — router.refresh() 시 page.tsx가 재실행되어 새 props가 자동으로 들어옴
-  const data = initialData;
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, activeTab);
@@ -54,42 +71,22 @@ export default function AttendancePageClient({ profile, initialData }: Attendanc
         <CheckInOutTab
           userId={profile.id}
           isAdmin={isAdmin}
-          todayRecord={data.todayRecord}
-          weekRecords={data.weekRecords}
-          weekStart={data.weekStart}
-          workSchedules={data.workSchedules}
-          myChangeRequests={data.myWorkScheduleChangeRequests}
+          todayRecord={initialData.todayRecord}
+          weekRecords={initialData.weekRecords}
+          weekStart={initialData.weekStart}
+          workSchedules={initialData.workSchedules}
+          myChangeRequests={initialData.myWorkScheduleChangeRequests}
           allowedIp={profile.allowed_ip}
         />
       )}
 
       {activeTab === "records" && (
-        <RecordsTab
-          profile={profile}
-          allProfiles={data.allProfiles ?? []}
-          workSchedules={data.workSchedules}
-        />
+        <RecordsTab profile={profile} workSchedules={initialData.workSchedules} />
       )}
 
-      {activeTab === "vacation" && (
-        <VacationTab
-          vacationBalance={data.vacationBalance}
-          vacationRequests={data.vacationRequests}
-        />
-      )}
+      {activeTab === "vacation" && <VacationTab userId={profile.id} />}
 
-      {activeTab === "admin" && isAdmin && (
-        <AdminTab
-          allTodayAttendance={data.allTodayAttendance ?? []}
-          allProfiles={data.allProfiles ?? []}
-          pendingVacationRequests={data.pendingVacationRequests ?? []}
-          cancelVacationRequests={data.cancelVacationRequests ?? []}
-          pendingCorrectionRequests={data.pendingCorrectionRequests ?? []}
-          pendingWorkScheduleChangeRequests={data.pendingWorkScheduleChangeRequests ?? []}
-          pendingHireDateChangeRequests={data.pendingHireDateChangeRequests ?? []}
-          pendingIpChangeRequests={data.pendingIpChangeRequests ?? []}
-        />
-      )}
+      {activeTab === "admin" && isAdmin && <AdminTab />}
     </div>
   );
 }

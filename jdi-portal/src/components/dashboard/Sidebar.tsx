@@ -4,16 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
-import {
-  SquaresFour,
-  Clock,
-  ListChecks,
-  CalendarBlank,
-  ChatCircle,
-  WarningCircle,
-  GearSix,
-  SignOut,
-} from "phosphor-react";
+// 아이콘별 deep import — 전체 phosphor-react 배럴 로드 회피 (서버 cold-start ↓)
+import SquaresFour from "phosphor-react/dist/icons/SquaresFour.esm.js";
+import Clock from "phosphor-react/dist/icons/Clock.esm.js";
+import ListChecks from "phosphor-react/dist/icons/ListChecks.esm.js";
+import CalendarBlank from "phosphor-react/dist/icons/CalendarBlank.esm.js";
+import ChatCircle from "phosphor-react/dist/icons/ChatCircle.esm.js";
+import WarningCircle from "phosphor-react/dist/icons/WarningCircle.esm.js";
+import GearSix from "phosphor-react/dist/icons/GearSix.esm.js";
+import SignOut from "phosphor-react/dist/icons/SignOut.esm.js";
 
 interface SidebarProps {
   user: { email: string; name: string; avatarUrl?: string | null };
