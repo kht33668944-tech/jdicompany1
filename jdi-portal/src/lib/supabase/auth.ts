@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "./server";
 import { getProfile } from "../attendance/queries";
-import { getPool } from "@/lib/db/postgres";
+import { getPool, isPostgresUsable, markPostgresUnavailable } from "@/lib/db/postgres";
 import type { Profile } from "../attendance/types";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
@@ -12,7 +12,7 @@ export interface AuthUser {
 }
 
 async function getProfileViaPostgres(userId: string): Promise<Profile | null> {
-  if (!process.env.DATABASE_URL) return null;
+  if (!isPostgresUsable()) return null;
 
   const { rows } = await getPool().query(
     "select * from public.profiles where id = $1 limit 1",
@@ -40,6 +40,7 @@ export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
   try {
     profile = await getProfileViaPostgres(user.id);
   } catch (error) {
+    markPostgresUnavailable();
     console.error("[auth] postgres profile lookup failed, falling back:", error);
   }
 

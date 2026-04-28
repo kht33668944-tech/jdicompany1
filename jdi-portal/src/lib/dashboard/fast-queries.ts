@@ -4,7 +4,7 @@ import type { TaskAssignee, TaskWithDetails } from "@/lib/tasks/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import { addDays, getWeekRange, toDateString } from "@/lib/utils/date";
 import { sortTasks } from "@/lib/tasks/utils";
-import { getPool } from "@/lib/db/postgres";
+import { getPool, isPostgresUsable, markPostgresUnavailable } from "@/lib/db/postgres";
 import { getDashboardData, type DashboardData, type RecentActivity } from "./queries";
 
 type TaskRow = TaskWithDetails & {
@@ -193,13 +193,14 @@ export async function getDashboardDataFast(
   userId: string,
   userName: string
 ): Promise<DashboardData> {
-  if (!process.env.DATABASE_URL) {
+  if (!isPostgresUsable()) {
     return getDashboardData(supabase, userId, userName);
   }
 
   try {
     return await getDashboardDataViaPostgres(userId, userName);
   } catch (error) {
+    markPostgresUnavailable();
     console.error("[dashboard] postgres data failed, falling back:", error);
     return getDashboardData(supabase, userId, userName);
   }

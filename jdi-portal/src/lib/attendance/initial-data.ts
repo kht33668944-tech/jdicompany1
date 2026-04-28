@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getPool } from "@/lib/db/postgres";
+import { getPool, isPostgresUsable, markPostgresUnavailable } from "@/lib/db/postgres";
 import { getWeekRange, toDateString } from "@/lib/utils/date";
 import {
   getMyWorkScheduleChangeRequests,
@@ -91,13 +91,14 @@ export async function getAttendancePageData(
   supabase: SupabaseClient,
   userId: string
 ): Promise<AttendancePageData> {
-  if (!process.env.DATABASE_URL) {
+  if (!isPostgresUsable()) {
     return getAttendancePageDataViaSupabase(supabase, userId);
   }
 
   try {
     return await getAttendancePageDataViaPostgres(userId);
   } catch (error) {
+    markPostgresUnavailable();
     console.error("[attendance] postgres initial data failed, falling back:", error);
     return getAttendancePageDataViaSupabase(supabase, userId);
   }
