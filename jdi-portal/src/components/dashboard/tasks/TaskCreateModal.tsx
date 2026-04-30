@@ -16,10 +16,11 @@ interface TaskCreateModalProps {
   userId: string;
   profiles: Profile[];
   onClose: () => void;
+  onCreated?: () => void;
   parentId?: string;
 }
 
-export default function TaskCreateModal({ userId, profiles, onClose, parentId }: TaskCreateModalProps) {
+export default function TaskCreateModal({ userId, profiles, onClose, onCreated, parentId }: TaskCreateModalProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -58,7 +59,11 @@ export default function TaskCreateModal({ userId, profiles, onClose, parentId }:
         assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
         parentId: parentId || undefined,
       });
-      router.refresh();
+      if (onCreated) {
+        onCreated();
+      } else {
+        router.refresh();
+      }
       onClose();
     } catch (error) {
       setFeedback(getErrorMessage(error, "할일 생성에 실패했습니다."));

@@ -111,8 +111,8 @@ export default function TaskSubtasks({
         <TaskCreateModal
           userId={userId}
           profiles={profiles}
-          onClose={() => {
-            setShowCreate(false);
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
             if (mode === "panel" && onRefresh) {
               onRefresh();
             } else {

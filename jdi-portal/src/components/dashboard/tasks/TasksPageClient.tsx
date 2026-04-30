@@ -255,6 +255,7 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
           userId={userId}
           profiles={profiles}
           onClose={() => setShowCreate(false)}
+          onCreated={refreshTasks}
         />
       )}
 
