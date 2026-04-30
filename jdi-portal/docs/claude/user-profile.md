@@ -26,5 +26,5 @@
 ## 프로젝트 맥락
 
 - 소규모 사내 포털 (직원 몇 명). **안정성 > 신기능**.
-- 비용: Supabase Free / Vercel Hobby.
+- 비용: Supabase Free / Railway Hobby ($5/월).
 - 한국어 UI, Asia/Seoul.

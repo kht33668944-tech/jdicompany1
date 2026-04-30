@@ -37,7 +37,7 @@
 - 역할: 실제 환경에서 동작 확인.
 - 키워드: verification, verifier, qa
 - opt-in 기능이면 **배포 후 실환경 검증**이 정확 (iOS PWA, HTTPS 필요 기능).
-- 에러 조사 순서: Vercel 빌드 로그 → 브라우저 콘솔 → Edge Function 로그 → DB.
+- 에러 조사 순서: Railway Deploy 로그 → 브라우저 콘솔 → Edge Function 로그 → DB.
 
 ## 부가 — 필요할 때만
 - **디버깅**: systematic-debugging / debugger / tracer 류
