@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// Vercel serverless 콜드 스타트 방지용 핑 엔드포인트
-// - 외부 cron (cron-job.org) 이 5분마다 호출
-// - 인증 불필요
-// - Supabase SDK 초기화 + 각 페이지가 실제 쓰는 테이블에 가벼운 쿼리 1회씩
-//   → DB 연결 풀, PostgREST JIT, Postgres query plan 캐시, V8 모듈 캐시 모두 warm
+// DB 연결 풀 / PostgREST JIT / 쿼리 플랜 캐시 warm 유지용 핑 엔드포인트
+// - instrumentation.ts 가 컨테이너 내부에서 4분마다 self-ping (Railway always-on이라
+//   콜드 스타트는 없지만, 장시간 idle 후 첫 DB 요청 지연을 줄임)
+// - 인증 불필요 (middleware.ts 에서 예외 처리)
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
