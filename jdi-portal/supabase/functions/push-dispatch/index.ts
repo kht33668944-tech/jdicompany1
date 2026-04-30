@@ -12,10 +12,22 @@ const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@jdicompany.com";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET") ?? "";
 const ACTIVE_THRESHOLD_MS = 10_000;
 
 if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
   console.error("VAPID keys missing");
+}
+if (!WEBHOOK_SECRET) {
+  console.error("WEBHOOK_SECRET missing — function will reject all requests");
+}
+
+// 합법적 link는 항상 "/dashboard/..." 같은 내부 path. 외부 URL은 피싱 방지용으로 차단.
+function isInternalLink(link: string): boolean {
+  if (!link.startsWith("/")) return false;
+  if (link.startsWith("//")) return false;   // protocol-relative URL 차단
+  if (link.startsWith("/\\")) return false;  // Windows backslash 우회 차단
+  return true;
 }
 
 // ============================================================
@@ -126,7 +138,8 @@ async function resolveRecipientsForNotifications(
   const type = record.type as string;
   const title = (record.title as string) || "JDI 포털";
   const body = (record.body as string) || "";
-  const link = (record.link as string) || "/dashboard";
+  const rawLink = (record.link as string) || "/dashboard";
+  const link = isInternalLink(rawLink) ? rawLink : "/dashboard";
   const settingKey = SETTING_KEY_BY_TYPE[type] ?? null;
   return {
     userIds: [userId],
@@ -266,11 +279,22 @@ Deno.serve(async (req) => {
     return new Response("method not allowed", { status: 405 });
   }
 
+  // Webhook shared secret 검증 — Supabase Database Webhook의 Authorization 헤더와 일치해야 함.
+  // WEBHOOK_SECRET 미설정 시 모든 요청 거부 (안전 기본값).
+  const authHeader = req.headers.get("authorization") ?? "";
+  if (!WEBHOOK_SECRET || authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
+    return new Response("unauthorized", { status: 401 });
+  }
+
   let body: WebhookPayload;
   try {
     body = await req.json();
   } catch {
     return new Response("invalid json", { status: 400 });
+  }
+
+  if (body.schema !== "public") {
+    return new Response("invalid schema", { status: 400 });
   }
 
   if (body.type !== "INSERT") {
