@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AdminAttendanceTable from "../AdminAttendanceTable";
 import AdminVacationRequests from "../AdminVacationRequests";
 import AdminWorkScheduleRequests from "../AdminWorkScheduleRequests";
@@ -11,7 +11,11 @@ import { getAdminAttendanceData, type AdminAttendanceData } from "@/lib/attendan
 export default function AdminTab() {
   const [data, setData] = useState<AdminAttendanceData | null>(null);
 
-  // 관리 탭 클릭 시점에만 8개 admin 쿼리 일괄 실행 — 페이지 진입 비용 ↓
+  const refresh = useCallback(async () => {
+    const result = await getAdminAttendanceData();
+    setData(result);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     getAdminAttendanceData().then((result) => {
@@ -40,10 +44,11 @@ export default function AdminTab() {
           vacationRequests={data.pendingVacationRequests}
           cancelRequests={data.cancelVacationRequests}
           correctionRequests={data.pendingCorrectionRequests}
+          onRefresh={refresh}
         />
-        <AdminWorkScheduleRequests requests={data.pendingWorkScheduleChangeRequests} />
-        <AdminHireDateRequests requests={data.pendingHireDateChangeRequests} />
-        <AdminIpChangeRequests requests={data.pendingIpChangeRequests} />
+        <AdminWorkScheduleRequests requests={data.pendingWorkScheduleChangeRequests} onRefresh={refresh} />
+        <AdminHireDateRequests requests={data.pendingHireDateChangeRequests} onRefresh={refresh} />
+        <AdminIpChangeRequests requests={data.pendingIpChangeRequests} onRefresh={refresh} />
       </div>
     </div>
   );

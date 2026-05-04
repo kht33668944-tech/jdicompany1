@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { HourglassHigh } from "phosphor-react";
 import {
   approveCorrectionRequest,
@@ -20,14 +19,15 @@ interface AdminVacationRequestsProps {
   vacationRequests: VacationRequest[];
   cancelRequests: VacationRequest[];
   correctionRequests: CorrectionRequest[];
+  onRefresh?: () => void | Promise<void>;
 }
 
 export default function AdminVacationRequests({
   vacationRequests,
   cancelRequests,
   correctionRequests,
+  onRefresh,
 }: AdminVacationRequestsProps) {
-  const router = useRouter();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,7 @@ export default function AdminVacationRequests({
     setFeedback(null);
     try {
       await approveVacationRequest(id);
-      router.refresh();
+      await onRefresh?.();
     } catch (error) {
       setFeedback(getErrorMessage(error, "휴가 요청 승인에 실패했습니다."));
     } finally {
@@ -54,7 +54,7 @@ export default function AdminVacationRequests({
       await rejectVacationRequest(id, rejectReason);
       setRejectingId(null);
       setRejectReason("");
-      router.refresh();
+      await onRefresh?.();
     } catch (error) {
       setFeedback(getErrorMessage(error, "휴가 요청 반려에 실패했습니다."));
     } finally {
@@ -68,7 +68,7 @@ export default function AdminVacationRequests({
     setFeedback(null);
     try {
       await cancelApprovedVacation(id);
-      router.refresh();
+      await onRefresh?.();
     } catch (error) {
       setFeedback(getErrorMessage(error, "휴가 취소에 실패했습니다."));
     } finally {
@@ -81,7 +81,7 @@ export default function AdminVacationRequests({
     setFeedback(null);
     try {
       await rejectVacationCancel(id);
-      router.refresh();
+      await onRefresh?.();
     } catch (error) {
       setFeedback(getErrorMessage(error, "취소 요청 거부에 실패했습니다."));
     } finally {
@@ -94,7 +94,7 @@ export default function AdminVacationRequests({
     setFeedback(null);
     try {
       await approveCorrectionRequest(id);
-      router.refresh();
+      await onRefresh?.();
     } catch (error) {
       setFeedback(getErrorMessage(error, "정정 요청 승인에 실패했습니다."));
     } finally {
@@ -107,7 +107,7 @@ export default function AdminVacationRequests({
     setFeedback(null);
     try {
       await rejectCorrectionRequest(id);
-      router.refresh();
+      await onRefresh?.();
     } catch (error) {
       setFeedback(getErrorMessage(error, "정정 요청 반려에 실패했습니다."));
     } finally {

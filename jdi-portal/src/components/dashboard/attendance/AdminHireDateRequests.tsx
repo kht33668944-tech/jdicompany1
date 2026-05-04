@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { CalendarBlank } from "phosphor-react";
 import {
   approveHireDateChangeRequest,
@@ -12,10 +11,10 @@ import type { HireDateChangeRequest } from "@/lib/attendance/types";
 
 interface Props {
   requests: HireDateChangeRequest[];
+  onRefresh?: () => void | Promise<void>;
 }
 
-export default function AdminHireDateRequests({ requests }: Props) {
-  const router = useRouter();
+export default function AdminHireDateRequests({ requests, onRefresh }: Props) {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,7 +25,7 @@ export default function AdminHireDateRequests({ requests }: Props) {
     setError(null);
     try {
       await approveHireDateChangeRequest(id);
-      router.refresh();
+      await onRefresh?.();
     } catch (e) {
       setError(getErrorMessage(e, "승인에 실패했습니다."));
     } finally {
@@ -42,7 +41,7 @@ export default function AdminHireDateRequests({ requests }: Props) {
       await rejectHireDateChangeRequest(id, reason);
       setRejectingId(null);
       setReason("");
-      router.refresh();
+      await onRefresh?.();
     } catch (e) {
       setError(getErrorMessage(e, "반려에 실패했습니다."));
     } finally {

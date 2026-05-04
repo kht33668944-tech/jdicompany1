@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { WifiHigh } from "phosphor-react";
 import {
   approveIpChangeRequest,
@@ -12,10 +11,10 @@ import type { IpChangeRequest } from "@/lib/attendance/types";
 
 interface Props {
   requests: IpChangeRequest[];
+  onRefresh?: () => void | Promise<void>;
 }
 
-export default function AdminIpChangeRequests({ requests }: Props) {
-  const router = useRouter();
+export default function AdminIpChangeRequests({ requests, onRefresh }: Props) {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,7 +25,7 @@ export default function AdminIpChangeRequests({ requests }: Props) {
     setError(null);
     try {
       await approveIpChangeRequest(id);
-      router.refresh();
+      await onRefresh?.();
     } catch (e) {
       setError(getErrorMessage(e, "승인에 실패했습니다."));
     } finally {
@@ -42,7 +41,7 @@ export default function AdminIpChangeRequests({ requests }: Props) {
       await rejectIpChangeRequest(id, reason);
       setRejectingId(null);
       setReason("");
-      router.refresh();
+      await onRefresh?.();
     } catch (e) {
       setError(getErrorMessage(e, "반려에 실패했습니다."));
     } finally {

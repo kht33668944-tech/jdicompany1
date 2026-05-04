@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ClockClockwise } from "phosphor-react";
 import {
   approveWorkScheduleChangeRequest,
@@ -12,14 +11,14 @@ import type { WorkScheduleChangeRequest } from "@/lib/attendance/types";
 
 interface Props {
   requests: WorkScheduleChangeRequest[];
+  onRefresh?: () => void | Promise<void>;
 }
 
 function fmt(t: string) {
   return t.slice(0, 5);
 }
 
-export default function AdminWorkScheduleRequests({ requests }: Props) {
-  const router = useRouter();
+export default function AdminWorkScheduleRequests({ requests, onRefresh }: Props) {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,7 +29,7 @@ export default function AdminWorkScheduleRequests({ requests }: Props) {
     setError(null);
     try {
       await approveWorkScheduleChangeRequest(id);
-      router.refresh();
+      await onRefresh?.();
     } catch (e) {
       setError(getErrorMessage(e, "승인에 실패했습니다."));
     } finally {
@@ -46,7 +45,7 @@ export default function AdminWorkScheduleRequests({ requests }: Props) {
       await rejectWorkScheduleChangeRequest(id, reason);
       setRejectingId(null);
       setReason("");
-      router.refresh();
+      await onRefresh?.();
     } catch (e) {
       setError(getErrorMessage(e, "반려에 실패했습니다."));
     } finally {
