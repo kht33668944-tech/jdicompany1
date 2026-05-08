@@ -75,10 +75,10 @@ export interface InfluencerCampaign {
 export interface InfluencerKpiSnapshot {
   id: string;
   snapshot_date: string;
-  total_influencers: number | null;
-  active_campaigns: number | null;
+  total_count: number | null;
   avg_engagement_rate: number | null;
-  total_follower_reach: number | null;
+  estimated_reach: bigint | number | null;
+  campaign_progress_rate: number | null;
   created_at: string;
 }
 
@@ -98,14 +98,8 @@ export interface InfluencerFilterOpts {
 }
 
 export interface KpiCards {
-  totalInfluencers: number;
-  activeCampaigns: number;
-  avgEngagementRate: number | null;
-  totalFollowerReach: number | null;
-  prevWeek: {
-    totalInfluencers: number | null;
-    activeCampaigns: number | null;
-    avgEngagementRate: number | null;
-    totalFollowerReach: number | null;
-  };
+  totalInfluencers: { value: number; deltaPct: number | null };
+  avgEngagementRate: { value: number | null; deltaPct: number | null };
+  estimatedReach: { value: number | null; deltaPct: number | null };
+  campaignProgressRate: { value: number; deltaPct: number | null };
 }

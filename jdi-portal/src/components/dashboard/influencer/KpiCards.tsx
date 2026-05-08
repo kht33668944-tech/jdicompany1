@@ -21,24 +21,15 @@ function formatPercent(n: number | null): string {
   return `${Math.round(n)}%`;
 }
 
-interface DeltaBadgeProps {
-  current: number | null;
-  prev: number | null;
-  formatFn?: (n: number) => string;
-}
-
-function DeltaBadge({ current, prev, formatFn }: DeltaBadgeProps) {
-  if (current === null || prev === null) return <span className="text-xs text-slate-400">—</span>;
-  const delta = current - prev;
-  if (Math.abs(delta) < 0.001) return <span className="text-xs text-slate-400">변동없음</span>;
-  const isPositive = delta > 0;
-  const label = formatFn ? (isPositive ? `+${formatFn(delta)}` : formatFn(delta)) : (isPositive ? `+${delta.toFixed(1)}` : delta.toFixed(1));
+function DeltaBadge({ deltaPct }: { deltaPct: number | null }) {
+  if (deltaPct === null) return <span className="text-xs text-slate-400">—</span>;
+  if (Math.abs(deltaPct) < 0.1) return <span className="text-xs text-slate-400">변동없음</span>;
+  const isPositive = deltaPct > 0;
+  const label = `${isPositive ? "+" : ""}${deltaPct.toFixed(1)}%`;
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-        isPositive
-          ? "bg-green-50 text-green-600"
-          : "bg-rose-50 text-rose-600"
+        isPositive ? "bg-green-50 text-green-600" : "bg-rose-50 text-rose-600"
       }`}
     >
       {label}
@@ -63,61 +54,27 @@ function KpiCard({ title, value, delta }: CardProps) {
 }
 
 export default function KpiCards({ data }: Props) {
-  const totalDelta = data.prevWeek.totalInfluencers !== null
-    ? data.totalInfluencers - (data.prevWeek.totalInfluencers ?? 0)
-    : null;
-
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <KpiCard
         title="전체 인플루언서"
-        value={formatNumber(data.totalInfluencers)}
-        delta={
-          totalDelta !== null ? (
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                totalDelta >= 0 ? "bg-green-50 text-green-600" : "bg-rose-50 text-rose-600"
-              }`}
-            >
-              {totalDelta >= 0 ? `+${totalDelta}` : totalDelta}명
-            </span>
-          ) : (
-            <span className="text-xs text-slate-400">—</span>
-          )
-        }
+        value={formatNumber(data.totalInfluencers.value)}
+        delta={<DeltaBadge deltaPct={data.totalInfluencers.deltaPct} />}
       />
       <KpiCard
         title="평균 Engagement Rate"
-        value={formatRate(data.avgEngagementRate)}
-        delta={
-          <DeltaBadge
-            current={data.avgEngagementRate}
-            prev={data.prevWeek.avgEngagementRate}
-            formatFn={(n) => `${n.toFixed(2)}%`}
-          />
-        }
+        value={formatRate(data.avgEngagementRate.value)}
+        delta={<DeltaBadge deltaPct={data.avgEngagementRate.deltaPct} />}
       />
       <KpiCard
         title="예상 총 도달 (Reach)"
-        value={formatNumber(data.totalFollowerReach)}
-        delta={
-          <DeltaBadge
-            current={data.totalFollowerReach}
-            prev={data.prevWeek.totalFollowerReach}
-            formatFn={(n) => formatNumber(Math.round(n))}
-          />
-        }
+        value={formatNumber(data.estimatedReach.value)}
+        delta={<DeltaBadge deltaPct={data.estimatedReach.deltaPct} />}
       />
       <KpiCard
-        title="활성 캠페인"
-        value={formatPercent(data.activeCampaigns)}
-        delta={
-          <DeltaBadge
-            current={data.activeCampaigns}
-            prev={data.prevWeek.activeCampaigns}
-            formatFn={(n) => String(Math.round(n))}
-          />
-        }
+        title="시딩 진행률"
+        value={formatPercent(data.campaignProgressRate.value)}
+        delta={<DeltaBadge deltaPct={data.campaignProgressRate.deltaPct} />}
       />
     </div>
   );

@@ -97,18 +97,19 @@ export async function getActiveCampaigns(): Promise<InfluencerCampaign[]> {
   return (data as InfluencerCampaign[]) ?? [];
 }
 
+function calcDeltaPct(current: number | null, prev: number | null): number | null {
+  if (current === null || prev === null || prev === 0) return null;
+  return ((current - prev) / Math.abs(prev)) * 100;
+}
+
 export async function getKpiCards(): Promise<KpiCards> {
   const supabase = await createClient();
 
-  const [totalRes, campaignRes, engagementRes, followerRes, snapshotRes] = await Promise.all([
+  const [totalRes, engagementRes, followerRes, campaignRes, snapshotRes] = await Promise.all([
     supabase
       .from("influencers")
       .select("id", { count: "exact", head: true })
       .eq("status", "active"),
-    supabase
-      .from("influencer_campaigns")
-      .select("id", { count: "exact", head: true })
-      .not("status", "in", '("done")'),
     supabase
       .from("influencers")
       .select("engagement_rate")
@@ -116,48 +117,82 @@ export async function getKpiCards(): Promise<KpiCards> {
       .not("engagement_rate", "is", null),
     supabase
       .from("influencers")
-      .select("follower_count")
+      .select("follower_count, engagement_rate")
       .eq("status", "active")
-      .not("follower_count", "is", null),
+      .not("follower_count", "is", null)
+      .not("engagement_rate", "is", null),
+    supabase
+      .from("influencer_campaigns")
+      .select("status"),
     supabase
       .from("influencer_kpi_weekly_snapshots")
-      .select("*")
+      .select("total_count, avg_engagement_rate, estimated_reach, campaign_progress_rate")
       .order("snapshot_date", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
 
   if (totalRes.error) throw totalRes.error;
-  if (campaignRes.error) throw campaignRes.error;
   if (engagementRes.error) throw engagementRes.error;
   if (followerRes.error) throw followerRes.error;
+  if (campaignRes.error) throw campaignRes.error;
   if (snapshotRes.error) throw snapshotRes.error;
 
-  const engagementRates = (engagementRes.data ?? [])
+  // 평균 ER
+  const erValues = (engagementRes.data ?? [])
     .map((r) => (r as { engagement_rate: number }).engagement_rate)
     .filter((v): v is number => v !== null);
   const avgEngagementRate =
-    engagementRates.length > 0
-      ? engagementRates.reduce((a, b) => a + b, 0) / engagementRates.length
+    erValues.length > 0
+      ? erValues.reduce((a, b) => a + b, 0) / erValues.length
       : null;
 
-  const totalFollowerReach = (followerRes.data ?? [])
-    .map((r) => (r as { follower_count: number }).follower_count)
-    .filter((v): v is number => v !== null)
-    .reduce((a, b) => a + b, 0) || null;
+  // 예상 도달: SUM(follower * ER * 0.003)
+  const estimatedReach =
+    (followerRes.data ?? [])
+      .map((r) => {
+        const row = r as { follower_count: number; engagement_rate: number };
+        return row.follower_count * row.engagement_rate * 0.003;
+      })
+      .reduce((a, b) => a + b, 0) || null;
+
+  // 시딩 진행률
+  const campaigns = (campaignRes.data ?? []) as { status: string }[];
+  const totalCampaigns = campaigns.length;
+  const doneCampaigns = campaigns.filter((c) =>
+    ["shipped", "posted", "done"].includes(c.status)
+  ).length;
+  const campaignProgressRate =
+    totalCampaigns > 0 ? (doneCampaigns / totalCampaigns) * 100 : 0;
 
   const prev = snapshotRes.data as InfluencerKpiSnapshot | null;
+  const prevTotal = prev?.total_count ?? null;
+  const prevER = prev?.avg_engagement_rate ?? null;
+  const prevReach = prev != null
+    ? typeof prev.estimated_reach === "bigint"
+      ? Number(prev.estimated_reach)
+      : (prev.estimated_reach as number | null)
+    : null;
+  const prevProgress = prev?.campaign_progress_rate ?? null;
+
+  const totalCount = totalRes.count ?? 0;
 
   return {
-    totalInfluencers: totalRes.count ?? 0,
-    activeCampaigns: campaignRes.count ?? 0,
-    avgEngagementRate,
-    totalFollowerReach,
-    prevWeek: {
-      totalInfluencers: prev?.total_influencers ?? null,
-      activeCampaigns: prev?.active_campaigns ?? null,
-      avgEngagementRate: prev?.avg_engagement_rate ?? null,
-      totalFollowerReach: prev?.total_follower_reach ?? null,
+    totalInfluencers: {
+      value: totalCount,
+      deltaPct: calcDeltaPct(totalCount, prevTotal),
+    },
+    avgEngagementRate: {
+      value: avgEngagementRate,
+      deltaPct: calcDeltaPct(avgEngagementRate, prevER),
+    },
+    estimatedReach: {
+      value: estimatedReach,
+      deltaPct: calcDeltaPct(estimatedReach, prevReach),
+    },
+    campaignProgressRate: {
+      value: campaignProgressRate,
+      deltaPct: calcDeltaPct(campaignProgressRate, prevProgress),
     },
   };
 }
