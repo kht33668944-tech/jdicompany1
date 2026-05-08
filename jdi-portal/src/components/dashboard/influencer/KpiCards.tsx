@@ -1,8 +1,4 @@
 import type { KpiCards as KpiCardsType } from "@/lib/influencer/types";
-import UsersThree from "phosphor-react/dist/icons/UsersThree.esm.js";
-import ChartLineUp from "phosphor-react/dist/icons/ChartLineUp.esm.js";
-import Broadcast from "phosphor-react/dist/icons/Broadcast.esm.js";
-import RocketLaunch from "phosphor-react/dist/icons/RocketLaunch.esm.js";
 
 interface Props {
   data: KpiCardsType;
@@ -26,7 +22,7 @@ function formatPercent(n: number | null): string {
 }
 
 function DeltaBadge({ deltaPct }: { deltaPct: number | null }) {
-  if (deltaPct === null) return <span className="text-xs text-slate-400">—</span>;
+  if (deltaPct === null) return <span className="text-xs text-slate-300">—</span>;
   if (Math.abs(deltaPct) < 0.1) return <span className="text-xs text-slate-400">변동없음</span>;
   const isPositive = deltaPct > 0;
   const label = `${isPositive ? "+" : ""}${deltaPct.toFixed(1)}%`;
@@ -44,56 +40,43 @@ function DeltaBadge({ deltaPct }: { deltaPct: number | null }) {
 interface CardProps {
   title: string;
   value: string;
-  delta?: React.ReactNode;
-  icon: React.ReactNode;
-  iconBg: string;
+  delta: React.ReactNode;
 }
 
-function KpiCard({ title, value, delta, icon, iconBg }: CardProps) {
+function KpiCard({ title, value, delta }: CardProps) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{title}</p>
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${iconBg}`}>
-          {icon}
-        </div>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide truncate">{title}</p>
+        {delta}
       </div>
-      <p className="text-2xl font-bold text-slate-800 leading-none">{value}</p>
-      {delta}
+      <p className="text-xl font-bold text-slate-800 leading-tight">{value}</p>
     </div>
   );
 }
 
 export default function KpiCards({ data }: Props) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <KpiCard
         title="전체 인플루언서"
         value={formatNumber(data.totalInfluencers.value)}
         delta={<DeltaBadge deltaPct={data.totalInfluencers.deltaPct} />}
-        icon={<UsersThree size={16} weight="fill" className="text-blue-600" />}
-        iconBg="bg-blue-50"
       />
       <KpiCard
         title="평균 Engagement Rate"
         value={formatRate(data.avgEngagementRate.value)}
         delta={<DeltaBadge deltaPct={data.avgEngagementRate.deltaPct} />}
-        icon={<ChartLineUp size={16} weight="fill" className="text-emerald-600" />}
-        iconBg="bg-emerald-50"
       />
       <KpiCard
         title="예상 총 도달 (Reach)"
         value={formatNumber(data.estimatedReach.value)}
         delta={<DeltaBadge deltaPct={data.estimatedReach.deltaPct} />}
-        icon={<Broadcast size={16} weight="fill" className="text-violet-600" />}
-        iconBg="bg-violet-50"
       />
       <KpiCard
         title="시딩 진행률"
         value={formatPercent(data.campaignProgressRate.value)}
         delta={<DeltaBadge deltaPct={data.campaignProgressRate.deltaPct} />}
-        icon={<RocketLaunch size={16} weight="fill" className="text-amber-600" />}
-        iconBg="bg-amber-50"
       />
     </div>
   );
