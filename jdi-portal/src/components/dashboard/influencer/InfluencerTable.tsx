@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import DotsThreeVertical from "phosphor-react/dist/icons/DotsThreeVertical.esm.js";
 import ArrowsClockwise from "phosphor-react/dist/icons/ArrowsClockwise.esm.js";
@@ -36,7 +37,26 @@ interface RowMenuProps {
 
 function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const [, startTransition] = useTransition();
+
+  const MENU_WIDTH = 160;
+  const MENU_HEIGHT = 180;
+
+  function handleToggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const showAbove = spaceBelow < MENU_HEIGHT + 16;
+      setPos({
+        top: showAbove ? rect.top - MENU_HEIGHT - 4 : rect.bottom + 4,
+        left: Math.max(8, rect.right - MENU_WIDTH),
+      });
+    }
+    setOpen((v) => !v);
+  }
 
   function handleResync() {
     setOpen(false);
@@ -82,17 +102,22 @@ function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
   }
 
   return (
-    <div className="relative">
+    <>
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        ref={buttonRef}
+        onClick={handleToggle}
         className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
       >
         <DotsThreeVertical size={16} />
       </button>
-      {open && (
+      {open && pos && typeof document !== "undefined" && createPortal(
         <>
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-30 w-40 bg-white rounded-xl shadow-lg border border-slate-100 py-1 text-sm">
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            style={{ position: "fixed", top: pos.top, left: pos.left, width: MENU_WIDTH }}
+            className="z-50 bg-white rounded-xl shadow-lg border border-slate-100 py-1 text-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={(e) => { e.stopPropagation(); onViewDetail(); setOpen(false); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors"
@@ -119,9 +144,10 @@ function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
               <Trash size={14} /> 삭제
             </button>
           </div>
-        </>
+        </>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
