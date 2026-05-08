@@ -1,0 +1,792 @@
+"use client";
+
+import { useEffect, useState, useRef, useCallback } from "react";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+import type { InfluencerWithPosts, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
+import {
+  updateInfluencerNotes,
+  updateInfluencerTags,
+  addCampaign,
+  updateCampaignStatus,
+  deleteCampaign,
+  resyncInfluencer,
+  analyzeInfluencer,
+  archiveInfluencer,
+} from "@/lib/influencer/actions";
+import GradeBadge from "./GradeBadge";
+import StatusBadge from "./StatusBadge";
+
+import X from "phosphor-react/dist/icons/X.esm.js";
+import Robot from "phosphor-react/dist/icons/Robot.esm.js";
+import ArrowsClockwise from "phosphor-react/dist/icons/ArrowsClockwise.esm.js";
+import Sparkle from "phosphor-react/dist/icons/Sparkle.esm.js";
+import Archive from "phosphor-react/dist/icons/Archive.esm.js";
+import Plus from "phosphor-react/dist/icons/Plus.esm.js";
+import Trash from "phosphor-react/dist/icons/Trash.esm.js";
+import Tag from "phosphor-react/dist/icons/Tag.esm.js";
+import NotePencil from "phosphor-react/dist/icons/NotePencil.esm.js";
+
+type PanelPhase = "closed" | "opening" | "open" | "closing";
+
+type Props = {
+  influencerId: string | null;
+  onClose: () => void;
+};
+
+function formatNumber(n: number | null): string {
+  if (n === null) return "—";
+  if (n >= 10000) return `${(n / 10000).toFixed(1)}만`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}천`;
+  return String(n);
+}
+
+function formatPct(n: number | null): string {
+  if (n === null) return "—";
+  return `${n.toFixed(2)}%`;
+}
+
+const CAMPAIGN_STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
+  { value: "planned", label: "접촉 전" },
+  { value: "dm_sent", label: "DM 발송" },
+  { value: "replied", label: "응답 받음" },
+  { value: "shipped", label: "제품 발송" },
+  { value: "posted", label: "게시 완료" },
+  { value: "done", label: "완료" },
+];
+
+// ── 캠페인 추가 폼 ──────────────────────────────────────────────
+interface AddCampaignFormProps {
+  influencerId: string;
+  onSaved: (c: InfluencerCampaign) => void;
+  onCancel: () => void;
+}
+
+function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormProps) {
+  const [name, setName] = useState("");
+  const [product, setProduct] = useState("");
+  const [cost, setCost] = useState("");
+  const [shipDate, setShipDate] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { toast.error("캠페인 이름을 입력하세요."); return; }
+    setSaving(true);
+    try {
+      const saved = await addCampaign({
+        influencer_id: influencerId,
+        campaign_name: name.trim(),
+        product_name: product.trim() || undefined,
+        cost: cost ? Number(cost) : undefined,
+        ship_date: shipDate || undefined,
+      });
+      toast.success("캠페인이 추가되었습니다.");
+      onSaved(saved);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "캠페인 추가 실패");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-200">
+      <input
+        type="text"
+        placeholder="캠페인 이름 *"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="text"
+          placeholder="제품명"
+          value={product}
+          onChange={(e) => setProduct(e.target.value)}
+          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+        <input
+          type="number"
+          placeholder="비용 (원)"
+          value={cost}
+          onChange={(e) => setCost(e.target.value)}
+          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+      </div>
+      <input
+        type="date"
+        value={shipDate}
+        onChange={(e) => setShipDate(e.target.value)}
+        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+      />
+      <div className="flex gap-2 justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {saving ? "저장 중…" : "저장"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── 메인 패널 ──────────────────────────────────────────────────
+export default function InfluencerDetailPanel({ influencerId, onClose }: Props) {
+  const [influencer, setInfluencer] = useState<InfluencerWithPosts | null>(null);
+  const [campaigns, setCampaigns] = useState<InfluencerCampaign[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [phase, setPhase] = useState<PanelPhase>("closed");
+  const [prevId, setPrevId] = useState<string | null>(null);
+
+  const [notes, setNotes] = useState("");
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [showAddCampaign, setShowAddCampaign] = useState(false);
+
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visible = phase !== "closed";
+  const sliding = phase === "open";
+
+  // ── 패널 열기/닫기 상태 머신 ──
+  if (influencerId !== prevId) {
+    setPrevId(influencerId);
+    if (influencerId) {
+      setPhase("opening");
+      setError(null);
+      setInfluencer(null);
+      setCampaigns([]);
+      setShowAddCampaign(false);
+    } else if (prevId) {
+      setPhase("closing");
+    }
+  }
+
+  useEffect(() => {
+    if (phase !== "opening") return;
+    const raf = requestAnimationFrame(() => setPhase("open"));
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "closing") return;
+    const t = setTimeout(() => {
+      setPhase("closed");
+      setInfluencer(null);
+      setCampaigns([]);
+      setError(null);
+    }, 220);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  // ── 데이터 로드 ──
+  useEffect(() => {
+    if (!influencerId) return;
+    let cancelled = false;
+    setLoading(true);
+    const supabase = createClient();
+
+    Promise.all([
+      supabase
+        .from("influencers")
+        .select("*")
+        .eq("id", influencerId)
+        .single()
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return data as InfluencerWithPosts;
+        })
+        .then(async (inf) => {
+          const { data: posts } = await supabase
+            .from("influencer_posts")
+            .select("id, influencer_id, post_url, thumbnail_url, caption, likes, comments, posted_at, fetched_at")
+            .eq("influencer_id", influencerId)
+            .order("posted_at", { ascending: false, nullsFirst: false })
+            .limit(12);
+          return { ...inf, recent_posts: posts ?? [] } as InfluencerWithPosts;
+        }),
+      supabase
+        .from("influencer_campaigns")
+        .select("*")
+        .eq("influencer_id", influencerId)
+        .order("created_at", { ascending: false })
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return (data ?? []) as InfluencerCampaign[];
+        }),
+    ])
+      .then(([inf, cams]) => {
+        if (cancelled) return;
+        setInfluencer(inf);
+        setCampaigns(cams);
+        setNotes(inf.notes ?? "");
+        setTags(inf.tags ?? []);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "데이터 로드 실패");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [influencerId]);
+
+  // ── ESC 닫기 / body scroll lock ──
+  useEffect(() => {
+    if (!visible) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.body.style.overflow = "";
+    };
+  }, [visible, onClose]);
+
+  // ── 메모 디바운스 저장 ──
+  const handleNotesChange = useCallback((val: string) => {
+    setNotes(val);
+    if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current);
+    notesDebounceRef.current = setTimeout(async () => {
+      if (!influencerId) return;
+      try {
+        await updateInfluencerNotes(influencerId, val);
+      } catch {
+        toast.error("메모 저장 실패");
+      }
+    }, 1000);
+  }, [influencerId]);
+
+  // ── 태그 추가/삭제 ──
+  const handleAddTag = useCallback(async () => {
+    const t = tagInput.trim();
+    if (!t || !influencerId || tags.includes(t)) { setTagInput(""); return; }
+    const next = [...tags, t];
+    setTags(next);
+    setTagInput("");
+    try {
+      await updateInfluencerTags(influencerId, next);
+    } catch {
+      toast.error("태그 저장 실패");
+      setTags(tags);
+    }
+  }, [tagInput, influencerId, tags]);
+
+  const handleRemoveTag = useCallback(async (tag: string) => {
+    if (!influencerId) return;
+    const next = tags.filter((t) => t !== tag);
+    setTags(next);
+    try {
+      await updateInfluencerTags(influencerId, next);
+    } catch {
+      toast.error("태그 삭제 실패");
+      setTags(tags);
+    }
+  }, [influencerId, tags]);
+
+  // ── 캠페인 상태 변경 ──
+  const handleStatusChange = useCallback(async (campaignId: string, status: CampaignStatus) => {
+    try {
+      await updateCampaignStatus(campaignId, status);
+      setCampaigns((prev) => prev.map((c) => c.id === campaignId ? { ...c, status } : c));
+      toast.success("상태가 변경되었습니다.");
+    } catch {
+      toast.error("상태 변경 실패");
+    }
+  }, []);
+
+  const handleDeleteCampaign = useCallback(async (campaignId: string) => {
+    try {
+      await deleteCampaign(campaignId);
+      setCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
+      toast.success("캠페인이 삭제되었습니다.");
+    } catch {
+      toast.error("캠페인 삭제 실패");
+    }
+  }, []);
+
+  // ── 하단 액션 ──
+  const handleResync = useCallback(async () => {
+    if (!influencerId) return;
+    setActionLoading("resync");
+    try {
+      await resyncInfluencer(influencerId);
+      toast.success("재동기화가 시작되었습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "재동기화 실패");
+    } finally {
+      setActionLoading(null);
+    }
+  }, [influencerId]);
+
+  const handleAnalyze = useCallback(async () => {
+    if (!influencerId) return;
+    setActionLoading("analyze");
+    try {
+      await analyzeInfluencer(influencerId);
+      toast.success("AI 재분석이 시작되었습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "AI 분석 실패");
+    } finally {
+      setActionLoading(null);
+    }
+  }, [influencerId]);
+
+  const handleArchive = useCallback(async () => {
+    if (!influencerId) return;
+    setActionLoading("archive");
+    try {
+      await archiveInfluencer(influencerId);
+      toast.success("보관되었습니다.");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "보관 처리 실패");
+      setActionLoading(null);
+    }
+  }, [influencerId, onClose]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      {/* 배경 오버레이 */}
+      <div
+        className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-220 ${
+          sliding ? "opacity-100" : "opacity-0"
+        }`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* 패널 */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="인플루언서 상세"
+        className={`absolute top-0 right-0 h-full w-full sm:w-[480px] lg:w-[560px] bg-white shadow-xl flex flex-col transform transition-transform duration-220 ease-out ${
+          sliding ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <span className="text-sm font-semibold text-slate-700">인플루언서 상세</span>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            aria-label="닫기"
+          >
+            <X size={18} weight="bold" />
+          </button>
+        </div>
+
+        {/* 본문 */}
+        <div className="flex-1 overflow-y-auto">
+          {loading && (
+            <div className="p-5 space-y-4 animate-pulse">
+              <div className="flex gap-4 items-start">
+                <div className="w-20 h-20 rounded-full bg-slate-200 shrink-0" />
+                <div className="flex-1 space-y-2 pt-1">
+                  <div className="h-5 w-32 bg-slate-200 rounded" />
+                  <div className="h-4 w-24 bg-slate-100 rounded" />
+                  <div className="h-4 w-16 bg-slate-100 rounded" />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-14 rounded-xl bg-slate-100" />
+                ))}
+              </div>
+              <div className="h-24 rounded-xl bg-slate-100" />
+            </div>
+          )}
+
+          {error && (
+            <div className="p-5 flex flex-col items-center justify-center gap-3 h-64">
+              <p className="text-sm text-red-500">{error}</p>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && influencer && (
+            <div className="p-5 space-y-5">
+              {/* 프로필 */}
+              <div className="flex gap-4 items-start">
+                <div className="shrink-0">
+                  {influencer.profile_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={influencer.profile_image_url}
+                      alt={`@${influencer.username} 프로필`}
+                      referrerPolicy="no-referrer"
+                      className="w-20 h-20 rounded-full object-cover border-2 border-slate-100"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-2xl font-bold text-slate-500">
+                      {influencer.username[0]?.toUpperCase() ?? "?"}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 space-y-1 pt-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-slate-800">@{influencer.username}</span>
+                    <GradeBadge grade={influencer.grade} size="md" />
+                    <StatusBadge status={influencer.status} type="influencer" />
+                  </div>
+                  {influencer.display_name && (
+                    <p className="text-sm text-slate-500">{influencer.display_name}</p>
+                  )}
+                  {influencer.category && (
+                    <p className="text-xs text-slate-400">{influencer.category}</p>
+                  )}
+                  {influencer.profile_url && (
+                    <a
+                      href={influencer.profile_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-500 hover:underline"
+                    >
+                      프로필 보기 →
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* 통계 */}
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: "팔로워", value: formatNumber(influencer.follower_count) },
+                  { label: "참여율", value: formatPct(influencer.engagement_rate) },
+                  { label: "평균 좋아요", value: formatNumber(influencer.avg_likes) },
+                  { label: "평균 댓글", value: formatNumber(influencer.avg_comments) },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    className="bg-slate-50 rounded-xl p-3 flex flex-col items-center gap-1"
+                  >
+                    <span className="text-sm font-semibold text-slate-800">{value}</span>
+                    <span className="text-[10px] text-slate-400 text-center leading-tight">{label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* bio */}
+              {influencer.bio && (
+                <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-xl px-4 py-3">
+                  {influencer.bio}
+                </p>
+              )}
+
+              {/* AI 인사이트 */}
+              {(influencer.ai_summary || influencer.ai_insights) && (
+                <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Robot size={14} className="text-violet-500" weight="bold" />
+                    <span className="text-xs font-semibold text-slate-600">AI 인사이트</span>
+                  </div>
+                  {influencer.ai_summary && (
+                    <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                      {influencer.ai_summary}
+                    </p>
+                  )}
+                  {influencer.ai_insights && (
+                    <div className="space-y-2">
+                      {influencer.ai_insights.category && (
+                        <InsightRow label="카테고리" value={influencer.ai_insights.category} />
+                      )}
+                      {influencer.ai_insights.persona && (
+                        <InsightRow label="페르소나" value={influencer.ai_insights.persona} />
+                      )}
+                      {influencer.ai_insights.approach && (
+                        <InsightRow label="추천 어프로치" value={influencer.ai_insights.approach} />
+                      )}
+                      {influencer.ai_insights.fake_signal && (
+                        <InsightRow
+                          label="가짜 팔로워 신호"
+                          value={influencer.ai_insights.fake_signal}
+                          accent="red"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 최근 게시물 */}
+              {influencer.recent_posts.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    최근 게시물
+                  </h4>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {influencer.recent_posts.slice(0, 8).map((post) => (
+                      <a
+                        key={post.id}
+                        href={post.post_url ?? "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 group block"
+                      >
+                        {post.thumbnail_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={post.thumbnail_url}
+                            alt="게시물 썸네일"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">
+                            없음
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end justify-center pb-1.5 gap-2 opacity-0 group-hover:opacity-100">
+                          {post.likes !== null && (
+                            <span className="text-white text-[10px] font-medium">
+                              ♥ {formatNumber(post.likes)}
+                            </span>
+                          )}
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 캠페인 */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    캠페인
+                  </h4>
+                  <button
+                    onClick={() => setShowAddCampaign(true)}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                  >
+                    <Plus size={13} weight="bold" />
+                    캠페인 추가
+                  </button>
+                </div>
+
+                {showAddCampaign && (
+                  <AddCampaignForm
+                    influencerId={influencer.id}
+                    onSaved={(c) => {
+                      setCampaigns((prev) => [c, ...prev]);
+                      setShowAddCampaign(false);
+                    }}
+                    onCancel={() => setShowAddCampaign(false)}
+                  />
+                )}
+
+                {campaigns.length === 0 && !showAddCampaign && (
+                  <p className="text-xs text-slate-400 py-2">등록된 캠페인이 없습니다.</p>
+                )}
+
+                <div className="space-y-2">
+                  {campaigns.map((c) => (
+                    <div
+                      key={c.id}
+                      className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-medium text-slate-700 leading-tight">
+                          {c.campaign_name}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteCampaign(c.id)}
+                          className="shrink-0 p-1 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                          aria-label="캠페인 삭제"
+                        >
+                          <Trash size={13} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          value={c.status}
+                          onChange={(e) => handleStatusChange(c.id, e.target.value as CampaignStatus)}
+                          className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                          aria-label="캠페인 상태"
+                        >
+                          {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                        <StatusBadge status={c.status} type="campaign" />
+                      </div>
+                      <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
+                        {c.product_name && <span>제품: {c.product_name}</span>}
+                        {c.cost !== null && <span>비용: {c.cost.toLocaleString()}원</span>}
+                        {c.ship_date && <span>발송: {c.ship_date}</span>}
+                        {c.expected_post_date && <span>포스팅: {c.expected_post_date}</span>}
+                      </div>
+                      {c.notes && (
+                        <p className="text-xs text-slate-500 leading-relaxed">{c.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 메모 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <NotePencil size={13} className="text-slate-400" />
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">메모</h4>
+                </div>
+                <textarea
+                  value={notes}
+                  onChange={(e) => handleNotesChange(e.target.value)}
+                  placeholder="인플루언서에 대한 메모를 입력하세요…"
+                  rows={3}
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none text-slate-700 placeholder:text-slate-300 transition-colors"
+                />
+              </div>
+
+              {/* 태그 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Tag size={13} className="text-slate-400" />
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">태그</h4>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => handleRemoveTag(tag)}
+                        className="ml-0.5 text-blue-400 hover:text-blue-700 transition-colors"
+                        aria-label={`${tag} 태그 삭제`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddTag(); } }}
+                    placeholder="태그 입력 후 Enter"
+                    className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-700 placeholder:text-slate-300 transition-colors"
+                  />
+                  <button
+                    onClick={handleAddTag}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                  >
+                    추가
+                  </button>
+                </div>
+              </div>
+
+              {/* 하단 여백 */}
+              <div className="h-2" />
+            </div>
+          )}
+        </div>
+
+        {/* 하단 액션 바 */}
+        {influencer && (
+          <div className="shrink-0 px-5 py-4 border-t border-slate-100 flex gap-2">
+            <ActionButton
+              onClick={handleResync}
+              loading={actionLoading === "resync"}
+              icon={<ArrowsClockwise size={14} weight="bold" />}
+              label="재동기화"
+            />
+            <ActionButton
+              onClick={handleAnalyze}
+              loading={actionLoading === "analyze"}
+              icon={<Sparkle size={14} weight="bold" />}
+              label="AI 재분석"
+            />
+            <ActionButton
+              onClick={handleArchive}
+              loading={actionLoading === "archive"}
+              icon={<Archive size={14} weight="bold" />}
+              label="보관"
+              variant="danger"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── 보조 컴포넌트 ──────────────────────────────────────────────
+function InsightRow({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: "red";
+}) {
+  return (
+    <div className="flex gap-2 text-xs">
+      <span className="shrink-0 text-slate-400 w-24">{label}</span>
+      <span className={`text-slate-600 ${accent === "red" ? "text-red-500" : ""}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function ActionButton({
+  onClick,
+  loading,
+  icon,
+  label,
+  variant,
+}: {
+  onClick: () => void;
+  loading: boolean;
+  icon: React.ReactNode;
+  label: string;
+  variant?: "danger";
+}) {
+  const base =
+    "flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl transition-colors disabled:opacity-50";
+  const styles =
+    variant === "danger"
+      ? "bg-red-50 text-red-600 hover:bg-red-100"
+      : "bg-slate-100 text-slate-600 hover:bg-slate-200";
+
+  return (
+    <button onClick={onClick} disabled={loading} className={`${base} ${styles}`}>
+      {loading ? (
+        <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+      ) : (
+        icon
+      )}
+      {label}
+    </button>
+  );
+}
