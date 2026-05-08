@@ -29,6 +29,7 @@ interface GeminiInsights {
   persona: string;
   approach: string;
   fake_signal: string;
+  summary: string;
 }
 
 interface InfluencerRow {
@@ -72,7 +73,8 @@ ${captionText || "(없음)"}
   "category": "뷰티" | "패션" | "IT" | "육아" | "푸드" | "여행" | "라이프스타일" | "운동/건강" | "기타",
   "persona": "주 타겟 페르소나 1줄 (예: '20대 후반 여성, 가성비 추구')",
   "approach": "협업 시 추천 어프로치 1줄 (예: '제품 사용 후기 위주, 진솔한 톤이 잘 맞음')",
-  "fake_signal": "정상" | "의심: 사유 1줄"
+  "fake_signal": "정상" | "의심: 사유 1줄",
+  "summary": "이 인플루언서에 대한 한국어 종합 요약 1줄 (예: '이 인플루언서는 뷰티 카테고리에서 20대 여성을 타겟하며 진솔한 후기 스타일로 협업이 적합합니다')"
 }`;
 
   const responseSchema = {
@@ -82,8 +84,9 @@ ${captionText || "(없음)"}
       persona: { type: "string" },
       approach: { type: "string" },
       fake_signal: { type: "string" },
+      summary: { type: "string" },
     },
-    required: ["category", "persona", "approach", "fake_signal"],
+    required: ["category", "persona", "approach", "fake_signal", "summary"],
   };
 
   const body = {
@@ -214,11 +217,13 @@ Deno.serve(async (req) => {
     }
 
     // 4. influencers 업데이트
+    const aiSummary = insights.summary || insights.approach;
+
     const { error: updateErr } = await supabase
       .from("influencers")
       .update({
         ai_insights: insights,
-        ai_summary: insights.approach,
+        ai_summary: aiSummary,
         category: insights.category,
         updated_at: new Date().toISOString(),
       })
@@ -230,7 +235,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        ai_summary: insights.approach,
+        ai_summary: aiSummary,
         category: insights.category,
         ai_insights: insights,
       }),

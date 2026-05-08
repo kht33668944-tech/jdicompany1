@@ -45,11 +45,10 @@ export default function TopUrlBar({ onFilterClick }: Props) {
     }
 
     startTransition(async () => {
-      const toastId = toast.loading("프로필 추출 중...");
+      const toastId = toast.loading("인플루언서 분석 중... (10~30초 소요)");
       try {
-        toast.loading("AI 분석 중...", { id: toastId });
         await addInfluencer(trimmed);
-        toast.success("인플루언서가 추가되었습니다!", { id: toastId });
+        toast.success("인플루언서 등록 완료", { id: toastId });
         setUrl("");
         router.refresh();
       } catch (err) {

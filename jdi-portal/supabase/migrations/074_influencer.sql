@@ -153,9 +153,10 @@ CREATE POLICY "Approved users can view influencer_sync_logs"
   ON public.influencer_sync_logs FOR SELECT TO authenticated
   USING (public.is_approved_user());
 
-CREATE POLICY "Approved users can create influencer_sync_logs"
+-- sync_logs INSERT는 Edge Function(service_role) 전용 — 일반 사용자 직접 삽입 차단
+CREATE POLICY "Block direct insert to influencer_sync_logs"
   ON public.influencer_sync_logs FOR INSERT TO authenticated
-  WITH CHECK (public.is_approved_user());
+  WITH CHECK (FALSE);
 
 CREATE POLICY "Approved users can update influencer_sync_logs"
   ON public.influencer_sync_logs FOR UPDATE TO authenticated
