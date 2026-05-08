@@ -174,12 +174,13 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh }: S
   }
 
   return (
-    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+    <div className="relative inline-flex items-center" onClick={(e) => e.stopPropagation()}>
       <StatusBadge status={campaign.status} type="campaign" />
       <select
         value={campaign.status}
         onChange={handleChange}
-        className="text-xs text-slate-500 bg-transparent border-none outline-none cursor-pointer hover:text-slate-700"
+        aria-label="시딩 상태 변경"
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
       >
         {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
