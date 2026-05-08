@@ -10,6 +10,7 @@ import Clock from "phosphor-react/dist/icons/Clock.esm.js";
 import ListChecks from "phosphor-react/dist/icons/ListChecks.esm.js";
 import CalendarBlank from "phosphor-react/dist/icons/CalendarBlank.esm.js";
 import ChatCircle from "phosphor-react/dist/icons/ChatCircle.esm.js";
+import UsersThree from "phosphor-react/dist/icons/UsersThree.esm.js";
 import WarningCircle from "phosphor-react/dist/icons/WarningCircle.esm.js";
 import GearSix from "phosphor-react/dist/icons/GearSix.esm.js";
 import SignOut from "phosphor-react/dist/icons/SignOut.esm.js";
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/dashboard/attendance", label: "근태관리", icon: Clock },
   { href: "/dashboard/tasks", label: "할일", icon: ListChecks },
   { href: "/dashboard/schedule", label: "스케줄", icon: CalendarBlank },
+  { href: "/dashboard/influencer", label: "인플루언서", icon: UsersThree },
   { href: "/dashboard/chat", label: "채팅", icon: ChatCircle },
   { href: "/dashboard/reports", label: "오류 접수", icon: WarningCircle },
   { href: "/dashboard/settings", label: "설정", icon: GearSix },
