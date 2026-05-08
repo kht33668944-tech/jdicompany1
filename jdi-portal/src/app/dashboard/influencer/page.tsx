@@ -1,10 +1,27 @@
+import { redirect } from "next/navigation";
+import { getAuthUser } from "@/lib/supabase/auth";
+import InfluencerPageClient from "@/components/dashboard/influencer/InfluencerPageClient";
+import { getKpiCards, getInfluencers, getActiveCampaigns, getCategories } from "@/lib/influencer/queries";
+
 export const metadata = { title: "인플루언서 관리 | JDI" };
 
-export default function InfluencerPage() {
+export default async function InfluencerPage() {
+  const auth = await getAuthUser();
+  if (!auth) redirect("/login");
+
+  const [kpi, influencers, activeCampaigns, categories] = await Promise.all([
+    getKpiCards(),
+    getInfluencers({ status: "active", sortBy: "engagement_rate", sortOrder: "desc", pageSize: 50 }),
+    getActiveCampaigns(),
+    getCategories(),
+  ]);
+
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-slate-800">인플루언서 관리</h1>
-      <p className="mt-2 text-sm text-slate-500">곧 메뉴가 채워질 자리입니다 (Phase 3에서 구현).</p>
-    </div>
+    <InfluencerPageClient
+      kpi={kpi}
+      influencers={influencers}
+      activeCampaigns={activeCampaigns}
+      categories={categories}
+    />
   );
 }
