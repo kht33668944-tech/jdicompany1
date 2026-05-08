@@ -1,0 +1,111 @@
+export type InfluencerGrade = "S" | "A" | "B" | "C" | "UNRATED";
+export type InfluencerStatus = "active" | "archived";
+export type CampaignStatus =
+  | "planned"
+  | "dm_sent"
+  | "replied"
+  | "shipped"
+  | "posted"
+  | "done";
+
+export interface Influencer {
+  id: string;
+  created_by: string;
+  platform: string;
+  username: string;
+  profile_url: string;
+  display_name: string | null;
+  bio: string | null;
+  profile_image_url: string | null;
+  follower_count: number | null;
+  following_count: number | null;
+  post_count: number | null;
+  avg_likes: number | null;
+  avg_comments: number | null;
+  engagement_rate: number | null;
+  grade: InfluencerGrade;
+  category: string | null;
+  ai_insights: AiInsights | null;
+  ai_summary: string | null;
+  tags: string[] | null;
+  notes: string | null;
+  status: InfluencerStatus;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiInsights {
+  category: string | null;
+  persona: string | null;
+  approach: string | null;
+  fake_signal: string | null;
+}
+
+export interface InfluencerPost {
+  id: string;
+  influencer_id: string;
+  post_url: string | null;
+  thumbnail_url: string | null;
+  caption: string | null;
+  likes: number | null;
+  comments: number | null;
+  posted_at: string | null;
+  fetched_at: string;
+}
+
+export interface InfluencerCampaign {
+  id: string;
+  influencer_id: string;
+  created_by: string;
+  campaign_name: string;
+  status: CampaignStatus;
+  product_name: string | null;
+  cost: number | null;
+  contact_date: string | null;
+  ship_date: string | null;
+  expected_post_date: string | null;
+  actual_post_date: string | null;
+  post_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InfluencerKpiSnapshot {
+  id: string;
+  snapshot_date: string;
+  total_influencers: number | null;
+  active_campaigns: number | null;
+  avg_engagement_rate: number | null;
+  total_follower_reach: number | null;
+  created_at: string;
+}
+
+export interface InfluencerWithPosts extends Influencer {
+  recent_posts: InfluencerPost[];
+}
+
+export interface InfluencerFilterOpts {
+  grade?: InfluencerGrade;
+  category?: string;
+  status?: InfluencerStatus;
+  search?: string;
+  sortBy?: "engagement_rate" | "follower_count" | "created_at" | "updated_at";
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+export interface KpiCards {
+  totalInfluencers: number;
+  activeCampaigns: number;
+  avgEngagementRate: number | null;
+  totalFollowerReach: number | null;
+  prevWeek: {
+    totalInfluencers: number | null;
+    activeCampaigns: number | null;
+    avgEngagementRate: number | null;
+    totalFollowerReach: number | null;
+  };
+}
