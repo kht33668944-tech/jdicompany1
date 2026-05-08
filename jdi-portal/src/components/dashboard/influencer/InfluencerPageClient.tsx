@@ -9,13 +9,13 @@ import InfluencerFilters, { DEFAULT_FILTER_STATE } from "./InfluencerFilters";
 import SeedingTimeline from "./SeedingTimeline";
 import InfluencerDetailPanel from "./InfluencerDetailPanel";
 import InfluencerTabs from "./InfluencerTabs";
-import type { Influencer, InfluencerCampaign, KpiCards as KpiCardsType } from "@/lib/influencer/types";
+import type { Influencer, InfluencerCampaignWithInfluencer, KpiCards as KpiCardsType } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
 interface Props {
   kpi: KpiCardsType;
   influencers: Influencer[];
-  activeCampaigns: InfluencerCampaign[];
+  activeCampaigns: InfluencerCampaignWithInfluencer[];
   categories: string[];
 }
 

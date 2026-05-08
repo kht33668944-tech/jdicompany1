@@ -1,19 +1,20 @@
 "use client";
 
-import type { InfluencerCampaign } from "@/lib/influencer/types";
+import type { InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
 import CalendarBlank from "phosphor-react/dist/icons/CalendarBlank.esm.js";
 
 interface TimelineItem {
   campaignId: string;
   date: string; // YYYY-MM-DD
-  influencerUsername?: string;
+  influencerUsername: string | null;
+  influencerDisplayName: string | null;
   campaignName: string;
   actionLabel: string;
   statusColor: string;
 }
 
 type Props = {
-  campaigns: InfluencerCampaign[];
+  campaigns: InfluencerCampaignWithInfluencer[];
 };
 
 function kstDateStr(offsetDays = 0): string {
@@ -29,7 +30,7 @@ function getDateLabel(dateStr: string): string {
   return `${Number(m)}월 ${Number(d)}일`;
 }
 
-function extractItems(campaigns: InfluencerCampaign[]): TimelineItem[] {
+function extractItems(campaigns: InfluencerCampaignWithInfluencer[]): TimelineItem[] {
   const items: TimelineItem[] = [];
   const todayKST = kstDateStr(0);
   const cutoffKST = kstDateStr(30);
@@ -54,6 +55,8 @@ function extractItems(campaigns: InfluencerCampaign[]): TimelineItem[] {
       items.push({
         campaignId: c.id,
         date: dateStr,
+        influencerUsername: c.influencer?.username ?? null,
+        influencerDisplayName: c.influencer?.display_name ?? null,
         campaignName: c.campaign_name,
         actionLabel: entry.action,
         statusColor: entry.color,
@@ -90,6 +93,16 @@ export default function SeedingTimeline({ campaigns }: Props) {
                 <p className="text-xs font-semibold text-slate-700 leading-tight">
                   {getDateLabel(item.date)}
                 </p>
+                {item.influencerUsername && (
+                  <p className="text-xs font-medium text-slate-600 truncate">
+                    @{item.influencerUsername}
+                    {item.influencerDisplayName && (
+                      <span className="text-slate-400 font-normal ml-1">
+                        {item.influencerDisplayName}
+                      </span>
+                    )}
+                  </p>
+                )}
                 <p className="text-xs text-slate-500 truncate">
                   {item.campaignName} — {item.actionLabel}
                 </p>

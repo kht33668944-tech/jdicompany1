@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import InfluencerTabs from "./InfluencerTabs";
 import SeedingCalendar from "./SeedingCalendar";
 import SeedingCampaignBoard from "./SeedingCampaignBoard";
-import type { InfluencerCampaign } from "@/lib/influencer/types";
+import type { InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
 
 interface Props {
-  activeCampaigns: InfluencerCampaign[];
+  activeCampaigns: InfluencerCampaignWithInfluencer[];
 }
 
 export default function SeedingSchedulePage({ activeCampaigns }: Props) {

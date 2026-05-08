@@ -3,10 +3,10 @@
 import { useState } from "react";
 import CaretLeft from "phosphor-react/dist/icons/CaretLeft.esm.js";
 import CaretRight from "phosphor-react/dist/icons/CaretRight.esm.js";
-import type { InfluencerCampaign } from "@/lib/influencer/types";
+import type { InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
 
 interface Props {
-  campaigns: InfluencerCampaign[];
+  campaigns: InfluencerCampaignWithInfluencer[];
   onDateSelect: (date: string | null) => void;
   selectedDate: string | null;
 }
@@ -16,7 +16,7 @@ function kstToday(): string {
 }
 
 // 캠페인에서 날짜 목록 추출 (contact_date, ship_date, expected_post_date)
-function getCampaignDates(campaigns: InfluencerCampaign[]): Map<string, string[]> {
+function getCampaignDates(campaigns: InfluencerCampaignWithInfluencer[]): Map<string, string[]> {
   const map = new Map<string, string[]>();
   const add = (date: string | null, color: string) => {
     if (!date) return;

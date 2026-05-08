@@ -86,6 +86,14 @@ export interface InfluencerWithPosts extends Influencer {
   recent_posts: InfluencerPost[];
 }
 
+export type InfluencerCampaignWithInfluencer = InfluencerCampaign & {
+  influencer: {
+    username: string;
+    display_name: string | null;
+    profile_image_url: string | null;
+  } | null;
+};
+
 export interface InfluencerFilterOpts {
   grade?: InfluencerGrade;
   category?: string;

@@ -3,6 +3,7 @@ import type {
   Influencer,
   InfluencerWithPosts,
   InfluencerCampaign,
+  InfluencerCampaignWithInfluencer,
   InfluencerFilterOpts,
   InfluencerKpiSnapshot,
   KpiCards,
@@ -84,17 +85,17 @@ export async function getCampaignsByInfluencer(influencer_id: string): Promise<I
   return (data as InfluencerCampaign[]) ?? [];
 }
 
-export async function getActiveCampaigns(): Promise<InfluencerCampaign[]> {
+export async function getActiveCampaigns(): Promise<InfluencerCampaignWithInfluencer[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("influencer_campaigns")
-    .select("*")
+    .select("*, influencer:influencers(username, display_name, profile_image_url)")
     .neq("status", "done")
     .order("ship_date", { ascending: true, nullsFirst: false });
 
   if (error) throw error;
-  return (data as InfluencerCampaign[]) ?? [];
+  return (data as unknown as InfluencerCampaignWithInfluencer[]) ?? [];
 }
 
 function calcDeltaPct(current: number | null, prev: number | null): number | null {

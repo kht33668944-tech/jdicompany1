@@ -1,4 +1,5 @@
 import type { CampaignStatus, InfluencerStatus } from "@/lib/influencer/types";
+import { CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 
 type AllStatus = CampaignStatus | InfluencerStatus;
 
@@ -14,27 +15,27 @@ interface BadgeConfig {
 
 const CAMPAIGN_CONFIG: Record<CampaignStatus, BadgeConfig> = {
   planned: {
-    label: "접촉 전",
+    label: CAMPAIGN_STATUS_LABEL.planned,
     classes: "bg-slate-100 text-slate-600",
   },
   dm_sent: {
-    label: "DM 발송",
+    label: CAMPAIGN_STATUS_LABEL.dm_sent,
     classes: "bg-blue-100 text-blue-700",
   },
   replied: {
-    label: "응답 받음",
+    label: CAMPAIGN_STATUS_LABEL.replied,
     classes: "bg-purple-100 text-purple-700",
   },
   shipped: {
-    label: "제품 발송",
+    label: CAMPAIGN_STATUS_LABEL.shipped,
     classes: "bg-cyan-100 text-cyan-700",
   },
   posted: {
-    label: "게시 완료",
+    label: CAMPAIGN_STATUS_LABEL.posted,
     classes: "bg-emerald-100 text-emerald-700",
   },
   done: {
-    label: "완료",
+    label: CAMPAIGN_STATUS_LABEL.done,
     classes: "bg-slate-100 text-slate-500",
   },
 };

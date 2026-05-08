@@ -10,8 +10,9 @@ import Eye from "phosphor-react/dist/icons/Eye.esm.js";
 import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
-import { updateCampaignStatus, resyncInfluencer, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
+import { updateCampaignStatus, addCampaign, resyncInfluencer, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
 import { proxyImageUrl } from "@/lib/influencer/proxy";
+import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
 import type { Influencer, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
@@ -26,15 +27,6 @@ function formatEngagementRate(n: number | null): string {
   if (n === null) return "—";
   return `${n.toFixed(1)}%`;
 }
-
-const CAMPAIGN_STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
-  { value: "planned", label: "예정" },
-  { value: "dm_sent", label: "DM 발송" },
-  { value: "replied", label: "회신" },
-  { value: "shipped", label: "발송완료" },
-  { value: "posted", label: "게시됨" },
-  { value: "done", label: "완료" },
-];
 
 interface RowMenuProps {
   influencerId: string;
@@ -135,16 +127,32 @@ function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
 
 interface StatusCellProps {
   campaign: InfluencerCampaign | undefined;
-  onStartSeeding: () => void;
+  influencerId: string;
+  influencerUsername: string;
+  onRefresh: () => void;
 }
 
-function StatusCell({ campaign, onStartSeeding }: StatusCellProps) {
+function StatusCell({ campaign, influencerId, influencerUsername, onRefresh }: StatusCellProps) {
   const [, startTransition] = useTransition();
 
   if (!campaign) {
     return (
       <button
-        onClick={(e) => { e.stopPropagation(); onStartSeeding(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          startTransition(async () => {
+            try {
+              await addCampaign({
+                influencer_id: influencerId,
+                campaign_name: `@${influencerUsername} 시딩`,
+              });
+              toast.success(`@${influencerUsername} 시딩이 시작되었습니다`);
+              onRefresh();
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "시딩 등록 실패");
+            }
+          });
+        }}
         className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
       >
         <Plus size={11} weight="bold" />
@@ -316,7 +324,9 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
                   <td className="px-4 py-3">
                     <StatusCell
                       campaign={campaignMap.get(inf.id)}
-                      onStartSeeding={() => onSelectInfluencer(inf.id)}
+                      influencerId={inf.id}
+                      influencerUsername={inf.username}
+                      onRefresh={onRefresh}
                     />
                   </td>
 

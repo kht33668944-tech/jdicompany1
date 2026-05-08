@@ -4,33 +4,25 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import { updateCampaignStatus } from "@/lib/influencer/actions";
 import StatusBadge from "./StatusBadge";
-import type { InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
+import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
+import type { InfluencerCampaignWithInfluencer, CampaignStatus } from "@/lib/influencer/types";
 
 interface Props {
-  campaigns: InfluencerCampaign[];
+  campaigns: InfluencerCampaignWithInfluencer[];
   selectedDate: string | null;
   onRefresh: () => void;
 }
 
-const STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
-  { value: "planned", label: "접촉 전" },
-  { value: "dm_sent", label: "DM 발송" },
-  { value: "replied", label: "응답 받음" },
-  { value: "shipped", label: "제품 발송" },
-  { value: "posted", label: "게시 완료" },
-  { value: "done", label: "완료" },
+const STATUS_COUNTS: { status: CampaignStatus; color: string }[] = [
+  { status: "planned", color: "text-slate-500" },
+  { status: "dm_sent", color: "text-blue-500" },
+  { status: "replied", color: "text-cyan-500" },
+  { status: "shipped", color: "text-amber-500" },
+  { status: "posted", color: "text-violet-500" },
+  { status: "done", color: "text-emerald-500" },
 ];
 
-const STATUS_COUNTS: { status: CampaignStatus; label: string; color: string }[] = [
-  { status: "planned", label: "접촉 전", color: "text-slate-500" },
-  { status: "dm_sent", label: "DM 발송", color: "text-blue-500" },
-  { status: "replied", label: "회신", color: "text-cyan-500" },
-  { status: "shipped", label: "발송완료", color: "text-amber-500" },
-  { status: "posted", label: "게시됨", color: "text-violet-500" },
-  { status: "done", label: "완료", color: "text-emerald-500" },
-];
-
-function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaign; onRefresh: () => void }) {
+function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaignWithInfluencer; onRefresh: () => void }) {
   const [, startTransition] = useTransition();
 
   function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -50,6 +42,18 @@ function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaign; o
     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
+          {campaign.influencer && (
+            <div className="mb-1">
+              <p className="text-xs font-medium text-slate-700 truncate">
+                @{campaign.influencer.username}
+              </p>
+              {campaign.influencer.display_name && (
+                <p className="text-[10px] text-slate-400 truncate leading-tight">
+                  {campaign.influencer.display_name}
+                </p>
+              )}
+            </div>
+          )}
           <p className="text-sm font-medium text-slate-800 leading-tight truncate">
             {campaign.campaign_name}
           </p>
@@ -84,7 +88,7 @@ function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaign; o
         className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
         aria-label="캠페인 상태 변경"
       >
-        {STATUS_OPTIONS.map((opt) => (
+        {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
@@ -124,10 +128,10 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
       {/* 상태별 요약 (선택 날짜 없을 때만) */}
       {!selectedDate && (
         <div className="grid grid-cols-3 gap-2">
-          {STATUS_COUNTS.filter(({ status }) => (countMap.get(status) ?? 0) > 0).map(({ status, label, color }) => (
+          {STATUS_COUNTS.filter(({ status }) => (countMap.get(status) ?? 0) > 0).map(({ status, color }) => (
             <div key={status} className="bg-slate-50 rounded-xl p-2.5 text-center">
               <p className={`text-lg font-bold ${color}`}>{countMap.get(status) ?? 0}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{label}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{CAMPAIGN_STATUS_LABEL[status]}</p>
             </div>
           ))}
         </div>

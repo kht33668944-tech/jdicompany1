@@ -17,6 +17,7 @@ import {
 import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import { proxyImageUrl } from "@/lib/influencer/proxy";
+import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
 
 import X from "phosphor-react/dist/icons/X.esm.js";
 import Robot from "phosphor-react/dist/icons/Robot.esm.js";
@@ -68,15 +69,6 @@ function formatPct(n: number | null): string {
   if (n === null) return "—";
   return `${n.toFixed(2)}%`;
 }
-
-const CAMPAIGN_STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
-  { value: "planned", label: "접촉 전" },
-  { value: "dm_sent", label: "DM 발송" },
-  { value: "replied", label: "응답 받음" },
-  { value: "shipped", label: "제품 발송" },
-  { value: "posted", label: "게시 완료" },
-  { value: "done", label: "완료" },
-];
 
 // ── 캠페인 추가 폼 ──────────────────────────────────────────────
 interface AddCampaignFormProps {
