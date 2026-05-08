@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import DotsThreeVertical from "phosphor-react/dist/icons/DotsThreeVertical.esm.js";
 import ArrowsClockwise from "phosphor-react/dist/icons/ArrowsClockwise.esm.js";
@@ -222,12 +221,6 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
           인플루언서 리스트 관리
           <span className="ml-2 text-xs font-normal text-slate-400">{filtered.length}명</span>
         </h2>
-        <Link
-          href="/dashboard/influencer/all"
-          className="text-xs text-slate-500 hover:text-slate-700 transition-colors font-medium"
-        >
-          전체보기 →
-        </Link>
       </div>
 
       {/* 테이블 */}
@@ -322,7 +315,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
 
       {sorted.length > 50 && (
         <div className="px-6 py-3 border-t border-slate-100 text-center text-xs text-slate-400">
-          상위 50명 표시 중 — 전체보기에서 모든 인플루언서를 확인하세요
+          상위 50명만 표시됩니다
         </div>
       )}
     </div>

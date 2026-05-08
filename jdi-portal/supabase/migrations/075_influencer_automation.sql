@@ -15,6 +15,7 @@ CREATE OR REPLACE FUNCTION public.snapshot_influencer_kpi()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_date date := (NOW() AT TIME ZONE 'Asia/Seoul')::date;
@@ -78,6 +79,7 @@ CREATE OR REPLACE FUNCTION public.weekly_resync_influencers()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   r record;

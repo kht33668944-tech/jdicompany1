@@ -90,7 +90,7 @@ export async function getActiveCampaigns(): Promise<InfluencerCampaign[]> {
   const { data, error } = await supabase
     .from("influencer_campaigns")
     .select("*")
-    .not("status", "in", '("done")')
+    .neq("status", "done")
     .order("ship_date", { ascending: true, nullsFirst: false });
 
   if (error) throw error;

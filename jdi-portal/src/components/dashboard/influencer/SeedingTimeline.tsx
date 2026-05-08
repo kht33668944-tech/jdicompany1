@@ -16,36 +16,23 @@ type Props = {
   campaigns: InfluencerCampaign[];
 };
 
-function toKSTDateString(isoDate: string): string {
-  // KST = UTC+9
-  const d = new Date(isoDate + "T00:00:00+09:00");
-  return d.toISOString().slice(0, 10);
+function kstDateStr(offsetDays = 0): string {
+  return new Date(Date.now() + 9 * 3600_000 + offsetDays * 86400_000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 function getDateLabel(dateStr: string): string {
-  const today = new Date();
-  const todayKST = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowKST = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
-
-  if (dateStr === todayKST) return "오늘";
-  if (dateStr === tomorrowKST) return "내일";
-
+  if (dateStr === kstDateStr(0)) return "오늘";
+  if (dateStr === kstDateStr(1)) return "내일";
   const [, m, d] = dateStr.split("-");
   return `${Number(m)}월 ${Number(d)}일`;
 }
 
 function extractItems(campaigns: InfluencerCampaign[]): TimelineItem[] {
   const items: TimelineItem[] = [];
-  const today = new Date();
-  const todayKST = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
-  // Look 30 days ahead
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() + 30);
-  const cutoffKST = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
+  const todayKST = kstDateStr(0);
+  const cutoffKST = kstDateStr(30);
 
   for (const c of campaigns) {
     if (c.status === "done") continue;
@@ -62,11 +49,11 @@ function extractItems(campaigns: InfluencerCampaign[]): TimelineItem[] {
 
     for (const entry of entries) {
       if (!entry.date) continue;
-      const kstDate = toKSTDateString(entry.date);
-      if (kstDate < todayKST || kstDate > cutoffKST) continue;
+      const dateStr = entry.date;
+      if (dateStr < todayKST || dateStr > cutoffKST) continue;
       items.push({
         campaignId: c.id,
-        date: kstDate,
+        date: dateStr,
         campaignName: c.campaign_name,
         actionLabel: entry.action,
         statusColor: entry.color,
