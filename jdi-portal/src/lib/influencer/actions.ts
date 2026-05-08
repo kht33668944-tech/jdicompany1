@@ -48,10 +48,14 @@ export async function addInfluencer(
 
   const influencerId = (extractData as { influencer_id: string }).influencer_id;
 
-  // analyze는 실패해도 인플루언서 등록 상태는 유지
-  supabase.functions
-    .invoke("influencer-analyze", { body: { influencer_id: influencerId } })
-    .catch(() => {});
+  // analyze는 실패해도 인플루언서 등록 상태는 유지 (await로 완료 보장)
+  try {
+    await supabase.functions.invoke("influencer-analyze", {
+      body: { influencer_id: influencerId },
+    });
+  } catch {
+    // 분석 실패는 무시
+  }
 
   revalidatePath("/dashboard/influencer");
   return { ok: true, influencer_id: influencerId };
@@ -78,9 +82,13 @@ export async function resyncInfluencer(id: string): Promise<void> {
 
   const influencerId = (extractData as { influencer_id: string }).influencer_id;
 
-  supabase.functions
-    .invoke("influencer-analyze", { body: { influencer_id: influencerId } })
-    .catch(() => {});
+  try {
+    await supabase.functions.invoke("influencer-analyze", {
+      body: { influencer_id: influencerId },
+    });
+  } catch {
+    // 분석 실패는 무시
+  }
 
   revalidatePath("/dashboard/influencer");
 }
