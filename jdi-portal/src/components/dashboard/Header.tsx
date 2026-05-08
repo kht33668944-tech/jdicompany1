@@ -33,6 +33,9 @@ const titles: Record<string, string> = {
   "/dashboard/attendance": "근태관리",
   "/dashboard/tasks": "할일",
   "/dashboard/schedule": "스케줄",
+  "/dashboard/influencer": "인플루언서",
+  "/dashboard/influencer/schedule": "인플루언서",
+  "/dashboard/chat": "채팅",
   "/dashboard/reports": "오류 접수",
   "/dashboard/settings": "설정",
 };
@@ -43,7 +46,13 @@ export default function Header({ user, onMenuClick, onCollapseToggle, collapsed,
   const [showReportDrawer, setShowReportDrawer] = useState(false);
   const dropdownRef = useClickOutside<HTMLDivElement>(() => setDropdownOpen(false));
 
-  const pageTitle = titles[pathname] ?? "대시보드";
+  // 정확 매치 우선, 없으면 가장 긴 prefix 매치
+  const pageTitle =
+    titles[pathname] ??
+    Object.entries(titles)
+      .filter(([key]) => pathname.startsWith(key + "/") || pathname === key)
+      .sort((a, b) => b[0].length - a[0].length)[0]?.[1] ??
+    "대시보드";
 
   return (
     <>

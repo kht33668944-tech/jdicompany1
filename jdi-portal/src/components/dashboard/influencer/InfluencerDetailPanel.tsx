@@ -16,6 +16,7 @@ import {
 } from "@/lib/influencer/actions";
 import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
+import { proxyImageUrl } from "@/lib/influencer/proxy";
 
 import X from "phosphor-react/dist/icons/X.esm.js";
 import Robot from "phosphor-react/dist/icons/Robot.esm.js";
@@ -43,7 +44,8 @@ function formatNumber(n: number | null): string {
 
 function PostThumbnail({ url, alt }: { url: string | null; alt: string }) {
   const [errored, setErrored] = useState(false);
-  if (!url || errored) {
+  const proxied = proxyImageUrl(url);
+  if (!proxied || errored) {
     return (
       <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">
         없음
@@ -53,9 +55,8 @@ function PostThumbnail({ url, alt }: { url: string | null; alt: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={url}
+      src={proxied}
       alt={alt}
-      referrerPolicy="no-referrer"
       loading="lazy"
       onError={() => setErrored(true)}
       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
@@ -458,9 +459,8 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                   {influencer.profile_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={influencer.profile_image_url}
+                      src={proxyImageUrl(influencer.profile_image_url) ?? ""}
                       alt={`@${influencer.username} 프로필`}
-                      referrerPolicy="no-referrer"
                       className="w-20 h-20 rounded-full object-cover border-2 border-slate-100"
                     />
                   ) : (

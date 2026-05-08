@@ -7,9 +7,11 @@ import ArrowsClockwise from "phosphor-react/dist/icons/ArrowsClockwise.esm.js";
 import Archive from "phosphor-react/dist/icons/Archive.esm.js";
 import Trash from "phosphor-react/dist/icons/Trash.esm.js";
 import Eye from "phosphor-react/dist/icons/Eye.esm.js";
+import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import { updateCampaignStatus, resyncInfluencer, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
+import { proxyImageUrl } from "@/lib/influencer/proxy";
 import type { Influencer, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
@@ -133,13 +135,22 @@ function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
 
 interface StatusCellProps {
   campaign: InfluencerCampaign | undefined;
+  onStartSeeding: () => void;
 }
 
-function StatusCell({ campaign }: StatusCellProps) {
+function StatusCell({ campaign, onStartSeeding }: StatusCellProps) {
   const [, startTransition] = useTransition();
 
   if (!campaign) {
-    return <span className="text-slate-300 text-sm">—</span>;
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); onStartSeeding(); }}
+        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+      >
+        <Plus size={11} weight="bold" />
+        시딩 시작
+      </button>
+    );
   }
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -206,7 +217,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
     return true;
   });
 
-  // 정렬: engagement_rate desc (서버에서 이미 정렬됐지만 필터 후 재정렬)
+  // 정렬: engagement_rate desc
   const sorted = [...filtered].sort(
     (a, b) => (b.engagement_rate ?? -1) - (a.engagement_rate ?? -1)
   );
@@ -257,11 +268,11 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
                   <td className="px-6 py-3">
                     <div className="flex items-center gap-3">
                       {/* 프로필 이미지 */}
-                      <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0 ring-1 ring-slate-100">
+                      <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 ring-1 ring-slate-100">
                         {inf.profile_image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={inf.profile_image_url}
+                            src={proxyImageUrl(inf.profile_image_url) ?? ""}
                             alt={inf.username}
                             className="w-full h-full object-cover"
                           />
@@ -271,11 +282,16 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
                           </div>
                         )}
                       </div>
-                      {/* 이름 */}
+                      {/* 이름 + display_name + category */}
                       <div className="min-w-0">
                         <p className="font-medium text-slate-800 truncate">@{inf.username}</p>
+                        {inf.display_name && (
+                          <p className="text-xs text-slate-500 truncate leading-tight">{inf.display_name}</p>
+                        )}
                         {inf.category && (
-                          <p className="text-xs text-slate-400 truncate">{inf.category}</p>
+                          <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium leading-none">
+                            {inf.category}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -298,7 +314,10 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
 
                   {/* 상태 */}
                   <td className="px-4 py-3">
-                    <StatusCell campaign={campaignMap.get(inf.id)} />
+                    <StatusCell
+                      campaign={campaignMap.get(inf.id)}
+                      onStartSeeding={() => onSelectInfluencer(inf.id)}
+                    />
                   </td>
 
                   {/* 메뉴 */}
