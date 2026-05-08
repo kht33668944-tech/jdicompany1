@@ -44,7 +44,7 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
       <KpiCards data={kpi} />
 
       {/* 메인 레이아웃: 테이블(65%) + 시딩 스케줄(35%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-start min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 items-start min-h-0">
         {/* 인플루언서 테이블 (좌측) */}
         <InfluencerTable
           influencers={influencers}
