@@ -117,7 +117,7 @@ export default function TopUrlBar({ onFilterClick }: Props) {
           title="비교 기간 선택 (추후 구현)"
         >
           <CalendarBlank size={14} />
-          지난주
+          날짜
         </button>
       </div>
 

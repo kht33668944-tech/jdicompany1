@@ -38,7 +38,29 @@ function formatNumber(n: number | null): string {
   if (n === null) return "—";
   if (n >= 10000) return `${(n / 10000).toFixed(1)}만`;
   if (n >= 1000) return `${(n / 1000).toFixed(1)}천`;
-  return String(n);
+  return String(Math.round(n));
+}
+
+function PostThumbnail({ url, alt }: { url: string | null; alt: string }) {
+  const [errored, setErrored] = useState(false);
+  if (!url || errored) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">
+        없음
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={alt}
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      onError={() => setErrored(true)}
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+    />
+  );
 }
 
 function formatPct(n: number | null): string {
@@ -511,9 +533,6 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                   )}
                   {influencer.ai_insights && (
                     <div className="space-y-2">
-                      {influencer.ai_insights.category && (
-                        <InsightRow label="카테고리" value={influencer.ai_insights.category} />
-                      )}
                       {influencer.ai_insights.persona && (
                         <InsightRow label="페르소나" value={influencer.ai_insights.persona} />
                       )}
@@ -547,19 +566,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                         rel="noopener noreferrer"
                         className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 group block"
                       >
-                        {post.thumbnail_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={post.thumbnail_url}
-                            alt="게시물 썸네일"
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">
-                            없음
-                          </div>
-                        )}
+                        <PostThumbnail url={post.thumbnail_url} alt="게시물 썸네일" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end justify-center pb-1.5 gap-2 opacity-0 group-hover:opacity-100">
                           {post.likes !== null && (
                             <span className="text-white text-[10px] font-medium">

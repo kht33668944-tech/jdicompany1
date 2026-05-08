@@ -17,7 +17,7 @@ function formatFollowers(n: number | null): string {
   if (n === null) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString("ko-KR");
+  return String(Math.round(n));
 }
 
 function formatEngagementRate(n: number | null): string {
@@ -221,6 +221,9 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
           인플루언서 리스트 관리
           <span className="ml-2 text-xs font-normal text-slate-400">{filtered.length}명</span>
         </h2>
+        {sorted.length > 0 && (
+          <span className="text-xs font-medium text-slate-400">전체보기 →</span>
+        )}
       </div>
 
       {/* 테이블 */}
