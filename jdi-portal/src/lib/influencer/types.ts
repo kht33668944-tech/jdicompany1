@@ -63,7 +63,9 @@ export interface InfluencerCampaign {
   product_name: string | null;
   cost: number | null;
   contact_date: string | null;
+  contract_date: string | null;
   ship_date: string | null;
+  content_deadline: string | null;
   expected_post_date: string | null;
   actual_post_date: string | null;
   post_url: string | null;

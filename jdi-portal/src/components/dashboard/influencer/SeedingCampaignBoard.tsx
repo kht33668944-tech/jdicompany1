@@ -102,6 +102,18 @@ function CampaignCard({
             발송 {campaign.ship_date}
           </span>
         )}
+        {campaign.contract_date && (
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
+            계약 {campaign.contract_date}
+          </span>
+        )}
+        {campaign.content_deadline && (
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block" />
+            마감 {campaign.content_deadline}
+          </span>
+        )}
         {campaign.expected_post_date && (
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-violet-400 inline-block" />
@@ -127,7 +139,7 @@ function CampaignCard({
   );
 }
 
-type TodayFilter = "dm" | "ship" | "post" | null;
+type TodayFilter = "dm" | "contract" | "ship" | "deadline" | "post" | null;
 
 function TodayTasksSection({
   campaigns,
@@ -137,8 +149,13 @@ function TodayTasksSection({
   onInfluencerClick?: (influencerId: string) => void;
 }) {
   const [activeFilter, setActiveFilter] = useState<TodayFilter>(null);
-  const { dmList, shipList, postList } = getTodayCampaignTasks(campaigns);
-  const isEmpty = dmList.length === 0 && shipList.length === 0 && postList.length === 0;
+  const { dmList, contractList, shipList, deadlineList, postList } = getTodayCampaignTasks(campaigns);
+  const isEmpty =
+    dmList.length === 0 &&
+    contractList.length === 0 &&
+    shipList.length === 0 &&
+    deadlineList.length === 0 &&
+    postList.length === 0;
 
   if (isEmpty) {
     return (
@@ -149,22 +166,26 @@ function TodayTasksSection({
     );
   }
 
-  const categories: { key: TodayFilter & string; icon: string; label: string; count: number }[] = [
+  const categories: { key: NonNullable<TodayFilter>; icon: string; label: string; count: number }[] = [
     { key: "dm", icon: "📩", label: "DM 보낼 곳", count: dmList.length },
+    { key: "contract", icon: "✍️", label: "계약 진행", count: contractList.length },
     { key: "ship", icon: "📦", label: "발송할 제품", count: shipList.length },
+    { key: "deadline", icon: "⏰", label: "콘텐츠 마감", count: deadlineList.length },
     { key: "post", icon: "🔍", label: "포스팅 확인", count: postList.length },
   ];
 
   const filteredList =
     activeFilter === "dm" ? dmList :
+    activeFilter === "contract" ? contractList :
     activeFilter === "ship" ? shipList :
+    activeFilter === "deadline" ? deadlineList :
     activeFilter === "post" ? postList :
     [];
 
   return (
     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
       <p className="text-xs font-semibold text-slate-700">🔔 오늘 할 일</p>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-5 gap-1.5">
         {categories.map(({ key, icon, label, count }) => (
           <button
             key={key}
@@ -232,8 +253,14 @@ function UpcomingSection({
     if (c.contact_date && c.contact_date >= from && c.contact_date <= to) {
       candidates.push({ dateStr: c.contact_date, label: "DM 보내기" });
     }
+    if (c.contract_date && c.contract_date >= from && c.contract_date <= to) {
+      candidates.push({ dateStr: c.contract_date, label: "계약 진행" });
+    }
     if (c.ship_date && c.ship_date >= from && c.ship_date <= to) {
       candidates.push({ dateStr: c.ship_date, label: "발송 마감" });
+    }
+    if (c.content_deadline && c.content_deadline >= from && c.content_deadline <= to) {
+      candidates.push({ dateStr: c.content_deadline, label: "콘텐츠 마감" });
     }
     if (c.expected_post_date && c.expected_post_date >= from && c.expected_post_date <= to) {
       candidates.push({ dateStr: c.expected_post_date, label: "포스팅 예정" });

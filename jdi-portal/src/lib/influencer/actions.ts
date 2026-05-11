@@ -226,7 +226,9 @@ export async function addCampaign(input: {
   product_name?: string;
   cost?: number;
   contact_date?: string;
+  contract_date?: string;
   ship_date?: string;
+  content_deadline?: string;
   expected_post_date?: string;
   notes?: string;
 }): Promise<InfluencerCampaign> {
@@ -243,7 +245,9 @@ export async function addCampaign(input: {
       product_name: input.product_name ?? null,
       cost: input.cost ?? null,
       contact_date: input.contact_date ?? null,
+      contract_date: input.contract_date ?? null,
       ship_date: input.ship_date ?? null,
+      content_deadline: input.content_deadline ?? null,
       expected_post_date: input.expected_post_date ?? null,
       notes: input.notes ?? null,
     })
@@ -282,7 +286,9 @@ export async function updateCampaign(
       | "product_name"
       | "cost"
       | "contact_date"
+      | "contract_date"
       | "ship_date"
+      | "content_deadline"
       | "expected_post_date"
       | "actual_post_date"
       | "post_url"

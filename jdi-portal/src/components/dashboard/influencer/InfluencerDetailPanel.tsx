@@ -90,7 +90,9 @@ function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormPro
   const [product, setProduct] = useState("");
   const [cost, setCost] = useState("");
   const [contactDate, setContactDate] = useState("");
+  const [contractDate, setContractDate] = useState("");
   const [shipDate, setShipDate] = useState("");
+  const [contentDeadline, setContentDeadline] = useState("");
   const [postDate, setPostDate] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -105,7 +107,9 @@ function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormPro
         product_name: product.trim() || undefined,
         cost: cost ? Number(cost) : undefined,
         contact_date: contactDate || undefined,
+        contract_date: contractDate || undefined,
         ship_date: shipDate || undefined,
+        content_deadline: contentDeadline || undefined,
         expected_post_date: postDate || undefined,
       });
       toast.success("캠페인이 추가되었습니다.");
@@ -142,7 +146,7 @@ function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormPro
           className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
         />
       </div>
-      {/* 날짜 3개 — 시딩 캘린더 막대 시각화용 */}
+      {/* 날짜 5개 — 시딩 캘린더 막대 시각화용 */}
       <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="block text-[10px] text-slate-500 mb-0.5">연락일 (DM)</label>
@@ -154,11 +158,29 @@ function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormPro
           />
         </div>
         <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">계약 진행</label>
+          <input
+            type="date"
+            value={contractDate}
+            onChange={(e) => setContractDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+        <div>
           <label className="block text-[10px] text-slate-500 mb-0.5">발송일</label>
           <input
             type="date"
             value={shipDate}
             onChange={(e) => setShipDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">콘텐츠 마감</label>
+          <input
+            type="date"
+            value={contentDeadline}
+            onChange={(e) => setContentDeadline(e.target.value)}
             className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
           />
         </div>
@@ -205,7 +227,9 @@ function EditCampaignForm({ campaign, onSaved, onCancel }: EditCampaignFormProps
   const [cost, setCost] = useState(campaign.cost !== null ? String(campaign.cost) : "");
   const [status, setStatus] = useState<CampaignStatus>(campaign.status);
   const [contactDate, setContactDate] = useState(campaign.contact_date ?? "");
+  const [contractDate, setContractDate] = useState(campaign.contract_date ?? "");
   const [shipDate, setShipDate] = useState(campaign.ship_date ?? "");
+  const [contentDeadline, setContentDeadline] = useState(campaign.content_deadline ?? "");
   const [postDate, setPostDate] = useState(campaign.expected_post_date ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -220,7 +244,9 @@ function EditCampaignForm({ campaign, onSaved, onCancel }: EditCampaignFormProps
         cost: cost ? Number(cost) : null,
         status,
         contact_date: contactDate || null,
+        contract_date: contractDate || null,
         ship_date: shipDate || null,
+        content_deadline: contentDeadline || null,
         expected_post_date: postDate || null,
       };
       await updateCampaign(campaign.id, patch);
@@ -279,11 +305,29 @@ function EditCampaignForm({ campaign, onSaved, onCancel }: EditCampaignFormProps
           />
         </div>
         <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">계약 진행</label>
+          <input
+            type="date"
+            value={contractDate}
+            onChange={(e) => setContractDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+        <div>
           <label className="block text-[10px] text-slate-500 mb-0.5">발송일</label>
           <input
             type="date"
             value={shipDate}
             onChange={(e) => setShipDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">콘텐츠 마감</label>
+          <input
+            type="date"
+            value={contentDeadline}
+            onChange={(e) => setContentDeadline(e.target.value)}
             className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
           />
         </div>
@@ -897,9 +941,23 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                         <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
                           {c.product_name && <span>제품: {c.product_name}</span>}
                           {c.cost !== null && <span>비용: {c.cost.toLocaleString()}원</span>}
-                          {c.contact_date && <span>연락: {c.contact_date}</span>}
-                          {c.ship_date && <span>발송: {c.ship_date}</span>}
-                          {c.expected_post_date && <span>포스팅: {c.expected_post_date}</span>}
+                        </div>
+                        <div className="flex gap-3 text-[11px] flex-wrap">
+                          {c.contact_date && <span className="text-slate-400">연락: {c.contact_date}</span>}
+                          {c.contract_date && (
+                            <span className="flex items-center gap-1 text-rose-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
+                              계약: {c.contract_date}
+                            </span>
+                          )}
+                          {c.ship_date && <span className="text-slate-400">발송: {c.ship_date}</span>}
+                          {c.content_deadline && (
+                            <span className="flex items-center gap-1 text-orange-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block" />
+                              마감: {c.content_deadline}
+                            </span>
+                          )}
+                          {c.expected_post_date && <span className="text-slate-400">포스팅: {c.expected_post_date}</span>}
                         </div>
                         {c.notes && (
                           <p className="text-xs text-slate-500 leading-relaxed">{c.notes}</p>

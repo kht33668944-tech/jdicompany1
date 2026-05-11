@@ -32,9 +32,13 @@ export function getCampaignDatesInRange(
 
   for (const c of campaigns) {
     if (seen.has(c.id)) continue;
-    const dates = [c.contact_date, c.ship_date, c.expected_post_date].filter(
-      (d): d is string => d !== null && d >= fromStr && d <= toStr
-    );
+    const dates = [
+      c.contact_date,
+      c.contract_date,
+      c.ship_date,
+      c.content_deadline,
+      c.expected_post_date,
+    ].filter((d): d is string => d !== null && d >= fromStr && d <= toStr);
     if (dates.length === 0) continue;
     seen.add(c.id);
     dates.sort();
@@ -175,9 +179,14 @@ export function buildSeedingWeeks(
 }
 
 // ============================================================
-// 날짜별 마일스톤 (DM / 발송 / 포스팅) - 개별 칩 표시용
+// 날짜별 마일스톤 - 개별 칩 표시용
+//   dm        : DM 발송 (contact_date)
+//   contract  : 계약 진행 (contract_date)
+//   ship      : 제품 발송 (ship_date)
+//   deadline  : 콘텐츠 제작 마감 (content_deadline)
+//   post      : 포스팅 예정 (expected_post_date)
 // ============================================================
-export type MilestoneKind = "dm" | "ship" | "post";
+export type MilestoneKind = "dm" | "contract" | "ship" | "deadline" | "post";
 
 export interface CampaignMilestone {
   campaign: InfluencerCampaignWithInfluencer;
@@ -185,7 +194,7 @@ export interface CampaignMilestone {
   dateStr: string;
 }
 
-/** 해당 월에 떨어지는 모든 캠페인의 contact_date / ship_date / expected_post_date를 날짜별로 묶어서 반환 */
+/** 해당 월에 떨어지는 모든 캠페인 마일스톤 5종을 날짜별로 묶어서 반환 */
 export function getMilestonesByDate(
   campaigns: InfluencerCampaignWithInfluencer[],
   year: number,
@@ -203,7 +212,9 @@ export function getMilestonesByDate(
 
   for (const c of campaigns) {
     add(c.contact_date, "dm", c);
+    add(c.contract_date, "contract", c);
     add(c.ship_date, "ship", c);
+    add(c.content_deadline, "deadline", c);
     add(c.expected_post_date, "post", c);
   }
 
@@ -231,6 +242,15 @@ export function getMilestoneStyle(kind: MilestoneKind): MilestoneStyle {
         text: "text-blue-700",
         border: "border-blue-200",
       };
+    case "contract":
+      return {
+        icon: "✍️",
+        label: "계약 진행",
+        shortLabel: "계약",
+        bg: "bg-rose-50",
+        text: "text-rose-700",
+        border: "border-rose-200",
+      };
     case "ship":
       return {
         icon: "📦",
@@ -239,6 +259,15 @@ export function getMilestoneStyle(kind: MilestoneKind): MilestoneStyle {
         bg: "bg-amber-50",
         text: "text-amber-700",
         border: "border-amber-200",
+      };
+    case "deadline":
+      return {
+        icon: "⏰",
+        label: "콘텐츠 마감",
+        shortLabel: "마감",
+        bg: "bg-orange-50",
+        text: "text-orange-700",
+        border: "border-orange-300",
       };
     case "post":
       return {
@@ -256,13 +285,17 @@ export function getMilestoneStyle(kind: MilestoneKind): MilestoneStyle {
 
 export function getTodayCampaignTasks(campaigns: InfluencerCampaignWithInfluencer[]): {
   dmList: InfluencerCampaignWithInfluencer[];
+  contractList: InfluencerCampaignWithInfluencer[];
   shipList: InfluencerCampaignWithInfluencer[];
+  deadlineList: InfluencerCampaignWithInfluencer[];
   postList: InfluencerCampaignWithInfluencer[];
 } {
   const today = kstTodayStr();
   return {
-    dmList:   campaigns.filter((c) => c.contact_date === today),
-    shipList: campaigns.filter((c) => c.ship_date === today),
-    postList: campaigns.filter((c) => c.expected_post_date === today),
+    dmList:       campaigns.filter((c) => c.contact_date === today),
+    contractList: campaigns.filter((c) => c.contract_date === today),
+    shipList:     campaigns.filter((c) => c.ship_date === today),
+    deadlineList: campaigns.filter((c) => c.content_deadline === today),
+    postList:     campaigns.filter((c) => c.expected_post_date === today),
   };
 }
