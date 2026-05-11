@@ -112,7 +112,7 @@ export default function InfluencerMediaGallery({
 
   return (
     <div
-      className={`flex-1 flex flex-col min-w-0 transition-opacity duration-220 ${
+      className={`flex-1 flex flex-col min-h-0 min-w-0 transition-opacity duration-220 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
       onClick={(e) => {
@@ -200,7 +200,7 @@ export default function InfluencerMediaGallery({
       </div>
 
       {/* 격자 */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         {visiblePosts.length === 0 ? (
           <div className="h-40 flex items-center justify-center text-slate-400 text-sm">
             조건에 맞는 게시물이 없습니다.

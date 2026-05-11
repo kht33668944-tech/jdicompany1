@@ -104,7 +104,7 @@ async function scrapeInstagramProfile(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       usernames: [username],
-      resultsLimit: 20,
+      resultsLimit: 50,
       resultsType: "posts",
     }),
   });

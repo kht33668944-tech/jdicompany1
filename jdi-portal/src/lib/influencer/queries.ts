@@ -63,7 +63,7 @@ export async function getInfluencerById(id: string): Promise<InfluencerWithPosts
     .select("id, influencer_id, post_url, thumbnail_url, caption, likes, comments, posted_at, fetched_at, post_type, product_type, view_count, is_sponsored, hashtags, child_thumbnails, video_url")
     .eq("influencer_id", id)
     .order("posted_at", { ascending: false, nullsFirst: false })
-    .limit(20);
+    .limit(50);
 
   if (postsError) throw postsError;
 

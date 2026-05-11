@@ -442,7 +442,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
             .select("id, influencer_id, post_url, thumbnail_url, caption, likes, comments, posted_at, fetched_at, post_type, product_type, view_count, is_sponsored, hashtags, child_thumbnails, video_url")
             .eq("influencer_id", influencerId)
             .order("posted_at", { ascending: false, nullsFirst: false })
-            .limit(20);
+            .limit(50);
           return { ...inf, recent_posts: posts ?? [] } as InfluencerWithPosts;
         }),
       supabase
@@ -608,7 +608,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
 
       {/* 좌측 와이드 갤러리 (lg 이상에서만) */}
       {influencer && (
-        <div className="hidden lg:flex absolute inset-y-0 left-0 right-[560px] flex-col">
+        <div className="hidden lg:flex absolute inset-y-0 left-0 right-[560px] flex-col min-h-0">
           <InfluencerMediaGallery
             influencer={influencer}
             visible={sliding}
