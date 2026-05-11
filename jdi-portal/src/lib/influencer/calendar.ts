@@ -174,6 +174,84 @@ export function buildSeedingWeeks(
   return weeks;
 }
 
+// ============================================================
+// 날짜별 마일스톤 (DM / 발송 / 포스팅) - 개별 칩 표시용
+// ============================================================
+export type MilestoneKind = "dm" | "ship" | "post";
+
+export interface CampaignMilestone {
+  campaign: InfluencerCampaignWithInfluencer;
+  kind: MilestoneKind;
+  dateStr: string;
+}
+
+/** 해당 월에 떨어지는 모든 캠페인의 contact_date / ship_date / expected_post_date를 날짜별로 묶어서 반환 */
+export function getMilestonesByDate(
+  campaigns: InfluencerCampaignWithInfluencer[],
+  year: number,
+  month: number,
+): Map<string, CampaignMilestone[]> {
+  const result = new Map<string, CampaignMilestone[]>();
+  const monthPrefix = `${year}-${String(month).padStart(2, "0")}-`;
+
+  const add = (dateStr: string | null, kind: MilestoneKind, campaign: InfluencerCampaignWithInfluencer) => {
+    if (!dateStr || !dateStr.startsWith(monthPrefix)) return;
+    const arr = result.get(dateStr) ?? [];
+    arr.push({ campaign, kind, dateStr });
+    result.set(dateStr, arr);
+  };
+
+  for (const c of campaigns) {
+    add(c.contact_date, "dm", c);
+    add(c.ship_date, "ship", c);
+    add(c.expected_post_date, "post", c);
+  }
+
+  return result;
+}
+
+/** 액션 종류별 표시 스타일 */
+export interface MilestoneStyle {
+  icon: string;        // 이모지 (예: "📩")
+  label: string;       // 한국어 라벨 ("DM 발송")
+  shortLabel: string;  // 짧은 라벨 ("DM")
+  bg: string;          // Tailwind bg class
+  text: string;        // Tailwind text class
+  border: string;      // Tailwind border class
+}
+
+export function getMilestoneStyle(kind: MilestoneKind): MilestoneStyle {
+  switch (kind) {
+    case "dm":
+      return {
+        icon: "📩",
+        label: "DM 발송",
+        shortLabel: "DM",
+        bg: "bg-blue-50",
+        text: "text-blue-700",
+        border: "border-blue-200",
+      };
+    case "ship":
+      return {
+        icon: "📦",
+        label: "제품 발송",
+        shortLabel: "발송",
+        bg: "bg-amber-50",
+        text: "text-amber-700",
+        border: "border-amber-200",
+      };
+    case "post":
+      return {
+        icon: "📸",
+        label: "포스팅 예정",
+        shortLabel: "포스팅",
+        bg: "bg-violet-50",
+        text: "text-violet-700",
+        border: "border-violet-200",
+      };
+  }
+}
+
 // ─── 오늘 할 일 분류 ──────────────────────────────────────────────────────────
 
 export function getTodayCampaignTasks(campaigns: InfluencerCampaignWithInfluencer[]): {
