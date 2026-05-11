@@ -17,6 +17,7 @@ interface Props {
   campaigns: InfluencerCampaignWithInfluencer[];
   selectedDate: string | null;
   onRefresh: () => void;
+  onInfluencerClick?: (influencerId: string) => void;
 }
 
 const STATUS_COUNTS: { status: CampaignStatus; color: string }[] = [
@@ -35,7 +36,15 @@ function formatDateLabel(dateStr: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}(${DAY_KO[d.getDay()]})`;
 }
 
-function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaignWithInfluencer; onRefresh: () => void }) {
+function CampaignCard({
+  campaign,
+  onRefresh,
+  onInfluencerClick,
+}: {
+  campaign: InfluencerCampaignWithInfluencer;
+  onRefresh: () => void;
+  onInfluencerClick?: (influencerId: string) => void;
+}) {
   const [, startTransition] = useTransition();
 
   function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -51,13 +60,22 @@ function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaignWit
     });
   }
 
+  function handleHeaderClick() {
+    if (onInfluencerClick) onInfluencerClick(campaign.influencer_id);
+  }
+
   return (
     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <button
+          type="button"
+          onClick={handleHeaderClick}
+          disabled={!onInfluencerClick}
+          className="min-w-0 text-left flex-1 group disabled:cursor-default"
+        >
           {campaign.influencer && (
             <div className="mb-1">
-              <p className="text-xs font-medium text-slate-700 truncate">
+              <p className="text-xs font-medium text-slate-700 truncate group-hover:text-blue-600 transition-colors">
                 @{campaign.influencer.username}
               </p>
               {campaign.influencer.display_name && (
@@ -73,7 +91,7 @@ function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaignWit
           {campaign.product_name && (
             <p className="text-xs text-slate-400 mt-0.5 truncate">{campaign.product_name}</p>
           )}
-        </div>
+        </button>
         <StatusBadge status={campaign.status} type="campaign" />
       </div>
 
@@ -111,7 +129,13 @@ function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaignWit
 
 type TodayFilter = "dm" | "ship" | "post" | null;
 
-function TodayTasksSection({ campaigns }: { campaigns: InfluencerCampaignWithInfluencer[] }) {
+function TodayTasksSection({
+  campaigns,
+  onInfluencerClick,
+}: {
+  campaigns: InfluencerCampaignWithInfluencer[];
+  onInfluencerClick?: (influencerId: string) => void;
+}) {
   const [activeFilter, setActiveFilter] = useState<TodayFilter>(null);
   const { dmList, shipList, postList } = getTodayCampaignTasks(campaigns);
   const isEmpty = dmList.length === 0 && shipList.length === 0 && postList.length === 0;
@@ -162,12 +186,18 @@ function TodayTasksSection({ campaigns }: { campaigns: InfluencerCampaignWithInf
       {activeFilter && filteredList.length > 0 && (
         <div className="flex flex-col gap-1.5 pt-1">
           {filteredList.map((c) => (
-            <div key={c.id} className="bg-white rounded-lg px-2.5 py-1.5 border border-slate-100 flex items-center gap-2">
+            <button
+              type="button"
+              key={c.id}
+              onClick={() => onInfluencerClick?.(c.influencer_id)}
+              disabled={!onInfluencerClick}
+              className="bg-white rounded-lg px-2.5 py-1.5 border border-slate-100 flex items-center gap-2 text-left hover:border-blue-300 hover:bg-blue-50/40 transition-colors disabled:cursor-default disabled:hover:bg-white disabled:hover:border-slate-100"
+            >
               <span className="text-xs text-slate-500 font-medium truncate">
                 {c.influencer ? `@${c.influencer.username}` : c.campaign_name}
               </span>
               <span className="text-[10px] text-slate-400 truncate flex-1">{c.campaign_name}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -175,14 +205,26 @@ function TodayTasksSection({ campaigns }: { campaigns: InfluencerCampaignWithInf
   );
 }
 
-function UpcomingSection({ campaigns }: { campaigns: InfluencerCampaignWithInfluencer[] }) {
+function UpcomingSection({
+  campaigns,
+  onInfluencerClick,
+}: {
+  campaigns: InfluencerCampaignWithInfluencer[];
+  onInfluencerClick?: (influencerId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const today = kstTodayStr();
   const from = addDaysStr(today, 1);
   const to = addDaysStr(today, 7);
   const inRange = getCampaignDatesInRange(campaigns, from, to);
 
-  type UpcomingItem = { campaignId: string; dateStr: string; label: string; username: string };
+  type UpcomingItem = {
+    campaignId: string;
+    influencerId: string;
+    dateStr: string;
+    label: string;
+    username: string;
+  };
   const items: UpcomingItem[] = [];
 
   for (const c of inRange) {
@@ -201,6 +243,7 @@ function UpcomingSection({ campaigns }: { campaigns: InfluencerCampaignWithInflu
     const best = candidates[0];
     items.push({
       campaignId: c.id,
+      influencerId: c.influencer_id,
       dateStr: best.dateStr,
       label: best.label,
       username: c.influencer ? `@${c.influencer.username}` : c.campaign_name,
@@ -222,11 +265,17 @@ function UpcomingSection({ campaigns }: { campaigns: InfluencerCampaignWithInflu
         <>
           <div className="flex flex-col gap-1">
             {visible.map((item) => (
-              <div key={`${item.campaignId}-${item.dateStr}-${item.label}`} className="flex items-center gap-2 text-xs text-slate-600">
+              <button
+                type="button"
+                key={`${item.campaignId}-${item.dateStr}-${item.label}`}
+                onClick={() => onInfluencerClick?.(item.influencerId)}
+                disabled={!onInfluencerClick}
+                className="flex items-center gap-2 text-xs text-slate-600 text-left rounded-md px-1 py-0.5 -mx-1 hover:bg-blue-50/40 hover:text-blue-700 transition-colors disabled:hover:bg-transparent disabled:hover:text-slate-600 disabled:cursor-default"
+              >
                 <span className="text-slate-400 shrink-0">{formatDateLabel(item.dateStr)}</span>
                 <span className="font-medium truncate">{item.username}</span>
                 <span className="text-slate-400 shrink-0">{item.label}</span>
-              </div>
+              </button>
             ))}
           </div>
           {!expanded && hiddenCount > 0 && (
@@ -243,7 +292,7 @@ function UpcomingSection({ campaigns }: { campaigns: InfluencerCampaignWithInflu
   );
 }
 
-export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefresh }: Props) {
+export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefresh, onInfluencerClick }: Props) {
   const displayed = selectedDate
     ? campaigns.filter((c) =>
         c.contact_date === selectedDate ||
@@ -285,8 +334,8 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
       {/* 오늘 할 일 + 다가오는 7일 (선택 날짜 없을 때만) */}
       {!selectedDate && (
         <>
-          <TodayTasksSection campaigns={campaigns} />
-          <UpcomingSection campaigns={campaigns} />
+          <TodayTasksSection campaigns={campaigns} onInfluencerClick={onInfluencerClick} />
+          <UpcomingSection campaigns={campaigns} onInfluencerClick={onInfluencerClick} />
         </>
       )}
 
@@ -298,7 +347,12 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
           </p>
         ) : (
           displayed.map((c) => (
-            <CampaignCard key={c.id} campaign={c} onRefresh={onRefresh} />
+            <CampaignCard
+              key={c.id}
+              campaign={c}
+              onRefresh={onRefresh}
+              onInfluencerClick={onInfluencerClick}
+            />
           ))
         )}
       </div>

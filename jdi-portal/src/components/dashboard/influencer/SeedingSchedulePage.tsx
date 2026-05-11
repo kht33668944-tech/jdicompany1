@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import InfluencerTabs from "./InfluencerTabs";
 import SeedingCalendar from "./SeedingCalendar";
 import SeedingCampaignBoard from "./SeedingCampaignBoard";
+import InfluencerDetailPanel from "./InfluencerDetailPanel";
 import type { InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 export default function SeedingSchedulePage({ activeCampaigns }: Props) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedInfluencerId, setSelectedInfluencerId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const handleRefresh = useCallback(() => {
@@ -33,13 +35,21 @@ export default function SeedingSchedulePage({ activeCampaigns }: Props) {
           campaigns={activeCampaigns}
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
+          onCampaignClick={(influencerId) => setSelectedInfluencerId(influencerId)}
         />
         <SeedingCampaignBoard
           campaigns={activeCampaigns}
           selectedDate={selectedDate}
           onRefresh={handleRefresh}
+          onInfluencerClick={(influencerId) => setSelectedInfluencerId(influencerId)}
         />
       </div>
+
+      {/* 인플루언서 상세 패널 (우측 슬라이드) */}
+      <InfluencerDetailPanel
+        influencerId={selectedInfluencerId}
+        onClose={() => setSelectedInfluencerId(null)}
+      />
     </div>
   );
 }

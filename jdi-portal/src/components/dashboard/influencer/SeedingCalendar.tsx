@@ -16,6 +16,7 @@ interface Props {
   campaigns: InfluencerCampaignWithInfluencer[];
   onDateSelect: (date: string | null) => void;
   selectedDate: string | null;
+  onCampaignClick?: (influencerId: string) => void;
 }
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -32,7 +33,7 @@ const LEGEND_STATUSES: CampaignStatus[] = [
   "done",
 ];
 
-export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate }: Props) {
+export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate, onCampaignClick }: Props) {
   const today = kstTodayStr();
   const [year, setYear] = useState(() => Number(today.slice(0, 4)));
   const [month, setMonth] = useState(() => Number(today.slice(5, 7)));
@@ -184,6 +185,10 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate 
                     key={`${bar.campaign.id}-w${wi}`}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (onCampaignClick && bar.campaign.influencer_id) {
+                        onCampaignClick(bar.campaign.influencer_id);
+                        return;
+                      }
                       const range = getCampaignDateRange(bar.campaign);
                       if (range.start) onDateSelect(range.start);
                     }}
