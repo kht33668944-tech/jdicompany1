@@ -131,7 +131,7 @@ export default function InfluencerMediaGallery({
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
-          className="text-xs px-2 py-1 rounded-lg bg-white/10 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="text-xs px-2 py-1 rounded-lg bg-white/10 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 [&>option]:bg-slate-900 [&>option]:text-white"
           aria-label="정렬"
         >
           <option value="recent">최신순</option>
