@@ -93,12 +93,42 @@ async function scrapeInstagramProfile(
 }
 
 // ============================================================
-// 등급 계산
+// 등급 계산 (팔로워 사이즈별 — 2025 업계 벤치마크)
+// 같은 ER이라도 팔로워가 적을수록 평균이 높기 때문에 사이즈별로 임계값 다름
 // ============================================================
-function calcGrade(er: number): string {
-  if (er >= 10) return "S";
-  if (er >= 5) return "A";
-  if (er >= 1) return "B";
+function calcGrade(er: number, followerCount: number): string {
+  // 나노 (~1만)
+  if (followerCount < 10_000) {
+    if (er >= 6) return "S";
+    if (er >= 3) return "A";
+    if (er >= 1) return "B";
+    return "C";
+  }
+  // 마이크로 (1만~5만)
+  if (followerCount < 50_000) {
+    if (er >= 4) return "S";
+    if (er >= 2) return "A";
+    if (er >= 0.8) return "B";
+    return "C";
+  }
+  // 미드 (5만~50만)
+  if (followerCount < 500_000) {
+    if (er >= 2.5) return "S";
+    if (er >= 1.5) return "A";
+    if (er >= 0.5) return "B";
+    return "C";
+  }
+  // 매크로 (50만~100만)
+  if (followerCount < 1_000_000) {
+    if (er >= 1.5) return "S";
+    if (er >= 0.8) return "A";
+    if (er >= 0.3) return "B";
+    return "C";
+  }
+  // 메가 (100만+)
+  if (er >= 1.0) return "S";
+  if (er >= 0.5) return "A";
+  if (er >= 0.2) return "B";
   return "C";
 }
 
@@ -178,7 +208,7 @@ Deno.serve(async (req) => {
       : 0;
 
     // 4. 등급
-    const grade = calcGrade(engagementRate);
+    const grade = calcGrade(engagementRate, followerCount);
 
     const createdBy = body.created_by ?? user.id;
 

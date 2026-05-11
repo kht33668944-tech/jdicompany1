@@ -18,6 +18,12 @@ import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import { proxyImageUrl } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
+import {
+  getTier,
+  calcEstimatedReach,
+  calcLikeCommentRatio,
+  calcErVsTierAverage,
+} from "@/lib/influencer/metrics";
 
 import X from "phosphor-react/dist/icons/X.esm.js";
 import Robot from "phosphor-react/dist/icons/Robot.esm.js";
@@ -503,6 +509,84 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                   </div>
                 ))}
               </div>
+
+              {/* 마케터 지표 — 사이즈 / 도달 / 품질 */}
+              {(() => {
+                const tier = getTier(influencer.follower_count);
+                const reach = calcEstimatedReach(influencer.follower_count);
+                const erDelta = calcErVsTierAverage(influencer.engagement_rate, influencer.follower_count);
+                const ratio = calcLikeCommentRatio(influencer.avg_likes, influencer.avg_comments);
+                const ratioStatus = ratio === null
+                  ? null
+                  : ratio < 50
+                    ? { label: "댓글 활발", cls: "text-emerald-600" }
+                    : ratio <= 200
+                      ? { label: "정상", cls: "text-slate-500" }
+                      : ratio <= 500
+                        ? { label: "주의", cls: "text-amber-600" }
+                        : { label: "봇 의심", cls: "text-rose-600" };
+                return (
+                  <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkle size={12} weight="fill" className="text-violet-500" />
+                      <span className="text-[11px] font-semibold text-violet-700">마케터 지표</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* 사이즈 티어 */}
+                      <div className="bg-white rounded-xl p-2.5 flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-400">사이즈</span>
+                        <span className="text-sm font-semibold text-slate-800">
+                          {tier ? tier.shortLabel : "—"}
+                          {tier && (
+                            <span className="ml-1 text-[10px] font-normal text-slate-400">
+                              ({tier.rangeLabel})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {/* 예상 도달 */}
+                      <div className="bg-white rounded-xl p-2.5 flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-400">
+                          예상 도달 / 포스팅
+                        </span>
+                        <span className="text-sm font-semibold text-slate-800">
+                          {reach > 0 ? `${formatNumber(reach)}명` : "—"}
+                          {tier && (
+                            <span className="ml-1 text-[10px] font-normal text-slate-400">
+                              (×{(tier.reachRate * 100).toFixed(1)}%)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {/* 사이즈 평균 대비 ER */}
+                      <div className="bg-white rounded-xl p-2.5 flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-400">사이즈 평균 ER 대비</span>
+                        {erDelta === null ? (
+                          <span className="text-sm font-semibold text-slate-400">—</span>
+                        ) : (
+                          <span className={`text-sm font-semibold ${erDelta >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                            {erDelta >= 0 ? "▲ +" : "▼ "}{Math.round(erDelta)}%
+                          </span>
+                        )}
+                      </div>
+                      {/* 좋아요:댓글 비율 */}
+                      <div className="bg-white rounded-xl p-2.5 flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-400">좋아요 : 댓글 비율</span>
+                        {ratio === null || !ratioStatus ? (
+                          <span className="text-sm font-semibold text-slate-400">—</span>
+                        ) : (
+                          <span className="text-sm font-semibold text-slate-800">
+                            {ratio} : 1
+                            <span className={`ml-1.5 text-[10px] font-medium ${ratioStatus.cls}`}>
+                              {ratioStatus.label}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* bio */}
               {influencer.bio && (

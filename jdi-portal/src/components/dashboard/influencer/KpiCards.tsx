@@ -47,11 +47,15 @@ interface CardProps {
   delta: React.ReactNode;
   icon: React.ReactNode;
   iconBg: string;
+  tooltip?: string;
 }
 
-function KpiCard({ title, value, delta, icon, iconBg }: CardProps) {
+function KpiCard({ title, value, delta, icon, iconBg, tooltip }: CardProps) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 flex items-center gap-3">
+    <div
+      className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 flex items-center gap-3"
+      title={tooltip}
+    >
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
         {icon}
       </div>
@@ -82,6 +86,7 @@ export default function KpiCards({ data }: Props) {
         delta={<DeltaBadge deltaPct={data.avgEngagementRate.deltaPct} />}
         icon={<ChartLineUp size={20} weight="duotone" className="text-emerald-600" />}
         iconBg="bg-emerald-50"
+        tooltip="ER = (평균 좋아요 + 평균 댓글) / 팔로워 × 100. 활성 인플루언서 전체 평균. 업계 기준: 1% 이상이면 상위 25% (Rival IQ 2025)."
       />
       <KpiCard
         title="예상 총 도달 (Reach)"
@@ -89,6 +94,7 @@ export default function KpiCards({ data }: Props) {
         delta={<DeltaBadge deltaPct={data.estimatedReach.deltaPct} />}
         icon={<Megaphone size={20} weight="duotone" className="text-violet-600" />}
         iconBg="bg-violet-50"
+        tooltip="활성 인플루언서 전원이 1회 포스팅했을 때의 추정 도달 인원. 팔로워 사이즈별 평균 organic reach (~1만 10%, 1만~5만 7%, 5만~50만 5%, 50만~100만 4%, 100만+ 3.5%)를 합산."
       />
       <KpiCard
         title="시딩 진행률"

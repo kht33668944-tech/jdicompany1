@@ -14,6 +14,7 @@ import StatusBadge from "./StatusBadge";
 import { updateCampaignStatus, addCampaign, resyncInfluencer, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
 import { proxyImageUrl } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
+import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
 import type { Influencer, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
@@ -27,6 +28,19 @@ function formatFollowers(n: number | null): string {
 function formatEngagementRate(n: number | null): string {
   if (n === null) return "—";
   return `${n.toFixed(1)}%`;
+}
+
+function ErTierEvaluation({ er, follower }: { er: number | null; follower: number | null }) {
+  const delta = calcErVsTierAverage(er, follower);
+  if (delta === null) return null;
+  const isUp = delta >= 0;
+  const sign = isUp ? "▲" : "▼";
+  const cls = isUp ? "text-emerald-600" : "text-rose-500";
+  return (
+    <span className={`text-[10px] ${cls} font-medium tabular-nums`}>
+      {sign} 평균 {isUp ? "+" : ""}{Math.round(delta)}%
+    </span>
+  );
 }
 
 interface RowMenuProps {
@@ -333,13 +347,20 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
                   </td>
 
                   {/* ER */}
-                  <td className="px-4 py-3 text-right font-medium text-slate-700 tabular-nums">
-                    {formatEngagementRate(inf.engagement_rate)}
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    <div className="font-medium text-slate-700">{formatEngagementRate(inf.engagement_rate)}</div>
+                    <ErTierEvaluation er={inf.engagement_rate} follower={inf.follower_count} />
                   </td>
 
                   {/* 팔로워 */}
-                  <td className="px-4 py-3 text-right text-slate-600 tabular-nums">
-                    {formatFollowers(inf.follower_count)}
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    <div className="text-slate-600">{formatFollowers(inf.follower_count)}</div>
+                    {(() => {
+                      const tier = getTier(inf.follower_count);
+                      return tier ? (
+                        <span className="text-[10px] text-slate-400 font-medium">{tier.shortLabel}</span>
+                      ) : null;
+                    })()}
                   </td>
 
                   {/* AI 등급 */}

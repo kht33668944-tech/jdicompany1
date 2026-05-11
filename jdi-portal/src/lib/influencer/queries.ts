@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { calcEstimatedReach } from "./metrics";
 import type {
   Influencer,
   InfluencerWithPosts,
@@ -118,10 +119,9 @@ export async function getKpiCards(): Promise<KpiCards> {
       .not("engagement_rate", "is", null),
     supabase
       .from("influencers")
-      .select("follower_count, engagement_rate")
+      .select("follower_count")
       .eq("status", "active")
-      .not("follower_count", "is", null)
-      .not("engagement_rate", "is", null),
+      .not("follower_count", "is", null),
     supabase
       .from("influencer_campaigns")
       .select("status"),
@@ -148,13 +148,11 @@ export async function getKpiCards(): Promise<KpiCards> {
       ? erValues.reduce((a, b) => a + b, 0) / erValues.length
       : null;
 
-  // 예상 도달: SUM(follower * ER * 0.003)
+  // 예상 도달 v2: 팔로워 사이즈별 organic reach rate 적용
+  // (~1만:10%, 1만~5만:7%, 5만~50만:5%, 50만~100만:4%, 100만+:3.5%)
   const estimatedReach =
     (followerRes.data ?? [])
-      .map((r) => {
-        const row = r as { follower_count: number; engagement_rate: number };
-        return row.follower_count * row.engagement_rate * 0.003;
-      })
+      .map((r) => calcEstimatedReach((r as { follower_count: number }).follower_count))
       .reduce((a, b) => a + b, 0) || null;
 
   // 시딩 진행률
