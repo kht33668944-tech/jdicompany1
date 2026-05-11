@@ -20,7 +20,7 @@ import StatusBadge from "./StatusBadge";
 import InfluencerMediaGallery from "./InfluencerMediaGallery";
 import PostLightbox from "./PostLightbox";
 import Image from "next/image";
-import { resolveMediaUrl } from "@/lib/influencer/proxy";
+import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
 import {
   getTier,
@@ -80,7 +80,7 @@ function PostThumbnail({
       sizes="(max-width: 1024px) 25vw, 12vw"
       onError={() => setErrored(true)}
       className="object-cover group-hover:scale-105 transition-transform duration-200"
-      unoptimized={src.startsWith("/api/")}
+      unoptimized={shouldSkipOptimize(src)}
     />
   );
 }
@@ -700,7 +700,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                         height={80}
                         sizes="80px"
                         className="w-20 h-20 rounded-full object-cover border-2 border-slate-100"
-                        unoptimized={src.startsWith("/api/")}
+                        unoptimized={shouldSkipOptimize(src)}
                       />
                     ) : (
                       <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-2xl font-bold text-slate-500">

@@ -15,7 +15,7 @@ import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
 import Image from "next/image";
-import { resolveMediaUrl } from "@/lib/influencer/proxy";
+import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { formatKRW } from "@/lib/influencer/format";
 import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
@@ -691,7 +691,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                                 height={36}
                                 sizes="36px"
                                 className="w-full h-full object-cover"
-                                unoptimized={src.startsWith("/api/")}
+                                unoptimized={shouldSkipOptimize(src)}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">

@@ -6,7 +6,7 @@ import type {
   InfluencerWithPosts,
 } from "@/lib/influencer/types";
 import NextImage from "next/image";
-import { resolveMediaUrl } from "@/lib/influencer/proxy";
+import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { calcPostER, isBestPost, isReel } from "@/lib/influencer/post-utils";
 
 import FilmStrip from "phosphor-react/dist/icons/FilmStrip.esm.js";
@@ -250,7 +250,7 @@ function PostGridCell({
           fill
           sizes="(max-width: 1280px) 33vw, 25vw"
           className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-          unoptimized={thumb.startsWith("/api/")}
+          unoptimized={shouldSkipOptimize(thumb)}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">

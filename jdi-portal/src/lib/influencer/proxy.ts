@@ -42,6 +42,18 @@ export function resolveMediaUrl(
 }
 
 /**
+ * Next.js Image Optimizer 우회 여부.
+ * - `/api/...` (자체 프록시) → 이미 변환된 응답이라 재변환 불필요
+ * - Supabase Storage public URL → Cloudflare CDN이 이미 압축·캐싱
+ * 두 경우 모두 Railway에서 sharp 재변환을 피해 콜드 응답을 단축.
+ */
+export function shouldSkipOptimize(src: string | null | undefined): boolean {
+  if (!src) return false;
+  if (src.startsWith("/api/")) return true;
+  return src.includes(".supabase.co/storage/");
+}
+
+/**
  * 기존 프록시 함수 — Storage path 없을 때 fallback.
  */
 export function proxyImageUrl(rawUrl: string | null): string | null {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import ModalContainer from "@/components/shared/ModalContainer";
-import { resolveMediaUrl } from "@/lib/influencer/proxy";
+import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { calcPostER, extractHashtags, isBestPost } from "@/lib/influencer/post-utils";
 import type {
   Influencer,
@@ -135,7 +135,7 @@ export default function PostLightbox({
                 sizes="(max-width: 1024px) 100vw, 60vw"
                 className="object-contain"
                 priority
-                unoptimized={currentImageUrl.startsWith("/api/")}
+                unoptimized={shouldSkipOptimize(currentImageUrl)}
               />
             ) : (
               <div className="text-slate-400 text-sm">이미지를 불러올 수 없습니다.</div>
@@ -194,7 +194,7 @@ export default function PostLightbox({
                     height={36}
                     sizes="36px"
                     className="w-9 h-9 rounded-full object-cover"
-                    unoptimized={src.startsWith("/api/")}
+                    unoptimized={shouldSkipOptimize(src)}
                   />
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-slate-200" />
