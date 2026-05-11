@@ -8,6 +8,7 @@ import {
   updateInfluencerNotes,
   updateInfluencerTags,
   addCampaign,
+  updateCampaign,
   updateCampaignStatus,
   deleteCampaign,
   resyncInfluencer,
@@ -34,6 +35,7 @@ import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 import Trash from "phosphor-react/dist/icons/Trash.esm.js";
 import Tag from "phosphor-react/dist/icons/Tag.esm.js";
 import NotePencil from "phosphor-react/dist/icons/NotePencil.esm.js";
+import PencilSimple from "phosphor-react/dist/icons/PencilSimple.esm.js";
 
 type PanelPhase = "closed" | "opening" | "open" | "closing";
 
@@ -87,7 +89,9 @@ function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormPro
   const [name, setName] = useState("");
   const [product, setProduct] = useState("");
   const [cost, setCost] = useState("");
+  const [contactDate, setContactDate] = useState("");
   const [shipDate, setShipDate] = useState("");
+  const [postDate, setPostDate] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -100,7 +104,9 @@ function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormPro
         campaign_name: name.trim(),
         product_name: product.trim() || undefined,
         cost: cost ? Number(cost) : undefined,
+        contact_date: contactDate || undefined,
         ship_date: shipDate || undefined,
+        expected_post_date: postDate || undefined,
       });
       toast.success("캠페인이 추가되었습니다.");
       onSaved(saved);
@@ -136,12 +142,161 @@ function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormPro
           className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
         />
       </div>
+      {/* 날짜 3개 — 시딩 캘린더 막대 시각화용 */}
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">연락일 (DM)</label>
+          <input
+            type="date"
+            value={contactDate}
+            onChange={(e) => setContactDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">발송일</label>
+          <input
+            type="date"
+            value={shipDate}
+            onChange={(e) => setShipDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">포스팅 예정</label>
+          <input
+            type="date"
+            value={postDate}
+            onChange={(e) => setPostDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {saving ? "저장 중…" : "저장"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── 캠페인 수정 폼 (인라인 편집) ──────────────────────────────
+interface EditCampaignFormProps {
+  campaign: InfluencerCampaign;
+  onSaved: (updated: InfluencerCampaign) => void;
+  onCancel: () => void;
+}
+
+function EditCampaignForm({ campaign, onSaved, onCancel }: EditCampaignFormProps) {
+  const [name, setName] = useState(campaign.campaign_name);
+  const [product, setProduct] = useState(campaign.product_name ?? "");
+  const [cost, setCost] = useState(campaign.cost !== null ? String(campaign.cost) : "");
+  const [status, setStatus] = useState<CampaignStatus>(campaign.status);
+  const [contactDate, setContactDate] = useState(campaign.contact_date ?? "");
+  const [shipDate, setShipDate] = useState(campaign.ship_date ?? "");
+  const [postDate, setPostDate] = useState(campaign.expected_post_date ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { toast.error("캠페인 이름을 입력하세요."); return; }
+    setSaving(true);
+    try {
+      const patch = {
+        campaign_name: name.trim(),
+        product_name: product.trim() || null,
+        cost: cost ? Number(cost) : null,
+        status,
+        contact_date: contactDate || null,
+        ship_date: shipDate || null,
+        expected_post_date: postDate || null,
+      };
+      await updateCampaign(campaign.id, patch);
+      toast.success("캠페인이 수정되었습니다.");
+      onSaved({ ...campaign, ...patch });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "캠페인 수정 실패");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-blue-50/40 rounded-xl p-3 space-y-2 ring-1 ring-blue-200">
       <input
-        type="date"
-        value={shipDate}
-        onChange={(e) => setShipDate(e.target.value)}
-        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+        type="text"
+        placeholder="캠페인 이름 *"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
       />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="text"
+          placeholder="제품명"
+          value={product}
+          onChange={(e) => setProduct(e.target.value)}
+          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+        <input
+          type="number"
+          placeholder="비용 (원)"
+          value={cost}
+          onChange={(e) => setCost(e.target.value)}
+          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+      </div>
+      <select
+        value={status}
+        onChange={(e) => setStatus(e.target.value as CampaignStatus)}
+        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        aria-label="캠페인 상태"
+      >
+        {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">연락일 (DM)</label>
+          <input
+            type="date"
+            value={contactDate}
+            onChange={(e) => setContactDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">발송일</label>
+          <input
+            type="date"
+            value={shipDate}
+            onChange={(e) => setShipDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-500 mb-0.5">포스팅 예정</label>
+          <input
+            type="date"
+            value={postDate}
+            onChange={(e) => setPostDate(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
+          />
+        </div>
+      </div>
       <div className="flex gap-2 justify-end">
         <button
           type="button"
@@ -176,6 +331,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [showAddCampaign, setShowAddCampaign] = useState(false);
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -192,6 +348,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       setInfluencer(null);
       setCampaigns([]);
       setShowAddCampaign(false);
+      setEditingCampaignId(null);
     } else if (prevId) {
       setPhase("closing");
     }
@@ -688,45 +845,67 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
 
                 <div className="space-y-2">
                   {campaigns.map((c) => (
-                    <div
-                      key={c.id}
-                      className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-medium text-slate-700 leading-tight">
-                          {c.campaign_name}
-                        </span>
-                        <button
-                          onClick={() => handleDeleteCampaign(c.id)}
-                          className="shrink-0 p-1 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
-                          aria-label="캠페인 삭제"
-                        >
-                          <Trash size={13} />
-                        </button>
+                    editingCampaignId === c.id ? (
+                      <EditCampaignForm
+                        key={c.id}
+                        campaign={c}
+                        onSaved={(updated) => {
+                          setCampaigns((prev) => prev.map((x) => x.id === updated.id ? updated : x));
+                          setEditingCampaignId(null);
+                        }}
+                        onCancel={() => setEditingCampaignId(null)}
+                      />
+                    ) : (
+                      <div
+                        key={c.id}
+                        className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-sm font-medium text-slate-700 leading-tight">
+                            {c.campaign_name}
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => setEditingCampaignId(c.id)}
+                              className="p-1 rounded text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                              aria-label="캠페인 수정"
+                            >
+                              <PencilSimple size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCampaign(c.id)}
+                              className="p-1 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                              aria-label="캠페인 삭제"
+                            >
+                              <Trash size={13} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select
+                            value={c.status}
+                            onChange={(e) => handleStatusChange(c.id, e.target.value as CampaignStatus)}
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                            aria-label="캠페인 상태"
+                          >
+                            {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                          <StatusBadge status={c.status} type="campaign" />
+                        </div>
+                        <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
+                          {c.product_name && <span>제품: {c.product_name}</span>}
+                          {c.cost !== null && <span>비용: {c.cost.toLocaleString()}원</span>}
+                          {c.contact_date && <span>연락: {c.contact_date}</span>}
+                          {c.ship_date && <span>발송: {c.ship_date}</span>}
+                          {c.expected_post_date && <span>포스팅: {c.expected_post_date}</span>}
+                        </div>
+                        {c.notes && (
+                          <p className="text-xs text-slate-500 leading-relaxed">{c.notes}</p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <select
-                          value={c.status}
-                          onChange={(e) => handleStatusChange(c.id, e.target.value as CampaignStatus)}
-                          className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          aria-label="캠페인 상태"
-                        >
-                          {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                        <StatusBadge status={c.status} type="campaign" />
-                      </div>
-                      <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
-                        {c.product_name && <span>제품: {c.product_name}</span>}
-                        {c.cost !== null && <span>비용: {c.cost.toLocaleString()}원</span>}
-                        {c.ship_date && <span>발송: {c.ship_date}</span>}
-                        {c.expected_post_date && <span>포스팅: {c.expected_post_date}</span>}
-                      </div>
-                      {c.notes && (
-                        <p className="text-xs text-slate-500 leading-relaxed">{c.notes}</p>
-                      )}
-                    </div>
+                    )
                   ))}
                 </div>
               </div>

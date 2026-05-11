@@ -170,9 +170,10 @@ interface StatusCellProps {
   influencerId: string;
   influencerUsername: string;
   onRefresh: () => void;
+  onOpenDetail: (id: string) => void;
 }
 
-function StatusCell({ campaign, influencerId, influencerUsername, onRefresh }: StatusCellProps) {
+function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onOpenDetail }: StatusCellProps) {
   const [, startTransition] = useTransition();
 
   if (!campaign) {
@@ -186,8 +187,9 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh }: S
                 influencer_id: influencerId,
                 campaign_name: `@${influencerUsername} 시딩`,
               });
-              toast.success(`@${influencerUsername} 시딩이 시작되었습니다`);
+              toast.success(`@${influencerUsername} 시딩이 시작되었습니다. 날짜를 입력해 주세요!`);
               onRefresh();
+              onOpenDetail(influencerId);
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "시딩 등록 실패");
             }
@@ -414,6 +416,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
                       influencerId={inf.id}
                       influencerUsername={inf.username}
                       onRefresh={onRefresh}
+                      onOpenDetail={onSelectInfluencer}
                     />
                   </td>
 
