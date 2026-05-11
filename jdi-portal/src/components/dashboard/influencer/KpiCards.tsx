@@ -3,15 +3,10 @@ import PaperPlaneTilt from "phosphor-react/dist/icons/PaperPlaneTilt.esm.js";
 import CheckCircle from "phosphor-react/dist/icons/CheckCircle.esm.js";
 import CurrencyKrw from "phosphor-react/dist/icons/CurrencyKrw.esm.js";
 import type { KpiCards as KpiCardsType } from "@/lib/influencer/types";
+import { formatKRW } from "@/lib/influencer/format";
 
 interface Props {
   data: KpiCardsType;
-}
-
-function formatKRW(n: number): string {
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
-  if (n >= 10_000) return `${Math.round(n / 10_000)}만`;
-  return `${n.toLocaleString()}원`;
 }
 
 function DeltaBadge({ deltaPct }: { deltaPct: number | null }) {

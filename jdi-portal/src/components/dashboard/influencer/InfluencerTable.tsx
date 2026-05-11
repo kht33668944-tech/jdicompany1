@@ -13,6 +13,7 @@ import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
 import { proxyImageUrl } from "@/lib/influencer/proxy";
+import { formatKRW } from "@/lib/influencer/format";
 import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
 import type { InfluencerTier } from "@/lib/influencer/metrics";
@@ -31,12 +32,6 @@ function formatEngagementRate(n: number | null): string {
   return `${n.toFixed(1)}%`;
 }
 
-function formatKRW(n: number): string {
-  if (n === 0) return "—";
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
-  if (n >= 10_000) return `${Math.round(n / 10_000)}만`;
-  return `${n.toLocaleString()}원`;
-}
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
@@ -433,59 +428,67 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
   }
 
   // 캠페인 맵: influencer_id → 최신 active 캠페인
-  const campaignMap = new Map<string, InfluencerCampaign>();
-  for (const c of activeCampaigns) {
-    if (!campaignMap.has(c.influencer_id)) {
-      campaignMap.set(c.influencer_id, c);
+  const campaignMap = useMemo(() => {
+    const map = new Map<string, InfluencerCampaign>();
+    for (const c of activeCampaigns) {
+      if (!map.has(c.influencer_id)) map.set(c.influencer_id, c);
     }
-  }
+    return map;
+  }, [activeCampaigns]);
 
-  // 클라이언트 필터링
-  const filtered = influencers.filter((inf) => {
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      if (
-        !inf.username.toLowerCase().includes(q) &&
-        !(inf.display_name ?? "").toLowerCase().includes(q)
-      ) return false;
+  // 날짜 마일스톤 인덱스: influencer_id → Set<date string>
+  const milestoneByInfluencer = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const c of allCampaigns) {
+      const set = map.get(c.influencer_id) ?? new Set<string>();
+      if (c.contact_date) set.add(c.contact_date);
+      if (c.contract_date) set.add(c.contract_date);
+      if (c.ship_date) set.add(c.ship_date);
+      if (c.content_deadline) set.add(c.content_deadline);
+      if (c.expected_post_date) set.add(c.expected_post_date);
+      map.set(c.influencer_id, set);
     }
-    if (filters.grades.length > 0 && !filters.grades.includes(inf.grade)) return false;
-    if (filters.categories.length > 0 && !filters.categories.includes(inf.category ?? "")) return false;
-    if (filters.status !== "all" && inf.status !== filters.status) return false;
-    if (filters.tags.length > 0) {
-      const infTags = inf.tags ?? [];
-      if (!filters.tags.every((t) => infTags.includes(t))) return false;
-    }
-    // 팔로워 tier 필터
-    if (filters.followerTiers.length > 0) {
-      const tier = getTier(inf.follower_count);
-      if (!tier || !filters.followerTiers.includes(tier.key)) return false;
-    }
-    // 캠페인 상태 필터
-    if (filters.campaignStatuses.length > 0) {
-      const c = campaignMap.get(inf.id);
-      if (!c || !filters.campaignStatuses.includes(c.status)) return false;
-    }
-    // 날짜 마일스톤 필터
-    if (filters.dateMilestone) {
-      const d = filters.dateMilestone;
-      const hasMilestone = allCampaigns.some(
-        (c) => c.influencer_id === inf.id && (
-          c.contact_date === d || c.contract_date === d || c.ship_date === d ||
-          c.content_deadline === d || c.expected_post_date === d
-        )
-      );
-      if (!hasMilestone) return false;
-    }
-    return true;
-  });
+    return map;
+  }, [allCampaigns]);
 
-  // 정렬: engagement_rate desc
-  const sorted = [...filtered].sort(
-    (a, b) => (b.engagement_rate ?? -1) - (a.engagement_rate ?? -1)
-  );
+  // 클라이언트 필터링 + 정렬
+  const sorted = useMemo(() => {
+    const filtered = influencers.filter((inf) => {
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        if (
+          !inf.username.toLowerCase().includes(q) &&
+          !(inf.display_name ?? "").toLowerCase().includes(q)
+        ) return false;
+      }
+      if (filters.grades.length > 0 && !filters.grades.includes(inf.grade)) return false;
+      if (filters.categories.length > 0 && !filters.categories.includes(inf.category ?? "")) return false;
+      if (filters.status !== "all" && inf.status !== filters.status) return false;
+      if (filters.tags.length > 0) {
+        const infTags = inf.tags ?? [];
+        if (!filters.tags.every((t) => infTags.includes(t))) return false;
+      }
+      // 팔로워 tier 필터
+      if (filters.followerTiers.length > 0) {
+        const tier = getTier(inf.follower_count);
+        if (!tier || !filters.followerTiers.includes(tier.key)) return false;
+      }
+      // 캠페인 상태 필터
+      if (filters.campaignStatuses.length > 0) {
+        const c = campaignMap.get(inf.id);
+        if (!c || !filters.campaignStatuses.includes(c.status)) return false;
+      }
+      // 날짜 마일스톤 필터
+      if (filters.dateMilestone) {
+        const set = milestoneByInfluencer.get(inf.id);
+        if (!set || !set.has(filters.dateMilestone)) return false;
+      }
+      return true;
+    });
+    return [...filtered].sort((a, b) => (b.engagement_rate ?? -1) - (a.engagement_rate ?? -1));
+  }, [influencers, filters, campaignMap, milestoneByInfluencer]);
 
-  const displayed = sorted.slice(0, 50);
+  const displayed = useMemo(() => sorted.slice(0, 50), [sorted]);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -493,7 +496,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
         <h2 className="text-sm font-semibold text-slate-800">
           인플루언서 리스트 관리
-          <span className="ml-2 text-xs font-normal text-slate-400">{filtered.length}명</span>
+          <span className="ml-2 text-xs font-normal text-slate-400">{sorted.length}명</span>
         </h2>
         <div className="flex items-center gap-2">
           <button
@@ -707,7 +710,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                     {/* 시딩 금액 */}
                     <td className="px-4 py-3 text-right tabular-nums">
                       <div className="font-medium text-slate-700">
-                        {seeding && seeding.totalCost > 0 ? formatKRW(seeding.totalCost) : "—"}
+                        {seeding ? formatKRW(seeding.totalCost, { dashOnZero: true }) : "—"}
                       </div>
                       {seeding && seeding.count > 0 && (
                         <div className="text-[10px] text-slate-400">{seeding.count}건</div>

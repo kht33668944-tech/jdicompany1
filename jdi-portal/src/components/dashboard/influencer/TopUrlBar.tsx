@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -21,10 +21,10 @@ interface Props {
   onDateMilestoneChange: (date: string | null) => void;
 }
 
-const todayStr = (() => {
+function kstTodayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-})();
+}
 
 function CalendarPopover({
   anchorRef,
@@ -32,7 +32,7 @@ function CalendarPopover({
   onSelect,
   onClose,
 }: {
-  anchorRef: React.RefObject<HTMLButtonElement | null>;
+  anchorRef: RefObject<HTMLElement | null>;
   selected: string | null;
   onSelect: (date: string) => void;
   onClose: () => void;
@@ -122,7 +122,7 @@ function CalendarPopover({
           if (day === null) return <div key={`e-${i}`} />;
           const ds = toDateStr(day);
           const isSelected = ds === selected;
-          const isToday = ds === todayStr;
+          const isToday = ds === kstTodayStr();
           return (
             <button
               key={ds}
@@ -153,7 +153,7 @@ export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMileston
   const [bulkOpen, setBulkOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dateButtonRef = useRef<HTMLButtonElement>(null);
+  const dateButtonRef = useRef<HTMLElement>(null);
 
   function isValidInstagramUrl(value: string): boolean {
     try {
@@ -250,30 +250,39 @@ export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMileston
         </button>
 
         {/* 날짜 버튼 */}
-        <button
-          ref={dateButtonRef}
-          onClick={() => setCalOpen((v) => !v)}
-          className={[
-            "inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-colors shrink-0",
-            dateMilestone
-              ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
-              : "border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300",
-          ].join(" ")}
-        >
-          <CalendarBlank size={14} />
-          {dateLabel ? `📅 ${dateLabel}` : "날짜"}
-          {dateMilestone && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => { e.stopPropagation(); onDateMilestoneChange(null); }}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onDateMilestoneChange(null); } }}
-              className="ml-0.5 rounded hover:bg-blue-200 p-0.5 cursor-pointer"
+        {dateMilestone ? (
+          <div
+            ref={dateButtonRef as unknown as RefObject<HTMLDivElement>}
+            className="inline-flex items-stretch rounded-xl border border-blue-300 bg-blue-50 overflow-hidden shrink-0"
+          >
+            <button
+              type="button"
+              onClick={() => setCalOpen((v) => !v)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+            >
+              <CalendarBlank size={14} />
+              {`📅 ${dateLabel}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDateMilestoneChange(null)}
+              className="inline-flex items-center px-2 py-2 text-blue-500 hover:bg-blue-200 transition-colors"
+              aria-label="날짜 초기화"
             >
               <X size={10} weight="bold" />
-            </span>
-          )}
-        </button>
+            </button>
+          </div>
+        ) : (
+          <button
+            ref={dateButtonRef as unknown as RefObject<HTMLButtonElement>}
+            type="button"
+            onClick={() => setCalOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0"
+          >
+            <CalendarBlank size={14} />
+            날짜
+          </button>
+        )}
       </div>
 
       {calOpen && (
