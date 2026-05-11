@@ -96,19 +96,18 @@ function extractUsername(profileUrl: string): string | null {
 async function scrapeInstagramProfile(
   username: string,
 ): Promise<ApifyProfileResult> {
-  // 비용 최적화: instagram-scraper 단일 호출 (~$0.06/인)
-  // resultsType:"details"는 profile-scraper와 동일한 형식으로 메타 + 최근 게시물을 반환.
-  // 게시물 탭 + 릴스가 섞여서 12~24개. 별도 액터 없이 한 번에 끝남.
+  // 비용 최적화: profile-scraper 단일 호출 (~$0.03/인)
+  // 검증된 액터 — 프로필 메타 + 최근 게시물 12개를 안정적으로 반환.
   const url =
-    `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
+    `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
 
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       usernames: [username],
-      resultsType: "details",
-      resultsLimit: 24,
+      resultsType: "posts",
+      resultsLimit: 12,
     }),
   });
 
