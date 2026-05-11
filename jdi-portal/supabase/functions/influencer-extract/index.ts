@@ -169,22 +169,21 @@ async function scrapeInstagramProfile(
     safeJson(reelsRes),
   ]);
 
-  // 릴스 응답은 productType이 누락된 경우가 있음 — clips로 강제 표시
-  const normalizedReels = reelsList.map((r) => ({
-    ...r,
-    type: r.type ?? "Video",
-    productType: r.productType ?? "clips",
-  } as ApifyPost));
-
-  // 합치고 shortCode/url 기준 중복 제거
+  // ⚠️ reels 호출 결과를 강제로 clips로 마킹하지 않음.
+  // Apify 응답의 type/productType을 그대로 신뢰해야 게시물/릴스가 올바르게 분류됨.
+  // 합치고 shortCode/url 기준 중복 제거 (posts를 먼저 — 다른 거 같은 게시물이면 posts 응답 형식을 우선)
   const merged: ApifyPost[] = [];
   const seen = new Set<string>();
-  for (const p of [...normalizedReels, ...postsList]) {
+  for (const p of [...postsList, ...reelsList]) {
     const key = p.shortCode ?? p.url ?? "";
     if (!key || seen.has(key)) continue;
     seen.add(key);
     merged.push(p);
   }
+
+  console.log(
+    `[scrape] @${username} — posts:${postsList.length} reels:${reelsList.length} merged:${merged.length}`,
+  );
 
   return { profile, galleryPosts: merged };
 }
