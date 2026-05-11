@@ -96,32 +96,66 @@ function extractUsername(profileUrl: string): string | null {
 async function scrapeInstagramProfile(
   username: string,
 ): Promise<ApifyProfileResult> {
-  // apify/instagram-scraper: 페이지네이션 지원, resultsLimit이 실제로 적용됨
-  // (이전: apify/instagram-profile-scraper는 첫 페이지 12개만 반환하는 한계)
-  const url =
+  // 두 액터 병렬 호출:
+  //   1) profile-scraper → 프로필 메타(팔로워/bio 등) + 게시물 12개
+  //   2) instagram-scraper(posts) → 게시물 50개 (페이지네이션 지원)
+  // 두 결과를 합쳐 메타는 1번에서, 게시물은 더 많은 쪽으로 채택
+  const profileUrl =
+    `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
+  const postsUrl =
     `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      directUrls: [`https://www.instagram.com/${username}/`],
-      resultsLimit: 50,
-      resultsType: "details",
-      addParentData: false,
+  const [profileRes, postsRes] = await Promise.all([
+    fetch(profileUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        usernames: [username],
+        resultsLimit: 12,
+        resultsType: "posts",
+      }),
     }),
-  });
+    fetch(postsUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        directUrls: [`https://www.instagram.com/${username}/`],
+        resultsLimit: 50,
+        resultsType: "posts",
+        searchType: "user",
+        addParentData: false,
+      }),
+    }),
+  ]);
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Apify API error ${res.status}: ${text}`);
+  if (!profileRes.ok) {
+    const text = await profileRes.text();
+    throw new Error(`Apify profile error ${profileRes.status}: ${text}`);
+  }
+  const profileData = await profileRes.json() as ApifyProfileResult[];
+  if (!profileData || profileData.length === 0) {
+    throw new Error(`Apify profile empty for @${username}`);
+  }
+  const profile = profileData[0];
+
+  // 게시물 호출 결과: posts-only는 ApifyPost 배열
+  let extraPosts: ApifyPost[] = [];
+  if (postsRes.ok) {
+    try {
+      extraPosts = await postsRes.json() as ApifyPost[];
+    } catch {
+      extraPosts = [];
+    }
+  } else {
+    console.warn(`instagram-scraper posts call failed: ${postsRes.status}`);
   }
 
-  const data = await res.json() as ApifyProfileResult[];
-  if (!data || data.length === 0) {
-    throw new Error(`Apify returned empty result for @${username}`);
+  // 게시물은 더 많이 받은 쪽으로 대체
+  if (extraPosts.length > (profile.latestPosts?.length ?? 0)) {
+    profile.latestPosts = extraPosts;
   }
-  return data[0];
+
+  return profile;
 }
 
 // ============================================================
