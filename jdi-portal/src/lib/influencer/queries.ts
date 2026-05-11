@@ -26,7 +26,7 @@ export async function getInfluencers(opts: InfluencerFilterOpts = {}): Promise<I
   let query = supabase
     .from("influencers")
     .select(
-      "id, created_by, platform, username, profile_url, display_name, bio, profile_image_url, " +
+      "id, created_by, platform, username, profile_url, display_name, bio, profile_image_url, profile_image_path, " +
       "follower_count, following_count, post_count, avg_likes, avg_comments, engagement_rate, " +
       "grade, category, ai_insights, ai_summary, tags, notes, status, last_synced_at, created_at, updated_at"
     );
@@ -60,7 +60,7 @@ export async function getInfluencerById(id: string): Promise<InfluencerWithPosts
 
   const { data: posts, error: postsError } = await supabase
     .from("influencer_posts")
-    .select("id, influencer_id, post_url, thumbnail_url, caption, likes, comments, posted_at, fetched_at, post_type, product_type, view_count, is_sponsored, hashtags, child_thumbnails, video_url")
+    .select("id, influencer_id, post_url, thumbnail_url, thumbnail_path, caption, likes, comments, posted_at, fetched_at, post_type, product_type, view_count, is_sponsored, hashtags, child_thumbnails, child_thumbnail_paths, video_url")
     .eq("influencer_id", id)
     .order("posted_at", { ascending: false, nullsFirst: false })
     .limit(60);
@@ -91,7 +91,7 @@ export async function getActiveCampaigns(): Promise<InfluencerCampaignWithInflue
 
   const { data, error } = await supabase
     .from("influencer_campaigns")
-    .select("*, influencer:influencers(username, display_name, profile_image_url)")
+    .select("*, influencer:influencers(username, display_name, profile_image_url, profile_image_path)")
     .neq("status", "done")
     .order("ship_date", { ascending: true, nullsFirst: false });
 

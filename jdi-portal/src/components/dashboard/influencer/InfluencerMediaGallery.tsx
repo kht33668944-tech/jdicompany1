@@ -5,7 +5,8 @@ import type {
   InfluencerPost,
   InfluencerWithPosts,
 } from "@/lib/influencer/types";
-import { proxyImageUrl } from "@/lib/influencer/proxy";
+import NextImage from "next/image";
+import { resolveMediaUrl } from "@/lib/influencer/proxy";
 import { calcPostER, isBestPost, isReel } from "@/lib/influencer/post-utils";
 
 import FilmStrip from "phosphor-react/dist/icons/FilmStrip.esm.js";
@@ -233,7 +234,7 @@ function PostGridCell({
 }) {
   const reel = isReel(post);
   const carousel = post.post_type === "carousel";
-  const thumb = proxyImageUrl(post.thumbnail_url);
+  const thumb = resolveMediaUrl(post.thumbnail_url, post.thumbnail_path);
 
   return (
     <button
@@ -243,12 +244,13 @@ function PostGridCell({
       aria-label="게시물 자세히 보기"
     >
       {thumb ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <NextImage
           src={thumb}
           alt="게시물 썸네일"
-          loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+          fill
+          sizes="(max-width: 1280px) 33vw, 25vw"
+          className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+          unoptimized={thumb.startsWith("/api/")}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">

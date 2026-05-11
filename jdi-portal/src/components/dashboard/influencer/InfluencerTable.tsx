@@ -12,7 +12,8 @@ import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
-import { proxyImageUrl } from "@/lib/influencer/proxy";
+import Image from "next/image";
+import { resolveMediaUrl } from "@/lib/influencer/proxy";
 import { formatKRW } from "@/lib/influencer/format";
 import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
@@ -644,19 +645,25 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                     {/* 인플루언서 */}
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 ring-1 ring-slate-100">
-                          {inf.profile_image_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={proxyImageUrl(inf.profile_image_url) ?? ""}
-                              alt={inf.username}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">
-                              {inf.username.charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                        <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 ring-1 ring-slate-100 relative">
+                          {(() => {
+                            const src = resolveMediaUrl(inf.profile_image_url, inf.profile_image_path);
+                            return src ? (
+                              <Image
+                                src={src}
+                                alt={inf.username}
+                                width={36}
+                                height={36}
+                                sizes="36px"
+                                className="w-full h-full object-cover"
+                                unoptimized={src.startsWith("/api/")}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">
+                                {inf.username.charAt(0).toUpperCase()}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium text-slate-800 truncate">@{inf.username}</p>

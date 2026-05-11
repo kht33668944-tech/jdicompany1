@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import ModalContainer from "@/components/shared/ModalContainer";
-import { proxyImageUrl } from "@/lib/influencer/proxy";
+import { resolveMediaUrl } from "@/lib/influencer/proxy";
 import { calcPostER, extractHashtags, isBestPost } from "@/lib/influencer/post-utils";
 import type {
   Influencer,
@@ -25,7 +26,11 @@ interface Props {
   post: InfluencerPost;
   influencer: Pick<
     Influencer,
-    "username" | "profile_image_url" | "follower_count" | "avg_likes"
+    | "username"
+    | "profile_image_url"
+    | "profile_image_path"
+    | "follower_count"
+    | "avg_likes"
   >;
   campaigns: InfluencerCampaign[];
   onClose: () => void;
@@ -50,13 +55,24 @@ export default function PostLightbox({
   const [videoFailed, setVideoFailed] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
-  // 캐러셀: child_thumbnails가 있으면 그것을 우선, 없으면 thumbnail_url 단일
-  const carouselImages = useMemo<string[]>(() => {
-    if (post.child_thumbnails && post.child_thumbnails.length > 0) {
-      return post.child_thumbnails;
+  // 캐러셀: child_thumbnails(url)와 child_thumbnail_paths(storage)를 zip해서
+  // 각 슬라이드별로 storage 우선 + url fallback이 동작하도록 구성
+  const carouselSlides = useMemo<Array<{ url: string | null; path: string | null }>>(() => {
+    const urls = post.child_thumbnails ?? [];
+    const paths = post.child_thumbnail_paths ?? [];
+    if (urls.length > 0) {
+      return urls.map((u, i) => ({ url: u, path: paths[i] ?? null }));
     }
-    return post.thumbnail_url ? [post.thumbnail_url] : [];
-  }, [post.child_thumbnails, post.thumbnail_url]);
+    return post.thumbnail_url || post.thumbnail_path
+      ? [{ url: post.thumbnail_url, path: post.thumbnail_path }]
+      : [];
+  }, [
+    post.child_thumbnails,
+    post.child_thumbnail_paths,
+    post.thumbnail_url,
+    post.thumbnail_path,
+  ]);
+  const carouselImages = carouselSlides;
 
   const isCarousel = post.post_type === "carousel" && carouselImages.length > 1;
   const isVideo = post.post_type === "video";
@@ -84,9 +100,14 @@ export default function PostLightbox({
   }, [isCarousel, carouselImages.length]);
 
   const showVideoInline = isVideo && post.video_url && !videoFailed;
-  const currentImageUrl = proxyImageUrl(
-    isCarousel ? carouselImages[carouselIdx] : (post.thumbnail_url ?? null),
-  );
+  const currentImageUrl = (() => {
+    if (isCarousel) {
+      const slide = carouselImages[carouselIdx];
+      return slide ? resolveMediaUrl(slide.url, slide.path) : null;
+    }
+    return resolveMediaUrl(post.thumbnail_url, post.thumbnail_path);
+  })();
+  const posterUrl = resolveMediaUrl(post.thumbnail_url, post.thumbnail_path);
 
   return (
     <>
@@ -99,17 +120,22 @@ export default function PostLightbox({
                 src={post.video_url ?? undefined}
                 controls
                 autoPlay
+                muted
                 playsInline
+                preload="metadata"
                 onError={() => setVideoFailed(true)}
                 className="max-w-full max-h-full"
-                poster={proxyImageUrl(post.thumbnail_url) ?? undefined}
+                poster={posterUrl ?? undefined}
               />
             ) : currentImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={currentImageUrl}
                 alt="게시물 미리보기"
-                className="max-w-full max-h-[80vh] object-contain"
+                fill
+                sizes="(max-width: 1024px) 100vw, 60vw"
+                className="object-contain"
+                priority
+                unoptimized={currentImageUrl.startsWith("/api/")}
               />
             ) : (
               <div className="text-slate-400 text-sm">이미지를 불러올 수 없습니다.</div>
@@ -155,16 +181,25 @@ export default function PostLightbox({
           {/* 우측: 메타 */}
           <div className="lg:w-2/5 flex flex-col max-h-[80vh] overflow-y-auto">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
-              {influencer.profile_image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={proxyImageUrl(influencer.profile_image_url) ?? ""}
-                  alt={`@${influencer.username}`}
-                  className="w-9 h-9 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-slate-200" />
-              )}
+              {(() => {
+                const src = resolveMediaUrl(
+                  influencer.profile_image_url,
+                  influencer.profile_image_path,
+                );
+                return src ? (
+                  <Image
+                    src={src}
+                    alt={`@${influencer.username}`}
+                    width={36}
+                    height={36}
+                    sizes="36px"
+                    className="w-9 h-9 rounded-full object-cover"
+                    unoptimized={src.startsWith("/api/")}
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-slate-200" />
+                );
+              })()}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-slate-800 truncate">
                   @{influencer.username}

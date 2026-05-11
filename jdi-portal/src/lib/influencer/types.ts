@@ -17,6 +17,7 @@ export interface Influencer {
   display_name: string | null;
   bio: string | null;
   profile_image_url: string | null;
+  profile_image_path: string | null;
   follower_count: number | null;
   following_count: number | null;
   post_count: number | null;
@@ -50,6 +51,7 @@ export interface InfluencerPost {
   influencer_id: string;
   post_url: string | null;
   thumbnail_url: string | null;
+  thumbnail_path: string | null;
   caption: string | null;
   likes: number | null;
   comments: number | null;
@@ -61,6 +63,7 @@ export interface InfluencerPost {
   is_sponsored: boolean;
   hashtags: string[];
   child_thumbnails: string[];
+  child_thumbnail_paths: string[];
   video_url: string | null;
 }
 
@@ -103,6 +106,7 @@ export type InfluencerCampaignWithInfluencer = InfluencerCampaign & {
     username: string;
     display_name: string | null;
     profile_image_url: string | null;
+    profile_image_path: string | null;
   } | null;
 };
 

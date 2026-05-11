@@ -19,7 +19,8 @@ import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import InfluencerMediaGallery from "./InfluencerMediaGallery";
 import PostLightbox from "./PostLightbox";
-import { proxyImageUrl } from "@/lib/influencer/proxy";
+import Image from "next/image";
+import { resolveMediaUrl } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
 import {
   getTier,
@@ -53,10 +54,18 @@ function formatNumber(n: number | null): string {
   return String(Math.round(n));
 }
 
-function PostThumbnail({ url, alt }: { url: string | null; alt: string }) {
+function PostThumbnail({
+  url,
+  path,
+  alt,
+}: {
+  url: string | null;
+  path?: string | null;
+  alt: string;
+}) {
   const [errored, setErrored] = useState(false);
-  const proxied = proxyImageUrl(url);
-  if (!proxied || errored) {
+  const src = resolveMediaUrl(url, path);
+  if (!src || errored) {
     return (
       <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">
         없음
@@ -64,13 +73,14 @@ function PostThumbnail({ url, alt }: { url: string | null; alt: string }) {
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={proxied}
+    <Image
+      src={src}
       alt={alt}
-      loading="lazy"
+      fill
+      sizes="(max-width: 1024px) 25vw, 12vw"
       onError={() => setErrored(true)}
-      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+      className="object-cover group-hover:scale-105 transition-transform duration-200"
+      unoptimized={src.startsWith("/api/")}
     />
   );
 }
@@ -439,7 +449,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
         .then(async (inf) => {
           const { data: posts } = await supabase
             .from("influencer_posts")
-            .select("id, influencer_id, post_url, thumbnail_url, caption, likes, comments, posted_at, fetched_at, post_type, product_type, view_count, is_sponsored, hashtags, child_thumbnails, video_url")
+            .select("id, influencer_id, post_url, thumbnail_url, thumbnail_path, caption, likes, comments, posted_at, fetched_at, post_type, product_type, view_count, is_sponsored, hashtags, child_thumbnails, child_thumbnail_paths, video_url")
             .eq("influencer_id", influencerId)
             .order("posted_at", { ascending: false, nullsFirst: false })
             .limit(60);
@@ -677,18 +687,27 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
               {/* 프로필 */}
               <div className="flex gap-4 items-start">
                 <div className="shrink-0">
-                  {influencer.profile_image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={proxyImageUrl(influencer.profile_image_url) ?? ""}
-                      alt={`@${influencer.username} 프로필`}
-                      className="w-20 h-20 rounded-full object-cover border-2 border-slate-100"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-2xl font-bold text-slate-500">
-                      {influencer.username[0]?.toUpperCase() ?? "?"}
-                    </div>
-                  )}
+                  {(() => {
+                    const src = resolveMediaUrl(
+                      influencer.profile_image_url,
+                      influencer.profile_image_path,
+                    );
+                    return src ? (
+                      <Image
+                        src={src}
+                        alt={`@${influencer.username} 프로필`}
+                        width={80}
+                        height={80}
+                        sizes="80px"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-slate-100"
+                        unoptimized={src.startsWith("/api/")}
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-2xl font-bold text-slate-500">
+                        {influencer.username[0]?.toUpperCase() ?? "?"}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex-1 min-w-0 space-y-1 pt-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -865,7 +884,11 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                         rel="noopener noreferrer"
                         className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 group block"
                       >
-                        <PostThumbnail url={post.thumbnail_url} alt="게시물 썸네일" />
+                        <PostThumbnail
+                          url={post.thumbnail_url}
+                          path={post.thumbnail_path}
+                          alt="게시물 썸네일"
+                        />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end justify-center pb-1.5 gap-2 opacity-0 group-hover:opacity-100">
                           {post.likes !== null && (
                             <span className="text-white text-[10px] font-medium">
