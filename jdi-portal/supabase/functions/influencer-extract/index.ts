@@ -96,18 +96,20 @@ function extractUsername(profileUrl: string): string | null {
 async function scrapeInstagramProfile(
   username: string,
 ): Promise<ApifyProfileResult> {
-  // 비용 최적화: profile-scraper 단일 호출 (~$0.03/인)
-  // 검증된 액터 — 프로필 메타 + 최근 게시물 12개를 안정적으로 반환.
+  // instagram-scraper details 모드 — 한 번에 프로필 메타 + 최근 게시물 24개.
+  // directUrls + details가 검증된 조합 (usernames는 빈 응답 반환 사례 발견).
   const url =
-    `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
+    `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
 
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      usernames: [username],
-      resultsType: "posts",
-      resultsLimit: 12,
+      directUrls: [`https://www.instagram.com/${username}/`],
+      resultsType: "details",
+      resultsLimit: 24,
+      searchType: "user",
+      addParentData: false,
     }),
   });
 
@@ -115,16 +117,50 @@ async function scrapeInstagramProfile(
     const text = await res.text();
     throw new Error(`Apify error ${res.status}: ${text}`);
   }
-  const data = await res.json() as ApifyProfileResult[];
-  if (!data || data.length === 0) {
+
+  // 응답이 ApifyProfileResult 형식이 아니라 게시물 배열일 수 있어 형식 감지 필요.
+  // 첫 항목에 followersCount/biography 같은 프로필 필드가 있으면 ApifyProfileResult,
+  // 없고 likesCount/timestamp 같은 게시물 필드뿐이면 ApifyPost[]로 간주하고 메타 구성.
+  const raw = await res.json() as unknown[];
+  if (!raw || raw.length === 0) {
     throw new Error(`Apify returned empty result for @${username}`);
   }
 
-  console.log(
-    `[scrape] @${username} — posts:${data[0].latestPosts?.length ?? 0}`,
-  );
+  const first = raw[0] as Record<string, unknown>;
+  const looksLikeProfile =
+    "followersCount" in first ||
+    "biography" in first ||
+    "latestPosts" in first ||
+    "profilePicUrl" in first;
 
-  return data[0];
+  if (looksLikeProfile) {
+    const profile = first as unknown as ApifyProfileResult;
+    console.log(
+      `[scrape] @${username} (profile-shape) — posts:${profile.latestPosts?.length ?? 0}`,
+    );
+    return profile;
+  }
+
+  // 게시물 배열 형식 — 첫 게시물의 owner* 필드에서 메타를 복원하고
+  // 전체 항목을 latestPosts로 사용.
+  const posts = raw as unknown as ApifyPost[];
+  const ownerFields = first as Record<string, unknown>;
+  const constructedProfile: ApifyProfileResult = {
+    username,
+    fullName: (ownerFields.ownerFullName as string | undefined) ??
+      (ownerFields.fullName as string | undefined),
+    biography: undefined,
+    profilePicUrl: (ownerFields.ownerProfilePicUrl as string | undefined) ??
+      (ownerFields.profilePicUrl as string | undefined),
+    followersCount: ownerFields.ownerFollowersCount as number | undefined,
+    followsCount: undefined,
+    postsCount: undefined,
+    latestPosts: posts,
+  };
+  console.log(
+    `[scrape] @${username} (posts-shape) — posts:${posts.length}, owner-meta-recovered`,
+  );
+  return constructedProfile;
 }
 
 // ============================================================
