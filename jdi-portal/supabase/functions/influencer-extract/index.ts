@@ -96,16 +96,19 @@ function extractUsername(profileUrl: string): string | null {
 async function scrapeInstagramProfile(
   username: string,
 ): Promise<ApifyProfileResult> {
+  // apify/instagram-scraper: 페이지네이션 지원, resultsLimit이 실제로 적용됨
+  // (이전: apify/instagram-profile-scraper는 첫 페이지 12개만 반환하는 한계)
   const url =
-    `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
+    `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
 
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      usernames: [username],
+      directUrls: [`https://www.instagram.com/${username}/`],
       resultsLimit: 50,
-      resultsType: "posts",
+      resultsType: "details",
+      addParentData: false,
     }),
   });
 
