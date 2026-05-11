@@ -177,10 +177,11 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
                   const style = getMilestoneStyle(m.kind);
                   const username = m.campaign.influencer?.username ?? "?";
                   const displayName = cleanDisplayName(m.campaign.influencer?.display_name, username);
+                  const hasName = displayName && displayName !== `@${username}`;
                   const campaignName = m.campaign.campaign_name ?? "";
                   const isAutoName = campaignName === `@${username} 시딩`;
                   const tooltipText = isAutoName
-                    ? `${style.label} · @${username}`
+                    ? `${style.label} · @${username}${hasName ? ` (${displayName})` : ""}`
                     : `${style.label} · @${username} · ${campaignName}`;
                   return (
                     <button
@@ -194,7 +195,10 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
                       title={tooltipText}
                     >
                       <span className="shrink-0">{style.icon}</span>
-                      <span className="truncate">{displayName}</span>
+                      <span className="truncate">
+                        @{username}
+                        {hasName && <span className="ml-1 opacity-70">{displayName}</span>}
+                      </span>
                     </button>
                   );
                 })}
