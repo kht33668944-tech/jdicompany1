@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef, useMemo } from "react";
+import { useState, useTransition, useRef, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import DotsThreeVertical from "phosphor-react/dist/icons/DotsThreeVertical.esm.js";
@@ -15,6 +15,7 @@ import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluence
 import { proxyImageUrl } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
+import type { InfluencerTier } from "@/lib/influencer/metrics";
 import type { Influencer, InfluencerCampaign, CampaignStatus, CampaignBasic } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
@@ -43,6 +44,107 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
       {label}
       <button type="button" onClick={onRemove} className="text-slate-400 hover:text-rose-500" aria-label="제거">×</button>
     </span>
+  );
+}
+
+const GRADE_OPTS = [
+  { key: "S", label: "S" },
+  { key: "A", label: "A" },
+  { key: "B", label: "B" },
+  { key: "C", label: "C" },
+  { key: "UNRATED", label: "미분류" },
+] as const;
+
+const TIER_OPTS: { key: InfluencerTier; label: string }[] = [
+  { key: "nano", label: "나노 (~1만)" },
+  { key: "micro", label: "마이크로 (1만~5만)" },
+  { key: "mid", label: "미드 (5만~50만)" },
+  { key: "macro", label: "매크로 (50만~100만)" },
+  { key: "mega", label: "메가 (100만+)" },
+];
+
+interface HeaderFilterPopoverProps<T extends string> {
+  open: boolean;
+  anchorRect: DOMRect | null;
+  options: { key: T; label: string }[];
+  selected: T[];
+  onChange: (next: T[]) => void;
+  onClose: () => void;
+}
+
+function HeaderFilterPopover<T extends string>({
+  open,
+  anchorRect,
+  options,
+  selected,
+  onChange,
+  onClose,
+}: HeaderFilterPopoverProps<T>) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open || !anchorRect || typeof document === "undefined") return null;
+
+  function toggle(key: T) {
+    const next = selected.includes(key)
+      ? selected.filter((x) => x !== key)
+      : [...selected, key];
+    onChange(next);
+  }
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={{
+        position: "fixed",
+        top: anchorRect.bottom + 4,
+        left: anchorRect.left,
+        width: 180,
+        zIndex: 9999,
+      }}
+      className="bg-white rounded-xl shadow-lg border border-slate-200 p-2"
+    >
+      {options.map((opt) => (
+        <label
+          key={opt.key}
+          className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer text-sm"
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(opt.key)}
+            onChange={() => toggle(opt.key)}
+            className="w-3.5 h-3.5"
+          />
+          <span>{opt.label}</span>
+        </label>
+      ))}
+      <hr className="my-1.5 border-slate-100" />
+      <button
+        type="button"
+        onClick={() => onChange([])}
+        className="w-full text-left px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+      >
+        초기화
+      </button>
+    </div>,
+    document.body
   );
 }
 
@@ -277,6 +379,22 @@ interface Props {
 export default function InfluencerTable({ influencers, activeCampaigns, allCampaigns, filters, onFiltersChange, onSelectInfluencer, onRefresh }: Props) {
   const [resyncingAll, startResyncAll] = useTransition();
 
+  type OpenFilter = "grade" | "tier" | "status" | null;
+  const [openFilter, setOpenFilter] = useState<OpenFilter>(null);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const gradeBtnRef = useRef<HTMLButtonElement>(null);
+  const tierBtnRef = useRef<HTMLButtonElement>(null);
+  const statusBtnRef = useRef<HTMLButtonElement>(null);
+
+  function openPop(which: OpenFilter, ref: React.RefObject<HTMLButtonElement | null>) {
+    if (openFilter === which) {
+      setOpenFilter(null);
+      return;
+    }
+    setAnchorRect(ref.current?.getBoundingClientRect() ?? null);
+    setOpenFilter(which);
+  }
+
   // influencer_id → {totalCost, count}
   const seedingByInfluencer = useMemo(() => {
     const map = new Map<string, { totalCost: number; count: number }>();
@@ -338,6 +456,11 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       const infTags = inf.tags ?? [];
       if (!filters.tags.every((t) => infTags.includes(t))) return false;
     }
+    // 팔로워 tier 필터
+    if (filters.followerTiers.length > 0) {
+      const tier = getTier(inf.follower_count);
+      if (!tier || !filters.followerTiers.includes(tier.key)) return false;
+    }
     // 캠페인 상태 필터
     if (filters.campaignStatuses.length > 0) {
       const c = campaignMap.get(inf.id);
@@ -390,7 +513,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       </div>
 
       {/* 활성 필터 칩 */}
-      {(filters.grades.length > 0 || filters.campaignStatuses.length > 0 || filters.dateMilestone) && (
+      {(filters.grades.length > 0 || filters.followerTiers.length > 0 || filters.campaignStatuses.length > 0 || filters.dateMilestone) && (
         <div className="flex flex-wrap items-center gap-1.5 px-6 py-2 border-b border-slate-50 bg-slate-50/40">
           <span className="text-[11px] text-slate-400">필터:</span>
           {filters.grades.map((g) => (
@@ -398,6 +521,13 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
               key={`g-${g}`}
               label={`등급 ${g === "UNRATED" ? "미분류" : g}`}
               onRemove={() => onFiltersChange({ ...filters, grades: filters.grades.filter((x) => x !== g) })}
+            />
+          ))}
+          {filters.followerTiers.map((t) => (
+            <Chip
+              key={`t-${t}`}
+              label={`팔로워 ${TIER_OPTS.find((o) => o.key === t)?.label ?? t}`}
+              onRemove={() => onFiltersChange({ ...filters, followerTiers: filters.followerTiers.filter((x) => x !== t) })}
             />
           ))}
           {filters.campaignStatuses.map((s) => (
@@ -415,7 +545,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
           )}
           <button
             type="button"
-            onClick={() => onFiltersChange({ ...filters, grades: [], campaignStatuses: [], dateMilestone: null })}
+            onClick={() => onFiltersChange({ ...filters, grades: [], followerTiers: [], campaignStatuses: [], dateMilestone: null })}
             className="ml-auto text-[11px] text-slate-500 hover:text-slate-700"
           >전체 해제</button>
         </div>
@@ -428,10 +558,67 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
             <tr className="border-b border-slate-100 bg-slate-50/60">
               <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">인플루언서</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">ER</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">팔로워</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">AI 등급</th>
+              <th className="text-right px-4 py-3 whitespace-nowrap">
+                <button
+                  ref={tierBtnRef}
+                  type="button"
+                  onClick={() => openPop("tier", tierBtnRef)}
+                  className={`inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide hover:text-slate-700 transition-colors ${
+                    filters.followerTiers.length > 0 ? "text-blue-600 font-semibold" : "text-slate-500"
+                  }`}
+                >
+                  팔로워 <span className="text-[10px]">▾</span>
+                </button>
+                <HeaderFilterPopover
+                  open={openFilter === "tier"}
+                  anchorRect={anchorRect}
+                  options={TIER_OPTS}
+                  selected={filters.followerTiers}
+                  onChange={(next) => onFiltersChange({ ...filters, followerTiers: next })}
+                  onClose={() => setOpenFilter(null)}
+                />
+              </th>
+              <th className="text-center px-4 py-3 whitespace-nowrap">
+                <button
+                  ref={gradeBtnRef}
+                  type="button"
+                  onClick={() => openPop("grade", gradeBtnRef)}
+                  className={`inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide hover:text-slate-700 transition-colors ${
+                    filters.grades.length > 0 ? "text-blue-600 font-semibold" : "text-slate-500"
+                  }`}
+                >
+                  AI 등급 <span className="text-[10px]">▾</span>
+                </button>
+                <HeaderFilterPopover
+                  open={openFilter === "grade"}
+                  anchorRect={anchorRect}
+                  options={GRADE_OPTS as unknown as { key: string; label: string }[]}
+                  selected={filters.grades}
+                  onChange={(next) => onFiltersChange({ ...filters, grades: next as FilterState["grades"] })}
+                  onClose={() => setOpenFilter(null)}
+                />
+              </th>
               <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">시딩 금액</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">상태</th>
+              <th className="text-left px-4 py-3 whitespace-nowrap">
+                <button
+                  ref={statusBtnRef}
+                  type="button"
+                  onClick={() => openPop("status", statusBtnRef)}
+                  className={`inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide hover:text-slate-700 transition-colors ${
+                    filters.campaignStatuses.length > 0 ? "text-blue-600 font-semibold" : "text-slate-500"
+                  }`}
+                >
+                  상태 <span className="text-[10px]">▾</span>
+                </button>
+                <HeaderFilterPopover
+                  open={openFilter === "status"}
+                  anchorRect={anchorRect}
+                  options={CAMPAIGN_STATUS_OPTIONS.map((o) => ({ key: o.value, label: o.label }))}
+                  selected={filters.campaignStatuses}
+                  onChange={(next) => onFiltersChange({ ...filters, campaignStatuses: next as FilterState["campaignStatuses"] })}
+                  onClose={() => setOpenFilter(null)}
+                />
+              </th>
               <th className="px-4 py-3 w-10" />
             </tr>
           </thead>

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import X from "phosphor-react/dist/icons/X.esm.js";
-import type { InfluencerGrade, InfluencerStatus } from "@/lib/influencer/types";
+import type { CampaignStatus, InfluencerGrade, InfluencerStatus } from "@/lib/influencer/types";
+import type { InfluencerTier } from "@/lib/influencer/metrics";
 
 export interface FilterState {
   search: string;
@@ -10,8 +11,9 @@ export interface FilterState {
   categories: string[];
   status: InfluencerStatus | "all";
   tags: string[];
-  campaignStatuses: import("@/lib/influencer/types").CampaignStatus[];
+  campaignStatuses: CampaignStatus[];
   dateMilestone: string | null;
+  followerTiers: InfluencerTier[];
 }
 
 export const DEFAULT_FILTER_STATE: FilterState = {
@@ -22,6 +24,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   tags: [],
   campaignStatuses: [],
   dateMilestone: null,
+  followerTiers: [],
 };
 
 interface Props {

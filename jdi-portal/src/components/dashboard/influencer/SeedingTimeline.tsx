@@ -33,14 +33,16 @@ function getDateLabel(dateStr: string): string {
 function extractItems(campaigns: InfluencerCampaignWithInfluencer[]): TimelineItem[] {
   const items: TimelineItem[] = [];
   const todayKST = kstDateStr(0);
-  const cutoffKST = kstDateStr(30);
+  const cutoffKST = kstDateStr(7);
 
   for (const c of campaigns) {
     if (c.status === "done") continue;
 
     const entries: Array<{ date: string; action: string; color: string }> = [
       { date: c.contact_date ?? "", action: "DM 발송", color: "bg-blue-400" },
+      { date: c.contract_date ?? "", action: "계약 진행", color: "bg-rose-400" },
       { date: c.ship_date ?? "", action: "제품 발송", color: "bg-cyan-400" },
+      { date: c.content_deadline ?? "", action: "콘텐츠 마감", color: "bg-orange-400" },
       {
         date: c.expected_post_date ?? "",
         action: "포스팅 확인",
