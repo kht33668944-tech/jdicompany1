@@ -1,11 +1,17 @@
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { toast } from "sonner";
 import { updateCampaignStatus } from "@/lib/influencer/actions";
 import StatusBadge from "./StatusBadge";
 import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import type { InfluencerCampaignWithInfluencer, CampaignStatus } from "@/lib/influencer/types";
+import {
+  kstTodayStr,
+  addDaysStr,
+  getCampaignDatesInRange,
+  getTodayCampaignTasks,
+} from "@/lib/influencer/calendar";
 
 interface Props {
   campaigns: InfluencerCampaignWithInfluencer[];
@@ -21,6 +27,13 @@ const STATUS_COUNTS: { status: CampaignStatus; color: string }[] = [
   { status: "posted", color: "text-violet-500" },
   { status: "done", color: "text-emerald-500" },
 ];
+
+const DAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return `${d.getMonth() + 1}/${d.getDate()}(${DAY_KO[d.getDay()]})`;
+}
 
 function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaignWithInfluencer; onRefresh: () => void }) {
   const [, startTransition] = useTransition();
@@ -96,8 +109,141 @@ function CampaignCard({ campaign, onRefresh }: { campaign: InfluencerCampaignWit
   );
 }
 
+type TodayFilter = "dm" | "ship" | "post" | null;
+
+function TodayTasksSection({ campaigns }: { campaigns: InfluencerCampaignWithInfluencer[] }) {
+  const [activeFilter, setActiveFilter] = useState<TodayFilter>(null);
+  const { dmList, shipList, postList } = getTodayCampaignTasks(campaigns);
+  const isEmpty = dmList.length === 0 && shipList.length === 0 && postList.length === 0;
+
+  if (isEmpty) {
+    return (
+      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+        <p className="text-xs font-semibold text-slate-700 mb-2">🔔 오늘 할 일</p>
+        <p className="text-xs text-slate-400 text-center py-1">오늘 할 일 없음 ✨</p>
+      </div>
+    );
+  }
+
+  const categories: { key: TodayFilter & string; icon: string; label: string; count: number }[] = [
+    { key: "dm", icon: "📩", label: "DM 보낼 곳", count: dmList.length },
+    { key: "ship", icon: "📦", label: "발송할 제품", count: shipList.length },
+    { key: "post", icon: "🔍", label: "포스팅 확인", count: postList.length },
+  ];
+
+  const filteredList =
+    activeFilter === "dm" ? dmList :
+    activeFilter === "ship" ? shipList :
+    activeFilter === "post" ? postList :
+    [];
+
+  return (
+    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
+      <p className="text-xs font-semibold text-slate-700">🔔 오늘 할 일</p>
+      <div className="grid grid-cols-3 gap-1.5">
+        {categories.map(({ key, icon, label, count }) => (
+          <button
+            key={key}
+            onClick={() => setActiveFilter(activeFilter === key ? null : key)}
+            className={`rounded-lg p-2 text-center transition-colors ${
+              count === 0
+                ? "bg-white border border-slate-100 opacity-50 cursor-default"
+                : activeFilter === key
+                ? "bg-blue-50 border border-blue-200"
+                : "bg-white border border-slate-200 hover:border-slate-300"
+            }`}
+          >
+            <p className="text-base leading-none mb-1">{icon}</p>
+            <p className={`text-sm font-bold ${count === 0 ? "text-slate-300" : "text-slate-700"}`}>{count}</p>
+            <p className={`text-[9px] leading-tight mt-0.5 ${count === 0 ? "text-slate-300" : "text-slate-500"}`}>{label}</p>
+          </button>
+        ))}
+      </div>
+      {activeFilter && filteredList.length > 0 && (
+        <div className="flex flex-col gap-1.5 pt-1">
+          {filteredList.map((c) => (
+            <div key={c.id} className="bg-white rounded-lg px-2.5 py-1.5 border border-slate-100 flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-medium truncate">
+                {c.influencer ? `@${c.influencer.username}` : c.campaign_name}
+              </span>
+              <span className="text-[10px] text-slate-400 truncate flex-1">{c.campaign_name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UpcomingSection({ campaigns }: { campaigns: InfluencerCampaignWithInfluencer[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const today = kstTodayStr();
+  const from = addDaysStr(today, 1);
+  const to = addDaysStr(today, 7);
+  const inRange = getCampaignDatesInRange(campaigns, from, to);
+
+  type UpcomingItem = { campaignId: string; dateStr: string; label: string; username: string };
+  const items: UpcomingItem[] = [];
+
+  for (const c of inRange) {
+    const candidates: { dateStr: string; label: string }[] = [];
+    if (c.contact_date && c.contact_date >= from && c.contact_date <= to) {
+      candidates.push({ dateStr: c.contact_date, label: "DM 보내기" });
+    }
+    if (c.ship_date && c.ship_date >= from && c.ship_date <= to) {
+      candidates.push({ dateStr: c.ship_date, label: "발송 마감" });
+    }
+    if (c.expected_post_date && c.expected_post_date >= from && c.expected_post_date <= to) {
+      candidates.push({ dateStr: c.expected_post_date, label: "포스팅 예정" });
+    }
+    if (candidates.length === 0) continue;
+    candidates.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+    const best = candidates[0];
+    items.push({
+      campaignId: c.id,
+      dateStr: best.dateStr,
+      label: best.label,
+      username: c.influencer ? `@${c.influencer.username}` : c.campaign_name,
+    });
+  }
+
+  items.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+
+  const LIMIT = 5;
+  const visible = expanded ? items : items.slice(0, LIMIT);
+  const hiddenCount = items.length - LIMIT;
+
+  return (
+    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
+      <p className="text-xs font-semibold text-slate-700">📅 다가오는 7일</p>
+      {items.length === 0 ? (
+        <p className="text-xs text-slate-400 text-center py-1">다가오는 7일 일정 없음</p>
+      ) : (
+        <>
+          <div className="flex flex-col gap-1">
+            {visible.map((item) => (
+              <div key={`${item.campaignId}-${item.dateStr}-${item.label}`} className="flex items-center gap-2 text-xs text-slate-600">
+                <span className="text-slate-400 shrink-0">{formatDateLabel(item.dateStr)}</span>
+                <span className="font-medium truncate">{item.username}</span>
+                <span className="text-slate-400 shrink-0">{item.label}</span>
+              </div>
+            ))}
+          </div>
+          {!expanded && hiddenCount > 0 && (
+            <button
+              onClick={() => setExpanded(true)}
+              className="text-[11px] text-blue-500 hover:text-blue-600 w-full text-center pt-0.5"
+            >
+              +{hiddenCount}건 더
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefresh }: Props) {
-  // 날짜 선택 시 해당 날짜에 관련 캠페인만 표시, 아니면 전체
   const displayed = selectedDate
     ? campaigns.filter((c) =>
         c.contact_date === selectedDate ||
@@ -106,7 +252,6 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
       )
     : campaigns.filter((c) => c.status !== "done");
 
-  // 상태별 카운트 (전체 기준)
   const active = campaigns.filter((c) => c.status !== "done");
   const countMap = new Map<CampaignStatus, number>();
   for (const c of active) {
@@ -135,6 +280,14 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
             </div>
           ))}
         </div>
+      )}
+
+      {/* 오늘 할 일 + 다가오는 7일 (선택 날짜 없을 때만) */}
+      {!selectedDate && (
+        <>
+          <TodayTasksSection campaigns={campaigns} />
+          <UpcomingSection campaigns={campaigns} />
+        </>
       )}
 
       {/* 캠페인 카드 목록 */}
