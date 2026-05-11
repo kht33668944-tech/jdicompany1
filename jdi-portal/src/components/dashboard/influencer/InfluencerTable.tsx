@@ -9,6 +9,8 @@ import Archive from "phosphor-react/dist/icons/Archive.esm.js";
 import Trash from "phosphor-react/dist/icons/Trash.esm.js";
 import Eye from "phosphor-react/dist/icons/Eye.esm.js";
 import Plus from "phosphor-react/dist/icons/Plus.esm.js";
+import MagnifyingGlass from "phosphor-react/dist/icons/MagnifyingGlass.esm.js";
+import X from "phosphor-react/dist/icons/X.esm.js";
 import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
@@ -456,11 +458,19 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
   const sorted = useMemo(() => {
     const filtered = influencers.filter((inf) => {
       if (filters.search) {
-        const q = filters.search.toLowerCase();
-        if (
-          !inf.username.toLowerCase().includes(q) &&
-          !(inf.display_name ?? "").toLowerCase().includes(q)
-        ) return false;
+        const q = filters.search.toLowerCase().trim();
+        if (q.length > 0) {
+          // 검색 대상: 아이디(username), 이름(display_name), 카테고리, 바이오, 태그, 메모
+          const haystack = [
+            inf.username,
+            inf.display_name ?? "",
+            inf.category ?? "",
+            inf.bio ?? "",
+            inf.notes ?? "",
+            ...(inf.tags ?? []),
+          ].join(" ").toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
       }
       if (filters.grades.length > 0 && !filters.grades.includes(inf.grade)) return false;
       if (filters.categories.length > 0 && !filters.categories.includes(inf.category ?? "")) return false;
@@ -489,17 +499,45 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
     return [...filtered].sort((a, b) => (b.engagement_rate ?? -1) - (a.engagement_rate ?? -1));
   }, [influencers, filters, campaignMap, milestoneByInfluencer]);
 
-  const displayed = useMemo(() => sorted.slice(0, 50), [sorted]);
+  // 스크롤 컨테이너 안에서 전체 표시 — 페이지 자체는 늘어나지 않음.
+  const displayed = sorted;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       {/* 헤더 */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-        <h2 className="text-sm font-semibold text-slate-800">
-          인플루언서 리스트 관리
-          <span className="ml-2 text-xs font-normal text-slate-400">{sorted.length}명</span>
-        </h2>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-slate-800 shrink-0">
+            인플루언서 리스트 관리
+            <span className="ml-2 text-xs font-normal text-slate-400">{sorted.length}명</span>
+          </h2>
+          {/* 검색창: 아이디·이름·카테고리·바이오·태그 통합 검색 */}
+          <div className="relative w-full max-w-xs">
+            <MagnifyingGlass
+              size={14}
+              weight="bold"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+              placeholder="아이디·이름·카테고리·태그 검색"
+              className="w-full pl-7 pr-7 py-1.5 text-xs rounded-md border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-colors placeholder:text-slate-400"
+            />
+            {filters.search && (
+              <button
+                type="button"
+                onClick={() => onFiltersChange({ ...filters, search: "" })}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                aria-label="검색어 지우기"
+              >
+                <X size={12} weight="bold" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleResyncAll}
@@ -510,9 +548,6 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
             <ArrowsClockwise size={12} weight="bold" className={resyncingAll ? "animate-spin" : ""} />
             {resyncingAll ? "동기화 중..." : "전체 재동기화"}
           </button>
-          {sorted.length > 0 && (
-            <span className="text-xs font-medium text-slate-400">전체보기 →</span>
-          )}
         </div>
       </div>
 
@@ -555,11 +590,11 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
         </div>
       )}
 
-      {/* 테이블 */}
-      <div className="overflow-x-auto">
+      {/* 테이블 — 페이지 전체가 길어지지 않도록 컨테이너 안에서 스크롤 (sticky 헤더) */}
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px]">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/60">
+          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
+            <tr className="border-b border-slate-100">
               <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">인플루언서</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">ER</th>
               <th className="text-right px-4 py-3 whitespace-nowrap">
