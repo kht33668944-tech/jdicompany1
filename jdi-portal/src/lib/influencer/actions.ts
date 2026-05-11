@@ -61,6 +61,54 @@ export async function addInfluencer(
   return { ok: true, influencer_id: influencerId };
 }
 
+export async function resyncAllInfluencers(): Promise<{
+  total: number;
+  success: number;
+  failed: number;
+}> {
+  const userId = await getSessionUserId();
+  const supabase = await createClient();
+
+  const { data: list, error } = await supabase
+    .from("influencers")
+    .select("id, profile_url")
+    .eq("status", "active");
+
+  if (error) throw error;
+  const items = list ?? [];
+
+  let success = 0;
+  let failed = 0;
+
+  // Apify rate limit 회피를 위해 순차 호출
+  for (const inf of items) {
+    try {
+      const { data: extractData, error: extractError } = await supabase.functions.invoke(
+        "influencer-extract",
+        { body: { profile_url: inf.profile_url, created_by: userId } },
+      );
+      if (extractError) {
+        failed++;
+        continue;
+      }
+      const influencerId = (extractData as { influencer_id: string }).influencer_id;
+      try {
+        await supabase.functions.invoke("influencer-analyze", {
+          body: { influencer_id: influencerId },
+        });
+      } catch {
+        // 분석 실패는 무시
+      }
+      success++;
+    } catch {
+      failed++;
+    }
+  }
+
+  revalidatePath("/dashboard/influencer");
+  return { total: items.length, success, failed };
+}
+
 export async function resyncInfluencer(id: string): Promise<void> {
   const userId = await getSessionUserId();
   const supabase = await createClient();

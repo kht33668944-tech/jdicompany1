@@ -11,7 +11,7 @@ import Eye from "phosphor-react/dist/icons/Eye.esm.js";
 import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
-import { updateCampaignStatus, addCampaign, resyncInfluencer, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
+import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
 import { proxyImageUrl } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
@@ -239,6 +239,33 @@ interface Props {
 }
 
 export default function InfluencerTable({ influencers, activeCampaigns, filters, onSelectInfluencer, onRefresh }: Props) {
+  const [resyncingAll, startResyncAll] = useTransition();
+
+  function handleResyncAll() {
+    const activeCount = influencers.filter((i) => i.status === "active").length;
+    if (activeCount === 0) {
+      toast.info("재동기화할 활성 인플루언서가 없습니다.");
+      return;
+    }
+    if (!confirm(`활성 인플루언서 ${activeCount}명을 모두 재동기화합니다. 약 ${activeCount * 5}초 소요. 진행할까요?`)) {
+      return;
+    }
+    startResyncAll(async () => {
+      const id = toast.loading(`전체 재동기화 중... (0/${activeCount})`);
+      try {
+        const result = await resyncAllInfluencers();
+        if (result.failed === 0) {
+          toast.success(`전체 재동기화 완료 (${result.success}/${result.total})`, { id });
+        } else {
+          toast.warning(`일부 실패: 성공 ${result.success}, 실패 ${result.failed}`, { id });
+        }
+        onRefresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "전체 재동기화 실패", { id });
+      }
+    });
+  }
+
   // 캠페인 맵: influencer_id → 최신 active 캠페인
   const campaignMap = new Map<string, InfluencerCampaign>();
   for (const c of activeCampaigns) {
@@ -281,9 +308,21 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
           인플루언서 리스트 관리
           <span className="ml-2 text-xs font-normal text-slate-400">{filtered.length}명</span>
         </h2>
-        {sorted.length > 0 && (
-          <span className="text-xs font-medium text-slate-400">전체보기 →</span>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleResyncAll}
+            disabled={resyncingAll}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title="활성 인플루언서 전체를 Apify로 다시 긁어옵니다"
+          >
+            <ArrowsClockwise size={12} weight="bold" className={resyncingAll ? "animate-spin" : ""} />
+            {resyncingAll ? "동기화 중..." : "전체 재동기화"}
+          </button>
+          {sorted.length > 0 && (
+            <span className="text-xs font-medium text-slate-400">전체보기 →</span>
+          )}
+        </div>
       </div>
 
       {/* 테이블 */}
