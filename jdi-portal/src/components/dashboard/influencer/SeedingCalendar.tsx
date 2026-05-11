@@ -22,6 +22,13 @@ interface Props {
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MAX_VISIBLE_CHIPS = 3;
 
+/** display_name에서 ` | ` 앞부분만 깔끔하게 추출. 없으면 @username */
+function cleanDisplayName(displayName: string | null | undefined, username: string): string {
+  if (!displayName) return `@${username}`;
+  const beforePipe = displayName.split("|")[0].trim();
+  return beforePipe || displayName;
+}
+
 export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate, onCampaignClick }: Props) {
   const today = kstTodayStr();
   const [year, setYear] = useState(() => Number(today.slice(0, 4)));
@@ -169,6 +176,7 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
                 {visibleChips.map((m: CampaignMilestone) => {
                   const style = getMilestoneStyle(m.kind);
                   const username = m.campaign.influencer?.username ?? "?";
+                  const displayName = cleanDisplayName(m.campaign.influencer?.display_name, username);
                   const campaignName = m.campaign.campaign_name ?? "";
                   const isAutoName = campaignName === `@${username} 시딩`;
                   const tooltipText = isAutoName
@@ -186,7 +194,7 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
                       title={tooltipText}
                     >
                       <span className="shrink-0">{style.icon}</span>
-                      <span className="truncate">@{username}</span>
+                      <span className="truncate">{displayName}</span>
                     </button>
                   );
                 })}
