@@ -590,8 +590,8 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
         </div>
       )}
 
-      {/* 테이블 — 페이지 전체가 길어지지 않도록 컨테이너 안에서 스크롤 (sticky 헤더) */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px]">
+      {/* 테이블 — 페이지 전체가 길어지지 않도록 컨테이너 안에서 스크롤 (sticky 헤더, 스크롤바 숨김) */}
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px] no-scrollbar">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
             <tr className="border-b border-slate-100">

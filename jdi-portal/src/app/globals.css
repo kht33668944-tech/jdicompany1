@@ -139,3 +139,12 @@ input:-webkit-autofill:active {
   mix-blend-mode: multiply;
   will-change: transform;
 }
+
+/* 스크롤바 시각적으로 숨김 — 마우스 휠/터치 스크롤은 그대로 동작 */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE/구 Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;            /* Chrome/Safari/Edge(Chromium) */
+}
