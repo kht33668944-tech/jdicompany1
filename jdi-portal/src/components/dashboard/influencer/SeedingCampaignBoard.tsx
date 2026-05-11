@@ -323,7 +323,9 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
   const displayed = selectedDate
     ? campaigns.filter((c) =>
         c.contact_date === selectedDate ||
+        c.contract_date === selectedDate ||
         c.ship_date === selectedDate ||
+        c.content_deadline === selectedDate ||
         c.expected_post_date === selectedDate
       )
     : campaigns.filter((c) => c.status !== "done");
