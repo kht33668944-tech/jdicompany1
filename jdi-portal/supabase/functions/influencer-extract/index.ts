@@ -1,7 +1,10 @@
 // supabase/functions/influencer-extract/index.ts
 // 인스타그램 프로필 Apify 추출 → influencers / influencer_posts / influencer_sync_logs 저장
+//
+// 미디어(프로필/썸네일) 다운로드는 응답 직후 EdgeRuntime.waitUntil로 백그라운드 처리 →
+// 사용자 응답 시간에 영향 0. Storage 업로드 실패는 influencer_media_jobs.status='failed'에 기록.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 // ============================================================
 // 환경 변수
@@ -9,6 +12,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const APIFY_API_TOKEN = Deno.env.get("APIFY_API_TOKEN") ?? "";
+
+const STORAGE_BUCKET = "influencer-media";
+const MEDIA_FETCH_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const MEDIA_FETCH_TIMEOUT_MS = 8_000; // 인스타 CDN 응답 안 오면 빠르게 포기
 
 if (!APIFY_API_TOKEN) {
   console.error("APIFY_API_TOKEN missing — scraping will fail");
@@ -204,6 +212,177 @@ function calcGrade(er: number, followerCount: number): string {
 }
 
 // ============================================================
+// 미디어 백그라운드 다운로드 → Storage 업로드
+//   - EdgeRuntime.waitUntil로 응답 후 비동기 실행 → 사용자 응답 시간 영향 0
+//   - 실패 1건은 다른 건 처리에 영향 주지 않음 (개별 try/catch)
+//   - 같은 path가 이미 있으면 upsert로 덮어쓰기 (재동기화 호환)
+// ============================================================
+type PostRow = {
+  id: string;
+  thumbnail_url: string | null;
+  child_thumbnails: string[] | null;
+};
+
+function detectImageExt(contentType: string | null): string {
+  if (!contentType) return "jpg";
+  if (contentType.includes("webp")) return "webp";
+  if (contentType.includes("png")) return "png";
+  if (contentType.includes("gif")) return "gif";
+  return "jpg";
+}
+
+async function downloadImage(
+  url: string,
+): Promise<{ buf: ArrayBuffer; contentType: string } | null> {
+  try {
+    const ctl = new AbortController();
+    const timeout = setTimeout(() => ctl.abort(), MEDIA_FETCH_TIMEOUT_MS);
+    const r = await fetch(url, {
+      headers: { "User-Agent": MEDIA_FETCH_UA, Accept: "image/*" },
+      signal: ctl.signal,
+    });
+    clearTimeout(timeout);
+    if (!r.ok) return null;
+    const buf = await r.arrayBuffer();
+    const contentType = r.headers.get("content-type") ?? "image/jpeg";
+    return { buf, contentType };
+  } catch {
+    return null;
+  }
+}
+
+async function uploadToStorage(
+  admin: SupabaseClient,
+  path: string,
+  buf: ArrayBuffer,
+  contentType: string,
+): Promise<boolean> {
+  const { error } = await admin.storage.from(STORAGE_BUCKET).upload(
+    path,
+    buf,
+    { contentType, upsert: true, cacheControl: "31536000" },
+  );
+  if (error) {
+    console.error(`[media] upload failed for ${path}:`, error.message);
+    return false;
+  }
+  return true;
+}
+
+async function downloadAndStore(
+  admin: SupabaseClient,
+  url: string | null | undefined,
+  pathPrefix: string,
+): Promise<string | null> {
+  if (!url) return null;
+  const img = await downloadImage(url);
+  if (!img) return null;
+  const ext = detectImageExt(img.contentType);
+  const path = `${pathPrefix}.${ext}`;
+  const ok = await uploadToStorage(admin, path, img.buf, img.contentType);
+  return ok ? path : null;
+}
+
+async function processMediaBackground(
+  admin: SupabaseClient,
+  jobId: string,
+  influencerId: string,
+  profileImageUrl: string | null,
+  postRows: PostRow[],
+): Promise<void> {
+  // 1) 작업 시작 마크
+  await admin.from("influencer_media_jobs").update({
+    status: "running",
+    attempts: 1,
+    updated_at: new Date().toISOString(),
+  }).eq("id", jobId);
+
+  let okCount = 0;
+  let failCount = 0;
+
+  try {
+    // 2) 프로필 사진
+    if (profileImageUrl) {
+      const path = await downloadAndStore(
+        admin,
+        profileImageUrl,
+        `profiles/${influencerId}`,
+      );
+      if (path) {
+        await admin.from("influencers")
+          .update({ profile_image_path: path })
+          .eq("id", influencerId);
+        okCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    // 3) 게시물 썸네일 + 자식 (동시 6개씩 처리 — 인스타 rate-limit 방지)
+    const CONCURRENCY = 6;
+    for (let i = 0; i < postRows.length; i += CONCURRENCY) {
+      const chunk = postRows.slice(i, i + CONCURRENCY);
+      await Promise.all(chunk.map(async (post) => {
+        try {
+          const thumbPath = await downloadAndStore(
+            admin,
+            post.thumbnail_url,
+            `posts/${post.id}/thumb`,
+          );
+
+          const childrenPaths: string[] = [];
+          const children = post.child_thumbnails ?? [];
+          for (let n = 0; n < children.length; n++) {
+            const cp = await downloadAndStore(
+              admin,
+              children[n],
+              `posts/${post.id}/child_${n}`,
+            );
+            if (cp) childrenPaths.push(cp);
+          }
+
+          const patch: Record<string, unknown> = {};
+          if (thumbPath) patch.thumbnail_path = thumbPath;
+          if (childrenPaths.length > 0) {
+            patch.child_thumbnail_paths = childrenPaths;
+          }
+          if (Object.keys(patch).length > 0) {
+            await admin.from("influencer_posts")
+              .update(patch)
+              .eq("id", post.id);
+            okCount++;
+          } else {
+            failCount++;
+          }
+        } catch (err) {
+          failCount++;
+          console.error(`[media] post ${post.id} failed:`, err);
+        }
+      }));
+    }
+
+    // 4) 작업 완료 마크
+    await admin.from("influencer_media_jobs").update({
+      status: "done",
+      error_message: failCount > 0 ? `partial: ${failCount} failed` : null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", jobId);
+
+    console.log(
+      `[media] influencer ${influencerId} done — ok=${okCount} fail=${failCount}`,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[media] influencer ${influencerId} fatal:`, message);
+    await admin.from("influencer_media_jobs").update({
+      status: "failed",
+      error_message: message,
+      updated_at: new Date().toISOString(),
+    }).eq("id", jobId);
+  }
+}
+
+// ============================================================
 // HTTP 진입점
 // ============================================================
 Deno.serve(async (req) => {
@@ -353,12 +532,48 @@ Deno.serve(async (req) => {
         };
       });
 
-      const { error: postsError } = await supabaseAdmin
+      const { data: insertedPosts, error: postsError } = await supabaseAdmin
         .from("influencer_posts")
-        .insert(postRows);
+        .insert(postRows)
+        .select("id, thumbnail_url, child_thumbnails");
 
       if (postsError) {
         console.error("influencer_posts insert error:", postsError.message);
+      }
+
+      // 백그라운드 미디어 다운로드 큐 등록 + EdgeRuntime.waitUntil로 비동기 실행
+      //   - 응답 시간 영향 0 (waitUntil은 응답 후에도 함수 인스턴스 유지)
+      //   - influencer_media_jobs 테이블에 상태 기록 (모니터링/재시도용)
+      const profileImageUrl = profile.profilePicUrl ?? null;
+      const postsForMedia = (insertedPosts ?? []) as PostRow[];
+
+      if (profileImageUrl || postsForMedia.length > 0) {
+        const { data: job } = await supabaseAdmin
+          .from("influencer_media_jobs")
+          .insert({ influencer_id: influencerId, status: "pending" })
+          .select("id")
+          .single();
+
+        if (job?.id) {
+          const bgPromise = processMediaBackground(
+            supabaseAdmin,
+            job.id as string,
+            influencerId,
+            profileImageUrl,
+            postsForMedia,
+          );
+          const er = (
+            globalThis as unknown as {
+              EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void };
+            }
+          ).EdgeRuntime;
+          if (er?.waitUntil) {
+            er.waitUntil(bgPromise);
+          } else {
+            // 로컬 dev fallback: 함수 종료 막지 않도록 catch만 부착
+            bgPromise.catch((e) => console.error("[media] bg error:", e));
+          }
+        }
       }
     }
 
