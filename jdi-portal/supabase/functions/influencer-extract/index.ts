@@ -93,99 +93,39 @@ function extractUsername(profileUrl: string): string | null {
 // ============================================================
 // Apify Actor 동기 호출
 // ============================================================
-interface ScrapeResult {
-  profile: ApifyProfileResult;   // latestPosts는 ER/평균 계산 baseline (12개)
-  galleryPosts: ApifyPost[];     // 갤러리용 합산 (게시물 30 + 릴스 30, 중복 제거)
-}
-
 async function scrapeInstagramProfile(
   username: string,
-): Promise<ScrapeResult> {
-  // 3개 액터 병렬 호출:
-  //   1) profile-scraper → 프로필 메타(팔로워/bio/avg_likes 계산 기준)
-  //   2) instagram-scraper (posts URL)  → 게시물 탭 30개
-  //   3) instagram-scraper (reels URL)  → 릴스 탭 30개
-  // ER/평균/등급은 (1)의 12개를 기준으로 계산해야 마케팅 표준에 부합.
-  const profileUrl =
-    `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
-  const scraperUrl =
+): Promise<ApifyProfileResult> {
+  // 비용 최적화: instagram-scraper 단일 호출 (~$0.06/인)
+  // resultsType:"details"는 profile-scraper와 동일한 형식으로 메타 + 최근 게시물을 반환.
+  // 게시물 탭 + 릴스가 섞여서 12~24개. 별도 액터 없이 한 번에 끝남.
+  const url =
     `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
 
-  const [profileRes, postsRes, reelsRes] = await Promise.all([
-    fetch(profileUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        usernames: [username],
-        resultsLimit: 12,
-        resultsType: "posts",
-      }),
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      usernames: [username],
+      resultsType: "details",
+      resultsLimit: 24,
     }),
-    fetch(scraperUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        directUrls: [`https://www.instagram.com/${username}/`],
-        resultsLimit: 30,
-        resultsType: "posts",
-        searchType: "user",
-        addParentData: false,
-      }),
-    }),
-    fetch(scraperUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        directUrls: [`https://www.instagram.com/${username}/reels/`],
-        resultsLimit: 30,
-        resultsType: "posts",
-        searchType: "user",
-        addParentData: false,
-      }),
-    }),
-  ]);
+  });
 
-  if (!profileRes.ok) {
-    const text = await profileRes.text();
-    throw new Error(`Apify profile error ${profileRes.status}: ${text}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Apify error ${res.status}: ${text}`);
   }
-  const profileData = await profileRes.json() as ApifyProfileResult[];
-  if (!profileData || profileData.length === 0) {
-    throw new Error(`Apify profile empty for @${username}`);
-  }
-  const profile = profileData[0];
-
-  // 게시물 / 릴스 호출 결과 (실패해도 진행)
-  async function safeJson(res: Response): Promise<ApifyPost[]> {
-    if (!res.ok) return [];
-    try {
-      return await res.json() as ApifyPost[];
-    } catch {
-      return [];
-    }
-  }
-  const [postsList, reelsList] = await Promise.all([
-    safeJson(postsRes),
-    safeJson(reelsRes),
-  ]);
-
-  // ⚠️ reels 호출 결과를 강제로 clips로 마킹하지 않음.
-  // Apify 응답의 type/productType을 그대로 신뢰해야 게시물/릴스가 올바르게 분류됨.
-  // 합치고 shortCode/url 기준 중복 제거 (posts를 먼저 — 다른 거 같은 게시물이면 posts 응답 형식을 우선)
-  const merged: ApifyPost[] = [];
-  const seen = new Set<string>();
-  for (const p of [...postsList, ...reelsList]) {
-    const key = p.shortCode ?? p.url ?? "";
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    merged.push(p);
+  const data = await res.json() as ApifyProfileResult[];
+  if (!data || data.length === 0) {
+    throw new Error(`Apify returned empty result for @${username}`);
   }
 
   console.log(
-    `[scrape] @${username} — posts:${postsList.length} reels:${reelsList.length} merged:${merged.length}`,
+    `[scrape] @${username} — posts:${data[0].latestPosts?.length ?? 0}`,
   );
 
-  return { profile, galleryPosts: merged };
+  return data[0];
 }
 
 // ============================================================
@@ -282,17 +222,13 @@ Deno.serve(async (req) => {
   let influencerId: string | null = null;
 
   try {
-    // 1. Apify 스크래핑 (profile + 게시물 + 릴스 병렬)
-    const { profile, galleryPosts } = await scrapeInstagramProfile(username);
+    // 1. Apify 스크래핑 (단일 호출)
+    const profile = await scrapeInstagramProfile(username);
 
     const followerCount = profile.followersCount ?? 0;
     const followingCount = profile.followsCount ?? 0;
     const postCount = profile.postsCount ?? 0;
-    // ER/평균/등급 계산용 baseline (최근 12개) — 마케팅 표준
     const posts = profile.latestPosts ?? [];
-    // DB에 저장할 게시물 (갤러리용, 최대 60개 합산)
-    const persistedPosts: ApifyPost[] =
-      galleryPosts.length > 0 ? galleryPosts : posts;
 
     // 2. 평균 likes·comments 계산
     const avgLikes = posts.length > 0
@@ -351,8 +287,8 @@ Deno.serve(async (req) => {
       .delete()
       .eq("influencer_id", influencerId);
 
-    if (persistedPosts.length > 0) {
-      const postRows = persistedPosts.map((p) => {
+    if (posts.length > 0) {
+      const postRows = posts.map((p) => {
         const apifyHashtags = (p.hashtags ?? []).filter((h): h is string =>
           typeof h === "string" && h.length > 0
         );

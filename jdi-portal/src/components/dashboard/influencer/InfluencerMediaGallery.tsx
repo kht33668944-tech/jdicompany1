@@ -8,7 +8,6 @@ import type {
 import { proxyImageUrl } from "@/lib/influencer/proxy";
 import { calcPostER, isBestPost, isReel } from "@/lib/influencer/post-utils";
 
-import GridFour from "phosphor-react/dist/icons/GridFour.esm.js";
 import FilmStrip from "phosphor-react/dist/icons/FilmStrip.esm.js";
 import Play from "phosphor-react/dist/icons/Play.esm.js";
 import Stack from "phosphor-react/dist/icons/Stack.esm.js";
@@ -17,8 +16,9 @@ import Megaphone from "phosphor-react/dist/icons/Megaphone.esm.js";
 import Heart from "phosphor-react/dist/icons/Heart.esm.js";
 import ChatCircle from "phosphor-react/dist/icons/ChatCircle.esm.js";
 import Eye from "phosphor-react/dist/icons/Eye.esm.js";
+import Image from "phosphor-react/dist/icons/Image.esm.js";
 
-type Tab = "posts" | "reels";
+type MediaFilter = "all" | "photo" | "reel";
 type Sort = "recent" | "er" | "likes" | "views";
 
 interface Filters {
@@ -47,7 +47,7 @@ export default function InfluencerMediaGallery({
   onPostClick,
   onClose,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("posts");
+  const [media, setMedia] = useState<MediaFilter>("all");
   const [sort, setSort] = useState<Sort>("recent");
   const [filters, setFilters] = useState<Filters>({
     hideSponsored: false,
@@ -57,20 +57,10 @@ export default function InfluencerMediaGallery({
 
   const allPosts = influencer.recent_posts ?? [];
 
-  const { postsCount, reelsCount } = useMemo(() => {
-    let p = 0;
-    let r = 0;
-    for (const post of allPosts) {
-      if (isReel(post)) r++;
-      else p++;
-    }
-    return { postsCount: p, reelsCount: r };
-  }, [allPosts]);
-
   const visiblePosts = useMemo(() => {
-    let list = allPosts.filter((p) =>
-      tab === "reels" ? isReel(p) : !isReel(p),
-    );
+    let list = allPosts;
+    if (media === "reel") list = list.filter((p) => isReel(p));
+    else if (media === "photo") list = list.filter((p) => !isReel(p));
 
     if (filters.hideSponsored) list = list.filter((p) => !p.is_sponsored);
     if (filters.onlySponsored) list = list.filter((p) => p.is_sponsored);
@@ -101,7 +91,7 @@ export default function InfluencerMediaGallery({
     return list;
   }, [
     allPosts,
-    tab,
+    media,
     sort,
     filters.hideSponsored,
     filters.onlySponsored,
@@ -135,24 +125,8 @@ export default function InfluencerMediaGallery({
         </span>
       </div>
 
-      {/* 탭 */}
-      <div className="px-6 flex items-center gap-1 border-b border-white/10 shrink-0">
-        <TabButton
-          active={tab === "posts"}
-          onClick={() => setTab("posts")}
-          icon={<GridFour size={14} weight="bold" />}
-          label={`게시물 (${postsCount})`}
-        />
-        <TabButton
-          active={tab === "reels"}
-          onClick={() => setTab("reels")}
-          icon={<FilmStrip size={14} weight="bold" />}
-          label={`릴스 (${reelsCount})`}
-        />
-      </div>
-
       {/* 정렬 / 필터 바 */}
-      <div className="px-6 py-3 flex items-center gap-2 flex-wrap shrink-0">
+      <div className="px-6 py-3 flex items-center gap-2 flex-wrap shrink-0 border-b border-white/10">
         <label className="text-[11px] text-slate-300 mr-1">정렬</label>
         <select
           value={sort}
@@ -163,8 +137,30 @@ export default function InfluencerMediaGallery({
           <option value="recent">최신순</option>
           <option value="er">참여율 높은순</option>
           <option value="likes">좋아요 많은순</option>
-          {tab === "reels" && <option value="views">조회수 많은순</option>}
+          <option value="views">조회수 많은순</option>
         </select>
+
+        <span className="w-px h-4 bg-white/10 mx-1" />
+
+        <FilterChip
+          active={media === "all"}
+          onClick={() => setMedia("all")}
+          label="전체"
+        />
+        <FilterChip
+          active={media === "photo"}
+          onClick={() => setMedia("photo")}
+          icon={<Image size={11} weight="fill" />}
+          label="사진"
+        />
+        <FilterChip
+          active={media === "reel"}
+          onClick={() => setMedia("reel")}
+          icon={<FilmStrip size={11} weight="fill" />}
+          label="영상"
+        />
+
+        <span className="w-px h-4 bg-white/10 mx-1" />
 
         <FilterChip
           active={filters.onlyBest}
@@ -314,33 +310,6 @@ function PostGridCell({
           {formatNumber(post.comments)}
         </span>
       </div>
-    </button>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-        active
-          ? "border-white text-white"
-          : "border-transparent text-slate-400 hover:text-slate-200"
-      }`}
-    >
-      {icon}
-      {label}
     </button>
   );
 }
