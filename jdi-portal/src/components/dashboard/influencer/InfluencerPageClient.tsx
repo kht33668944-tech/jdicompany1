@@ -9,17 +9,18 @@ import InfluencerFilters, { DEFAULT_FILTER_STATE } from "./InfluencerFilters";
 import SeedingTimeline from "./SeedingTimeline";
 import InfluencerDetailPanel from "./InfluencerDetailPanel";
 import InfluencerTabs from "./InfluencerTabs";
-import type { Influencer, InfluencerCampaignWithInfluencer, KpiCards as KpiCardsType } from "@/lib/influencer/types";
+import type { CampaignBasic, Influencer, InfluencerCampaignWithInfluencer, KpiCards as KpiCardsType } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
 interface Props {
   kpi: KpiCardsType;
   influencers: Influencer[];
   activeCampaigns: InfluencerCampaignWithInfluencer[];
+  allCampaigns: CampaignBasic[];
   categories: string[];
 }
 
-export default function InfluencerPageClient({ kpi, influencers, activeCampaigns, categories }: Props) {
+export default function InfluencerPageClient({ kpi, influencers, activeCampaigns, allCampaigns, categories }: Props) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -38,7 +39,11 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
       <InfluencerTabs />
 
       {/* URL 입력 바 */}
-      <TopUrlBar onFilterClick={() => setFilterOpen(true)} />
+      <TopUrlBar
+        onFilterClick={() => setFilterOpen(true)}
+        dateMilestone={filters.dateMilestone}
+        onDateMilestoneChange={(d) => setFilters((p) => ({ ...p, dateMilestone: d }))}
+      />
 
       {/* KPI 카드 */}
       <KpiCards data={kpi} />
@@ -49,7 +54,9 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
         <InfluencerTable
           influencers={influencers}
           activeCampaigns={activeCampaigns}
+          allCampaigns={allCampaigns}
           filters={filters}
+          onFiltersChange={setFilters}
           onSelectInfluencer={(id) => setSelectedId(id)}
           onRefresh={handleRefresh}
         />

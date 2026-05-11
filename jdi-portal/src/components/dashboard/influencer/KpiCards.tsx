@@ -1,28 +1,17 @@
 import UsersThree from "phosphor-react/dist/icons/UsersThree.esm.js";
-import ChartLineUp from "phosphor-react/dist/icons/ChartLineUp.esm.js";
-import Megaphone from "phosphor-react/dist/icons/Megaphone.esm.js";
-import Package from "phosphor-react/dist/icons/Package.esm.js";
+import PaperPlaneTilt from "phosphor-react/dist/icons/PaperPlaneTilt.esm.js";
+import CheckCircle from "phosphor-react/dist/icons/CheckCircle.esm.js";
+import CurrencyKrw from "phosphor-react/dist/icons/CurrencyKrw.esm.js";
 import type { KpiCards as KpiCardsType } from "@/lib/influencer/types";
 
 interface Props {
   data: KpiCardsType;
 }
 
-function formatNumber(n: number | null): string {
-  if (n === null) return "—";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(Math.round(n));
-}
-
-function formatRate(n: number | null): string {
-  if (n === null) return "—";
-  return `${n.toFixed(2)}%`;
-}
-
-function formatPercent(n: number | null): string {
-  if (n === null) return "—";
-  return `${Math.round(n)}%`;
+function formatKRW(n: number): string {
+  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
+  if (n >= 10_000) return `${Math.round(n / 10_000)}만`;
+  return `${n.toLocaleString()}원`;
 }
 
 function DeltaBadge({ deltaPct }: { deltaPct: number | null }) {
@@ -47,16 +36,12 @@ interface CardProps {
   delta: React.ReactNode;
   icon: React.ReactNode;
   iconBg: string;
-  tooltip?: string;
 }
 
-function KpiCard({ title, value, delta, icon, iconBg, tooltip }: CardProps) {
+function KpiCard({ title, value, delta, icon, iconBg }: CardProps) {
   return (
-    <div
-      className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 flex items-center gap-3"
-      title={tooltip}
-    >
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-3 py-2.5 flex items-center gap-3">
+      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">
@@ -64,7 +49,7 @@ function KpiCard({ title, value, delta, icon, iconBg, tooltip }: CardProps) {
           <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide truncate">{title}</p>
           {delta}
         </div>
-        <p className="text-xl font-bold text-slate-800 leading-tight mt-0.5">{value}</p>
+        <p className="text-lg font-bold text-slate-800 leading-tight mt-0.5">{value}</p>
       </div>
     </div>
   );
@@ -72,35 +57,33 @@ function KpiCard({ title, value, delta, icon, iconBg, tooltip }: CardProps) {
 
 export default function KpiCards({ data }: Props) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
       <KpiCard
         title="전체 인플루언서"
-        value={formatNumber(data.totalInfluencers.value)}
+        value={String(data.totalInfluencers.value)}
         delta={<DeltaBadge deltaPct={data.totalInfluencers.deltaPct} />}
-        icon={<UsersThree size={20} weight="duotone" className="text-blue-600" />}
+        icon={<UsersThree size={16} weight="duotone" className="text-blue-600" />}
         iconBg="bg-blue-50"
       />
       <KpiCard
-        title="평균 Engagement Rate"
-        value={formatRate(data.avgEngagementRate.value)}
-        delta={<DeltaBadge deltaPct={data.avgEngagementRate.deltaPct} />}
-        icon={<ChartLineUp size={20} weight="duotone" className="text-emerald-600" />}
+        title="시딩 중 캠페인"
+        value={`${data.activeCampaigns.value}건`}
+        delta={<span />}
+        icon={<PaperPlaneTilt size={16} weight="duotone" className="text-cyan-600" />}
+        iconBg="bg-cyan-50"
+      />
+      <KpiCard
+        title="완료 캠페인"
+        value={`${data.doneCampaigns.value}건`}
+        delta={<span />}
+        icon={<CheckCircle size={16} weight="duotone" className="text-emerald-600" />}
         iconBg="bg-emerald-50"
-        tooltip="ER = (평균 좋아요 + 평균 댓글) / 팔로워 × 100. 활성 인플루언서 전체 평균. 업계 기준: 1% 이상이면 상위 25% (Rival IQ 2025)."
       />
       <KpiCard
-        title="예상 총 도달 (Reach)"
-        value={formatNumber(data.estimatedReach.value)}
-        delta={<DeltaBadge deltaPct={data.estimatedReach.deltaPct} />}
-        icon={<Megaphone size={20} weight="duotone" className="text-violet-600" />}
-        iconBg="bg-violet-50"
-        tooltip="활성 인플루언서 전원이 1회 포스팅했을 때의 추정 도달 인원. 팔로워 사이즈별 평균 organic reach (~1만 10%, 1만~5만 7%, 5만~50만 5%, 50만~100만 4%, 100만+ 3.5%)를 합산."
-      />
-      <KpiCard
-        title="시딩 진행률"
-        value={formatPercent(data.campaignProgressRate.value)}
-        delta={<DeltaBadge deltaPct={data.campaignProgressRate.deltaPct} />}
-        icon={<Package size={20} weight="duotone" className="text-amber-600" />}
+        title="총 시딩 금액"
+        value={formatKRW(data.totalSeedingCost.value)}
+        delta={<span />}
+        icon={<CurrencyKrw size={16} weight="duotone" className="text-amber-600" />}
         iconBg="bg-amber-50"
       />
     </div>

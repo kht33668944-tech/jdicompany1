@@ -109,7 +109,20 @@ export interface InfluencerFilterOpts {
 
 export interface KpiCards {
   totalInfluencers: { value: number; deltaPct: number | null };
-  avgEngagementRate: { value: number | null; deltaPct: number | null };
-  estimatedReach: { value: number | null; deltaPct: number | null };
-  campaignProgressRate: { value: number; deltaPct: number | null };
+  activeCampaigns: { value: number };
+  doneCampaigns: { value: number };
+  totalSeedingCost: { value: number };
 }
+
+export type CampaignBasic = Pick<
+  InfluencerCampaign,
+  | "id"
+  | "influencer_id"
+  | "status"
+  | "cost"
+  | "contact_date"
+  | "contract_date"
+  | "ship_date"
+  | "content_deadline"
+  | "expected_post_date"
+>;

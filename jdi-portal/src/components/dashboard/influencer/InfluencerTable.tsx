@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import DotsThreeVertical from "phosphor-react/dist/icons/DotsThreeVertical.esm.js";
@@ -13,9 +13,9 @@ import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
 import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
 import { proxyImageUrl } from "@/lib/influencer/proxy";
-import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
+import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
-import type { Influencer, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
+import type { Influencer, InfluencerCampaign, CampaignStatus, CampaignBasic } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
 function formatFollowers(n: number | null): string {
@@ -28,6 +28,22 @@ function formatFollowers(n: number | null): string {
 function formatEngagementRate(n: number | null): string {
   if (n === null) return "—";
   return `${n.toFixed(1)}%`;
+}
+
+function formatKRW(n: number): string {
+  if (n === 0) return "—";
+  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
+  if (n >= 10_000) return `${Math.round(n / 10_000)}만`;
+  return `${n.toLocaleString()}원`;
+}
+
+function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-slate-200 rounded-full text-[11px] text-slate-600">
+      {label}
+      <button type="button" onClick={onRemove} className="text-slate-400 hover:text-rose-500" aria-label="제거">×</button>
+    </span>
+  );
 }
 
 function ErTierEvaluation({ er, follower }: { er: number | null; follower: number | null }) {
@@ -171,9 +187,11 @@ interface StatusCellProps {
   influencerUsername: string;
   onRefresh: () => void;
   onOpenDetail: (id: string) => void;
+  filters: FilterState;
+  onFiltersChange: (next: FilterState) => void;
 }
 
-function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onOpenDetail }: StatusCellProps) {
+function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onOpenDetail, filters, onFiltersChange }: StatusCellProps) {
   const [, startTransition] = useTransition();
 
   if (!campaign) {
@@ -217,17 +235,31 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onO
 
   return (
     <div className="relative inline-flex items-center" onClick={(e) => e.stopPropagation()}>
-      <StatusBadge status={campaign.status} type="campaign" />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          const next = filters.campaignStatuses.includes(campaign.status)
+            ? filters.campaignStatuses.filter((s) => s !== campaign.status)
+            : [...filters.campaignStatuses, campaign.status];
+          onFiltersChange({ ...filters, campaignStatuses: next });
+        }}
+        title="이 상태로 필터"
+        className="hover:opacity-80"
+      >
+        <StatusBadge status={campaign.status} type="campaign" />
+      </button>
       <select
         value={campaign.status}
         onChange={handleChange}
         aria-label="시딩 상태 변경"
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        className="absolute inset-y-0 -right-4 w-4 opacity-0 cursor-pointer"
       >
         {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
+      <span className="text-[10px] text-slate-400 ml-0.5" aria-hidden>▾</span>
     </div>
   );
 }
@@ -235,13 +267,27 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onO
 interface Props {
   influencers: Influencer[];
   activeCampaigns: InfluencerCampaign[];
+  allCampaigns: CampaignBasic[];
   filters: FilterState;
+  onFiltersChange: (next: FilterState) => void;
   onSelectInfluencer: (id: string) => void;
   onRefresh: () => void;
 }
 
-export default function InfluencerTable({ influencers, activeCampaigns, filters, onSelectInfluencer, onRefresh }: Props) {
+export default function InfluencerTable({ influencers, activeCampaigns, allCampaigns, filters, onFiltersChange, onSelectInfluencer, onRefresh }: Props) {
   const [resyncingAll, startResyncAll] = useTransition();
+
+  // influencer_id → {totalCost, count}
+  const seedingByInfluencer = useMemo(() => {
+    const map = new Map<string, { totalCost: number; count: number }>();
+    for (const c of allCampaigns) {
+      const cur = map.get(c.influencer_id) ?? { totalCost: 0, count: 0 };
+      cur.totalCost += c.cost ?? 0;
+      cur.count += 1;
+      map.set(c.influencer_id, cur);
+    }
+    return map;
+  }, [allCampaigns]);
 
   function handleResyncAll() {
     const activeCount = influencers.filter((i) => i.status === "active").length;
@@ -292,6 +338,22 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
       const infTags = inf.tags ?? [];
       if (!filters.tags.every((t) => infTags.includes(t))) return false;
     }
+    // 캠페인 상태 필터
+    if (filters.campaignStatuses.length > 0) {
+      const c = campaignMap.get(inf.id);
+      if (!c || !filters.campaignStatuses.includes(c.status)) return false;
+    }
+    // 날짜 마일스톤 필터
+    if (filters.dateMilestone) {
+      const d = filters.dateMilestone;
+      const hasMilestone = allCampaigns.some(
+        (c) => c.influencer_id === inf.id && (
+          c.contact_date === d || c.contract_date === d || c.ship_date === d ||
+          c.content_deadline === d || c.expected_post_date === d
+        )
+      );
+      if (!hasMilestone) return false;
+    }
     return true;
   });
 
@@ -327,6 +389,38 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
         </div>
       </div>
 
+      {/* 활성 필터 칩 */}
+      {(filters.grades.length > 0 || filters.campaignStatuses.length > 0 || filters.dateMilestone) && (
+        <div className="flex flex-wrap items-center gap-1.5 px-6 py-2 border-b border-slate-50 bg-slate-50/40">
+          <span className="text-[11px] text-slate-400">필터:</span>
+          {filters.grades.map((g) => (
+            <Chip
+              key={`g-${g}`}
+              label={`등급 ${g === "UNRATED" ? "미분류" : g}`}
+              onRemove={() => onFiltersChange({ ...filters, grades: filters.grades.filter((x) => x !== g) })}
+            />
+          ))}
+          {filters.campaignStatuses.map((s) => (
+            <Chip
+              key={`s-${s}`}
+              label={`상태: ${CAMPAIGN_STATUS_LABEL[s] ?? s}`}
+              onRemove={() => onFiltersChange({ ...filters, campaignStatuses: filters.campaignStatuses.filter((x) => x !== s) })}
+            />
+          ))}
+          {filters.dateMilestone && (
+            <Chip
+              label={`날짜 ${filters.dateMilestone}`}
+              onRemove={() => onFiltersChange({ ...filters, dateMilestone: null })}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => onFiltersChange({ ...filters, grades: [], campaignStatuses: [], dateMilestone: null })}
+            className="ml-auto text-[11px] text-slate-500 hover:text-slate-700"
+          >전체 해제</button>
+        </div>
+      )}
+
       {/* 테이블 */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -336,6 +430,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
               <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">ER</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">팔로워</th>
               <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">AI 등급</th>
+              <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">시딩 금액</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">상태</th>
               <th className="px-4 py-3 w-10" />
             </tr>
@@ -343,93 +438,119 @@ export default function InfluencerTable({ influencers, activeCampaigns, filters,
           <tbody className="divide-y divide-slate-50">
             {displayed.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
+                <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400">
                   인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요.
                 </td>
               </tr>
             ) : (
-              displayed.map((inf) => (
-                <tr
-                  key={inf.id}
-                  onClick={() => onSelectInfluencer(inf.id)}
-                  className="hover:bg-slate-50/60 cursor-pointer transition-colors group"
-                >
-                  {/* 인플루언서 */}
-                  <td className="px-6 py-3">
-                    <div className="flex items-center gap-3">
-                      {/* 프로필 이미지 */}
-                      <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 ring-1 ring-slate-100">
-                        {inf.profile_image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={proxyImageUrl(inf.profile_image_url) ?? ""}
-                            alt={inf.username}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">
-                            {inf.username.charAt(0).toUpperCase()}
-                          </div>
-                        )}
+              displayed.map((inf) => {
+                const seeding = seedingByInfluencer.get(inf.id);
+                return (
+                  <tr
+                    key={inf.id}
+                    onClick={() => onSelectInfluencer(inf.id)}
+                    className="hover:bg-slate-50/60 cursor-pointer transition-colors group"
+                  >
+                    {/* 인플루언서 */}
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 ring-1 ring-slate-100">
+                          {inf.profile_image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={proxyImageUrl(inf.profile_image_url) ?? ""}
+                              alt={inf.username}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">
+                              {inf.username.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">@{inf.username}</p>
+                          {inf.display_name && (
+                            <p className="text-xs text-slate-500 truncate leading-tight">{inf.display_name}</p>
+                          )}
+                          {inf.category && (
+                            <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium leading-none">
+                              {inf.category}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {/* 이름 + display_name + category */}
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-800 truncate">@{inf.username}</p>
-                        {inf.display_name && (
-                          <p className="text-xs text-slate-500 truncate leading-tight">{inf.display_name}</p>
-                        )}
-                        {inf.category && (
-                          <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium leading-none">
-                            {inf.category}
-                          </span>
-                        )}
+                    </td>
+
+                    {/* ER */}
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <div className="font-medium text-slate-700">{formatEngagementRate(inf.engagement_rate)}</div>
+                      <ErTierEvaluation er={inf.engagement_rate} follower={inf.follower_count} />
+                    </td>
+
+                    {/* 팔로워 */}
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <div className="text-slate-600">{formatFollowers(inf.follower_count)}</div>
+                      {(() => {
+                        const tier = getTier(inf.follower_count);
+                        return tier ? (
+                          <span className="text-[10px] text-slate-400 font-medium">{tier.shortLabel}</span>
+                        ) : null;
+                      })()}
+                    </td>
+
+                    {/* AI 등급 */}
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const next = filters.grades.includes(inf.grade)
+                            ? filters.grades.filter((g) => g !== inf.grade)
+                            : [...filters.grades, inf.grade];
+                          onFiltersChange({ ...filters, grades: next });
+                        }}
+                        title="이 등급으로 필터"
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                      >
+                        <GradeBadge grade={inf.grade} />
+                      </button>
+                    </td>
+
+                    {/* 시딩 금액 */}
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <div className="font-medium text-slate-700">
+                        {seeding && seeding.totalCost > 0 ? formatKRW(seeding.totalCost) : "—"}
                       </div>
-                    </div>
-                  </td>
+                      {seeding && seeding.count > 0 && (
+                        <div className="text-[10px] text-slate-400">{seeding.count}건</div>
+                      )}
+                    </td>
 
-                  {/* ER */}
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    <div className="font-medium text-slate-700">{formatEngagementRate(inf.engagement_rate)}</div>
-                    <ErTierEvaluation er={inf.engagement_rate} follower={inf.follower_count} />
-                  </td>
+                    {/* 상태 */}
+                    <td className="px-4 py-3">
+                      <StatusCell
+                        campaign={campaignMap.get(inf.id)}
+                        influencerId={inf.id}
+                        influencerUsername={inf.username}
+                        onRefresh={onRefresh}
+                        onOpenDetail={onSelectInfluencer}
+                        filters={filters}
+                        onFiltersChange={onFiltersChange}
+                      />
+                    </td>
 
-                  {/* 팔로워 */}
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    <div className="text-slate-600">{formatFollowers(inf.follower_count)}</div>
-                    {(() => {
-                      const tier = getTier(inf.follower_count);
-                      return tier ? (
-                        <span className="text-[10px] text-slate-400 font-medium">{tier.shortLabel}</span>
-                      ) : null;
-                    })()}
-                  </td>
-
-                  {/* AI 등급 */}
-                  <td className="px-4 py-3 text-center">
-                    <GradeBadge grade={inf.grade} />
-                  </td>
-
-                  {/* 상태 */}
-                  <td className="px-4 py-3">
-                    <StatusCell
-                      campaign={campaignMap.get(inf.id)}
-                      influencerId={inf.id}
-                      influencerUsername={inf.username}
-                      onRefresh={onRefresh}
-                      onOpenDetail={onSelectInfluencer}
-                    />
-                  </td>
-
-                  {/* 메뉴 */}
-                  <td className="px-4 py-3">
-                    <RowMenu
-                      influencerId={inf.id}
-                      onViewDetail={() => onSelectInfluencer(inf.id)}
-                      onRefresh={onRefresh}
-                    />
-                  </td>
-                </tr>
-              ))
+                    {/* 메뉴 */}
+                    <td className="px-4 py-3">
+                      <RowMenu
+                        influencerId={inf.id}
+                        onViewDetail={() => onSelectInfluencer(inf.id)}
+                        onRefresh={onRefresh}
+                      />
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

@@ -10,6 +10,8 @@ export interface FilterState {
   categories: string[];
   status: InfluencerStatus | "all";
   tags: string[];
+  campaignStatuses: import("@/lib/influencer/types").CampaignStatus[];
+  dateMilestone: string | null;
 }
 
 export const DEFAULT_FILTER_STATE: FilterState = {
@@ -18,6 +20,8 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   categories: [],
   status: "all",
   tags: [],
+  campaignStatuses: [],
+  dateMilestone: null,
 };
 
 interface Props {
