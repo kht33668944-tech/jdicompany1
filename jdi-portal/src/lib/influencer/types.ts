@@ -42,6 +42,9 @@ export interface AiInsights {
   fake_signal: string | null;
 }
 
+export type InfluencerPostType = "image" | "video" | "carousel";
+export type InfluencerProductType = "feed" | "clips" | "igtv";
+
 export interface InfluencerPost {
   id: string;
   influencer_id: string;
@@ -52,6 +55,13 @@ export interface InfluencerPost {
   comments: number | null;
   posted_at: string | null;
   fetched_at: string;
+  post_type: InfluencerPostType | null;
+  product_type: InfluencerProductType | null;
+  view_count: number | null;
+  is_sponsored: boolean;
+  hashtags: string[];
+  child_thumbnails: string[];
+  video_url: string | null;
 }
 
 export interface InfluencerCampaign {

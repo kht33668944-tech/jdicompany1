@@ -316,3 +316,34 @@ export async function deleteCampaign(id: string): Promise<void> {
   if (error) throw error;
   revalidatePath("/dashboard/influencer");
 }
+
+// 인플루언서 라이트박스에서 게시물을 캠페인의 실제 결과 게시물로 연결.
+// post_url + actual_post_date 채우고 status를 'posted'로 자동 전환.
+export async function linkPostToCampaign(
+  campaign_id: string,
+  post_url: string,
+  posted_at: string | null,
+): Promise<InfluencerCampaign> {
+  await getSessionUserId();
+  const supabase = await createClient();
+
+  const actualPostDate = posted_at
+    ? new Date(posted_at).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("influencer_campaigns")
+    .update({
+      post_url,
+      actual_post_date: actualPostDate,
+      status: "posted" as CampaignStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", campaign_id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  revalidatePath("/dashboard/influencer");
+  return data as InfluencerCampaign;
+}

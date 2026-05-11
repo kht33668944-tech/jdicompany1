@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import type { InfluencerWithPosts, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
+import type { InfluencerWithPosts, InfluencerCampaign, CampaignStatus, InfluencerPost } from "@/lib/influencer/types";
 import {
   updateInfluencerNotes,
   updateInfluencerTags,
@@ -17,6 +17,8 @@ import {
 } from "@/lib/influencer/actions";
 import GradeBadge from "./GradeBadge";
 import StatusBadge from "./StatusBadge";
+import InfluencerMediaGallery from "./InfluencerMediaGallery";
+import PostLightbox from "./PostLightbox";
 import { proxyImageUrl } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
 import {
@@ -378,6 +380,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [activePost, setActivePost] = useState<InfluencerPost | null>(null);
 
   const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visible = phase !== "closed";
@@ -393,6 +396,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       setCampaigns([]);
       setShowAddCampaign(false);
       setEditingCampaignId(null);
+      setActivePost(null);
     } else if (prevId) {
       setPhase("closing");
     }
@@ -435,10 +439,10 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
         .then(async (inf) => {
           const { data: posts } = await supabase
             .from("influencer_posts")
-            .select("id, influencer_id, post_url, thumbnail_url, caption, likes, comments, posted_at, fetched_at")
+            .select("id, influencer_id, post_url, thumbnail_url, caption, likes, comments, posted_at, fetched_at, post_type, product_type, view_count, is_sponsored, hashtags, child_thumbnails, video_url")
             .eq("influencer_id", influencerId)
             .order("posted_at", { ascending: false, nullsFirst: false })
-            .limit(12);
+            .limit(20);
           return { ...inf, recent_posts: posts ?? [] } as InfluencerWithPosts;
         }),
       supabase
@@ -587,14 +591,32 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* 배경 오버레이 */}
+      {/* 배경 오버레이 — 모바일/태블릿에서는 단색, 데스크탑은 갤러리가 차지 */}
       <div
-        className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-220 ${
+        className={`absolute inset-0 lg:hidden bg-black/30 backdrop-blur-sm transition-opacity duration-220 ${
           sliding ? "opacity-100" : "opacity-0"
         }`}
         onClick={onClose}
         aria-hidden="true"
       />
+      <div
+        className={`absolute inset-0 hidden lg:block bg-slate-950/85 transition-opacity duration-220 ${
+          sliding ? "opacity-100" : "opacity-0"
+        }`}
+        aria-hidden="true"
+      />
+
+      {/* 좌측 와이드 갤러리 (lg 이상에서만) */}
+      {influencer && (
+        <div className="hidden lg:flex absolute inset-y-0 left-0 right-[560px] flex-col">
+          <InfluencerMediaGallery
+            influencer={influencer}
+            visible={sliding}
+            onPostClick={setActivePost}
+            onClose={onClose}
+          />
+        </div>
+      )}
 
       {/* 패널 */}
       <div
@@ -828,9 +850,9 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                 </div>
               )}
 
-              {/* 최근 게시물 */}
+              {/* 최근 게시물 — lg 미만 전용. 데스크탑은 좌측 갤러리가 대체 */}
               {influencer.recent_posts.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 lg:hidden">
                   <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     최근 게시물
                   </h4>
@@ -1055,6 +1077,22 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
           </div>
         )}
       </div>
+
+      {/* 라이트박스 */}
+      {activePost && influencer && (
+        <PostLightbox
+          post={activePost}
+          influencer={influencer}
+          campaigns={campaigns.filter((c) => c.status !== "done")}
+          onClose={() => setActivePost(null)}
+          onCampaignLinked={(updated) => {
+            setCampaigns((prev) =>
+              prev.map((c) => (c.id === updated.id ? updated : c)),
+            );
+            setActivePost(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -25,6 +25,35 @@ interface ApifyPost {
   likesCount?: number;
   commentsCount?: number;
   timestamp?: string;
+  type?: "Image" | "Video" | "Sidecar";
+  productType?: "clips" | "feed" | "igtv";
+  videoUrl?: string;
+  videoViewCount?: number;
+  hashtags?: string[];
+  childPosts?: Array<{ displayUrl?: string }>;
+}
+
+// ⚠️ 동일 정규식이 src/lib/influencer/post-utils.ts에도 존재 — 양쪽 동기 유지 필수
+const SPONSORED_RE =
+  /(\[?\s*AD\s*\]?|광고|협찬|유료\s*광고|sponsored|#광고|#협찬|#ad\b|#sponsored)/i;
+
+function detectSponsored(caption: string | null | undefined): boolean {
+  if (!caption) return false;
+  return SPONSORED_RE.test(caption);
+}
+
+function extractHashtags(caption: string | null | undefined): string[] {
+  if (!caption) return [];
+  return Array.from(caption.matchAll(/#([\w가-힣]+)/g)).map((m) => m[1]);
+}
+
+function mapPostType(
+  t: ApifyPost["type"],
+): "image" | "video" | "carousel" | null {
+  if (t === "Sidecar") return "carousel";
+  if (t === "Video") return "video";
+  if (t === "Image") return "image";
+  return null;
 }
 
 interface ApifyProfileResult {
@@ -252,17 +281,35 @@ Deno.serve(async (req) => {
       .eq("influencer_id", influencerId);
 
     if (posts.length > 0) {
-      const postRows = posts.map((p) => ({
-        influencer_id: influencerId,
-        post_url: p.url ?? (p.shortCode
-          ? `https://www.instagram.com/p/${p.shortCode}/`
-          : null),
-        thumbnail_url: p.displayUrl ?? null,
-        caption: p.caption ?? null,
-        likes: p.likesCount ?? 0,
-        comments: p.commentsCount ?? 0,
-        posted_at: p.timestamp ?? null,
-      }));
+      const postRows = posts.map((p) => {
+        const apifyHashtags = (p.hashtags ?? []).filter((h): h is string =>
+          typeof h === "string" && h.length > 0
+        );
+        const hashtags = apifyHashtags.length > 0
+          ? apifyHashtags
+          : extractHashtags(p.caption);
+        const children = (p.childPosts ?? [])
+          .map((c) => c.displayUrl)
+          .filter((u): u is string => typeof u === "string" && u.length > 0);
+        return {
+          influencer_id: influencerId,
+          post_url: p.url ?? (p.shortCode
+            ? `https://www.instagram.com/p/${p.shortCode}/`
+            : null),
+          thumbnail_url: p.displayUrl ?? null,
+          caption: p.caption ?? null,
+          likes: p.likesCount ?? 0,
+          comments: p.commentsCount ?? 0,
+          posted_at: p.timestamp ?? null,
+          post_type: mapPostType(p.type),
+          product_type: p.productType ?? null,
+          view_count: p.videoViewCount ?? null,
+          is_sponsored: detectSponsored(p.caption),
+          hashtags,
+          child_thumbnails: children,
+          video_url: p.videoUrl ?? null,
+        };
+      });
 
       const { error: postsError } = await supabaseAdmin
         .from("influencer_posts")
