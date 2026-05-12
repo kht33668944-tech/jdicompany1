@@ -85,7 +85,7 @@ export default function SeedingTimeline({ campaigns }: Props) {
           예정된 시딩 일정이 없습니다
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-3 max-h-[240px] overflow-y-auto no-scrollbar">
           {items.map((item, idx) => (
             <li key={`${item.campaignId}-${item.actionLabel}-${idx}`} className="flex items-start gap-3">
               <div className="mt-1.5 shrink-0 flex flex-col items-center">
