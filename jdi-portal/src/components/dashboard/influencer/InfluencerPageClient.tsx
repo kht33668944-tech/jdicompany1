@@ -7,7 +7,7 @@ import KpiCards from "./KpiCards";
 import InfluencerTable from "./InfluencerTable";
 import InfluencerFilters, { DEFAULT_FILTER_STATE } from "./InfluencerFilters";
 import SeedingTimeline from "./SeedingTimeline";
-import SeedingFunnel from "./SeedingFunnel";
+import SeedingSidebarCard from "./SeedingSidebarCard";
 import InfluencerDetailPanel from "./InfluencerDetailPanel";
 import InfluencerTabs from "./InfluencerTabs";
 import type { CampaignBasic, Influencer, InfluencerCampaignWithInfluencer, KpiCards as KpiCardsType } from "@/lib/influencer/types";
@@ -65,11 +65,13 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
         {/* 우측 사이드바: 시딩 스케줄 + 시딩 깔때기 */}
         <div className="flex flex-col gap-3 sm:gap-4">
           <SeedingTimeline campaigns={activeCampaigns} />
-          <SeedingFunnel
+          <SeedingSidebarCard
             influencers={influencers}
             activeCampaigns={activeCampaigns}
             filters={filters}
             onFiltersChange={setFilters}
+            onInfluencerClick={(id) => setSelectedId(id)}
+            onRefresh={handleRefresh}
           />
         </div>
       </div>

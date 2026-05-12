@@ -68,17 +68,7 @@ export default function SeedingFunnel({ influencers, activeCampaigns, filters, o
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100">
-        <h3 className="text-sm font-semibold text-slate-800">시딩 진행현황</h3>
-        <span className="text-[11px] text-slate-400 tabular-nums">
-          {influencers.length}명 · {activeCampaigns.length}건
-        </span>
-      </div>
-
-      {/* 단계 목록 */}
-      <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-0.5">
         {STEPS.map((step, idx) => {
           const count = stepCounts[idx];
           const active = isActive(step.key);
@@ -114,7 +104,6 @@ export default function SeedingFunnel({ influencers, activeCampaigns, filters, o
             </button>
           );
         })}
-      </div>
     </div>
   );
 }
