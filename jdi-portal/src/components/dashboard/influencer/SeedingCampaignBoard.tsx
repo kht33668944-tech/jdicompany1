@@ -11,7 +11,53 @@ import {
   addDaysStr,
   getCampaignDatesInRange,
   getTodayCampaignTasks,
+  getMilestoneStyle,
+  type MilestoneKind,
 } from "@/lib/influencer/calendar";
+
+const STATUS_BORDER: Record<CampaignStatus, string> = {
+  planned: "border-l-slate-300",
+  dm_sent: "border-l-blue-400",
+  replied: "border-l-cyan-400",
+  shipped: "border-l-amber-400",
+  posted: "border-l-violet-400",
+  done: "border-l-emerald-400",
+};
+
+function pickNextMilestone(
+  campaign: InfluencerCampaignWithInfluencer,
+): { kind: MilestoneKind; date: string } | null {
+  const today = kstTodayStr();
+  const candidates: { kind: MilestoneKind; date: string }[] = [];
+  if (campaign.contact_date) candidates.push({ kind: "dm", date: campaign.contact_date });
+  if (campaign.contract_date) candidates.push({ kind: "contract", date: campaign.contract_date });
+  if (campaign.ship_date) candidates.push({ kind: "ship", date: campaign.ship_date });
+  if (campaign.content_deadline) candidates.push({ kind: "deadline", date: campaign.content_deadline });
+  if (campaign.expected_post_date) candidates.push({ kind: "post", date: campaign.expected_post_date });
+  if (candidates.length === 0) return null;
+  const future = candidates
+    .filter((c) => c.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (future.length > 0) return future[0];
+  return candidates.sort((a, b) => b.date.localeCompare(a.date))[0];
+}
+
+function shortMD(dateStr: string): string {
+  const [, m, d] = dateStr.split("-");
+  return `${parseInt(m, 10)}/${parseInt(d, 10)}`;
+}
+
+function formatCostShort(n: number): string {
+  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억원`;
+  if (n >= 10_000) return `${Math.round(n / 10_000)}만원`;
+  return `${n.toLocaleString()}원`;
+}
+
+function cleanDisplayName(displayName: string | null | undefined): string | null {
+  if (!displayName) return null;
+  const beforePipe = displayName.split("|")[0].trim();
+  return beforePipe || displayName;
+}
 
 interface Props {
   campaigns: InfluencerCampaignWithInfluencer[];
@@ -64,77 +110,87 @@ function CampaignCard({
     if (onInfluencerClick) onInfluencerClick(campaign.influencer_id);
   }
 
+  const username = campaign.influencer?.username ?? null;
+  const displayName = cleanDisplayName(campaign.influencer?.display_name);
+  const hasDisplayName = displayName !== null && displayName !== `@${username}`;
+  const isAutoName = username !== null && campaign.campaign_name === `@${username} 시딩`;
+
+  const milestone = pickNextMilestone(campaign);
+  const metaParts: React.ReactNode[] = [];
+  if (!isAutoName && campaign.campaign_name) {
+    metaParts.push(
+      <span key="name" className="text-slate-600 font-medium">{campaign.campaign_name}</span>,
+    );
+  }
+  if (campaign.product_name) {
+    metaParts.push(<span key="product">{campaign.product_name}</span>);
+  }
+  if (milestone) {
+    const style = getMilestoneStyle(milestone.kind);
+    metaParts.push(
+      <span key="ms" className="tabular-nums">
+        {style.icon} {shortMD(milestone.date)}
+      </span>,
+    );
+  }
+  if (campaign.cost !== null) {
+    metaParts.push(<span key="cost" className="tabular-nums">{formatCostShort(campaign.cost)}</span>);
+  }
+
   return (
-    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
-      <div className="flex items-start justify-between gap-2">
+    <div
+      className={`bg-slate-50 rounded-lg pl-3 pr-2.5 py-2 border border-slate-100 border-l-4 ${STATUS_BORDER[campaign.status]} hover:bg-slate-100/70 transition-colors`}
+    >
+      {/* 1행: 인플 + 상태 dropdown */}
+      <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={handleHeaderClick}
           disabled={!onInfluencerClick}
-          className="min-w-0 text-left flex-1 group disabled:cursor-default"
+          className="min-w-0 flex-1 text-left flex items-baseline gap-1.5 group disabled:cursor-default"
         >
-          {campaign.influencer && (
-            <div className="mb-1">
-              <p className="text-xs font-medium text-slate-700 truncate group-hover:text-blue-600 transition-colors">
-                @{campaign.influencer.username}
-              </p>
-              {campaign.influencer.display_name && (
-                <p className="text-[10px] text-slate-400 truncate leading-tight">
-                  {campaign.influencer.display_name}
-                </p>
+          {username ? (
+            <>
+              <span className="text-sm font-semibold text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+                @{username}
+              </span>
+              {hasDisplayName && (
+                <span className="text-xs text-slate-500 truncate">· {displayName}</span>
               )}
-            </div>
-          )}
-          <p className="text-sm font-medium text-slate-800 leading-tight truncate">
-            {campaign.campaign_name}
-          </p>
-          {campaign.product_name && (
-            <p className="text-xs text-slate-400 mt-0.5 truncate">{campaign.product_name}</p>
+            </>
+          ) : (
+            <span className="text-sm font-medium text-slate-700 truncate">{campaign.campaign_name}</span>
           )}
         </button>
-        <StatusBadge status={campaign.status} type="campaign" />
+        <div className="relative inline-flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+          <StatusBadge status={campaign.status} type="campaign" />
+          <span className="text-[10px] text-slate-400 ml-0.5" aria-hidden>▾</span>
+          <select
+            value={campaign.status}
+            onChange={handleStatusChange}
+            aria-label="캠페인 상태 변경"
+            className="absolute inset-0 w-full opacity-0 cursor-pointer"
+          >
+            {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-[11px] text-slate-400">
-        {campaign.ship_date && (
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block" />
-            발송 {campaign.ship_date}
-          </span>
-        )}
-        {campaign.contract_date && (
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
-            계약 {campaign.contract_date}
-          </span>
-        )}
-        {campaign.content_deadline && (
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block" />
-            마감 {campaign.content_deadline}
-          </span>
-        )}
-        {campaign.expected_post_date && (
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 inline-block" />
-            포스팅 {campaign.expected_post_date}
-          </span>
-        )}
-        {campaign.cost !== null && (
-          <span>{campaign.cost.toLocaleString()}원</span>
+      {/* 2행: 메타 (캠페인명·제품·일정·비용) */}
+      <div className="mt-0.5 text-[11px] text-slate-500 truncate">
+        {metaParts.length === 0 ? (
+          <span className="text-slate-400 italic">일정/제품 미입력</span>
+        ) : (
+          metaParts.map((part, i) => (
+            <span key={i}>
+              {i > 0 && <span className="text-slate-300 mx-1.5">·</span>}
+              {part}
+            </span>
+          ))
         )}
       </div>
-
-      <select
-        value={campaign.status}
-        onChange={handleStatusChange}
-        className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-        aria-label="캠페인 상태 변경"
-      >
-        {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
     </div>
   );
 }
