@@ -183,82 +183,84 @@ export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMileston
 
   return (
     <>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 flex items-center gap-3 flex-wrap">
-        {/* URL 입력 */}
-        <div className="flex-1 min-w-0 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-          <Link size={16} className="text-slate-400 shrink-0" />
-          <input
-            ref={inputRef}
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="https://www.instagram.com/username"
-            className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none min-w-0"
-          />
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-3 py-3 sm:px-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+        {/* URL + 분석 (모바일 1행 / 데스크탑은 contents) */}
+        <div className="flex items-center gap-2 min-w-0 sm:contents">
+          <div className="flex-1 min-w-0 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 sm:flex-1">
+            <Link size={16} className="text-slate-400 shrink-0" />
+            <input
+              ref={inputRef}
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="https://www.instagram.com/username"
+              className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none min-w-0"
+            />
+          </div>
+          <button
+            onClick={handleAdd}
+            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 active:bg-slate-900 transition-colors shrink-0"
+          >
+            <Plus size={14} weight="bold" />
+            <span className="hidden sm:inline">분석 및 추가</span>
+            <span className="sm:hidden">분석</span>
+          </button>
         </div>
 
-        {/* 분석 및 추가 버튼 */}
-        <button
-          onClick={handleAdd}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 active:bg-slate-900 transition-colors shrink-0"
-        >
-          <Plus size={14} weight="bold" />
-          분석 및 추가
-        </button>
-
-        {/* 일괄 추가 버튼 */}
-        <button
-          onClick={() => setBulkOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0"
-        >
-          <Rows size={14} />
-          일괄 추가
-        </button>
-
-        {/* 필터 버튼 */}
-        <button
-          onClick={onFilterClick}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0"
-        >
-          <FunnelSimple size={14} />
-          필터
-        </button>
-
-        {/* 날짜 버튼 */}
-        {dateMilestone ? (
-          <div
-            ref={dateButtonRef as unknown as RefObject<HTMLDivElement>}
-            className="inline-flex items-stretch rounded-xl border border-blue-300 bg-blue-50 overflow-hidden shrink-0"
+        {/* 일괄/필터/날짜 (모바일 2행 / 데스크탑은 contents) */}
+        <div className="grid grid-cols-3 gap-2 sm:contents">
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0 sm:justify-start"
           >
+            <Rows size={14} />
+            <span className="hidden sm:inline">일괄 추가</span>
+            <span className="sm:hidden">일괄</span>
+          </button>
+
+          <button
+            onClick={onFilterClick}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0 sm:justify-start"
+          >
+            <FunnelSimple size={14} />
+            필터
+          </button>
+
+          {dateMilestone ? (
+            <div
+              ref={dateButtonRef as unknown as RefObject<HTMLDivElement>}
+              className="inline-flex items-stretch rounded-xl border border-blue-300 bg-blue-50 overflow-hidden shrink-0"
+            >
+              <button
+                type="button"
+                onClick={() => setCalOpen((v) => !v)}
+                className="inline-flex flex-1 items-center justify-center sm:justify-start gap-1.5 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              >
+                <CalendarBlank size={14} />
+                {`📅 ${dateLabel}`}
+              </button>
+              <button
+                type="button"
+                onClick={() => onDateMilestoneChange(null)}
+                className="inline-flex items-center px-2 py-2 text-blue-500 hover:bg-blue-200 transition-colors"
+                aria-label="날짜 초기화"
+              >
+                <X size={10} weight="bold" />
+              </button>
+            </div>
+          ) : (
             <button
+              ref={dateButtonRef as unknown as RefObject<HTMLButtonElement>}
               type="button"
               onClick={() => setCalOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0 sm:justify-start"
             >
               <CalendarBlank size={14} />
-              {`📅 ${dateLabel}`}
+              날짜
             </button>
-            <button
-              type="button"
-              onClick={() => onDateMilestoneChange(null)}
-              className="inline-flex items-center px-2 py-2 text-blue-500 hover:bg-blue-200 transition-colors"
-              aria-label="날짜 초기화"
-            >
-              <X size={10} weight="bold" />
-            </button>
-          </div>
-        ) : (
-          <button
-            ref={dateButtonRef as unknown as RefObject<HTMLButtonElement>}
-            type="button"
-            onClick={() => setCalOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0"
-          >
-            <CalendarBlank size={14} />
-            날짜
-          </button>
-        )}
+          )}
+        </div>
       </div>
 
       {calOpen && (

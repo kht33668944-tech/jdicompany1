@@ -504,56 +504,53 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-slate-800 shrink-0">
-            인플루언서 리스트 관리
-            <span className="ml-2 text-xs font-normal text-slate-400">{sorted.length}명</span>
-          </h2>
-          {/* 검색창: 아이디·이름·카테고리·바이오·태그 통합 검색 */}
-          <div className="relative w-full max-w-xs">
-            <MagnifyingGlass
-              size={14}
-              weight="bold"
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            />
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-              placeholder="아이디·이름·카테고리·태그 검색"
-              className="w-full pl-7 pr-7 py-1.5 text-xs rounded-md border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-colors placeholder:text-slate-400"
-            />
-            {filters.search && (
-              <button
-                type="button"
-                onClick={() => onFiltersChange({ ...filters, search: "" })}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                aria-label="검색어 지우기"
-              >
-                <X size={12} weight="bold" />
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleResyncAll}
-            disabled={resyncingAll}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="활성 인플루언서 전체를 Apify로 다시 긁어옵니다"
-          >
-            <ArrowsClockwise size={12} weight="bold" className={resyncingAll ? "animate-spin" : ""} />
-            {resyncingAll ? "동기화 중..." : "전체 재동기화"}
-          </button>
+      {/* 헤더 — 모바일: 제목+재동기화 1행 / 검색 별도 행. 데스크탑: 한 줄 */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100">
+        <h2 className="text-sm font-semibold text-slate-800 shrink-0">
+          인플루언서 리스트 관리
+          <span className="ml-2 text-xs font-normal text-slate-400">{sorted.length}명</span>
+        </h2>
+        <button
+          type="button"
+          onClick={handleResyncAll}
+          disabled={resyncingAll}
+          className="ml-auto sm:ml-0 sm:order-3 shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="활성 인플루언서 전체를 Apify로 다시 긁어옵니다"
+        >
+          <ArrowsClockwise size={12} weight="bold" className={resyncingAll ? "animate-spin" : ""} />
+          <span className="hidden sm:inline">{resyncingAll ? "동기화 중..." : "전체 재동기화"}</span>
+          <span className="sm:hidden">재동기화</span>
+        </button>
+        {/* 검색창: 아이디·이름·카테고리·바이오·태그 통합 검색 */}
+        <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-xs sm:order-2">
+          <MagnifyingGlass
+            size={14}
+            weight="bold"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
+          <input
+            type="text"
+            value={filters.search}
+            onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+            placeholder="아이디·이름·카테고리·태그 검색"
+            className="w-full pl-7 pr-7 py-1.5 text-xs rounded-md border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-colors placeholder:text-slate-400"
+          />
+          {filters.search && (
+            <button
+              type="button"
+              onClick={() => onFiltersChange({ ...filters, search: "" })}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              aria-label="검색어 지우기"
+            >
+              <X size={12} weight="bold" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* 활성 필터 칩 */}
       {(filters.grades.length > 0 || filters.followerTiers.length > 0 || filters.campaignStatuses.length > 0 || filters.dateMilestone) && (
-        <div className="flex flex-wrap items-center gap-1.5 px-6 py-2 border-b border-slate-50 bg-slate-50/40">
+        <div className="flex flex-wrap items-center gap-1.5 px-4 sm:px-6 py-2 border-b border-slate-50 bg-slate-50/40">
           <span className="text-[11px] text-slate-400">필터:</span>
           {filters.grades.map((g) => (
             <Chip
@@ -590,8 +587,126 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
         </div>
       )}
 
-      {/* 테이블 — 페이지 전체가 길어지지 않도록 컨테이너 안에서 스크롤 (sticky 헤더, 스크롤바 숨김) */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px] no-scrollbar">
+      {/* 모바일 카드 리스트 (sm 미만) */}
+      <div className="sm:hidden divide-y divide-slate-100 overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px] no-scrollbar">
+        {displayed.length === 0 ? (
+          <div className="px-4 py-12 text-center text-sm text-slate-400">
+            인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요.
+          </div>
+        ) : (
+          displayed.map((inf) => {
+            const seeding = seedingByInfluencer.get(inf.id);
+            const tier = getTier(inf.follower_count);
+            return (
+              <div
+                key={inf.id}
+                onClick={() => onSelectInfluencer(inf.id)}
+                className="px-4 py-3 hover:bg-slate-50/60 cursor-pointer transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  {/* 아바타 */}
+                  <div className="w-11 h-11 rounded-full bg-slate-200 overflow-hidden shrink-0 ring-1 ring-slate-100 relative">
+                    {(() => {
+                      const src = resolveMediaUrl(inf.profile_image_url, inf.profile_image_path);
+                      return src ? (
+                        <Image
+                          src={src}
+                          alt={inf.username}
+                          width={44}
+                          height={44}
+                          sizes="44px"
+                          className="w-full h-full object-cover"
+                          unoptimized={shouldSkipOptimize(src)}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">
+                          {inf.username.charAt(0).toUpperCase()}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* 컨텐츠 */}
+                  <div className="flex-1 min-w-0">
+                    {/* 1행: 아이디 + 등급 + 메뉴 */}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-slate-800 truncate text-sm">@{inf.username}</p>
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const next = filters.grades.includes(inf.grade)
+                              ? filters.grades.filter((g) => g !== inf.grade)
+                              : [...filters.grades, inf.grade];
+                            onFiltersChange({ ...filters, grades: next });
+                          }}
+                          title="이 등급으로 필터"
+                          className="cursor-pointer hover:opacity-80 transition-opacity"
+                        >
+                          <GradeBadge grade={inf.grade} />
+                        </button>
+                        <RowMenu
+                          influencerId={inf.id}
+                          onViewDetail={() => onSelectInfluencer(inf.id)}
+                          onRefresh={onRefresh}
+                        />
+                      </div>
+                    </div>
+                    {/* 2행: 이름 + 카테고리 */}
+                    {(inf.display_name || inf.category) && (
+                      <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                        {inf.display_name && (
+                          <p className="text-xs text-slate-500 truncate">{inf.display_name}</p>
+                        )}
+                        {inf.category && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium leading-none shrink-0">
+                            {inf.category}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {/* 3행: 지표 */}
+                    <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px]">
+                      <span className="tabular-nums">
+                        <span className="text-slate-400">ER </span>
+                        <span className="font-medium text-slate-700">{formatEngagementRate(inf.engagement_rate)}</span>
+                      </span>
+                      <span className="tabular-nums">
+                        <span className="text-slate-400">팔 </span>
+                        <span className="font-medium text-slate-700">{formatFollowers(inf.follower_count)}</span>
+                        {tier && <span className="text-[10px] text-slate-400 ml-0.5">{tier.shortLabel}</span>}
+                      </span>
+                      {seeding && seeding.count > 0 && (
+                        <span className="tabular-nums">
+                          <span className="text-slate-400">시딩 </span>
+                          <span className="font-medium text-slate-700">{formatKRW(seeding.totalCost, { dashOnZero: true })}</span>
+                          <span className="text-[10px] text-slate-400 ml-0.5">({seeding.count}건)</span>
+                        </span>
+                      )}
+                    </div>
+                    {/* 4행: 상태 */}
+                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      <StatusCell
+                        campaign={campaignMap.get(inf.id)}
+                        influencerId={inf.id}
+                        influencerUsername={inf.username}
+                        onRefresh={onRefresh}
+                        onOpenDetail={onSelectInfluencer}
+                        filters={filters}
+                        onFiltersChange={onFiltersChange}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* 데스크탑 테이블 (sm 이상) — 컨테이너 안에서 스크롤 (sticky 헤더, 스크롤바 숨김) */}
+      <div className="hidden sm:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px] no-scrollbar">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
             <tr className="border-b border-slate-100">
@@ -789,7 +904,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       </div>
 
       {sorted.length > 50 && (
-        <div className="px-6 py-3 border-t border-slate-100 text-center text-xs text-slate-400">
+        <div className="px-4 sm:px-6 py-3 border-t border-slate-100 text-center text-xs text-slate-400">
           상위 50명만 표시됩니다
         </div>
       )}

@@ -34,7 +34,7 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
   }, [router]);
 
   return (
-    <div className="flex flex-col gap-4 p-6 min-h-0">
+    <div className="flex flex-col gap-3 sm:gap-4 p-3 sm:p-6 min-h-0">
       {/* 탭 네비게이션 */}
       <InfluencerTabs />
 
