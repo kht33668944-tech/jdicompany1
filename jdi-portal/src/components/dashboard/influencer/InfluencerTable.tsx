@@ -484,6 +484,8 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
         const tier = getTier(inf.follower_count);
         if (!tier || !filters.followerTiers.includes(tier.key)) return false;
       }
+      // 캠페인 없는 인플만 필터
+      if (filters.noCampaign && campaignMap.has(inf.id)) return false;
       // 캠페인 상태 필터
       if (filters.campaignStatuses.length > 0) {
         const c = campaignMap.get(inf.id);
@@ -549,7 +551,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       </div>
 
       {/* 활성 필터 칩 */}
-      {(filters.grades.length > 0 || filters.followerTiers.length > 0 || filters.campaignStatuses.length > 0 || filters.dateMilestone) && (
+      {(filters.grades.length > 0 || filters.followerTiers.length > 0 || filters.campaignStatuses.length > 0 || filters.dateMilestone || filters.noCampaign) && (
         <div className="flex flex-wrap items-center gap-1.5 px-4 sm:px-6 py-2 border-b border-slate-50 bg-slate-50/40">
           <span className="text-[11px] text-slate-400">필터:</span>
           {filters.grades.map((g) => (
@@ -579,9 +581,15 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
               onRemove={() => onFiltersChange({ ...filters, dateMilestone: null })}
             />
           )}
+          {filters.noCampaign && (
+            <Chip
+              label="캠페인 없음"
+              onRemove={() => onFiltersChange({ ...filters, noCampaign: false })}
+            />
+          )}
           <button
             type="button"
-            onClick={() => onFiltersChange({ ...filters, grades: [], followerTiers: [], campaignStatuses: [], dateMilestone: null })}
+            onClick={() => onFiltersChange({ ...filters, grades: [], followerTiers: [], campaignStatuses: [], dateMilestone: null, noCampaign: false })}
             className="ml-auto text-[11px] text-slate-500 hover:text-slate-700"
           >전체 해제</button>
         </div>

@@ -14,6 +14,7 @@ export interface FilterState {
   campaignStatuses: CampaignStatus[];
   dateMilestone: string | null;
   followerTiers: InfluencerTier[];
+  noCampaign: boolean;
 }
 
 export const DEFAULT_FILTER_STATE: FilterState = {
@@ -25,6 +26,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   campaignStatuses: [],
   dateMilestone: null,
   followerTiers: [],
+  noCampaign: false,
 };
 
 interface Props {
