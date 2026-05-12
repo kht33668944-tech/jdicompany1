@@ -3,6 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { CampaignStatus, InfluencerCampaign } from "./types";
+import type { MilestoneKind } from "./calendar";
+
+const MILESTONE_COLUMN: Record<
+  MilestoneKind,
+  "contact_date" | "contract_date" | "ship_date" | "content_deadline" | "expected_post_date"
+> = {
+  dm: "contact_date",
+  contract: "contract_date",
+  ship: "ship_date",
+  deadline: "content_deadline",
+  post: "expected_post_date",
+};
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function getSessionUserId(): Promise<string> {
   const supabase = await createClient();
@@ -313,6 +327,27 @@ export async function deleteCampaign(id: string): Promise<void> {
   const supabase = await createClient();
 
   const { error } = await supabase.from("influencer_campaigns").delete().eq("id", id);
+  if (error) throw error;
+  revalidatePath("/dashboard/influencer");
+}
+
+export async function updateCampaignMilestoneDate(
+  campaign_id: string,
+  kind: MilestoneKind,
+  date_str: string,
+): Promise<void> {
+  if (!DATE_RE.test(date_str)) throw new Error("잘못된 날짜 형식입니다.");
+  const column = MILESTONE_COLUMN[kind];
+  if (!column) throw new Error("알 수 없는 일정 종류입니다.");
+
+  await getSessionUserId();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("influencer_campaigns")
+    .update({ [column]: date_str, updated_at: new Date().toISOString() })
+    .eq("id", campaign_id);
+
   if (error) throw error;
   revalidatePath("/dashboard/influencer");
 }

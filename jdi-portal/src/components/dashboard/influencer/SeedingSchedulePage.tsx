@@ -36,6 +36,7 @@ export default function SeedingSchedulePage({ activeCampaigns }: Props) {
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
           onCampaignClick={(influencerId) => setSelectedInfluencerId(influencerId)}
+          onRefresh={handleRefresh}
         />
         <SeedingCampaignBoard
           campaigns={activeCampaigns}

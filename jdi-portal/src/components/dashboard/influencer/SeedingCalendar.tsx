@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { toast } from "sonner";
 import CaretLeft from "phosphor-react/dist/icons/CaretLeft.esm.js";
 import CaretRight from "phosphor-react/dist/icons/CaretRight.esm.js";
 import {
@@ -8,7 +9,9 @@ import {
   getMilestonesByDate,
   getMilestoneStyle,
   type CampaignMilestone,
+  type MilestoneKind,
 } from "@/lib/influencer/calendar";
+import { updateCampaignMilestoneDate } from "@/lib/influencer/actions";
 import { getHolidayName, isRedDay } from "@/lib/schedule/holidays";
 import type { InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
 
@@ -17,6 +20,7 @@ interface Props {
   onDateSelect: (date: string | null) => void;
   selectedDate: string | null;
   onCampaignClick?: (influencerId: string) => void;
+  onRefresh?: () => void;
 }
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -29,15 +33,76 @@ function cleanDisplayName(displayName: string | null | undefined, username: stri
   return beforePipe || displayName;
 }
 
-export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate, onCampaignClick }: Props) {
+export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate, onCampaignClick, onRefresh }: Props) {
   const today = kstTodayStr();
   const [year, setYear] = useState(() => Number(today.slice(0, 4)));
   const [month, setMonth] = useState(() => Number(today.slice(5, 7)));
 
+  // 드래그 진행 중 optimistic 오버라이드: `${campaignId}|${kind}` → 새 날짜
+  const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+
+  // 서버에서 campaigns prop이 새로 내려오면 오버라이드는 모두 확정/무의미하므로 초기화
+  useEffect(() => {
+    setOverrides((prev) => (prev.size === 0 ? prev : new Map()));
+  }, [campaigns]);
+
+  // 오버라이드 적용된 campaigns
+  const effectiveCampaigns = useMemo(() => {
+    if (overrides.size === 0) return campaigns;
+    return campaigns.map((c) => {
+      const dm = overrides.get(`${c.id}|dm`);
+      const contract = overrides.get(`${c.id}|contract`);
+      const ship = overrides.get(`${c.id}|ship`);
+      const deadline = overrides.get(`${c.id}|deadline`);
+      const post = overrides.get(`${c.id}|post`);
+      if (
+        dm === undefined &&
+        contract === undefined &&
+        ship === undefined &&
+        deadline === undefined &&
+        post === undefined
+      ) {
+        return c;
+      }
+      return {
+        ...c,
+        ...(dm !== undefined && { contact_date: dm }),
+        ...(contract !== undefined && { contract_date: contract }),
+        ...(ship !== undefined && { ship_date: ship }),
+        ...(deadline !== undefined && { content_deadline: deadline }),
+        ...(post !== undefined && { expected_post_date: post }),
+      };
+    });
+  }, [campaigns, overrides]);
+
   const milestonesByDate = useMemo(
-    () => getMilestonesByDate(campaigns, year, month),
-    [campaigns, year, month],
+    () => getMilestonesByDate(effectiveCampaigns, year, month),
+    [effectiveCampaigns, year, month],
   );
+
+  async function handleDrop(campaignId: string, kind: MilestoneKind, fromDate: string, toDate: string) {
+    if (fromDate === toDate) return;
+    const key = `${campaignId}|${kind}`;
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(key, toDate);
+      return next;
+    });
+    try {
+      await updateCampaignMilestoneDate(campaignId, kind, toDate);
+      toast.success("일정 날짜가 변경되었습니다.");
+      onRefresh?.();
+    } catch {
+      setOverrides((prev) => {
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+      toast.error("날짜 변경에 실패했습니다.");
+    }
+  }
 
   const firstDow = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -142,14 +207,35 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
           const visibleChips = milestones.slice(0, MAX_VISIBLE_CHIPS);
           const hiddenCount = milestones.length - visibleChips.length;
 
+          const isDropTarget = dragOverDate === ds && draggingKey !== null;
+
           return (
             <div
               key={ds}
               onClick={() => onDateSelect(isSelected ? null : ds)}
+              onDragOver={(e) => {
+                if (!draggingKey) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (dragOverDate !== ds) setDragOverDate(ds);
+              }}
+              onDragLeave={() => {
+                if (dragOverDate === ds) setDragOverDate(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const data = e.dataTransfer.getData("text/plain");
+                setDragOverDate(null);
+                setDraggingKey(null);
+                if (!data) return;
+                const [campaignId, kind, fromDate] = data.split("|");
+                if (!campaignId || !kind || !fromDate) return;
+                void handleDrop(campaignId, kind as MilestoneKind, fromDate, ds);
+              }}
               style={dayBgStyle}
               className={`min-h-[120px] p-2 rounded-xl text-left transition-all duration-150 hover:bg-slate-50 cursor-pointer ${
                 isSelected ? "ring-2 ring-brand-400 bg-brand-50/30" : ""
-              }`}
+              } ${isDropTarget ? "ring-2 ring-brand-500 bg-brand-50/60" : ""}`}
             >
               {/* 날짜 숫자 + 공휴일명 */}
               <div className="flex items-center justify-between gap-1 mb-1.5 min-h-[28px]">
@@ -183,15 +269,33 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
                   const tooltipText = isAutoName
                     ? `${style.label} · @${username}${hasName ? ` (${displayName})` : ""}`
                     : `${style.label} · @${username} · ${campaignName}`;
+                  const chipKey = `${m.campaign.id}|${m.kind}`;
+                  const isDragging = draggingKey === chipKey;
                   return (
                     <button
                       type="button"
                       key={`${m.campaign.id}-${m.kind}`}
+                      draggable
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData(
+                          "text/plain",
+                          `${m.campaign.id}|${m.kind}|${m.dateStr}`,
+                        );
+                        setDraggingKey(chipKey);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingKey(null);
+                        setDragOverDate(null);
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (onCampaignClick) onCampaignClick(m.campaign.influencer_id);
                       }}
-                      className={`w-full flex items-center gap-1 text-left text-[11px] font-medium px-1.5 py-0.5 rounded border ${style.bg} ${style.text} ${style.border} hover:brightness-95 transition-all truncate`}
+                      className={`w-full flex items-center gap-1 text-left text-[11px] font-medium px-1.5 py-0.5 rounded border ${style.bg} ${style.text} ${style.border} hover:brightness-95 transition-all truncate cursor-grab active:cursor-grabbing ${
+                        isDragging ? "opacity-40" : ""
+                      }`}
                       title={tooltipText}
                     >
                       <span className="shrink-0">{style.icon}</span>
