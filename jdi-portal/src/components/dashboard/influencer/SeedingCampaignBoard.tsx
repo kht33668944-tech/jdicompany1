@@ -337,7 +337,7 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col gap-4">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-5 flex flex-col gap-3 sm:gap-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-800">

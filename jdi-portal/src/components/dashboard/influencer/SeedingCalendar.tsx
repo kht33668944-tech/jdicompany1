@@ -25,6 +25,15 @@ interface Props {
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MAX_VISIBLE_CHIPS = 3;
+const MOBILE_MAX_DOTS = 6;
+
+const MILESTONE_DOT_BG: Record<MilestoneKind, string> = {
+  dm: "bg-blue-400",
+  contract: "bg-rose-400",
+  ship: "bg-amber-400",
+  deadline: "bg-orange-400",
+  post: "bg-violet-400",
+};
 
 /** display_name에서 ` | ` 앞부분만 깔끔하게 추출. 없으면 @username */
 function cleanDisplayName(displayName: string | null | undefined, username: string): string {
@@ -135,9 +144,9 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-5">
       {/* 월 네비 */}
-      <div className="flex items-center justify-center gap-4 mb-5">
+      <div className="flex items-center justify-center gap-4 mb-3 sm:mb-5">
         <button
           type="button"
           onClick={prevMonth}
@@ -177,7 +186,7 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
       <div className="grid grid-cols-7 gap-y-0.5">
         {cells.map((day, idx) => {
           if (day === null) {
-            return <div key={`empty-${idx}`} className="min-h-[120px]" />;
+            return <div key={`empty-${idx}`} className="min-h-[68px] sm:min-h-[120px]" />;
           }
           const ds = dateStr(day);
           const milestones = milestonesByDate.get(ds) ?? [];
@@ -233,22 +242,22 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
                 void handleDrop(campaignId, kind as MilestoneKind, fromDate, ds);
               }}
               style={dayBgStyle}
-              className={`min-h-[120px] p-2 rounded-xl text-left transition-all duration-150 hover:bg-slate-50 cursor-pointer ${
+              className={`min-h-[68px] sm:min-h-[120px] p-1 sm:p-2 rounded-lg sm:rounded-xl text-left transition-all duration-150 hover:bg-slate-50 cursor-pointer ${
                 isSelected ? "ring-2 ring-brand-400 bg-brand-50/30" : ""
               } ${isDropTarget ? "ring-2 ring-brand-500 bg-brand-50/60" : ""}`}
             >
               {/* 날짜 숫자 + 공휴일명 */}
-              <div className="flex items-center justify-between gap-1 mb-1.5 min-h-[28px]">
+              <div className="flex items-center justify-between gap-1 mb-1 sm:mb-1.5 min-h-[22px] sm:min-h-[28px]">
                 <span
-                  className={`inline-flex items-center justify-center text-sm font-bold ${
-                    isToday ? "bg-brand-500 text-white rounded-full w-7 h-7" : dayNumColor
+                  className={`inline-flex items-center justify-center text-xs sm:text-sm font-bold ${
+                    isToday ? "bg-brand-500 text-white rounded-full w-6 h-6 sm:w-7 sm:h-7" : dayNumColor
                   }`}
                 >
                   {day}
                 </span>
                 {holidayName && (
                   <span
-                    className="text-[10px] font-semibold truncate leading-tight"
+                    className="hidden sm:inline text-[10px] font-semibold truncate leading-tight"
                     style={{ color: "var(--cal-holiday-label)" }}
                     title={holidayName}
                   >
@@ -257,8 +266,24 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
                 )}
               </div>
 
-              {/* 마일스톤 칩 */}
-              <div className="space-y-0.5">
+              {/* 모바일: 점 도트만 표시 */}
+              <div className="sm:hidden flex flex-wrap items-center gap-0.5 mt-0.5">
+                {milestones.slice(0, MOBILE_MAX_DOTS).map((m: CampaignMilestone) => (
+                  <span
+                    key={`m-${m.campaign.id}-${m.kind}`}
+                    className={`w-1.5 h-1.5 rounded-full ${MILESTONE_DOT_BG[m.kind]}`}
+                    title={getMilestoneStyle(m.kind).label}
+                  />
+                ))}
+                {milestones.length > MOBILE_MAX_DOTS && (
+                  <span className="text-[9px] text-slate-400 leading-none ml-0.5">
+                    +{milestones.length - MOBILE_MAX_DOTS}
+                  </span>
+                )}
+              </div>
+
+              {/* 데스크탑: 마일스톤 칩 */}
+              <div className="hidden sm:block space-y-0.5">
                 {visibleChips.map((m: CampaignMilestone) => {
                   const style = getMilestoneStyle(m.kind);
                   const username = m.campaign.influencer?.username ?? "?";
