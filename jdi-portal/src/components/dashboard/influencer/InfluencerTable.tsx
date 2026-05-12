@@ -12,7 +12,7 @@ import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 import MagnifyingGlass from "phosphor-react/dist/icons/MagnifyingGlass.esm.js";
 import X from "phosphor-react/dist/icons/X.esm.js";
 import GradeBadge from "./GradeBadge";
-import StatusBadge from "./StatusBadge";
+import CampaignStatusDropdown from "./CampaignStatusDropdown";
 import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
 import Image from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
@@ -287,11 +287,9 @@ interface StatusCellProps {
   influencerUsername: string;
   onRefresh: () => void;
   onOpenDetail: (id: string) => void;
-  filters: FilterState;
-  onFiltersChange: (next: FilterState) => void;
 }
 
-function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onOpenDetail, filters, onFiltersChange }: StatusCellProps) {
+function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onOpenDetail }: StatusCellProps) {
   const [, startTransition] = useTransition();
 
   if (!campaign) {
@@ -321,12 +319,11 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onO
     );
   }
 
-  function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    e.stopPropagation();
-    const next = e.target.value as CampaignStatus;
+  function handleStatusChange(next: CampaignStatus) {
     startTransition(async () => {
       try {
         await updateCampaignStatus(campaign!.id, next);
+        onRefresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "상태 변경 실패");
       }
@@ -334,32 +331,8 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onO
   }
 
   return (
-    <div className="relative inline-flex items-center" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          const next = filters.campaignStatuses.includes(campaign.status)
-            ? filters.campaignStatuses.filter((s) => s !== campaign.status)
-            : [...filters.campaignStatuses, campaign.status];
-          onFiltersChange({ ...filters, campaignStatuses: next });
-        }}
-        title="이 상태로 필터"
-        className="hover:opacity-80"
-      >
-        <StatusBadge status={campaign.status} type="campaign" />
-      </button>
-      <select
-        value={campaign.status}
-        onChange={handleChange}
-        aria-label="시딩 상태 변경"
-        className="absolute inset-y-0 -right-4 w-4 opacity-0 cursor-pointer"
-      >
-        {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-      <span className="text-[10px] text-slate-400 ml-0.5" aria-hidden>▾</span>
+    <div className="inline-flex" onClick={(e) => e.stopPropagation()}>
+      <CampaignStatusDropdown status={campaign.status} onChange={handleStatusChange} />
     </div>
   );
 }
@@ -701,8 +674,6 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                         influencerUsername={inf.username}
                         onRefresh={onRefresh}
                         onOpenDetail={onSelectInfluencer}
-                        filters={filters}
-                        onFiltersChange={onFiltersChange}
                       />
                     </div>
                   </div>
@@ -890,8 +861,6 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                         influencerUsername={inf.username}
                         onRefresh={onRefresh}
                         onOpenDetail={onSelectInfluencer}
-                        filters={filters}
-                        onFiltersChange={onFiltersChange}
                       />
                     </td>
 
