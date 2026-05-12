@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "phosphor-react/dist/icons/Link.esm.js";
 import FunnelSimple from "phosphor-react/dist/icons/FunnelSimple.esm.js";
@@ -12,7 +11,8 @@ import Rows from "phosphor-react/dist/icons/Rows.esm.js";
 import CaretLeft from "phosphor-react/dist/icons/CaretLeft.esm.js";
 import CaretRight from "phosphor-react/dist/icons/CaretRight.esm.js";
 import X from "phosphor-react/dist/icons/X.esm.js";
-import { addInfluencer } from "@/lib/influencer/actions";
+import { useAnalysisJobs } from "@/components/dashboard/AnalysisJobsProvider";
+import { parseInstagramUrl } from "@/lib/influencer/url";
 import BulkUploadModal from "./BulkUploadModal";
 
 interface Props {
@@ -147,25 +147,12 @@ function CalendarPopover({
 }
 
 export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMilestoneChange }: Props) {
-  const router = useRouter();
+  const { enqueue } = useAnalysisJobs();
   const [url, setUrl] = useState("");
-  const [isPending, startTransition] = useTransition();
   const [bulkOpen, setBulkOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dateButtonRef = useRef<HTMLElement>(null);
-
-  function isValidInstagramUrl(value: string): boolean {
-    try {
-      const parsed = new URL(value);
-      return (
-        (parsed.hostname === "www.instagram.com" || parsed.hostname === "instagram.com") &&
-        parsed.pathname.length > 1
-      );
-    } catch {
-      return false;
-    }
-  }
 
   function handleAdd() {
     const trimmed = url.trim();
@@ -174,23 +161,15 @@ export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMileston
       inputRef.current?.focus();
       return;
     }
-    if (!isValidInstagramUrl(trimmed)) {
+    const parsed = parseInstagramUrl(trimmed);
+    if (!parsed) {
       toast.error("올바른 인스타그램 프로필 URL을 입력해 주세요.");
       inputRef.current?.focus();
       return;
     }
-
-    startTransition(async () => {
-      const toastId = toast.loading("인플루언서 분석 중... (10~30초 소요)");
-      try {
-        await addInfluencer(trimmed);
-        toast.success("인플루언서 등록 완료", { id: toastId });
-        setUrl("");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "추가에 실패했습니다.", { id: toastId });
-      }
-    });
+    enqueue([{ url: parsed.url, username: parsed.username }]);
+    toast.info("분석 대기열에 추가됨. 좌하단 위젯에서 진행상황 확인.");
+    setUrl("");
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -216,15 +195,13 @@ export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMileston
             onKeyDown={handleKeyDown}
             placeholder="https://www.instagram.com/username"
             className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none min-w-0"
-            disabled={isPending}
           />
         </div>
 
         {/* 분석 및 추가 버튼 */}
         <button
           onClick={handleAdd}
-          disabled={isPending}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 active:bg-slate-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 active:bg-slate-900 transition-colors shrink-0"
         >
           <Plus size={14} weight="bold" />
           분석 및 추가
@@ -233,8 +210,7 @@ export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMileston
         {/* 일괄 추가 버튼 */}
         <button
           onClick={() => setBulkOpen(true)}
-          disabled={isPending}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0"
         >
           <Rows size={14} />
           일괄 추가
@@ -297,10 +273,6 @@ export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMileston
       <BulkUploadModal
         open={bulkOpen}
         onClose={() => setBulkOpen(false)}
-        onDone={() => {
-          router.refresh();
-          setBulkOpen(false);
-        }}
       />
     </>
   );

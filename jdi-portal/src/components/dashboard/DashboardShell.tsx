@@ -6,6 +6,8 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import NotificationProvider from "./NotificationProvider";
 import ChatUnreadProvider from "./chat/ChatUnreadProvider";
+import AnalysisJobsProvider from "./AnalysisJobsProvider";
+import AnalysisJobsWidget from "./AnalysisJobsWidget";
 
 interface DashboardShellProps {
   user: { id: string; email: string; name: string; avatarUrl?: string | null };
@@ -36,6 +38,7 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
       userId={user.id}
       onNewNotification={handleNewNotification}
     >
+      <AnalysisJobsProvider>
       <div className="min-h-screen bg-slate-50">
         {/* Mobile overlay backdrop */}
         {sidebarOpen && (
@@ -72,6 +75,8 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
 
       <ChatUnreadProvider userId={user.id} onUnreadChange={setChatUnreadCount} />
 
+      <AnalysisJobsWidget />
+
       <Toaster
         position="bottom-right"
         toastOptions={{
@@ -79,6 +84,7 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
           style: { fontFamily: "Pretendard, sans-serif" },
         }}
       />
+      </AnalysisJobsProvider>
     </NotificationProvider>
   );
 }
