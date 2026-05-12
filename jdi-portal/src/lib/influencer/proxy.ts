@@ -4,6 +4,8 @@
 //   3) supabase.co 도메인은 프록시 우회 — 직접 사용 가능
 
 const STORAGE_BUCKET = "influencer-media";
+const SUPABASE_STORAGE_MARK = ".supabase.co/storage/";
+const PROXY_PATH_PREFIX = "/api/";
 
 function getSupabasePublicBase(): string {
   const url =
@@ -49,8 +51,8 @@ export function resolveMediaUrl(
  */
 export function shouldSkipOptimize(src: string | null | undefined): boolean {
   if (!src) return false;
-  if (src.startsWith("/api/")) return true;
-  return src.includes(".supabase.co/storage/");
+  if (src.startsWith(PROXY_PATH_PREFIX)) return true;
+  return src.includes(SUPABASE_STORAGE_MARK);
 }
 
 /**
