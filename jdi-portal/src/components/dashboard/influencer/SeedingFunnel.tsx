@@ -34,12 +34,6 @@ const STEPS: Step[] = [
   { key: "done", icon: "✅", label: CAMPAIGN_STATUS_LABEL.done, dot: "bg-emerald-500", activeBg: "bg-emerald-50", activeRing: "ring-emerald-200", unit: "건" },
 ];
 
-function rateColor(rate: number): string {
-  if (rate < 30) return "text-rose-500";
-  if (rate >= 70) return "text-emerald-500";
-  return "text-slate-400";
-}
-
 export default function SeedingFunnel({ influencers, activeCampaigns, filters, onFiltersChange }: Props) {
   const campaignMap = useMemo(() => {
     const map = new Map<string, InfluencerCampaign>();
@@ -84,57 +78,40 @@ export default function SeedingFunnel({ influencers, activeCampaigns, filters, o
       </div>
 
       {/* 단계 목록 */}
-      <div className="flex flex-col">
+      <div className="flex flex-col gap-0.5">
         {STEPS.map((step, idx) => {
           const count = stepCounts[idx];
           const active = isActive(step.key);
           const isEmpty = count === 0;
-          const prevCount = idx > 0 ? stepCounts[idx - 1] : null;
-          const rate = prevCount !== null && prevCount > 0 ? (count / prevCount) * 100 : null;
-          const bottleneck = rate !== null && rate < 30 && prevCount !== null && prevCount > 0;
 
           return (
-            <div key={step.key}>
-              {idx > 0 && (
-                <div className="flex items-center gap-2 pl-[18px] py-0.5">
-                  <div className="w-px h-3.5 bg-slate-200" />
-                  {rate !== null ? (
-                    <span className={`text-[10px] tabular-nums font-medium ${rateColor(rate)}`}>
-                      {rate.toFixed(0)}%
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-300">—</span>
-                  )}
-                  {bottleneck && <span className="text-[10px] leading-none">🔴</span>}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => handleClick(step.key)}
-                aria-pressed={active}
-                className={`w-full flex items-center gap-3 pl-2 pr-2 py-1.5 rounded-lg transition-colors ${
-                  active ? `${step.activeBg} ring-1 ${step.activeRing}` : "hover:bg-slate-50"
+            <button
+              key={step.key}
+              type="button"
+              onClick={() => handleClick(step.key)}
+              aria-pressed={active}
+              className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg transition-colors ${
+                active ? `${step.activeBg} ring-1 ${step.activeRing}` : "hover:bg-slate-50"
+              }`}
+            >
+              <span className="w-6 text-base leading-none" aria-hidden>{step.icon}</span>
+              <span className={`flex-1 text-sm text-left truncate ${isEmpty ? "text-slate-400" : "text-slate-700 font-medium"}`}>
+                {step.label}
+              </span>
+              <span className="flex items-baseline gap-0.5 tabular-nums">
+                <span className={`text-lg font-bold tracking-tight ${isEmpty ? "text-slate-300" : "text-slate-900"}`}>
+                  {count}
+                </span>
+                <span className={`text-[10px] ${isEmpty ? "text-slate-300" : "text-slate-400"}`}>
+                  {step.unit}
+                </span>
+              </span>
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  isEmpty ? "border border-slate-300 bg-transparent" : step.dot
                 }`}
-              >
-                <span className="w-6 text-base leading-none" aria-hidden>{step.icon}</span>
-                <span className={`flex-1 text-sm text-left truncate ${isEmpty ? "text-slate-400" : "text-slate-700 font-medium"}`}>
-                  {step.label}
-                </span>
-                <span className="flex items-baseline gap-0.5 tabular-nums">
-                  <span className={`text-lg font-bold tracking-tight ${isEmpty ? "text-slate-300" : "text-slate-900"}`}>
-                    {count}
-                  </span>
-                  <span className={`text-[10px] ${isEmpty ? "text-slate-300" : "text-slate-400"}`}>
-                    {step.unit}
-                  </span>
-                </span>
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${
-                    isEmpty ? "border border-slate-300 bg-transparent" : step.dot
-                  }`}
-                />
-              </button>
-            </div>
+              />
+            </button>
           );
         })}
       </div>
