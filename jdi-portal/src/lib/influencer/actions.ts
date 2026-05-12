@@ -39,19 +39,47 @@ function validateInstagramUrl(url: string): boolean {
   }
 }
 
+function extractUsernameFromUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "www.instagram.com" && parsed.hostname !== "instagram.com") return null;
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    return parts[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ============================================================
 // 인플루언서
 // ============================================================
 
 export async function addInfluencer(
   profileUrl: string
-): Promise<{ ok: true; influencer_id: string }> {
+): Promise<{ ok: true; influencer_id: string; alreadyExisted?: boolean }> {
   if (!validateInstagramUrl(profileUrl)) {
     throw new Error("올바른 인스타그램 프로필 URL을 입력해 주세요.");
   }
 
+  const username = extractUsernameFromUrl(profileUrl);
+  if (!username) {
+    throw new Error("URL에서 사용자명을 추출할 수 없습니다.");
+  }
+
   const userId = await getSessionUserId();
   const supabase = await createClient();
+
+  // 이미 등록되어 있으면 Apify 호출 없이 기존 ID 반환 (비용·시간 절감)
+  const { data: existing } = await supabase
+    .from("influencers")
+    .select("id")
+    .eq("platform", "instagram")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (existing) {
+    return { ok: true, influencer_id: existing.id, alreadyExisted: true };
+  }
 
   const { data: extractData, error: extractError } = await supabase.functions.invoke(
     "influencer-extract",

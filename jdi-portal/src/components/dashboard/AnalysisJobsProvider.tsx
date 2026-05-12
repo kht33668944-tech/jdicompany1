@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { addInfluencer } from "@/lib/influencer/actions";
 
-export type AnalysisJobStatus = "pending" | "running" | "success" | "failed";
+export type AnalysisJobStatus = "pending" | "running" | "success" | "failed" | "skipped";
 
 export interface AnalysisJob {
   id: string;
@@ -49,6 +49,11 @@ export default function AnalysisJobsProvider({ children }: { children: React.Rea
   const [isRunning, setIsRunning] = useState(false);
   const processingRef = useRef(false);
   const summaryShownRef = useRef(false);
+  const jobsRef = useRef<AnalysisJob[]>([]);
+
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
 
   // jobs 변화 감지 → pending이 있으면 다음 거 1개 처리.
   // 처리 끝나면 setJobs가 다시 트리거되어 자연스럽게 다음 pending으로 넘어감.
@@ -65,11 +70,18 @@ export default function AnalysisJobsProvider({ children }: { children: React.Rea
           summaryShownRef.current = true;
           const success = jobs.filter((j) => j.status === "success").length;
           const failed = jobs.filter((j) => j.status === "failed").length;
-          if (success + failed > 0) {
-            if (failed === 0) toast.success(`인플루언서 ${success}명 분석 완료`);
-            else if (success === 0) toast.error(`${failed}명 모두 분석 실패`);
-            else toast.warning(`${success}명 성공 · ${failed}명 실패`);
-            router.refresh();
+          const skipped = jobs.filter((j) => j.status === "skipped").length;
+          if (success + failed + skipped > 0) {
+            const parts: string[] = [];
+            if (success > 0) parts.push(`${success}명 신규`);
+            if (skipped > 0) parts.push(`${skipped}명 기존`);
+            if (failed > 0) parts.push(`${failed}명 실패`);
+            const msg = parts.join(" · ");
+            if (failed === 0 && success === 0) toast.info(msg);
+            else if (failed === 0) toast.success(msg);
+            else if (success === 0 && skipped === 0) toast.error(msg);
+            else toast.warning(msg);
+            if (success > 0) router.refresh();
           }
         }
       }
@@ -86,10 +98,16 @@ export default function AnalysisJobsProvider({ children }: { children: React.Rea
       );
       try {
         const result = await addInfluencer(next.url);
-        const grade = (result as { grade?: string }).grade ?? "";
-        setJobs((prev) =>
-          prev.map((j) => (j.id === next.id ? { ...j, status: "success", grade } : j)),
-        );
+        if (result.alreadyExisted) {
+          setJobs((prev) =>
+            prev.map((j) => (j.id === next.id ? { ...j, status: "skipped" } : j)),
+          );
+        } else {
+          const grade = (result as { grade?: string }).grade ?? "";
+          setJobs((prev) =>
+            prev.map((j) => (j.id === next.id ? { ...j, status: "success", grade } : j)),
+          );
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "알 수 없는 오류";
         setJobs((prev) =>
@@ -103,8 +121,34 @@ export default function AnalysisJobsProvider({ children }: { children: React.Rea
 
   const enqueue = useCallback((items: { url: string; username: string }[]) => {
     if (items.length === 0) return;
+
+    // 큐에 이미 대기/처리 중인 username (대소문자 무시)
+    const activeUsernames = new Set(
+      jobsRef.current
+        .filter((j) => j.status === "pending" || j.status === "running")
+        .map((j) => j.username.toLowerCase()),
+    );
+
+    const seenInBatch = new Set<string>();
+    const filtered: { url: string; username: string }[] = [];
+    let skippedCount = 0;
+    for (const it of items) {
+      const u = it.username.toLowerCase();
+      if (activeUsernames.has(u) || seenInBatch.has(u)) {
+        skippedCount++;
+        continue;
+      }
+      seenInBatch.add(u);
+      filtered.push(it);
+    }
+
+    if (skippedCount > 0) {
+      toast.info(`이미 대기열에 있는 ${skippedCount}명 건너뜀`);
+    }
+    if (filtered.length === 0) return;
+
     summaryShownRef.current = false;
-    const newJobs: AnalysisJob[] = items.map((it) => ({
+    const newJobs: AnalysisJob[] = filtered.map((it) => ({
       id: crypto.randomUUID(),
       url: it.url,
       username: it.username,

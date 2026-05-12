@@ -4,6 +4,7 @@ import { useState } from "react";
 import Spinner from "phosphor-react/dist/icons/Spinner.esm.js";
 import CheckCircle from "phosphor-react/dist/icons/CheckCircle.esm.js";
 import XCircle from "phosphor-react/dist/icons/XCircle.esm.js";
+import MinusCircle from "phosphor-react/dist/icons/MinusCircle.esm.js";
 import CaretDown from "phosphor-react/dist/icons/CaretDown.esm.js";
 import CaretUp from "phosphor-react/dist/icons/CaretUp.esm.js";
 import X from "phosphor-react/dist/icons/X.esm.js";
@@ -17,9 +18,16 @@ export default function AnalysisJobsWidget() {
 
   const success = jobs.filter((j) => j.status === "success").length;
   const failed = jobs.filter((j) => j.status === "failed").length;
-  const done = success + failed;
+  const skipped = jobs.filter((j) => j.status === "skipped").length;
+  const done = success + failed + skipped;
   const total = jobs.length;
   const pct = total === 0 ? 0 : (done / total) * 100;
+
+  const summaryParts: string[] = [];
+  if (success > 0) summaryParts.push(`${success}신규`);
+  if (skipped > 0) summaryParts.push(`${skipped}기존`);
+  if (failed > 0) summaryParts.push(`${failed}실패`);
+  const summary = summaryParts.join(" · ");
 
   return (
     <div className="fixed bottom-4 left-4 z-50 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
@@ -40,7 +48,7 @@ export default function AnalysisJobsWidget() {
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-slate-800">
-            {isRunning ? `인플루언서 분석 중 (${done}/${total})` : `분석 완료 · ${success}성공 ${failed > 0 ? `· ${failed}실패` : ""}`}
+            {isRunning ? `인플루언서 분석 중 (${done}/${total})` : `분석 완료${summary ? ` · ${summary}` : ""}`}
           </p>
           {isRunning && (
             <div className="h-1 bg-slate-100 rounded-full overflow-hidden mt-1.5">
@@ -84,6 +92,9 @@ export default function AnalysisJobsWidget() {
                 {j.status === "success" && (
                   <CheckCircle size={12} weight="fill" className="text-emerald-500" />
                 )}
+                {j.status === "skipped" && (
+                  <MinusCircle size={12} weight="fill" className="text-slate-400" />
+                )}
                 {j.status === "failed" && (
                   <XCircle size={12} weight="fill" className="text-red-400" />
                 )}
@@ -93,6 +104,9 @@ export default function AnalysisJobsWidget() {
                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
                   {j.grade}
                 </span>
+              )}
+              {j.status === "skipped" && (
+                <span className="text-[10px] text-slate-400">이미 등록됨</span>
               )}
               {j.status === "failed" && (
                 <span className="text-[10px] text-red-400 truncate max-w-[120px]" title={j.errorMsg}>
