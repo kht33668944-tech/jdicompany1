@@ -1,110 +1,116 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# JDICOMPANY Portal Agent Guide
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+JDICOMPANY 내부 포털입니다. 비개발자 운영자가 쓰는 업무 도구이므로 안정성, 명확한 한국어 UI, 데이터 보호를 우선합니다.
 
-# Code Review Guide
+## 현재 스택
 
-이 프로젝트의 코드리뷰 가이드입니다. "코드리뷰 해줘"라고 요청받으면 아래 기준을 모두 적용하세요.
+- Next.js 16.2.2 App Router, React 19.2.4, TypeScript strict
+- Tailwind CSS 4, ESLint 9
+- Supabase Auth, Postgres, RLS, Storage, Realtime, Edge Functions
+- 주요 라이브러리: `@supabase/ssr`, `@supabase/supabase-js`, `@hello-pangea/dnd`, `phosphor-react`, `recharts`, `sonner`, `xlsx`, `idb`, `pg`
+- 배포: Railway 루트 래퍼에서 `jdi-portal` 빌드
 
-## 프로젝트 정보
+## 앱 기능 영역
 
-- **Framework**: Next.js 16 (App Router) + TypeScript 5 (strict)
-- **React**: 19, **Styling**: Tailwind CSS 4
-- **Auth/DB**: Supabase (RLS 활성화)
-- **서버 컴포넌트**: `@/lib/supabase/server`, **클라이언트 컴포넌트**: `@/lib/supabase/client`
-- **한국어 UI** (lang="ko")
+- 인증: 로그인, 회원가입, 비밀번호 재설정, 승인된 사용자만 대시보드 접근
+- 대시보드: 오늘 일정, 내 업무, 근태, 최근 활동, 알림
+- 근태: 출퇴근, IP 검증, 근무시간 변경, 휴가, 관리자 승인, 기록/통계
+- 업무: 목록/타임라인/캘린더, 상세 패널, 체크리스트, 댓글, 첨부, 활동 기록
+- 채팅: 채널, DM, Realtime, 멘션, 읽음, 즐겨찾기, 고정, 알림, IndexedDB 캐시
+- 일정: 월/주/일/목록 뷰, 참여자, 공개 범위, 휴가 연동
+- 리포트: 생성, 상세, 빠른 패널
+- 인플루언서: 캠페인, 시딩 일정, 등급/지표, 미디어, 자동 분석 Edge Function
+- 설정: 프로필, 계정, 알림, 앱 설치, 관리자 섹션
 
-## 리뷰 방법
+## 경로 규칙
 
-특별한 지시가 없으면 `git diff HEAD~1` 기준으로 최근 커밋을 리뷰합니다.
+| 목적 | 경로 |
+|---|---|
+| App Router 페이지 | `src/app/**/page.tsx` |
+| 도메인 UI | `src/components/dashboard/<domain>/` |
+| 공용 UI | `src/components/shared/` |
+| 도메인 로직 | `src/lib/<domain>/` |
+| Supabase 클라이언트 | `src/lib/supabase/` |
+| 공용 유틸 | `src/lib/utils/`, `src/lib/hooks/` |
+| DB 마이그레이션 | `supabase/migrations/NNN_*.sql` |
+| Edge Function | `supabase/functions/<name>/index.ts` |
+| 설계/계획 문서 | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
-## 리뷰 체크리스트
+`@/*`는 `./src/*`를 가리킵니다.
 
-모든 항목을 빠짐없이 검사하고, 문제가 있으면 파일명:라인번호와 함께 보고하세요.
+## 개발 명령
 
-### 1. 버그 및 로직 오류
-
-- 조건문 누락, off-by-one 에러, null/undefined 미처리
-- 비동기 처리 누락 (await 빠짐, Promise 미처리)
-- 타입 에러, 잘못된 타입 캐스팅
-- 무한 루프, 무한 리렌더링 가능성
-- 이벤트 핸들러 누수 (useEffect cleanup 누락)
-- 상태 업데이트 경쟁 조건 (race condition)
-
-### 2. 보안 취약점
-
-- XSS: 사용자 입력을 dangerouslySetInnerHTML로 렌더링
-- SQL Injection: Supabase 쿼리에 사용자 입력 직접 삽입
-- RLS 우회: SECURITY DEFINER 함수에서 auth.uid() 검증 누락
-- 민감 정보 노출: API 키, 비밀번호, 토큰이 클라이언트 코드에 노출
-- CSRF/인증: 인증 없이 접근 가능한 API 엔드포인트
-- .env.local 파일이 커밋에 포함되지 않았는지 확인
-
-### 3. 성능 문제
-
-- 불필요한 리렌더링 (useCallback, useMemo 필요한 곳)
-- N+1 쿼리: 루프 안에서 Supabase 쿼리 호출
-- 큰 데이터 전체 로드 (pagination 없이 전체 select)
-- 이미지/리소스 최적화 누락
-- 서버 컴포넌트로 충분한데 클라이언트 컴포넌트 사용
-- useEffect 의존성 배열 오류
-
-### 4. 에러 처리
-
-- try-catch 누락된 비동기 호출
-- 에러 발생 시 사용자에게 피드백 없음
-- Supabase 쿼리 에러 무시 (data만 확인하고 error 미확인)
-- 네트워크 실패 시 복구 방법 없음
-
-### 5. TypeScript 타입 안전성
-
-- `any` 타입 사용
-- 타입 단언 (`as`) 남용
-- optional chaining 필요한 곳에서 미사용
-- 제네릭 타입 누락
-
-### 6. Next.js / React 패턴
-
-- "use client" 불필요하게 선언
-- 서버 컴포넌트에서 useState/useEffect 사용 시도
-- 클라이언트 컴포넌트에서 서버 전용 API (cookies, headers) 사용
-- metadata export가 클라이언트 컴포넌트에 있는지
-- Image 컴포넌트 대신 img 태그 사용
-- Link 컴포넌트 대신 a 태그 사용
-
-### 7. Supabase 관련
-
-- RLS 정책과 코드 로직 불일치
-- 서버에서 써야 할 클라이언트를 클라이언트에서 사용 또는 그 반대
-- 인증 상태 확인 누락 (getUser 호출 없이 데이터 접근)
-- onConflict 설정 오류
-- TIMESTAMPTZ vs DATE 혼용 문제
-
-### 8. 코드 품질
-
-- 중복 코드 (3줄 이상 동일 패턴 반복)
-- 매직 넘버/문자열 (상수로 분리해야 할 값)
-- 함수가 너무 큼 (50줄 이상이면 분리 검토)
-- 네이밍이 불명확한 변수/함수
-
-## 보고 형식
-
-리뷰 결과를 다음 형식으로 정리하세요:
-
+```bash
+npm run dev
+npm run build
+npm run lint
 ```
-## 코드리뷰 결과
 
-### 🔴 심각 (즉시 수정 필요)
-- [파일명:라인] 설명 + 수정 제안
+Supabase 작업:
 
-### 🟡 주의 (수정 권장)
-- [파일명:라인] 설명 + 수정 제안
-
-### 🟢 개선 (선택적)
-- [파일명:라인] 설명 + 수정 제안
-
-### ✅ 잘된 점
-- 잘 작성된 부분 언급
+```bash
+npx supabase db push --linked
+npx supabase functions deploy <name> --no-verify-jwt
 ```
+
+## Next.js 주의
+
+이 프로젝트는 Next.js 16입니다. Next.js API, 라우팅, 캐시, 설정을 수정할 때는 현재 설치된 문서를 먼저 확인합니다.
+
+- `node_modules/next/dist/docs/`에 있는 관련 문서를 우선 확인합니다.
+- Next 16에서는 `middleware.ts` 대신 `src/proxy.ts`에서 세션 갱신을 처리합니다.
+- 서버 컴포넌트와 클라이언트 컴포넌트를 명확히 분리합니다. 필요한 곳에만 `"use client"`를 둡니다.
+- `metadata` export는 클라이언트 컴포넌트에 두지 않습니다.
+
+## Supabase 불변 조건
+
+- 모든 사용자 데이터 테이블은 RLS를 활성화하고 `public.is_approved_user()` 기준을 반영합니다.
+- 관리자 전용 RPC는 `admin_only` 또는 동등한 검증을 포함합니다.
+- `SECURITY DEFINER` 함수 안에서는 반드시 `auth.uid()`와 권한을 검증합니다.
+- 날짜 기준은 Asia/Seoul입니다. SQL에서 `CURRENT_DATE`, `NOW()`를 그대로 쓰지 말고 KST 변환을 명시합니다.
+- Edge Function은 Deno 런타임입니다. Node 전용 npm 패키지를 그대로 가져오지 않습니다.
+
+## 환경 변수
+
+커밋 가능한 예시는 `.env.local.example`에만 둡니다. 실제 값은 `.env.local`, Railway Variables, Supabase Secrets에서 관리합니다.
+
+현재 공개 환경 변수:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+
+서버 전용 값은 `DATABASE_URL`, Edge Function secrets 등으로 관리하며 클라이언트 코드에 노출하지 않습니다.
+
+## 코드 작성 기준
+
+- 비개발자 사용자를 전제로, 화면 문구는 쉬운 한국어로 씁니다.
+- 기능 수정은 해당 도메인의 `queries.ts`, `actions.ts`, `types.ts`, 컴포넌트 구조를 먼저 확인합니다.
+- 파일 업로드는 `src/lib/utils/upload.ts`의 검증 흐름을 따릅니다.
+- 오류 메시지는 `src/lib/utils/errors.ts`의 패턴을 우선 사용합니다.
+- 날짜 포맷과 KST 처리는 `src/lib/utils/date.ts`를 우선 사용합니다.
+- `any`와 넓은 타입 단언은 피하고, 필요한 타입은 도메인 `types.ts`에 둡니다.
+
+## 도메인별 추가 지침
+
+- DB/RLS/Edge Function: `supabase/CLAUDE.md`
+- 근태: `src/components/dashboard/attendance/CLAUDE.md`
+- 채팅: `src/components/dashboard/chat/CLAUDE.md`
+- 업무: `src/components/dashboard/tasks/CLAUDE.md`
+- 전체 프로젝트 가이드: `docs/claude/project-guide.md`
+- 작업 흐름: `docs/claude/workflow.md`
+
+## 리뷰 기준
+
+코드 리뷰 요청을 받으면 버그와 회귀 위험을 먼저 봅니다.
+
+- 인증/권한/RLS 우회 가능성
+- 서버/클라이언트 경계 오류
+- KST/UTC 날짜 오류
+- Supabase error 무시
+- Realtime 구독 cleanup 누락
+- 무한 렌더링, race condition, stale cache
+- N+1 쿼리와 불필요한 전체 로드
+- 민감 정보 노출
+
+보고는 파일과 라인을 포함해 심각도 순으로 작성합니다.

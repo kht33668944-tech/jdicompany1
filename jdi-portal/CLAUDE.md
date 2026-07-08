@@ -1,88 +1,62 @@
-# CLAUDE.md — JDI 포털
+# CLAUDE.md - JDI 포털 작업 지침
 
-<!-- /init 금지. 이 파일은 수동 관리. -->
+이 파일은 Claude 계열 에이전트가 빠르게 프로젝트 맥락을 잡기 위한 요약입니다. Codex는 `AGENTS.md`를 우선으로 보되, 이 파일도 같은 프로젝트 지침으로 취급합니다.
 
-비개발자(김효태) 1인 운영 사내 포털. Next.js 16 + Supabase.
-근태·할일·스케줄·오류접수·채팅·설정. 한국어 UI.
+## 항상 적용
 
-## 항상 적용 (공통 규칙)
-
-- 사용자는 **비개발자** → 쉬운 말·비유·단계별 안내.
-- **답변은 최대한 간결하게**. 핵심만, 불필요한 서론·요약·반복 금지.
-- 매 의미 단위마다 **commit**. `git push`는 명시적 요청 시에만.
-- 파괴적 작업(삭제, force, prod DB 변경) 전 **확인 요청**.
-- 스킬/에이전트 고정 X — 상황에 맞게 선택.
-
-## 프로젝트 함정 (자주 깨지는 것)
-
-- Edge Function은 **Deno 네이티브**만 (`web-push` npm 금지)
-- Supabase RPC의 `CURRENT_DATE`/`NOW()`는 **UTC** → KST 변환 필수
-- `tsconfig.json` exclude에 `supabase/functions/**` 필수
-- 새 테이블엔 **RLS + `is_approved_user()` 체크** 필수
-- `.env.local` 커밋 금지
+- 사용자는 비개발자 운영자입니다. 어려운 기술 설명보다 쉬운 한국어와 짧은 단계 안내를 우선합니다.
+- 코드는 안정성을 먼저 봅니다. 특히 인증, RLS, 날짜, 운영 데이터 변경은 보수적으로 처리합니다.
+- 사용자가 요청하지 않은 `git push`, 강제 푸시, 히스토리 재작성은 하지 않습니다.
+- `.env.local`과 실제 키 값은 커밋하지 않습니다.
+- 위험 작업은 실행 전 확인합니다. 예: 운영 DB 변경, 데이터 삭제, 권한 완화, 배포 설정 변경.
 
 ## 문서 인덱스
 
-| 문서 | 내용 | 언제 읽나 |
-|---|---|---|
-| [`docs/claude/project-guide.md`](docs/claude/project-guide.md) | 스택·경로·아키텍처·보안·커밋·유틸 | 기술 규칙/경로/보안 확인 시 |
-| [`docs/claude/workflow.md`](docs/claude/workflow.md) | brainstorm→plan→execute→verify | 큰 기능 설계·멀티파일 리팩토링 시 |
-| [`docs/claude/user-profile.md`](docs/claude/user-profile.md) | 사용자 톤·의사소통 규칙 | 응대 톤 재확인 시 |
-| [`docs/claude/archive/past-lessons.md`](docs/claude/archive/past-lessons.md) | 과거 실수 사례와 배경 | 함정 규칙의 "왜?"가 필요할 때 |
-| [`AGENTS.md`](AGENTS.md) | 코드리뷰 체크리스트 (8항목) | 코드리뷰 요청 시 |
-
-> 1줄 수정·단순 버그픽스·명확한 작업은 **어떤 문서도 열지 말고 바로 진행**.
-
-### 폴더별 CLAUDE.md
-
-| 경로 | 요약 | 언제 읽나 |
-|---|---|---|
-| [`supabase/CLAUDE.md`](supabase/CLAUDE.md) | 마이그레이션·RLS·Edge Function 규칙 | DB/마이그레이션/RLS 변경 시 |
-| [`src/components/dashboard/chat/CLAUDE.md`](src/components/dashboard/chat/CLAUDE.md) | Realtime 구독·캐싱·읽음 처리 | 채팅 기능 수정 시 |
-| [`src/components/dashboard/tasks/CLAUDE.md`](src/components/dashboard/tasks/CLAUDE.md) | IDB 캐시·Position RPC·패널/페이지 모드 | 할일 기능 수정 시 |
-| [`src/components/dashboard/attendance/CLAUDE.md`](src/components/dashboard/attendance/CLAUDE.md) | KST 타임존·IP 검증·승인 워크플로우 | 근태 기능 수정 시 |
-
-### 설계/계획 문서
-
-| 경로 | 용도 |
+| 문서 | 용도 |
 |---|---|
-| `docs/superpowers/specs/` | 기능 설계서 (brainstorm 결과) |
-| `docs/superpowers/plans/` | 구현 계획서 (plan 결과) |
+| `AGENTS.md` | Codex/공통 에이전트 작업 지침 |
+| `README.md` | 프로젝트 시작과 구조 안내 |
+| `docs/claude/project-guide.md` | 스택, 경로, 아키텍처, 보안 기준 |
+| `docs/claude/workflow.md` | 설계, 계획, 구현, 검증 흐름 |
+| `docs/claude/user-profile.md` | 사용자와 커뮤니케이션 방식 |
+| `supabase/CLAUDE.md` | DB, RLS, Edge Function 규칙 |
+| `src/components/dashboard/attendance/CLAUDE.md` | 근태 도메인 규칙 |
+| `src/components/dashboard/chat/CLAUDE.md` | 채팅 도메인 규칙 |
+| `src/components/dashboard/tasks/CLAUDE.md` | 업무 도메인 규칙 |
 
-## 읽기 우선순위 (작업 유형별)
+## 빠른 프로젝트 정보
 
-| 작업 유형 | 읽을 문서 |
-|---|---|
-| 1줄 수정·단순 버그픽스 | **아무것도 읽지 말고 바로 진행** |
-| DB 마이그레이션·RLS 변경 | `supabase/CLAUDE.md` |
-| 채팅 기능 수정 | `src/components/dashboard/chat/CLAUDE.md` |
-| 할일 기능 수정 | `src/components/dashboard/tasks/CLAUDE.md` |
-| 근태 기능 수정 | `src/components/dashboard/attendance/CLAUDE.md` |
-| 새 기능 전체 설계 | `docs/claude/workflow.md` → `project-guide.md` |
-| 코드리뷰 | `AGENTS.md` |
-| 보안·경로·커밋 규칙 확인 | `docs/claude/project-guide.md` |
+- 앱 위치: `jdi-portal/`
+- 프레임워크: Next.js 16.2.2 App Router, React 19.2.4
+- 언어: TypeScript strict
+- 스타일: Tailwind CSS 4
+- 백엔드: Supabase Auth, Postgres, RLS, Storage, Realtime, Edge Functions
+- 배포: Railway
+- UI 언어와 날짜 기준: 한국어, Asia/Seoul
 
-## 새 규칙 추가 위치
+## 자주 쓰는 명령
 
-| 규칙 종류 | 추가 위치 |
-|---|---|
-| 전체 프로젝트 공통 | 이 파일의 "항상 적용" 또는 "프로젝트 함정" |
-| 기술 상세 (경로, 보안, 커밋 등) | `docs/claude/project-guide.md` |
-| DB·마이그레이션·RLS | `supabase/CLAUDE.md` |
-| 채팅 realtime | `src/components/dashboard/chat/CLAUDE.md` |
-| 과거 사건 기록 | `docs/claude/archive/past-lessons.md` |
-| 새 도메인 고유 규칙 | 해당 폴더에 CLAUDE.md 신규 생성 (규칙 5개 이상일 때만) |
+```bash
+npm run dev
+npm run build
+npm run lint
+npx supabase db push --linked
+npx supabase functions deploy <name> --no-verify-jwt
+```
 
-## 문서 변경 정책
+루트 저장소에서 실행하면 래퍼 스크립트가 `jdi-portal`로 이동합니다. 세부 작업은 보통 `jdi-portal` 안에서 진행합니다.
 
-**코드 수정은 바로 진행 가능.** 단, 아래 항목은 **수정 전 반드시 사용자 승인 필수**:
+## 작업 우선순위
 
-- 루트 `CLAUDE.md` 수정
-- `docs/` 문서 구조 변경 (생성·삭제·이동)
-- 폴더별 `CLAUDE.md` 생성 또는 수정
-- 프로젝트 작업 규칙·문서 운영 규칙 변경
+1. 단순 버그나 작은 수정은 관련 파일을 읽고 바로 처리합니다.
+2. 여러 도메인에 걸친 기능은 `docs/claude/workflow.md` 흐름대로 설계와 계획을 남깁니다.
+3. DB, RLS, Edge Function은 `supabase/CLAUDE.md`를 먼저 확인합니다.
+4. 도메인별 기존 규칙이 있으면 해당 하위 `CLAUDE.md`를 먼저 확인합니다.
 
-**승인 요청 형식** (3줄 이내):
-1. **무엇을**: 어떤 파일의 어떤 부분을 변경
-2. **왜**: 변경 이유
-3. **해도 될까요?**
+## 금지/주의
+
+- `tsconfig.json`의 `exclude`에서 `supabase/functions/**`를 제거하지 않습니다.
+- SQL에서 `CURRENT_DATE`, `NOW()`를 KST 변환 없이 직접 사용하지 않습니다.
+- 클라이언트 코드에 서버 전용 키를 노출하지 않습니다.
+- RLS를 우회하거나 완화하는 변경은 명확한 근거 없이 하지 않습니다.
+- Supabase `error`를 무시하고 `data`만 처리하지 않습니다.

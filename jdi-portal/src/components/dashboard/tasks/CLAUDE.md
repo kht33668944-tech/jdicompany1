@@ -1,36 +1,40 @@
-# Tasks 도메인 규칙
+# 업무 도메인 지침
 
-## IndexedDB 캐시 (`tasksCache.ts`)
+업무 도메인은 목록 캐시, 상세 패널, Realtime 활동 기록, position 정렬이 핵심입니다.
 
-- 모든 캐시 함수는 IDB 없어도 동작 (프라이빗 모드, Safari 등 graceful degradation)
-- **`freshLoadedRef` 가드 필수** — 서버 fetch 완료 후 IDB의 stale 데이터가 덮어쓰지 않도록 방지
-- 캐시 키는 `"all"` 단일 키. 부분 갱신 없이 전체 교체
+## 주요 파일
 
-## Position 관리
+- UI: `src/components/dashboard/tasks/`
+- 페이지: `src/app/dashboard/tasks/`
+- 로직: `src/lib/tasks/`
+- 캐시: `src/lib/tasks/tasksCache.ts`
 
-- Position은 **status별 독립** — `"대기"`, `"진행중"`, `"완료"` 각각 별도 순서
-- 상태 변경 시 반드시 `reorder_task` RPC 사용. 직접 position UPDATE 금지
-- RPC 없이 쿼리하면 position 값이 stale 상태
+## 캐시
 
-## 패널 모드 vs 페이지 모드
+- IndexedDB 캐시는 오프라인/빠른 표시를 위한 보조 수단입니다.
+- 서버 fetch가 완료된 뒤 stale 캐시가 화면을 덮지 않도록 순서를 확인합니다.
+- 캐시 키와 필터 조건이 어긋나면 다른 목록이 섞일 수 있습니다.
 
-- `TaskDetailClient`의 `mode` prop으로 분기
-- `"panel"`: 슬라이드 드로어 → `onRefresh()` 콜백으로 부모 갱신
-- `"page"`: 전체 페이지 → `router.refresh()`로 갱신
-- 혼용하면 갱신 누락 발생
+## Position
 
-## 완료 태스크 표시 제한
+- position은 상태별로 독립된 순서를 가집니다.
+- 상태 변경과 드래그 정렬은 `reorder_task` RPC 흐름을 우선합니다.
+- 클라이언트에서 직접 position만 UPDATE하면 중복/충돌이 생길 수 있습니다.
 
-- 메인 리스트는 최근 7일 완료분만 표시 (`getCompletedCutoff()`)
-- 요약 카운트(`TaskSummaryPanel`)는 전체 완료 포함 — 수치 불일치 의도된 동작
+## 상세 패널과 페이지
 
-## 알림
+- `TaskDetailClient`는 `mode`로 패널과 페이지 흐름을 나눕니다.
+- 패널 모드는 부모 목록 갱신 콜백을 확인합니다.
+- 페이지 모드는 `router.refresh()` 흐름을 확인합니다.
+- 첨부, 체크리스트, 댓글, 하위 업무 변경 후 목록/상세가 함께 갱신되는지 확인합니다.
 
-- `createNotification()`은 fire-and-forget — 실패해도 뮤테이션 블로킹 안 함
-- 할당 시 → 담당자에게, 상태 변경 → 생성자에게, 댓글 → 담당자 전원(작성자 제외)
+## 완료 업무 표시
 
-## 실시간 구독
+- 메인 목록은 최근 완료 항목만 표시할 수 있습니다.
+- 요약 카운트는 전체 완료를 포함할 수 있어 목록과 숫자가 달라 보일 수 있습니다. 이 차이는 의도인지 확인합니다.
 
-- `TaskDetailClient`에서 `task_activities` 테이블만 Realtime 구독
-- 중복 방지: `prev.some(a => a.id === data.id)` 체크
-- 태스크 목록은 실시간 구독 없음 — IDB 캐시 + 수동 새로고침
+## 알림과 활동 기록
+
+- 알림 생성 실패가 업무 변경 자체를 막지 않도록 처리합니다.
+- 활동 기록 Realtime은 중복 ID 체크를 유지합니다.
+- 업무 목록 자체는 Realtime보다 캐시와 수동 갱신 흐름이 중심입니다.

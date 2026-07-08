@@ -1,44 +1,47 @@
-# Attendance 도메인 규칙
+# 근태 도메인 지침
 
-## KST 타임존
+근태는 날짜, 권한, 승인 흐름이 모두 중요합니다. 작은 UI 수정도 KST와 관리자 권한을 함께 확인합니다.
 
-- 날짜 비교는 **반드시 `toDateString()`** 사용 (`src/lib/utils/date.ts`)
-- JS `new Date().toISOString().slice(0,10)` 직접 쓰면 자정 전후 KST/UTC 차이로 하루 어긋남
-- 통계 계산(`stats.ts`)은 클라이언트에서 수동 KST 오프셋(`+9h`) 적용 — `extractTimeMinutes()` 참고
-- 차트용 Date 생성 시 반드시 `+09:00` 오프셋 포함: `new Date(\`${date}T12:00:00+09:00\`)`
+## 주요 파일
 
-## 출퇴근 보안 (IP 2단계 검증)
+- UI: `src/components/dashboard/attendance/`
+- 페이지: `src/app/dashboard/attendance/page.tsx`
+- API: `src/app/api/attendance/`
+- 로직: `src/lib/attendance/`
+- 유틸: `src/lib/utils/date.ts`, `src/lib/utils/vacation.ts`, `src/lib/utils/ip.ts`
 
-- 클라이언트 `/api/ip` 프리체크는 UX용 (빠른 피드백)
-- **실제 검증은 서버 RPC** — `x-forwarded-for` 헤더에서 첫 번째 IP 추출
-- 두 단계 모두 통과해야 출퇴근 처리됨
+## KST 기준
 
-## 근무시간표 이력 모델
+- 날짜 문자열은 `toDateString()` 계열 유틸을 우선 사용합니다.
+- `new Date().toISOString().slice(0, 10)` 방식은 UTC 날짜라 근태에서 위험합니다.
+- SQL 날짜 계산은 Asia/Seoul 변환을 명시합니다.
+- 차트용 Date 생성은 `+09:00` 오프셋을 포함합니다.
 
-- `effective_from` + `is_initial_seed` 플래그로 버전 관리
-- 직접 UPDATE 금지 — 반드시 RPC(`set_initial_work_schedule`, `approve_work_schedule_change_request`) 통해 변경
-- `getScheduleForDate()`로 특정 날짜에 적용되는 근무시간 조회
+## 출퇴근과 IP 검증
 
-## 휴가 잔여일
+- 클라이언트의 `/api/ip` 확인은 사용자 피드백용입니다.
+- 실제 검증은 서버/RPC에서 다시 수행해야 합니다.
+- `x-forwarded-for` 등 프록시 헤더 처리는 서버 쪽 기준을 확인합니다.
 
-- `ensure_vacation_balance` RPC가 첫 조회 시 `hire_date` 기반으로 자동 생성
-- 별도 초기화 로직 불필요 — RPC에 위임
+## 근무시간 변경
 
-## 승인/반려 워크플로우
+- 직접 UPDATE보다 RPC 흐름을 우선합니다.
+- `effective_from`과 변경 이력을 보존합니다.
+- 특정 날짜에 적용되는 근무시간은 이력 기준으로 조회합니다.
 
-- 승인·반려 후 `createNotification()` 호출 필수 — 누락 시 사용자가 결과를 모름
-- 요청 상태: `"대기중"` → `"승인"` / `"반려"`, 승인 후 `"취소요청"` → `"취소"` 가능
-- Admin 액션은 `requireAdmin()` 체크 필수
+## 휴가
+
+- 휴가 잔여일은 `hire_date` 기준 자동 생성/계산 흐름을 존중합니다.
+- 휴가 승인/취소는 일정 연동 여부를 함께 확인합니다.
+- 휴가 일수 계산은 주말, 반차, KST 경계를 확인합니다.
+
+## 승인 흐름
+
+- 관리자 액션은 `requireAdmin()` 또는 동등한 검증을 거칩니다.
+- 승인/반려 후 알림 생성이 누락되지 않았는지 확인합니다.
+- 사용자가 결과를 볼 수 있도록 상태 갱신과 `router.refresh()` 흐름을 확인합니다.
 
 ## 점심시간 공제
 
-- `attendance_records.total_minutes` GENERATED 컬럼에서 자동 처리
-- 정책: `check_out - check_in > 240분`일 때만 -60분
-- 클라이언트는 이 컬럼값을 그대로 소비 (별도 공제 로직 없음)
-- 정책 변경 시 migration 065 식만 수정
-
-## 데이터 페칭
-
-- `page.tsx`에서 admin/일반 분기하여 `Promise.all()` 병렬 fetch
-- 클라이언트 뮤테이션 후 `router.refresh()`로 서버 데이터 갱신
-- 실시간 구독 없음 — 새로고침 기반
+- `attendance_records.total_minutes`의 DB 생성/계산 규칙을 우선합니다.
+- 클라이언트에서 별도 공제 로직을 중복 구현하지 않습니다.

@@ -1,103 +1,110 @@
-# JDI 포털 — 프로젝트 가이드
+# JDI 포털 프로젝트 가이드
 
-> 필요할 때만 참고. 전체 읽지 말고 해당 섹션만 찾아 읽기.  
-> 과거 사건/상세 배경은 `docs/claude/archive/past-lessons.md`.
+필요한 부분만 빠르게 참고하기 위한 기술 가이드입니다. 오래된 배경이나 과거 이슈는 `docs/claude/archive/`에 남겨둡니다.
 
 ## 개요
 
-JDICOMPANY 사내 포털. 근태·할일·스케줄·오류접수·채팅·설정. 한국어 UI, Asia/Seoul. Railway 배포.
+JDICOMPANY 사내 업무 포털입니다. 승인된 사용자만 접근하며, 근태/업무/채팅/일정/리포트/인플루언서 운영을 통합합니다. 한국어 UI와 Asia/Seoul 기준 날짜 처리가 기본입니다.
 
 ## 스택
 
-- **Frontend**: Next.js 16 (App Router, Turbopack) + TypeScript 5 strict + React 19
-- **Styling**: Tailwind 4, Glass morphism, brand blue (`--color-brand-600: #2563eb`)
-- **Backend**: Supabase (Auth + DB + RLS + Edge Functions + Storage)
-- **라이브러리**: @hello-pangea/dnd, sonner, phosphor-react
-- **Lint**: ESLint 9
-- **배포**: Railway Hobby ($5/월, 콜드 스타트 없음)
+- Frontend: Next.js 16.2.2 App Router, React 19.2.4, TypeScript strict
+- Styling: Tailwind CSS 4
+- Backend: Supabase Auth, Postgres, RLS, Realtime, Storage, Edge Functions
+- Runtime/Deploy: Node 20 이상, Railway
+- Libraries: `@supabase/ssr`, `@hello-pangea/dnd`, `phosphor-react`, `recharts`, `sonner`, `xlsx`, `idb`, `pg`
 
-## 커맨드
+## 명령
 
 ```bash
-npm run dev                                           # 개발 서버
-npm run build                                         # 프로덕션 빌드
-npm run lint                                          # ESLint
-npx supabase db push --linked                         # DB 마이그레이션 (또는 node scripts/run-migration.mjs <file>)
-npx supabase functions deploy <name> --no-verify-jwt  # Edge Function 배포
-# 배포 상태/로그는 Railway Dashboard에서 확인 (자동 배포: master push 시)
+npm run dev
+npm run build
+npm run lint
+npx supabase db push --linked
+npx supabase functions deploy <name> --no-verify-jwt
 ```
 
-## 경로 규약
+루트 저장소의 `package.json`은 Railway/Railpack 감지를 위한 래퍼입니다. 앱 작업은 `jdi-portal`에서 진행합니다.
 
-| 용도 | 경로 |
+## 경로
+
+| 목적 | 경로 |
 |---|---|
-| 도메인 코드 | `src/lib/{domain}/` (`queries.ts`, `actions.ts`, `types.ts`) |
-| 페이지 (서버) | `src/app/dashboard/**/page.tsx` |
-| 클라이언트 컴포넌트 | `src/components/dashboard/**/*.tsx` |
-| 공유 컴포넌트 | `src/components/shared/` |
-| 훅 / 유틸 | `src/lib/hooks/`, `src/lib/utils/` |
-| DB 마이그레이션 | `supabase/migrations/NNN_*.sql` (순차 번호) |
-| Edge Function | `supabase/functions/<name>/index.ts` (Deno) |
-| 설계/계획 문서 | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
-| Path alias | `@/*` → `./src/*` |
+| App Router | `src/app/` |
+| 인증 페이지 | `src/app/(auth)/` |
+| API Route Handler | `src/app/api/` |
+| 대시보드 페이지 | `src/app/dashboard/` |
+| 도메인 컴포넌트 | `src/components/dashboard/<domain>/` |
+| 공용 컴포넌트 | `src/components/shared/` |
+| 도메인 쿼리/액션/타입 | `src/lib/<domain>/` |
+| Supabase SSR | `src/lib/supabase/` |
+| DB 마이그레이션 | `supabase/migrations/NNN_*.sql` |
+| Edge Function | `supabase/functions/<name>/index.ts` |
+| 기능 설계/계획 | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
-## 아키텍처 핵심
+## 아키텍처 메모
 
-- **Middleware**: Next.js 16이라 `middleware.ts` 대신 `src/proxy.ts`에서 `updateSession()`.
-- **Data Layer**: `queries.ts`(SELECT, 서버 컴포넌트용, `SupabaseClient` 매개변수) / `actions.ts`(INSERT/UPDATE/DELETE, 클라이언트, 내부에서 `createClient()`).
-  - `actions.ts`는 `"use server"` 아님. 브라우저에서 Supabase 직접 호출. 보안은 **RLS 담당**.
-- **Server→Client**: `page.tsx`에서 `getAuthUser()` → `queries.ts` → props → 클라이언트 컴포넌트.
-- **Auth**: `src/lib/supabase/auth.ts`의 `getAuthUser()` (React `cache()`로 중복 방지). Dashboard layout에서 `is_approved` 체크.
-- **Notifications**: `src/lib/notifications/` (RPC `insert_notification*`). 발송 전 `notification_settings` 확인.
-- **Web Push**: `src/lib/push/` + `supabase/functions/push-dispatch/` (Deno) + Database Webhook.
+- 인증 세션 갱신은 `src/proxy.ts`와 `src/lib/supabase/middleware.ts` 흐름을 확인합니다.
+- 서버 컴포넌트는 `getAuthUser()`와 도메인 `queries.ts`를 통해 초기 데이터를 가져옵니다.
+- 클라이언트 컴포넌트는 필요한 경우 도메인 `actions.ts`에서 Supabase client를 사용합니다. 보안은 RLS가 최종 방어선입니다.
+- Postgres 직접 연결이 가능한 일부 서버 흐름은 `src/lib/db/postgres.ts`를 통해 fallback과 함께 동작합니다.
+- 캐시가 있는 도메인은 stale 데이터가 UI를 덮어쓰지 않도록 로드 순서를 확인합니다.
 
-## 보안 (invariant)
+## 보안 기준
 
-- 모든 테이블 RLS에 `public.is_approved_user()` 체크 — 미승인 사용자 DB 레벨 차단.
-- 출퇴근: SECURITY DEFINER RPC (`attendance_check_in/out`)만.
-- 알림 생성: 관리자 전용 RPC (`admin_only` 체크).
-- 프로필 UPDATE: 본인은 제한 필드만, role/is_approved는 전용 RPC.
-- 파일 업로드: `src/lib/utils/upload.ts` `validateFile()` (10MB, 허용 확장자).
+- 모든 사용자 데이터는 RLS 정책을 기준으로 보호합니다.
+- `is_approved_user()` 체크가 빠진 정책을 추가하지 않습니다.
+- 관리자 기능은 서버 또는 RPC에서 권한을 다시 검증합니다.
+- `SECURITY DEFINER` 함수는 `auth.uid()`와 권한 검증을 포함합니다.
+- 민감 정보는 서버 환경 변수, Railway Variables, Supabase Secrets에만 둡니다.
+- Storage 정책은 파일 소유자/멤버십/관리자 조건을 명확히 둡니다.
 
-## 환경변수
+## 날짜와 시간
 
-- 프론트: `NEXT_PUBLIC_*` → Railway Variables + `.env.local`
-- Edge Function: `npx supabase secrets set KEY=value`
-- **커밋 금지**: 실제 키, `.env.local` / **커밋 OK**: `.env.local.example`
-- 로컬 DB 작업용(선택): `.env.local`에 `DATABASE_URL`(Transaction pooler 문자열) 추가 → `node scripts/run-migration.mjs <file>`로 직접 실행 가능.
-- 현재 등록된 NEXT_PUBLIC: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
+- 서비스 기준 시간대는 Asia/Seoul입니다.
+- SQL에서 날짜 기준을 쓸 때는 `(NOW() AT TIME ZONE 'Asia/Seoul')::DATE`처럼 명시합니다.
+- 클라이언트 날짜 포맷은 `src/lib/utils/date.ts`를 우선 사용합니다.
+- 근태와 휴가 계산은 UTC 경계 문제를 먼저 의심합니다.
 
-## 커밋 규칙
+## 환경 변수
 
-형식:
+커밋 가능:
+
+- `.env.local.example`
+
+커밋 금지:
+
+- `.env.local`
+- Railway/Supabase 실제 키
+- 서비스 role key
+- VAPID private key
+- DB 접속 문자열
+
+현재 공개 변수:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+
+## 커밋 기준
+
+커밋 메시지는 한 줄 요약을 명확히 씁니다.
+
+예:
+
+```text
+문서: 에이전트 작업 지침 최신화
+근태: KST 기준 출근 기록 계산 수정
+채팅: DM 채널 읽음 상태 갱신 보완
 ```
-<카테고리>: <한 줄 요약>
 
-<왜 중심 1-3문장, 선택>
+사용자가 요청하지 않으면 push하지 않습니다.
 
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-```
+## 자주 쓰는 유틸
 
-카테고리: `DB:` / `UI:` / `API:` / `SW:` / `Edge Function:` / `타입:` / `설정:` / `픽스:` / `보안 픽스:` / `정리:` / `성능:` / `UX:` / `문서:` / `트리거:`
-
-- 본문 **한국어**, HEREDOC 사용(한국어 깨짐 방지).
-- `--no-verify`, `--amend`, `--force` 금지 (명시 요청 제외).
-- `git push`는 사용자 확인 후.
-- 매 commit이 롤백 가능한 단위.
-
-## 절대 금지
-
-- ❌ `tsconfig.json` include에 `supabase/functions/**`
-- ❌ `.env.local` 커밋
-- ❌ 사용자 허락 없이 master push
-
-> DB/마이그레이션/RLS/Edge Function 관련 금지사항 → `supabase/CLAUDE.md` 참조.  
-> 위 항목이 왜 금지인지 배경은 `docs/claude/archive/past-lessons.md` 참조.
-
-## 공용 유틸/타입
-
-- 날짜 (KST): `src/lib/utils/date.ts` — `toDateString`, `formatTime`, `formatMinutes`
-- 에러: `src/lib/utils/errors.ts` — `getErrorMessage`
-- 업로드: `src/lib/utils/upload.ts` — `validateFile`
-- 프로필 공용 타입: `src/lib/attendance/types.ts`의 `Profile`
-- 역할: `"employee"` | `"admin"` (`verifyAdmin` 패턴)
+- 날짜: `src/lib/utils/date.ts`
+- 오류 메시지: `src/lib/utils/errors.ts`
+- 파일 검증: `src/lib/utils/upload.ts`
+- IP 처리: `src/lib/utils/ip.ts`
+- 휴가 계산: `src/lib/utils/vacation.ts`
+- 공용 프로필 타입: `src/lib/attendance/types.ts`
