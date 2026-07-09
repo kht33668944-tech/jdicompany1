@@ -8,7 +8,14 @@ export default async function DashboardPage() {
   if (!auth) redirect("/login");
 
   const userName = auth.profile.full_name ?? auth.user.email?.split("@")[0] ?? "사용자";
-  const initialData = await getDashboardDataFast(auth.supabase, auth.user.id, userName);
+  const canViewCompanyWork = auth.profile.role !== "employee";
+  const initialData = await getDashboardDataFast(
+    auth.supabase,
+    auth.user.id,
+    userName,
+    canViewCompanyWork,
+    auth.profile
+  );
 
   return (
     <DashboardClient

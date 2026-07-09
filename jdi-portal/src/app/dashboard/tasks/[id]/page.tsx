@@ -3,7 +3,6 @@ import { getAuthUser } from "@/lib/supabase/auth";
 import {
   getTaskBasic,
   getChecklistItems,
-  getSubtasksBasic,
   getAttachments,
   getActivities,
 } from "@/lib/tasks/queries";
@@ -20,10 +19,9 @@ export default async function TaskDetailPage({ params }: Props) {
   if (!auth) redirect("/login");
 
   // 모든 쿼리를 병렬 실행 — 순차 대기 없음
-  const [task, checklist, subtasks, attachments, activities, profiles] = await Promise.all([
+  const [task, checklist, attachments, activities, profiles] = await Promise.all([
     getTaskBasic(auth.supabase, id),
     getChecklistItems(auth.supabase, id),
-    getSubtasksBasic(auth.supabase, id),
     getAttachments(auth.supabase, id),
     getActivities(auth.supabase, id),
     getCachedAllProfiles(),
@@ -34,7 +32,6 @@ export default async function TaskDetailPage({ params }: Props) {
   // 카운트는 이미 조회된 실제 데이터에서 계산
   task.checklist_total = checklist.length;
   task.checklist_completed = checklist.filter((c) => c.is_completed).length;
-  task.subtask_count = subtasks.length;
   task.comment_count = activities.filter((a) => a.type === "comment").length;
   task.attachment_count = attachments.length;
 
@@ -42,7 +39,6 @@ export default async function TaskDetailPage({ params }: Props) {
     <TaskDetailClient
       task={task}
       checklist={checklist}
-      subtasks={subtasks}
       attachments={attachments}
       activities={activities}
       profiles={profiles}

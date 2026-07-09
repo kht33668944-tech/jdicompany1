@@ -16,12 +16,10 @@ import type {
   TaskAttachment,
   TaskActivity,
   TaskStatus,
-  TaskPriority,
 } from "@/lib/tasks/types";
-import { TASK_STATUSES, TASK_PRIORITIES, CATEGORIES, TASK_STATUS_CONFIG, PRIORITY_CONFIG } from "@/lib/tasks/constants";
+import { TASK_STATUSES, TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
 import { updateTask, deleteTask, addAssignee, removeAssignee } from "@/lib/tasks/actions";
 import TaskChecklist from "./TaskChecklist";
-import TaskSubtasks from "./TaskSubtasks";
 import TaskAttachments from "./TaskAttachments";
 import TaskActivityTimeline from "./TaskActivityTimeline";
 import TaskCommentInput from "./TaskCommentInput";
@@ -30,7 +28,6 @@ import UserAvatar from "@/components/shared/UserAvatar";
 interface Props {
   task: TaskWithDetails;
   checklist: TaskChecklistItem[];
-  subtasks: TaskWithDetails[];
   attachments: TaskAttachment[];
   activities: TaskActivity[];
   profiles: Profile[];
@@ -39,8 +36,6 @@ interface Props {
   mode?: "page" | "panel";
   /** panel 모드 전용: 패널 닫기 */
   onClose?: () => void;
-  /** panel 모드 전용: 패널 내 다른 task 로 이동 */
-  onNavigate?: (taskId: string) => void;
   /** panel 모드 전용: 데이터 재조회 트리거 */
   onRefresh?: () => void;
 }
@@ -50,14 +45,12 @@ import { getErrorMessage } from "@/lib/utils/errors";
 export default function TaskDetailClient({
   task,
   checklist,
-  subtasks,
   attachments,
   activities,
   profiles,
   userId,
   mode = "page",
   onClose,
-  onNavigate,
   onRefresh,
 }: Props) {
   const router = useRouter();
@@ -120,12 +113,9 @@ export default function TaskDetailClient({
       supabase.removeChannel(channel);
     };
   }, [
-    task.category,
     task.description,
     task.due_date,
     task.id,
-    task.priority,
-    task.start_date,
     task.status,
     task.title,
   ]);
@@ -133,10 +123,7 @@ export default function TaskDetailClient({
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
   const [status, setStatus] = useState<TaskStatus>(task.status);
-  const [priority, setPriority] = useState<TaskPriority>(task.priority);
-  const [category, setCategory] = useState(task.category ?? "");
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
-  const [startDate, setStartDate] = useState(task.start_date ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -147,17 +134,11 @@ export default function TaskDetailClient({
     setTitle(task.title);
     setDescription(task.description ?? "");
     setStatus(task.status);
-    setPriority(task.priority);
-    setCategory(task.category ?? "");
     setDueDate(task.due_date ?? "");
-    setStartDate(task.start_date ?? "");
   }, [
-    task.category,
     task.description,
     task.due_date,
     task.id,
-    task.priority,
-    task.start_date,
     task.status,
     task.title,
   ]);
@@ -177,10 +158,7 @@ export default function TaskDetailClient({
         title: title.trim(),
         description: description.trim() || null,
         status,
-        priority,
-        category: category || null,
         dueDate: dueDate || null,
-        startDate: startDate || null,
       });
       setFeedback({ type: "success", message: "저장되었습니다." });
       if (mode === "panel" && onRefresh) {
@@ -240,11 +218,9 @@ export default function TaskDetailClient({
 
   // 패널 모드: 전체 높이 flex 레이아웃
   if (mode === "panel") {
-    const periodText = (() => {
+    const deadlineText = (() => {
       const fmt = (d: string) => { const [, m, day] = d.split("-"); return `${m}.${day}`; };
-      if (task.start_date && task.due_date) return `${fmt(task.start_date)} ~ ${fmt(task.due_date)}`;
-      if (task.start_date) return `${fmt(task.start_date)} ~`;
-      if (task.due_date) return `~ ${fmt(task.due_date)}`;
+      if (task.due_date) return fmt(task.due_date);
       return null;
     })();
 
@@ -327,9 +303,9 @@ export default function TaskDetailClient({
                 </span>
               </div>
             )}
-            {periodText && (
+            {deadlineText && (
               <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                {periodText}
+                {deadlineText}
               </span>
             )}
           </div>
@@ -451,18 +427,6 @@ export default function TaskDetailClient({
             canEdit={canEdit}
           />
 
-          {/* 서브태스크 */}
-          <TaskSubtasks
-            taskId={task.id}
-            subtasks={subtasks}
-            userId={userId}
-            profiles={profiles}
-            canEdit={canEdit}
-            mode={mode}
-            onNavigate={onNavigate}
-            onRefresh={onRefresh}
-          />
-
           {/* 활동 타임라인 */}
           <div className="bg-white rounded-3xl shadow-sm p-6">
             <h3 className="font-bold text-slate-700 mb-4">활동</h3>
@@ -499,63 +463,9 @@ export default function TaskDetailClient({
               )}
             </div>
 
-            {/* 우선순위 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">우선순위</label>
-              {canEdit ? (
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                >
-                  {TASK_PRIORITIES.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className={`text-sm font-medium ${PRIORITY_CONFIG[priority].text}`}>
-                  {priority}
-                </span>
-              )}
-            </div>
-
-            {/* 카테고리 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">카테고리</label>
-              {canEdit ? (
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                >
-                  <option value="">없음</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="text-sm text-slate-600">{category || "없음"}</span>
-              )}
-            </div>
-
-            {/* 시작일 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">시작일</label>
-              {canEdit ? (
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                />
-              ) : (
-                <span className="text-sm text-slate-600">{startDate || "-"}</span>
-              )}
-            </div>
-
             {/* 마감일 */}
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">마감일</label>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">데드라인</label>
               {canEdit ? (
                 <input
                   type="date"

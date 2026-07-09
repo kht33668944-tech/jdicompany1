@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AttendanceRecord } from "@/lib/attendance/types";
+import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
 import type { TaskWithDetails } from "@/lib/tasks/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import { toDateString, getWeekRange, addDays } from "@/lib/utils/date";
-import { getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
-import { getMyTasksWithDetails } from "@/lib/tasks/queries";
+import { getAllProfiles, getAllTodayAttendance, getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
+import { getMyTasksWithDetails, getTasksWithDetails } from "@/lib/tasks/queries";
 import { getTodaySchedules } from "@/lib/schedule/queries";
 import { sortTasks } from "@/lib/tasks/utils";
 
@@ -26,28 +26,40 @@ export interface DashboardData {
   weekdayWorked: boolean[];
   myTasks: TaskWithDetails[];
   allTasksForUser: TaskWithDetails[];
+  allTasks: TaskWithDetails[];
+  allProfiles: Profile[];
+  todayAttendanceRecords: AttendanceRecord[];
   todaySchedules: ScheduleWithProfile[];
   recentActivities: RecentActivity[];
   nextScheduleMinutes: number | null;
   userName: string;
+  canViewCompanyWork: boolean;
 }
 
 export async function getDashboardData(
   supabase: SupabaseClient,
   userId: string,
-  userName: string
+  userName: string,
+  canViewCompanyWork: boolean,
+  currentProfile: Profile
 ): Promise<DashboardData> {
   const today = toDateString();
   const { start: weekStart, end: weekEnd } = getWeekRange();
 
-  const [todayRecord, weekRecords, allTasksForUser, todaySchedules, recentActivities] =
-    await Promise.all([
-      getTodayRecord(supabase, userId),
-      getWeekRecords(supabase, userId, weekStart, weekEnd),
-      getMyTasksWithDetails(supabase, userId, true, 7),
-      getTodaySchedules(supabase, today),
-      fetchRecentActivities(supabase, 15),
-    ]);
+  const [todayRecord, weekRecords, allTasks, todaySchedules] = await Promise.all([
+    getTodayRecord(supabase, userId),
+    getWeekRecords(supabase, userId, weekStart, weekEnd),
+    canViewCompanyWork ? getTasksWithDetails(supabase) : getMyTasksWithDetails(supabase, userId, true, 7),
+    getTodaySchedules(supabase, today),
+  ]);
+
+  const [allProfiles, todayAttendanceRecords] = canViewCompanyWork
+    ? await Promise.all([getAllProfiles(supabase), getAllTodayAttendance(supabase)])
+    : [[currentProfile], todayRecord ? [todayRecord] : []];
+
+  const allTasksForUser = allTasks.filter((task) =>
+    task.assignees.some((assignee) => assignee.user_id === userId)
+  );
 
   // 미완료만, 마감일순 정렬
   const myTasks = sortTasks(
@@ -85,50 +97,13 @@ export async function getDashboardData(
     weekdayWorked,
     myTasks,
     allTasksForUser,
+    allTasks,
+    allProfiles,
+    todayAttendanceRecords,
     todaySchedules,
-    recentActivities,
+    recentActivities: [],
     nextScheduleMinutes,
     userName,
+    canViewCompanyWork,
   };
-}
-
-async function fetchRecentActivities(
-  supabase: SupabaseClient,
-  limit: number
-): Promise<RecentActivity[]> {
-  const { data, error } = await supabase
-    .from("task_activities")
-    .select(
-      `
-      id,
-      type,
-      content,
-      metadata,
-      task_id,
-      created_at,
-      tasks!inner(title),
-      profiles!task_activities_user_id_fkey(full_name, avatar_url)
-    `
-    )
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  if (!data) return [];
-
-  return data.map((row: Record<string, unknown>) => {
-    const tasks = row.tasks as { title: string } | null;
-    const profiles = row.profiles as { full_name: string; avatar_url: string | null } | null;
-    return {
-      id: row.id as string,
-      type: row.type as RecentActivity["type"],
-      content: row.content as string | null,
-      metadata: row.metadata as Record<string, unknown> | null,
-      task_title: tasks?.title ?? "",
-      task_id: row.task_id as string,
-      user_name: profiles?.full_name ?? "",
-      user_avatar: profiles?.avatar_url ?? null,
-      created_at: row.created_at as string,
-    };
-  });
 }

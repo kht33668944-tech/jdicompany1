@@ -1,94 +1,73 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CircleDashed,
-  Circle,
-  CheckCircle,
-  ArrowBendDownRight,
-  ChatCircleDots,
-  Trash,
-  Check,
-  CheckSquare,
-  Square,
-  Plus,
-} from "phosphor-react";
-import type { TaskWithDetails, TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/tasks/types";
+import { Check, CheckSquare, Plus, Square, Trash } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
-import { PRIORITY_CONFIG, TASK_PRIORITIES, CATEGORIES, TASK_STATUSES, TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
-import { formatDueDate, calculateProgress } from "@/lib/tasks/utils";
-import { updateTask, deleteTask, addAssignee, removeAssignee, addChecklistItem, updateChecklistItem, deleteChecklistItem } from "@/lib/tasks/actions";
+import type { TaskChecklistItem, TaskStatus, TaskWithDetails } from "@/lib/tasks/types";
+import { TASK_STATUSES, TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
+import { calculateProgress, formatDueDate } from "@/lib/tasks/utils";
+import {
+  addAssignee,
+  addChecklistItem,
+  deleteChecklistItem,
+  deleteTask,
+  removeAssignee,
+  updateChecklistItem,
+  updateTask,
+} from "@/lib/tasks/actions";
 import { getChecklistItems } from "@/lib/tasks/queries";
 import { createClient } from "@/lib/supabase/client";
 import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   task: TaskWithDetails;
-  subtasks?: TaskWithDetails[];
   onTaskClick: (taskId: string) => void;
-  isSubtask: boolean;
   profiles: Profile[];
-  userId: string;
   onRefresh?: () => void;
 }
 
-const STATUS_ICONS: Record<TaskStatus, React.ComponentType<{ size?: number; className?: string }>> = {
-  "대기": Circle,
-  "진행중": CircleDashed,
-  "완료": CheckCircle,
-};
+type EditingField = "status" | "assignee" | "period" | null;
 
-const STATUS_COLORS: Record<TaskStatus, string> = {
-  "대기": "text-slate-300",
-  "진행중": "text-orange-500",
-  "완료": "text-emerald-500",
-};
-
-type EditingField = "status" | "priority" | "category" | "assignee" | "period" | null;
-
-function formatPeriod(startDate: string | null | undefined, dueDate: string | null | undefined): string {
-  const fmt = (d: string) => {
-    const [, m, day] = d.split("-");
-    return `${m}.${day}`;
-  };
-  if (startDate && dueDate) return `${fmt(startDate)} ~ ${fmt(dueDate)}`;
-  if (startDate) return `${fmt(startDate)} ~`;
-  if (dueDate) return `~ ${fmt(dueDate)}`;
-  return "—";
+function formatDeadline(dueDate: string | null | undefined): string {
+  if (!dueDate) return "-";
+  const [, month, day] = dueDate.split("-");
+  return `${month}.${day}`;
 }
 
-export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profiles, userId, onRefresh }: Props) {
+export default function ListRow({ task, onTaskClick, profiles, onRefresh }: Props) {
   const router = useRouter();
-  const refresh = () => { if (onRefresh) onRefresh(); else router.refresh(); };
+  const refresh = () => {
+    if (onRefresh) onRefresh();
+    else router.refresh();
+  };
   const [editingField, setEditingField] = useState<EditingField>(null);
-  // 체크리스트 인라인 펼침
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [checklistItems, setChecklistItems] = useState<TaskChecklistItem[]>([]);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [newChecklistItem, setNewChecklistItem] = useState("");
-  // 서버 상태에서 파생된 담당자 ID — task.assignees 가 바뀌면 자동 갱신 (effect 불필요)
-  const serverAssigneeIds = useMemo(
-    () => new Set(task.assignees.map((a) => a.user_id)),
-    [task.assignees]
-  );
-  // optimistic override (서버 응답 도착 전 임시 표시용)
-  const [optimisticOverride, setOptimisticOverride] = useState<Set<string> | null>(null);
-  const localAssigneeIds = optimisticOverride ?? serverAssigneeIds;
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const StatusIcon = STATUS_ICONS[task.status];
-  const priorityConfig = PRIORITY_CONFIG[task.priority];
+  const serverAssigneeIds = useMemo(
+    () => new Set(task.assignees.map((assignee) => assignee.user_id)),
+    [task.assignees]
+  );
+  const [optimisticOverride, setOptimisticOverride] = useState<Set<string> | null>(null);
+  const localAssigneeIds = optimisticOverride ?? serverAssigneeIds;
+  const statusConfig = TASK_STATUS_CONFIG[task.status];
   const dueInfo = formatDueDate(task.due_date, task.status);
   const progress = calculateProgress(task.checklist_total, task.checklist_completed);
-  const progressBarColor =
-    progress === 100 ? "bg-emerald-500" : task.status === "진행중" ? "bg-indigo-500" : "bg-indigo-300";
+  const progressBarColor = progress === 100 ? "bg-emerald-500" : "bg-indigo-500";
+  const [localDueDate, setLocalDueDate] = useState(task.due_date ?? "");
 
-  // Close dropdown on outside click
+  useEffect(() => {
+    setLocalDueDate(task.due_date ?? "");
+  }, [task.due_date]);
+
   useEffect(() => {
     if (!editingField) return;
-    const handle = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+    const handle = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setEditingField(null);
       }
     };
@@ -109,8 +88,8 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     }
   };
 
-  const handleToggleChecklist = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleChecklist = (event: React.MouseEvent) => {
+    event.stopPropagation();
     if (!checklistOpen) {
       setChecklistOpen(true);
       fetchChecklist();
@@ -120,24 +99,22 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
   };
 
   const handleChecklistToggleItem = async (item: TaskChecklistItem) => {
-    // optimistic update
     setChecklistItems((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, is_completed: !i.is_completed } : i))
+      prev.map((current) => (current.id === item.id ? { ...current, is_completed: !current.is_completed } : current))
     );
     try {
       await updateChecklistItem(item.id, { is_completed: !item.is_completed });
       refresh();
     } catch (error) {
-      console.error("체크리스트 토글 실패:", error);
-      // revert
+      console.error("체크리스트 변경 실패:", error);
       setChecklistItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, is_completed: item.is_completed } : i))
+        prev.map((current) => (current.id === item.id ? { ...current, is_completed: item.is_completed } : current))
       );
     }
   };
 
   const handleChecklistDeleteItem = async (itemId: string) => {
-    setChecklistItems((prev) => prev.filter((i) => i.id !== itemId));
+    setChecklistItems((prev) => prev.filter((item) => item.id !== itemId));
     try {
       await deleteChecklistItem(itemId);
       refresh();
@@ -166,85 +143,40 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
       await updateTask(task.id, { status });
       refresh();
     } catch (error) {
-      console.error("진행상태 변경 실패:", error);
+      console.error("상태 변경 실패:", error);
     }
   };
-
-  const handlePriorityChange = async (priority: TaskPriority) => {
-    setEditingField(null);
-    try {
-      await updateTask(task.id, { priority });
-      refresh();
-    } catch (error) {
-      console.error("우선순위 변경 실패:", error);
-    }
-  };
-
-  const handleCategoryChange = async (category: string | null) => {
-    setEditingField(null);
-    try {
-      await updateTask(task.id, { category });
-      refresh();
-    } catch (error) {
-      console.error("카테고리 변경 실패:", error);
-    }
-  };
-
-  // 기간 수정용 로컬 상태 (controlled input + onChange 즉시 저장)
-  const [localStartDate, setLocalStartDate] = useState(task.start_date ?? "");
-  const [localDueDate, setLocalDueDate] = useState(task.due_date ?? "");
-  useEffect(() => {
-    setLocalStartDate(task.start_date ?? "");
-    setLocalDueDate(task.due_date ?? "");
-  }, [task.start_date, task.due_date]);
 
   const handleDueDateChange = async (value: string) => {
     setLocalDueDate(value);
     try {
       await updateTask(task.id, { dueDate: value || null });
       refresh();
-    } catch (err) {
-      console.error("마감일 변경 실패:", err);
+    } catch (error) {
+      console.error("마감일 변경 실패:", error);
       setLocalDueDate(task.due_date ?? "");
-    }
-  };
-
-  const handleStartDateChange = async (value: string) => {
-    setLocalStartDate(value);
-    try {
-      await updateTask(task.id, { startDate: value || null });
-      refresh();
-    } catch (err) {
-      console.error("시작일 변경 실패:", err);
-      setLocalStartDate(task.start_date ?? "");
     }
   };
 
   const handleToggleAssignee = async (assigneeId: string) => {
     const isAssigned = localAssigneeIds.has(assigneeId);
-    // Optimistic override
     const next = new Set(localAssigneeIds);
     if (isAssigned) next.delete(assigneeId);
     else next.add(assigneeId);
     setOptimisticOverride(next);
     try {
-      if (isAssigned) {
-        await removeAssignee(task.id, assigneeId);
-      } else {
-        await addAssignee(task.id, assigneeId);
-      }
+      if (isAssigned) await removeAssignee(task.id, assigneeId);
+      else await addAssignee(task.id, assigneeId);
       refresh();
-      // 서버 응답 반영 후 override 해제 → serverAssigneeIds 자동 사용
       setOptimisticOverride(null);
     } catch (error) {
       console.error("담당자 변경 실패:", error);
-      // Revert
       setOptimisticOverride(null);
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async (event: React.MouseEvent) => {
+    event.stopPropagation();
     if (!confirm("정말 삭제하시겠습니까?")) return;
     try {
       await deleteTask(task.id);
@@ -254,84 +186,66 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
     }
   };
 
-  const openField = (field: EditingField) => (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openField = (field: EditingField) => (event: React.MouseEvent) => {
+    event.stopPropagation();
     setEditingField(editingField === field ? null : field);
   };
 
   return (
     <>
-      <tr
-        onClick={() => onTaskClick(task.id)}
-        className="hover:bg-slate-50 transition-all cursor-pointer group"
-      >
-        {/* 할일명 */}
-        <td className={`px-4 py-3 ${isSubtask ? "pl-10" : ""}`}>
+      <tr onClick={() => onTaskClick(task.id)} className="group cursor-pointer transition-all hover:bg-slate-50">
+        <td className="px-4 py-3">
           <div className="flex items-center gap-3">
-            {isSubtask && <ArrowBendDownRight size={16} className="text-slate-300" />}
             <button
               onClick={handleToggleChecklist}
-              className={`relative flex-shrink-0 rounded-md p-0.5 transition-all ${
+              className={`relative shrink-0 rounded-md p-0.5 transition-all ${
                 checklistOpen ? "bg-indigo-50 ring-2 ring-indigo-200" : "hover:bg-slate-100"
               }`}
               title={task.checklist_total > 0 ? "체크리스트 펼치기" : "체크리스트"}
             >
-              <StatusIcon size={18} className={STATUS_COLORS[task.status]} />
+              <span className={`block h-4 w-4 rounded-full ${statusConfig.dot}`} />
               {task.checklist_total > 0 && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 text-white text-[7px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full bg-indigo-500 text-[7px] font-bold text-white">
                   {task.checklist_total}
                 </span>
               )}
             </button>
-            <span
-              className={`font-semibold ${
-                isSubtask ? "text-slate-500 font-medium" : "text-slate-700"
-              } ${task.status === "완료" ? "line-through text-slate-400" : ""}`}
-            >
+            <span className={`font-semibold ${task.status === "완료" ? "text-slate-400 line-through" : "text-slate-700"}`}>
               {task.title}
             </span>
-            {task.comment_count > 0 && (
-              <div className="flex items-center gap-1 text-slate-300 ml-2">
-                <ChatCircleDots size={14} />
-                <span className="text-xs">{task.comment_count}</span>
-              </div>
-            )}
           </div>
         </td>
 
-        {/* 진행상태 — 인라인 수정 */}
-        <td className="px-4 py-3 relative">
+        <td className="relative px-4 py-3">
           <div onClick={openField("status")} title="클릭하여 수정">
-            <span
-              className={`inline-flex items-center gap-1.5 px-2 py-1 ${TASK_STATUS_CONFIG[task.status].bg} ${TASK_STATUS_CONFIG[task.status].text} text-[11px] font-bold rounded-md cursor-pointer hover:ring-2 hover:ring-indigo-200 transition-all`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${TASK_STATUS_CONFIG[task.status].dot}`} />
+            <span className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-bold transition-all hover:ring-2 hover:ring-indigo-200 ${statusConfig.bg} ${statusConfig.text}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot}`} />
               {task.status}
             </span>
           </div>
           {editingField === "status" && (
             <div
               ref={dropdownRef}
-              className="absolute top-full left-2 mt-1 z-30 bg-white rounded-xl shadow-lg border border-slate-100 py-1 min-w-[120px]"
+              className="absolute left-2 top-full z-30 mt-1 min-w-[120px] rounded-xl border border-slate-100 bg-white py-1 shadow-lg"
             >
-              {TASK_STATUSES.map((s) => {
-                const sc = TASK_STATUS_CONFIG[s];
+              {TASK_STATUSES.map((status) => {
+                const config = TASK_STATUS_CONFIG[status];
                 return (
                   <button
-                    key={s}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleStatusChange(s);
+                    key={status}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleStatusChange(status);
                     }}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2 ${
-                      task.status === s ? "bg-slate-50" : ""
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                      task.status === status ? "bg-slate-50" : ""
                     }`}
                   >
-                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold ${sc.bg} ${sc.text}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                      {s}
+                    <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-bold ${config.bg} ${config.text}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
+                      {status}
                     </span>
-                    {task.status === s && <Check size={14} className="text-indigo-600 ml-auto" />}
+                    {task.status === status && <Check size={14} className="ml-auto text-indigo-600" />}
                   </button>
                 );
               })}
@@ -339,99 +253,8 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
           )}
         </td>
 
-        {/* 우선순위 — 인라인 수정 */}
-        <td className="px-4 py-3 relative">
-          <div onClick={openField("priority")} title="클릭하여 수정">
-            <span
-              className={`px-2 py-1 ${priorityConfig.bg} ${priorityConfig.text} text-[11px] font-bold rounded-md border ${priorityConfig.border} uppercase cursor-pointer hover:ring-2 hover:ring-indigo-200 transition-all`}
-            >
-              {task.priority}
-            </span>
-          </div>
-          {editingField === "priority" && (
-            <div
-              ref={dropdownRef}
-              className="absolute top-full left-2 mt-1 z-30 bg-white rounded-xl shadow-lg border border-slate-100 py-1 min-w-[120px]"
-            >
-              {TASK_PRIORITIES.map((p) => {
-                const pc = PRIORITY_CONFIG[p];
-                return (
-                  <button
-                    key={p}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePriorityChange(p);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2 ${
-                      task.priority === p ? "bg-slate-50" : ""
-                    }`}
-                  >
-                    <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${pc.bg} ${pc.text}`}>
-                      {p}
-                    </span>
-                    {task.priority === p && <Check size={14} className="text-indigo-600 ml-auto" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </td>
-
-        {/* 카테고리 — 인라인 수정 */}
-        <td className="px-4 py-3 relative">
-          <div onClick={openField("category")} title="클릭하여 수정">
-            {task.category ? (
-              <span className="px-2 py-1 bg-slate-100 text-slate-500 text-[11px] font-bold rounded-md uppercase cursor-pointer hover:ring-2 hover:ring-indigo-200 transition-all">
-                {task.category}
-              </span>
-            ) : (
-              <span className="text-xs text-slate-300 cursor-pointer hover:text-slate-400 transition-colors">
-                —
-              </span>
-            )}
-          </div>
-          {editingField === "category" && (
-            <div
-              ref={dropdownRef}
-              className="absolute top-full left-2 mt-1 z-30 bg-white rounded-xl shadow-lg border border-slate-100 py-1 min-w-[120px]"
-            >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCategoryChange(null);
-                }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-slate-400 ${
-                  !task.category ? "bg-slate-50" : ""
-                }`}
-              >
-                없음
-              </button>
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCategoryChange(c);
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center ${
-                    task.category === c ? "bg-slate-50" : ""
-                  }`}
-                >
-                  <span>{c}</span>
-                  {task.category === c && <Check size={14} className="text-indigo-600 ml-auto" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </td>
-
-        {/* 담당자 — 인라인 수정 */}
-        <td className="px-4 py-3 relative">
-          <div
-            className="flex -space-x-2 cursor-pointer"
-            onClick={openField("assignee")}
-            title="클릭하여 수정"
-          >
+        <td className="relative px-4 py-3">
+          <div className="flex cursor-pointer -space-x-2" onClick={openField("assignee")} title="클릭하여 수정">
             {task.assignees.length > 0 ? (
               <>
                 {task.assignees.slice(0, 3).map((assignee) => (
@@ -440,39 +263,39 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
                     name={assignee.full_name}
                     avatarUrl={assignee.avatar_url}
                     size="sm"
-                    className="border-2 border-white hover:ring-2 hover:ring-indigo-200 transition-all"
+                    className="border-2 border-white transition-all hover:ring-2 hover:ring-indigo-200"
                   />
                 ))}
                 {task.assignees.length > 3 && (
-                  <div className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-400">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-400">
                     +{task.assignees.length - 3}
                   </div>
                 )}
               </>
             ) : (
-              <span className="text-xs text-slate-300 hover:text-slate-400 transition-colors">—</span>
+              <span className="text-xs text-slate-300 transition-colors hover:text-slate-400">-</span>
             )}
           </div>
           {editingField === "assignee" && (
             <div
               ref={dropdownRef}
-              className="absolute top-full left-2 mt-1 z-30 bg-white rounded-xl shadow-lg border border-slate-100 py-1 min-w-[200px] max-h-[240px] overflow-y-auto"
+              className="absolute left-2 top-full z-30 mt-1 max-h-[240px] min-w-[200px] overflow-y-auto rounded-xl border border-slate-100 bg-white py-1 shadow-lg"
             >
-              {profiles.map((p) => {
-                const isAssigned = localAssigneeIds.has(p.id);
+              {profiles.map((profile) => {
+                const isAssigned = localAssigneeIds.has(profile.id);
                 return (
                   <button
-                    key={p.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleAssignee(p.id);
+                    key={profile.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleToggleAssignee(profile.id);
                     }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 ${
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 ${
                       isAssigned ? "bg-indigo-50/50" : ""
                     }`}
                   >
-                    <UserAvatar name={p.full_name} avatarUrl={p.avatar_url} size="xs" />
-                    <span className="flex-1 text-left text-slate-600">{p.full_name}</span>
+                    <UserAvatar name={profile.full_name} avatarUrl={profile.avatar_url} size="xs" />
+                    <span className="flex-1 text-left text-slate-600">{profile.full_name}</span>
                     {isAssigned && <Check size={14} className="text-indigo-600" />}
                   </button>
                 );
@@ -481,56 +304,38 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
           )}
         </td>
 
-        {/* 기간 — 인라인 수정 */}
-        <td className="px-4 py-3 relative">
+        <td className="relative px-4 py-3">
           <span
             onClick={openField("period")}
-            className={`text-sm ${dueInfo.className} cursor-pointer hover:underline transition-colors`}
+            className={`cursor-pointer text-sm transition-colors hover:underline ${dueInfo.className}`}
             title="클릭하여 수정"
           >
-            {formatPeriod(localStartDate || null, localDueDate || null)}
+            {formatDeadline(localDueDate || null)}
           </span>
           {editingField === "period" && (
             <div
               ref={dropdownRef}
-              onClick={(e) => e.stopPropagation()}
-              className="absolute top-full right-0 mt-1 z-30 bg-white rounded-xl shadow-lg border border-slate-100 p-3 min-w-[220px]"
+              onClick={(event) => event.stopPropagation()}
+              className="absolute right-0 top-full z-30 mt-1 min-w-[220px] rounded-xl border border-slate-100 bg-white p-3 shadow-lg"
             >
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">시작일</label>
-                  <input
-                    type="date"
-                    value={localStartDate}
-                    onChange={(e) => handleStartDateChange(e.target.value)}
-                    className="glass-input px-2 py-1 rounded-lg text-sm outline-none w-full"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">마감일</label>
-                  <input
-                    type="date"
-                    value={localDueDate}
-                    onChange={(e) => handleDueDateChange(e.target.value)}
-                    className="glass-input px-2 py-1 rounded-lg text-sm outline-none w-full"
-                  />
-                </div>
-              </div>
+              <label className="mb-1 block text-[10px] font-bold uppercase text-slate-400">데드라인</label>
+              <input
+                type="date"
+                value={localDueDate}
+                onChange={(event) => handleDueDateChange(event.target.value)}
+                className="glass-input w-full rounded-lg px-2 py-1 text-sm outline-none"
+              />
             </div>
           )}
         </td>
 
-        {/* 진행률 + 삭제 */}
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="flex-1">
               {task.checklist_total > 0 ? (
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className={`${progressBarColor} h-full rounded-full transition-all`}
-                      style={{ width: `${progress}%` }}
-                    />
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div className={`${progressBarColor} h-full rounded-full transition-all`} style={{ width: `${progress}%` }} />
                   </div>
                   <span className="text-xs font-bold text-slate-400">
                     {task.checklist_completed}/{task.checklist_total}
@@ -542,7 +347,7 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
             </div>
             <button
               onClick={handleDelete}
-              className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all shrink-0"
+              className="shrink-0 p-1 text-slate-300 opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
               title="삭제"
             >
               <Trash size={14} />
@@ -551,67 +356,60 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
         </td>
       </tr>
 
-      {/* 체크리스트 펼침 행 */}
       {checklistOpen && (
         <tr>
-          <td colSpan={7} className="px-0 py-0">
-            <div className={`${isSubtask ? "ml-14" : "ml-10"} mr-4 mb-3 mt-1 bg-slate-50 rounded-2xl p-4 border border-slate-100`}>
+          <td colSpan={5} className="px-0 py-0">
+            <div className="mx-4 mb-3 ml-10 mt-1 rounded-2xl border border-slate-100 bg-slate-50 p-4">
               {checklistLoading ? (
                 <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <div className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-transparent" />
                   불러오는 중...
                 </div>
               ) : (
                 <>
-                  {/* 진행률 바 */}
                   {checklistItems.length > 0 && (
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div className="mb-3 flex items-center gap-3">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
                         <div
                           className={`h-full rounded-full transition-all ${
-                            checklistItems.every((i) => i.is_completed) ? "bg-emerald-500" : "bg-indigo-500"
+                            checklistItems.every((item) => item.is_completed) ? "bg-emerald-500" : "bg-indigo-500"
                           }`}
                           style={{
-                            width: `${checklistItems.length > 0 ? Math.round((checklistItems.filter((i) => i.is_completed).length / checklistItems.length) * 100) : 0}%`,
+                            width: `${Math.round((checklistItems.filter((item) => item.is_completed).length / checklistItems.length) * 100)}%`,
                           }}
                         />
                       </div>
                       <span className="text-xs font-bold text-slate-400">
-                        {checklistItems.filter((i) => i.is_completed).length}/{checklistItems.length}
+                        {checklistItems.filter((item) => item.is_completed).length}/{checklistItems.length}
                       </span>
                     </div>
                   )}
 
-                  {/* 체크리스트 항목 */}
                   <div className="space-y-1">
                     {checklistItems.map((item) => (
-                      <div key={item.id} className="flex items-center gap-2 group/item py-1 px-1 rounded-lg hover:bg-white transition-colors">
+                      <div key={item.id} className="group/item flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-white">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={(event) => {
+                            event.stopPropagation();
                             handleChecklistToggleItem(item);
                           }}
-                          className="flex-shrink-0"
+                          className="shrink-0"
                         >
                           {item.is_completed ? (
                             <CheckSquare size={16} weight="fill" className="text-emerald-500" />
                           ) : (
-                            <Square size={16} className="text-slate-300 hover:text-indigo-500 transition-colors" />
+                            <Square size={16} className="text-slate-300 transition-colors hover:text-indigo-500" />
                           )}
                         </button>
-                        <span
-                          className={`flex-1 text-sm ${
-                            item.is_completed ? "line-through text-slate-400" : "text-slate-600"
-                          }`}
-                        >
+                        <span className={`flex-1 text-sm ${item.is_completed ? "text-slate-400 line-through" : "text-slate-600"}`}>
                           {item.content}
                         </span>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={(event) => {
+                            event.stopPropagation();
                             handleChecklistDeleteItem(item.id);
                           }}
-                          className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-red-500 transition-all"
+                          className="text-slate-300 opacity-0 transition-all hover:text-red-500 group-hover/item:opacity-100"
                         >
                           <Trash size={12} />
                         </button>
@@ -619,33 +417,31 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
                     ))}
                   </div>
 
-                  {/* 항목이 없을 때 */}
                   {checklistItems.length === 0 && (
-                    <p className="text-xs text-slate-400 mb-2">체크리스트가 비어있습니다.</p>
+                    <p className="mb-2 text-xs text-slate-400">체크리스트가 비어있습니다.</p>
                   )}
 
-                  {/* 새 항목 추가 */}
-                  <div className="flex gap-2 mt-2">
+                  <div className="mt-2 flex gap-2">
                     <input
                       value={newChecklistItem}
-                      onChange={(e) => setNewChecklistItem(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.stopPropagation();
+                      onChange={(event) => setNewChecklistItem(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.stopPropagation();
                           handleChecklistAddItem();
                         }
                       }}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(event) => event.stopPropagation()}
                       placeholder="항목 추가..."
-                      className="flex-1 px-3 py-1.5 bg-white rounded-lg text-sm outline-none border border-slate-200 focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200 transition-all"
+                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition-all focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200"
                     />
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={(event) => {
+                        event.stopPropagation();
                         handleChecklistAddItem();
                       }}
                       disabled={!newChecklistItem.trim()}
-                      className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-500 disabled:opacity-40 transition-all"
+                      className="rounded-lg bg-indigo-600 px-2.5 py-1.5 text-sm font-bold text-white transition-all hover:bg-indigo-500 disabled:opacity-40"
                     >
                       <Plus size={14} weight="bold" />
                     </button>
@@ -656,18 +452,6 @@ export default function ListRow({ task, subtasks, onTaskClick, isSubtask, profil
           </td>
         </tr>
       )}
-
-      {subtasks?.map((child) => (
-        <ListRow
-          key={child.id}
-          task={child}
-          onTaskClick={onTaskClick}
-          isSubtask={true}
-          profiles={profiles}
-          userId={userId}
-          onRefresh={onRefresh}
-        />
-      ))}
     </>
   );
 }

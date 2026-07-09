@@ -1,8 +1,8 @@
 export type TaskStatus = "대기" | "진행중" | "완료";
 export type TaskPriority = "긴급" | "높음" | "보통" | "낮음";
 export type TaskViewId = "list" | "calendar" | "timeline";
-export type TaskGroupBy = "status" | "assignee" | "category" | "priority";
-export type TaskSortBy = "due_date" | "priority" | "created_at" | "updated_at";
+export type TaskGroupBy = "status" | "assignee" | "category";
+export type TaskSortBy = "due_date" | "created_at" | "updated_at";
 export type ActivityType =
   | "comment"
   | "status_change"

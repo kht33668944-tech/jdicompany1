@@ -1,0 +1,400 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { CalendarBlank, CheckSquare, Clock, Square } from "phosphor-react";
+import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
+import type { ScheduleWithProfile } from "@/lib/schedule/types";
+import type { TaskStatus, TaskWithDetails } from "@/lib/tasks/types";
+import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
+import { formatDueDate, isOverdue } from "@/lib/tasks/utils";
+import { updateTask } from "@/lib/tasks/actions";
+import { formatTime, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
+import UserAvatar from "@/components/shared/UserAvatar";
+
+interface Props {
+  profiles: Profile[];
+  attendanceRecords: AttendanceRecord[];
+  tasks: TaskWithDetails[];
+  schedules: ScheduleWithProfile[];
+  canViewCompanyWork: boolean;
+}
+
+type StatusFilter = "all" | TaskStatus;
+
+const FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "전체" },
+  { value: "대기", label: "대기" },
+  { value: "진행중", label: "진행중" },
+  { value: "완료", label: "완료" },
+];
+
+const STATUS_ORDER: Record<TaskStatus, number> = {
+  진행중: 0,
+  대기: 1,
+  완료: 2,
+};
+
+function getAttendanceText(record: AttendanceRecord | undefined): string {
+  if (!record?.check_in) return "미출근";
+  if (record.status === "퇴근") return "퇴근 완료";
+  return "출근 완료";
+}
+
+function getAttendanceTone(record: AttendanceRecord | undefined): string {
+  if (!record?.check_in) return "bg-slate-100 text-slate-500";
+  if (record.status === "퇴근") return "bg-emerald-50 text-emerald-700";
+  return "bg-indigo-50 text-indigo-700";
+}
+
+function scheduleBelongsToProfile(schedule: ScheduleWithProfile, profileId: string): boolean {
+  if (schedule.schedule_participants?.some((participant) => participant.user_id === profileId)) return true;
+  return schedule.created_by === profileId;
+}
+
+function taskBelongsToProfile(task: TaskWithDetails, profileId: string): boolean {
+  return task.assignees.some((assignee) => assignee.user_id === profileId);
+}
+
+function sortTasksForToday(a: TaskWithDetails, b: TaskWithDetails): number {
+  const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+  if (statusDiff !== 0) return statusDiff;
+  if (!a.due_date && !b.due_date) return a.created_at.localeCompare(b.created_at);
+  if (!a.due_date) return 1;
+  if (!b.due_date) return -1;
+  return a.due_date.localeCompare(b.due_date);
+}
+
+function isTodayWorkTask(task: TaskWithDetails, today: string): boolean {
+  if (task.status === "완료") return false;
+  if (task.due_date && task.due_date <= today) return true;
+  if (task.start_date && task.start_date <= today) return true;
+  return toDateStringFromTimestamp(task.created_at) === today;
+}
+
+function isCompletedToday(task: TaskWithDetails, today: string): boolean {
+  return task.status === "완료" && toDateStringFromTimestamp(task.updated_at) === today;
+}
+
+function getScheduleTimeText(schedule: ScheduleWithProfile): string {
+  if (schedule.is_all_day) return "종일";
+  return `${formatTime(schedule.start_time)} - ${formatTime(schedule.end_time)}`;
+}
+
+function getNextTaskStatus(status: TaskStatus): TaskStatus {
+  if (status === "대기") return "진행중";
+  if (status === "진행중") return "완료";
+  return "대기";
+}
+
+function formatDueWithWeekday(dueDate: string | null, fallbackText: string, today: string): string {
+  if (!dueDate) return fallbackText;
+  const [, month, day] = dueDate.split("-");
+  const weekday = new Date(`${dueDate}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    weekday: "short",
+  });
+  if (dueDate === today) return `오늘 (${weekday})`;
+  return `${month}.${day} (${weekday})`;
+}
+
+function getTaskOwnerLabel(task: TaskWithDetails): string {
+  if (task.assignees.length === 0) return "미배정";
+  if (task.assignees.length === 1) return task.assignees[0].full_name;
+  return `${task.assignees[0].full_name} 외 ${task.assignees.length - 1}명`;
+}
+
+export default function TodayWorkBoardWidget({
+  profiles,
+  attendanceRecords,
+  tasks,
+  schedules,
+  canViewCompanyWork,
+}: Props) {
+  const router = useRouter();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
+  const [isPending, startTransition] = useTransition();
+
+  const today = toDateString();
+  const approvedProfiles = profiles.filter((profile) => profile.is_approved);
+  const attendanceByUser = new Map(attendanceRecords.map((record) => [record.user_id, record]));
+
+  const todayOpenTasks = useMemo(
+    () => tasks.filter((task) => isTodayWorkTask(task, today)),
+    [tasks, today]
+  );
+  const completedTodayTasks = useMemo(
+    () => tasks.filter((task) => isCompletedToday(task, today)),
+    [tasks, today]
+  );
+  const todayBoardTasks = useMemo(
+    () => [...todayOpenTasks, ...completedTodayTasks].sort(sortTasksForToday),
+    [todayOpenTasks, completedTodayTasks]
+  );
+  const filteredTasks = useMemo(
+    () => todayBoardTasks.filter((task) => statusFilter === "all" || task.status === statusFilter),
+    [statusFilter, todayBoardTasks]
+  );
+
+  const counts = {
+    all: todayBoardTasks.length,
+    대기: todayBoardTasks.filter((task) => task.status === "대기").length,
+    진행중: todayBoardTasks.filter((task) => task.status === "진행중").length,
+    완료: todayBoardTasks.filter((task) => task.status === "완료").length,
+  };
+  const overdueCount = todayOpenTasks.filter((task) => isOverdue(task.due_date, task.status)).length;
+  const checkedInCount = approvedProfiles.filter((profile) => attendanceByUser.get(profile.id)?.check_in).length;
+  const unregisteredCount = approvedProfiles.filter((profile) => {
+    const hasCheckedIn = attendanceByUser.get(profile.id)?.check_in;
+    const hasTodayTask = todayOpenTasks.some((task) => taskBelongsToProfile(task, profile.id));
+    return hasCheckedIn && !hasTodayTask;
+  }).length;
+  const visibleSchedules = schedules.slice(0, 5);
+
+  const cycleTaskStatus = (task: TaskWithDetails) => {
+    if (pendingTaskIds.has(task.id)) return;
+
+    setPendingTaskIds((prev) => new Set(prev).add(task.id));
+    startTransition(async () => {
+      try {
+        await updateTask(task.id, { status: getNextTaskStatus(task.status) });
+        router.refresh();
+      } finally {
+        setPendingTaskIds((prev) => {
+          const next = new Set(prev);
+          next.delete(task.id);
+          return next;
+        });
+      }
+    });
+  };
+
+  return (
+    <section className="space-y-5">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">
+            {canViewCompanyWork ? "오늘 업무 현황" : "오늘 내 업무 현황"}
+          </h2>
+          <p className="mt-1 text-sm text-slate-400">
+            출근, 오늘 할 일, 지연 업무만 한 화면에서 확인합니다.
+          </p>
+        </div>
+        <p className="text-sm font-semibold text-slate-600">
+          출근 {checkedInCount}/{approvedProfiles.length}명 · 업무 미등록 {unregisteredCount}명 · 지연 {overdueCount}건
+        </p>
+      </div>
+
+      <section className="overflow-hidden rounded-lg bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h3 className="text-base font-bold text-slate-800">직원별 오늘 현황</h3>
+        </div>
+
+        {approvedProfiles.length === 0 ? (
+          <div className="px-5 py-10 text-center text-sm text-slate-400">표시할 직원이 없습니다</div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            <div className="hidden grid-cols-[minmax(180px,1.4fr)_110px_90px_90px_90px_minmax(120px,0.8fr)] gap-3 px-5 py-3 text-xs font-bold text-slate-400 lg:grid">
+              <span>직원</span>
+              <span>출근</span>
+              <span>대기</span>
+              <span>진행중</span>
+              <span>완료</span>
+              <span className="text-right">일정</span>
+            </div>
+
+            {approvedProfiles.map((profile) => {
+              const attendance = attendanceByUser.get(profile.id);
+              const profileTasks = todayBoardTasks.filter((task) => taskBelongsToProfile(task, profile.id));
+              const profileSchedules = schedules.filter((schedule) => scheduleBelongsToProfile(schedule, profile.id));
+              const pendingCount = profileTasks.filter((task) => task.status === "대기").length;
+              const progressCount = profileTasks.filter((task) => task.status === "진행중").length;
+              const doneCount = profileTasks.filter((task) => task.status === "완료").length;
+
+              return (
+                <div
+                  key={profile.id}
+                  className="grid grid-cols-2 gap-3 px-5 py-4 lg:grid-cols-[minmax(180px,1.4fr)_110px_90px_90px_90px_minmax(120px,0.8fr)] lg:items-center"
+                >
+                  <div className="col-span-2 flex min-w-0 items-center gap-3 lg:col-span-1">
+                    <UserAvatar name={profile.full_name} avatarUrl={profile.avatar_url} size="md" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-800">{profile.full_name}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">출근</p>
+                    <span className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-bold ${getAttendanceTone(attendance)}`}>
+                      {getAttendanceText(attendance)}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">대기</p>
+                    <p className="text-sm font-bold text-slate-700">{pendingCount}</p>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">진행중</p>
+                    <p className="text-sm font-bold text-amber-600">{progressCount}</p>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">완료</p>
+                    <p className="text-sm font-bold text-emerald-600">{doneCount}</p>
+                  </div>
+                  <div className="text-left lg:text-right">
+                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">일정</p>
+                    <p className="text-sm font-bold text-slate-800">{profileSchedules.length}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-lg bg-white shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">
+              {canViewCompanyWork ? "오늘 할 일 전체" : "오늘 할 일"}
+            </h3>
+            <p className="mt-1 text-xs text-slate-400">직원별로 묶어서 체크만으로 완료 처리합니다.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {FILTERS.map((filter) => {
+              const active = statusFilter === filter.value;
+              const count = filter.value === "all" ? counts.all : counts[filter.value];
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() => setStatusFilter(filter.value)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                    active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}
+                >
+                  {filter.label} {count}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {filteredTasks.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <Clock size={26} className="mx-auto text-slate-300" />
+            <p className="mt-3 text-sm font-semibold text-slate-600">표시할 오늘 할 일이 없습니다</p>
+            <p className="mt-1 text-xs text-slate-400">출근 후 오늘 할 일을 등록하면 이곳에 표시됩니다.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {approvedProfiles.map((profile) => {
+              const profileTasks = filteredTasks.filter((task) => taskBelongsToProfile(task, profile.id));
+              if (profileTasks.length === 0) return null;
+              const doneCount = profileTasks.filter((task) => task.status === "완료").length;
+
+              return (
+                <div key={profile.id} className="px-5 py-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <UserAvatar name={profile.full_name} avatarUrl={profile.avatar_url} size="sm" />
+                      <p className="truncate text-sm font-bold text-slate-800">{profile.full_name}</p>
+                    </div>
+                    <p className="shrink-0 text-xs font-bold text-slate-400">
+                      {doneCount}/{profileTasks.length} 완료
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {profileTasks.map((task) => {
+                      const statusConfig = TASK_STATUS_CONFIG[task.status];
+                      const due = formatDueDate(task.due_date, task.status);
+                      const isDone = task.status === "완료";
+                      const isTaskPending = pendingTaskIds.has(task.id) || isPending;
+
+                      return (
+                        <div
+                          key={task.id}
+                          className={`grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-slate-100 px-3 py-3 ${
+                            isDone ? "bg-slate-50" : "bg-white"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => cycleTaskStatus(task)}
+                            disabled={isTaskPending}
+                            className="mt-0.5 text-slate-300 transition-colors hover:text-emerald-500 disabled:cursor-default disabled:hover:text-emerald-500"
+                            aria-label={`${task.title} 상태 변경`}
+                          >
+                            {isDone ? (
+                              <CheckSquare size={20} weight="fill" className="text-emerald-500" />
+                            ) : task.status === "진행중" ? (
+                              <CheckSquare size={20} weight="fill" className="text-amber-500" />
+                            ) : (
+                              <Square size={20} />
+                            )}
+                          </button>
+                          <div className="min-w-0">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <p className={`truncate text-sm font-bold ${isDone ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                                {task.title}
+                              </p>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <span className={`rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
+                                  {task.status}
+                                </span>
+                                <span className={`text-xs font-bold ${due.className}`}>
+                                  {formatDueWithWeekday(task.due_date, due.text, today)}
+                                </span>
+                              </div>
+                            </div>
+                            {task.assignees.length > 1 && (
+                              <p className="mt-1 truncate text-xs text-slate-400">{getTaskOwnerLabel(task)}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-lg bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">오늘 일정</h3>
+            <p className="mt-1 text-xs text-slate-400">업무 흐름에 필요한 일정만 간단히 확인합니다.</p>
+          </div>
+        </div>
+
+        {visibleSchedules.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sm text-slate-400">오늘 일정 없음</div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {visibleSchedules.map((schedule) => (
+              <div key={schedule.id} className="grid grid-cols-1 gap-2 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_140px]">
+                <div className="flex min-w-0 items-center gap-3">
+                  <CalendarBlank size={18} className="shrink-0 text-indigo-500" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-800">{schedule.title}</p>
+                    <p className="mt-1 truncate text-xs text-slate-400">
+                      {schedule.creator_profile.full_name}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs font-bold text-slate-500 sm:text-right">{getScheduleTimeText(schedule)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}

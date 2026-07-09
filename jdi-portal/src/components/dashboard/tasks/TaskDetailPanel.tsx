@@ -28,13 +28,11 @@ interface Props {
   taskId: string | null;
   initialTask: TaskWithDetails | null;
   onClose: () => void;
-  onNavigate: (taskId: string) => void;
 }
 
 interface TaskDetailData {
   task: TaskWithDetails;
   checklist: TaskChecklistItem[];
-  subtasks: TaskWithDetails[];
   attachments: TaskAttachment[];
   activities: TaskActivity[];
 }
@@ -47,7 +45,6 @@ export default function TaskDetailPanel({
   taskId,
   initialTask,
   onClose,
-  onNavigate,
 }: Props) {
   const [data, setData] = useState<TaskDetailData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +75,6 @@ export default function TaskDetailPanel({
         setData({
           task: seedTask,
           checklist: cached?.checklist ?? [],
-          subtasks: [],
           attachments: [],
           activities: cached?.activities ?? [],
         });
@@ -115,7 +111,6 @@ export default function TaskDetailPanel({
       setData({
         task: initialTask,
         checklist: [],
-        subtasks: [],
         attachments: [],
         activities: [],
       });
@@ -149,7 +144,7 @@ export default function TaskDetailPanel({
         task.checklist_completed = checklist.filter((c) => c.is_completed).length;
         task.comment_count = activities.filter((a) => a.type === "comment").length;
         taskDetailsMemCache.set(taskId, { checklist, activities });
-        setData({ task, checklist, subtasks: [], attachments: [], activities });
+        setData({ task, checklist, attachments: [], activities });
       })
       .catch(() => {
         if (cancelled) return;
@@ -174,7 +169,7 @@ export default function TaskDetailPanel({
       task.checklist_completed = checklist.filter((c) => c.is_completed).length;
       task.comment_count = activities.filter((a) => a.type === "comment").length;
       taskDetailsMemCache.set(taskId, { checklist, activities });
-      setData({ task, checklist, subtasks: [], attachments: [], activities });
+      setData({ task, checklist, attachments: [], activities });
     }).catch((err) => {
       console.warn("[TaskDetailPanel] refresh failed:", err);
     });
@@ -255,14 +250,12 @@ export default function TaskDetailPanel({
             <TaskDetailClient
               task={data.task}
               checklist={data.checklist}
-              subtasks={data.subtasks}
               attachments={data.attachments}
               activities={data.activities}
               profiles={profiles}
               userId={userId}
               mode="panel"
               onClose={onClose}
-              onNavigate={onNavigate}
               onRefresh={handleRefresh}
             />
           )}

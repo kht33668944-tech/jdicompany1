@@ -1,12 +1,11 @@
-import { toDateString, addDays } from "@/lib/utils/date";
+import { addDays, toDateString } from "@/lib/utils/date";
 import type {
-  TaskWithDetails,
-  TaskStatus,
-  TaskPriority,
+  TaskFilterState,
   TaskGroupBy,
   TaskSortBy,
-  TaskFilterState,
+  TaskStatus,
   TaskSummary,
+  TaskWithDetails,
 } from "./types";
 
 export function calculateProgress(total: number, completed: number): number {
@@ -47,17 +46,10 @@ export function formatDueDate(dueDate: string | null, status: TaskStatus): { tex
   return { text: dueDate.slice(2).replace(/-/g, "."), className: "text-slate-500 font-medium" };
 }
 
-const PRIORITY_ORDER: Record<TaskPriority, number> = {
-  "긴급": 0,
-  "높음": 1,
-  "보통": 2,
-  "낮음": 3,
-};
-
 const STATUS_ORDER: Record<TaskStatus, number> = {
-  "진행중": 0,
-  "대기": 1,
-  "완료": 2,
+  진행중: 0,
+  대기: 1,
+  완료: 2,
 };
 
 export function sortTasks(tasks: TaskWithDetails[], sortBy: TaskSortBy): TaskWithDetails[] {
@@ -69,8 +61,6 @@ export function sortTasks(tasks: TaskWithDetails[], sortBy: TaskSortBy): TaskWit
         if (!b.due_date) return -1;
         return a.due_date.localeCompare(b.due_date);
       }
-      case "priority":
-        return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
       case "created_at":
         return b.created_at.localeCompare(a.created_at);
       case "updated_at":
@@ -99,9 +89,6 @@ export function groupTasks(
       case "category":
         key = task.category ?? "미분류";
         break;
-      case "priority":
-        key = task.priority;
-        break;
       default:
         key = "기타";
     }
@@ -117,8 +104,6 @@ export function groupTasks(
 
   if (groupBy === "status") {
     entries.sort((a, b) => STATUS_ORDER[a.key as TaskStatus] - STATUS_ORDER[b.key as TaskStatus]);
-  } else if (groupBy === "priority") {
-    entries.sort((a, b) => PRIORITY_ORDER[a.key as TaskPriority] - PRIORITY_ORDER[b.key as TaskPriority]);
   }
 
   return entries;
@@ -138,7 +123,7 @@ export function computeSummary(tasks: TaskWithDetails[]): TaskSummary {
   const today = toDateString();
   const weekStart = addDays(today, -7);
 
-  const by_status: Record<TaskStatus, number> = { "대기": 0, "진행중": 0, "완료": 0 };
+  const by_status: Record<TaskStatus, number> = { 대기: 0, 진행중: 0, 완료: 0 };
   let overdue = 0;
   let completed_this_week = 0;
 

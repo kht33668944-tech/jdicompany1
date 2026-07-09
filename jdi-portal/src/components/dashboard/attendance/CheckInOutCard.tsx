@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, SignIn, SignOut } from "phosphor-react";
+import { Clock, ListChecks, SignIn, SignOut } from "phosphor-react";
 async function checkIn(): Promise<AttendanceRecord> {
   const res = await fetch("/api/attendance/check-in", { method: "POST" });
   const body = await res.json();
@@ -50,6 +50,7 @@ export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCar
   const [elapsed, setElapsed] = useState(formatMinutes(0));
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [checkOutLoading, setCheckOutLoading] = useState(false);
+  const [showTaskPrompt, setShowTaskPrompt] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
@@ -86,6 +87,7 @@ export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCar
       const record = await checkIn();
       setStatus(record.status);
       setCheckInTime(record.check_in);
+      setShowTaskPrompt(true);
       setFeedback({ type: "success", message: "출근 처리가 완료되었습니다." });
       router.refresh();
     } catch (error) {
@@ -107,6 +109,7 @@ export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCar
       const record = await checkOut();
       setStatus(record.status);
       setCheckOutTime(record.check_out);
+      setShowTaskPrompt(false);
       setFeedback({ type: "success", message: "퇴근 처리가 완료되었습니다." });
       router.refresh();
     } catch (error) {
@@ -148,6 +151,34 @@ export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCar
           }`}
         >
           {feedback.message}
+        </div>
+      )}
+
+      {showTaskPrompt && (
+        <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <ListChecks size={18} className="mt-0.5 shrink-0 text-indigo-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-slate-800">오늘 할 일을 등록해주세요</p>
+              <p className="mt-1 text-xs text-slate-500">
+                오늘 처리할 개인 업무를 등록하면 메인 대시보드에 바로 표시됩니다.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => router.push("/dashboard/tasks?new=1")}
+                  className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-indigo-500"
+                >
+                  새 할 일 추가
+                </button>
+                <button
+                  onClick={() => router.push("/dashboard/tasks")}
+                  className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50"
+                >
+                  내 업무 보기
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

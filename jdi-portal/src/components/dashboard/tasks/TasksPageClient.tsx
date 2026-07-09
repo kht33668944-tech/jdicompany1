@@ -1,21 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MagnifyingGlass, Plus } from "phosphor-react";
+import { CalendarBlank, CheckCircle, ClockCounterClockwise, Plus } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
-import type { TaskWithDetails, TaskViewId, TaskFilterState } from "@/lib/tasks/types";
-import { TASK_VIEWS, DEFAULT_FILTER_STATE } from "@/lib/tasks/constants";
-import { filterTasks, sortTasks, groupTasks, computeSummary, buildTaskTree } from "@/lib/tasks/utils";
+import type { TaskWithDetails } from "@/lib/tasks/types";
+import { formatDueDate, sortTasks } from "@/lib/tasks/utils";
+import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
+import { toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { getTasksWithDetails } from "@/lib/tasks/queries";
-import { cacheTasks, getCachedTasks } from "@/lib/tasks/tasksCache";
+import { cacheTasks } from "@/lib/tasks/tasksCache";
 import { createClient } from "@/lib/supabase/client";
-import TaskSummaryPanel from "./TaskSummaryPanel";
-import TaskFilters from "./TaskFilters";
-import ListView from "./views/ListView";
-import CalendarView from "./views/CalendarView";
-import TimelineView from "./views/TimelineView";
 import TaskCreateModal from "./TaskCreateModal";
 import TaskDetailPanel from "./TaskDetailPanel";
+import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   profiles: Profile[];
@@ -23,97 +20,68 @@ interface Props {
   initialTasks: TaskWithDetails[];
 }
 
-const VIEW_STORAGE_KEY = "tasks-active-view";
-const FILTER_STORAGE_KEY = "tasks-filters";
+function isTodayTask(task: TaskWithDetails, today: string): boolean {
+  if (task.status === "완료") return false;
+  if (task.due_date && task.due_date <= today) return true;
+  if (task.start_date && task.start_date <= today) return true;
+  return toDateStringFromTimestamp(task.created_at) === today;
+}
+
+function formatDueWithWeekday(dueDate: string | null, fallbackText: string, today: string): string {
+  if (!dueDate) return fallbackText;
+  const [, month, day] = dueDate.split("-");
+  const weekday = new Date(`${dueDate}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    weekday: "short",
+  });
+  if (dueDate === today) return `오늘 (${weekday})`;
+  return `${month}.${day} (${weekday})`;
+}
 
 export default function TasksPageClient({ profiles, userId, initialTasks }: Props) {
-  // SSR/CSR hydration mismatch 방지 — 항상 기본값으로 시작 후 mount 시 localStorage 로드
-  const [activeView, setActiveView] = useState<TaskViewId>("list");
-  const [filters, setFilters] = useState<TaskFilterState>(DEFAULT_FILTER_STATE);
   const [showCreate, setShowCreate] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  // 상세 패널은 Next 라우터 대신 로컬 상태 + history.replaceState 로 관리
-  // → 서버 컴포넌트 재실행 없이 즉시 열림 (다른 페이지/탭 내비게이션엔 영향 없음)
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
-
   const [allTasks, setAllTasks] = useState<TaskWithDetails[]>(initialTasks);
-  // fresh fetch 가 적용된 후 늦게 도착한 IDB 캐시가 빈 fresh 를 stale 로 덮어쓰는 race 차단
-  const freshLoadedRef = useRef(initialTasks.length > 0);
-
-  // mount 후 localStorage 에서 사용자 설정 복원 (hydration 이후 비동기 적용)
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      try {
-        const savedView = window.localStorage.getItem(VIEW_STORAGE_KEY) as TaskViewId | null;
-        if (savedView) setActiveView(savedView);
-        const savedFilters = window.localStorage.getItem(FILTER_STORAGE_KEY);
-        if (savedFilters) {
-          setFilters({ ...DEFAULT_FILTER_STATE, ...JSON.parse(savedFilters) });
-        }
-      } catch {
-        // 파싱 실패 무시 — 기본값 유지
-      }
-    });
-  }, []);
 
   const refreshTasks = useCallback(async () => {
     try {
       const supabase = createClient();
       const fresh = await getTasksWithDetails(supabase);
       setAllTasks(fresh);
-      freshLoadedRef.current = true;
       void cacheTasks(fresh);
     } catch (err) {
       console.warn("[TasksPageClient] refreshTasks failed:", err);
     }
   }, []);
 
-  // 마운트 시: IDB 캐시 → 즉시 표시 → 백그라운드 네트워크 fetch
   useEffect(() => {
-    let cancelled = false;
-    // 1) IDB 캐시가 있으면 즉시 표시 (네트워크 대기 없이 화면 렌더)
-    getCachedTasks().then((cached) => {
-      if (cancelled || freshLoadedRef.current) return;
-      if (cached && cached.length > 0) setAllTasks(cached);
-    });
-    // 2) 백그라운드에서 최신 데이터 fetch
     const id = requestAnimationFrame(() => void refreshTasks());
-    return () => { cancelled = true; cancelAnimationFrame(id); };
+    return () => cancelAnimationFrame(id);
   }, [refreshTasks]);
 
   useEffect(() => {
-    window.localStorage.setItem(VIEW_STORAGE_KEY, activeView);
-  }, [activeView]);
-
-  useEffect(() => {
-    window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
-  }, [filters]);
-
-  // 딥링크 대응: 초기 URL 의 ?detail=xxx 를 1회 동기화
-  // rAF 로 지연 — hydration 후 비동기 적용 (cascading render 방지)
-  useEffect(() => {
     const raf = requestAnimationFrame(() => {
       const params = new URLSearchParams(window.location.search);
-      const d = params.get("detail");
-      if (d) setDetailTaskId(d);
+      const detail = params.get("detail");
+      if (detail) setDetailTaskId(detail);
+      if (params.get("new") === "1") {
+        setShowCreate(true);
+        params.delete("new");
+        const qs = params.toString();
+        window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+      }
     });
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // URL ?detail= 동기화 (history API — 서버 내비게이션 없음)
   const setDetailInUrl = useCallback((id: string | null) => {
     const params = new URLSearchParams(window.location.search);
     if (id) params.set("detail", id);
     else params.delete("detail");
     const qs = params.toString();
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}${qs ? `?${qs}` : ""}`
-    );
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
   }, []);
 
-  // 패널이 닫힐 때 목록 갱신
   const prevDetailRef = useRef<string | null>(null);
   useEffect(() => {
     if (prevDetailRef.current && !detailTaskId) {
@@ -122,33 +90,23 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
     prevDetailRef.current = detailTaskId;
   }, [detailTaskId, refreshTasks]);
 
-  const summary = useMemo(() => computeSummary(allTasks), [allTasks]);
+  const personalTasks = useMemo(
+    () => allTasks.filter((task) => task.assignees.some((assignee) => assignee.user_id === userId)),
+    [allTasks, userId]
+  );
+  const personalOpenTasks = useMemo(
+    () => sortTasks(personalTasks.filter((task) => task.status !== "완료"), "due_date"),
+    [personalTasks]
+  );
 
-  const processedTasks = useMemo(() => {
-    let tasks = allTasks;
-    // 검색 필터
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      tasks = tasks.filter(
-        (t) =>
-          t.title.toLowerCase().includes(q) ||
-          t.description?.toLowerCase().includes(q) ||
-          t.category?.toLowerCase().includes(q) ||
-          t.assignees.some((a) => a.full_name.toLowerCase().includes(q))
-      );
-    }
-    const filtered = filterTasks(tasks, filters);
-    const sorted = sortTasks(filtered, filters.sortBy);
-    return sorted;
-  }, [allTasks, filters, searchQuery]);
-
-  const groupedTasks = useMemo(() => {
-    const topLevel = processedTasks.filter((t) => !t.parent_id);
-    return groupTasks(topLevel, filters.groupBy);
-  }, [processedTasks, filters.groupBy]);
-
-  // 서브태스크를 부모에 매핑
-  const tasksWithChildren = useMemo(() => buildTaskTree(processedTasks), [processedTasks]);
+  const today = toDateString();
+  const todayFocusTasks = useMemo(
+    () => personalOpenTasks.filter((task) => isTodayTask(task, today)),
+    [personalOpenTasks, today]
+  );
+  const pendingCount = personalOpenTasks.filter((task) => task.status === "대기").length;
+  const progressCount = personalOpenTasks.filter((task) => task.status === "진행중").length;
+  const completedCount = personalTasks.filter((task) => task.status === "완료").length;
 
   const handleTaskClick = useCallback((taskId: string) => {
     setDetailTaskId(taskId);
@@ -160,96 +118,111 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
     setDetailInUrl(null);
   }, [setDetailInUrl]);
 
-  // 클릭한 할일을 allTasks 에서 즉시 찾아 패널에 시드 → 제목/담당자/기간 즉시 표시
   const initialTask = useMemo(
-    () => (detailTaskId ? allTasks.find((t) => t.id === detailTaskId) ?? null : null),
+    () => (detailTaskId ? allTasks.find((task) => task.id === detailTaskId) ?? null : null),
     [detailTaskId, allTasks]
   );
 
   return (
-    <div className="space-y-8">
-      {/* 검색 바 + 할일 추가 버튼 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center flex-1 sm:max-w-xl">
-          <div className="relative w-full">
-            <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="할일 검색..."
-              className="w-full pl-12 pr-4 py-2.5 bg-white rounded-2xl border-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm outline-none shadow-sm"
-            />
-          </div>
+    <div className="space-y-5">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-400">내 진행 업무</p>
+          <p className="mt-2 text-2xl font-bold text-slate-800">{personalOpenTasks.length}</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all w-full sm:w-auto"
-          style={{ background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" }}
-        >
-          <Plus size={16} weight="bold" />
-          할일 추가
-        </button>
-      </div>
+        <div className="rounded-lg bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+            <ClockCounterClockwise size={14} />
+            대기
+          </div>
+          <p className="mt-2 text-2xl font-bold text-slate-800">{pendingCount}</p>
+        </div>
+        <div className="rounded-lg bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
+            <CalendarBlank size={14} />
+            진행중
+          </div>
+          <p className="mt-2 text-2xl font-bold text-amber-600">{progressCount}</p>
+        </div>
+        <div className="rounded-lg bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-500">
+            <CheckCircle size={14} />
+            완료
+          </div>
+          <p className="mt-2 text-2xl font-bold text-emerald-600">{completedCount}</p>
+        </div>
+      </section>
 
-      <TaskSummaryPanel summary={summary} />
+      <section className="overflow-hidden rounded-lg bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div>
+            <h1 className="text-lg font-bold text-slate-800">오늘 할 일</h1>
+            <p className="mt-1 text-xs text-slate-400">마감일 기준으로 오늘 처리할 업무를 보여줍니다.</p>
+          </div>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-indigo-500"
+          >
+            <Plus size={14} weight="bold" />
+            할 일
+          </button>
+        </div>
 
-      {/* 뷰 탭 + 필터 */}
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="bg-white p-1 rounded-2xl shadow-sm flex gap-1">
-            {(Object.keys(TASK_VIEWS) as TaskViewId[]).map((viewId) => {
-              const view = TASK_VIEWS[viewId];
-              const active = activeView === viewId;
+        {todayFocusTasks.length === 0 ? (
+          <div className="px-5 py-12 text-center">
+            <CheckCircle size={28} weight="fill" className="mx-auto text-emerald-400" />
+            <p className="mt-3 text-sm font-semibold text-slate-600">오늘 표시할 업무가 없습니다</p>
+            <p className="mt-1 text-xs text-slate-400">새 업무를 추가하면 이 목록에 바로 표시됩니다.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {todayFocusTasks.map((task) => {
+              const statusConfig = TASK_STATUS_CONFIG[task.status];
+              const due = formatDueDate(task.due_date, task.status);
+              const mainAssignee = task.assignees[0] ?? profiles.find((profile) => profile.id === userId);
+
               return (
                 <button
-                  key={viewId}
-                  onClick={() => setActiveView(viewId)}
-                  className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
-                    active
-                      ? "bg-indigo-600 text-white"
-                      : "text-slate-400 hover:bg-slate-50"
-                  }`}
+                  key={task.id}
+                  onClick={() => handleTaskClick(task.id)}
+                  className="grid w-full grid-cols-1 gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50 lg:grid-cols-[minmax(0,1fr)_120px_120px]"
                 >
-                  {view.label}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusConfig.dot}`} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-800">{task.title}</p>
+                      {task.description && (
+                        <p className="mt-1 truncate text-xs text-slate-400">{task.description}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 lg:justify-center">
+                    {mainAssignee && (
+                      <>
+                        <UserAvatar name={mainAssignee.full_name} avatarUrl={mainAssignee.avatar_url} size="sm" />
+                        <span className="truncate text-xs font-semibold text-slate-500 lg:hidden">
+                          {mainAssignee.full_name}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 lg:justify-end">
+                    <span className={`rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
+                      {task.status}
+                    </span>
+                    <span className={`text-xs font-bold ${due.className}`}>
+                      {formatDueWithWeekday(task.due_date, due.text, today)}
+                    </span>
+                  </div>
                 </button>
               );
             })}
           </div>
-        </div>
+        )}
+      </section>
 
-        <TaskFilters
-          profiles={profiles}
-          filters={filters}
-          onFilterChange={setFilters}
-        />
-      </div>
-
-      {/* 뷰 렌더링 */}
-      {activeView === "list" && (
-        <ListView
-          groupedTasks={groupedTasks}
-          allTasks={tasksWithChildren}
-          onTaskClick={handleTaskClick}
-          profiles={profiles}
-          userId={userId}
-          onRefresh={refreshTasks}
-        />
-      )}
-      {activeView === "calendar" && (
-        <CalendarView
-          tasks={processedTasks}
-          onTaskClick={handleTaskClick}
-        />
-      )}
-      {activeView === "timeline" && (
-        <TimelineView
-          tasks={processedTasks}
-          onTaskClick={handleTaskClick}
-        />
-      )}
-
-      {/* 생성 모달 */}
       {showCreate && (
         <TaskCreateModal
           userId={userId}
@@ -259,14 +232,12 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
         />
       )}
 
-      {/* 상세 패널 */}
       <TaskDetailPanel
         profiles={profiles}
         userId={userId}
         taskId={detailTaskId}
         initialTask={initialTask}
         onClose={handleClosePanel}
-        onNavigate={handleTaskClick}
       />
     </div>
   );

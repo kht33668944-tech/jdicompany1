@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  ListChecks,
-  ClockClockwise,
-  WarningCircle,
-  CheckCircle,
-} from "phosphor-react";
+import { CheckCircle, ClockClockwise, ListChecks, WarningCircle } from "phosphor-react";
 import type { TaskSummary } from "@/lib/tasks/types";
 
 interface Props {
@@ -15,11 +10,11 @@ interface Props {
 const cards = [
   {
     key: "total" as const,
-    label: "전체 할일",
+    label: "전체 할 일",
     icon: ListChecks,
     iconBg: "bg-indigo-50",
     iconColor: "text-indigo-600",
-    getValue: (s: TaskSummary) => s.total,
+    getValue: (summary: TaskSummary) => summary.total,
     textColor: "",
     border: "",
   },
@@ -29,7 +24,17 @@ const cards = [
     icon: ClockClockwise,
     iconBg: "bg-orange-50",
     iconColor: "text-orange-600",
-    getValue: (s: TaskSummary) => s.by_status["진행중"],
+    getValue: (summary: TaskSummary) => summary.by_status["진행중"],
+    textColor: "",
+    border: "",
+  },
+  {
+    key: "done" as const,
+    label: "완료",
+    icon: CheckCircle,
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    getValue: (summary: TaskSummary) => summary.by_status["완료"],
     textColor: "",
     border: "",
   },
@@ -39,35 +44,25 @@ const cards = [
     icon: WarningCircle,
     iconBg: "bg-red-50",
     iconColor: "text-red-600",
-    getValue: (s: TaskSummary) => s.overdue,
+    getValue: (summary: TaskSummary) => summary.overdue,
     textColor: "text-red-600",
     border: "border border-red-100",
-  },
-  {
-    key: "completedWeek" as const,
-    label: "이번주 완료",
-    icon: CheckCircle,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
-    getValue: (s: TaskSummary) => s.completed_this_week,
-    textColor: "",
-    border: "",
   },
 ];
 
 export default function TaskSummaryPanel({ summary }: Props) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-6">
       {cards.map((card) => {
         const Icon = card.icon;
         const value = card.getValue(summary);
         return (
           <div
             key={card.key}
-            className={`bg-white p-4 lg:p-6 rounded-3xl shadow-sm flex items-center gap-3 lg:gap-5 ${card.border}`}
+            className={`flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm lg:gap-5 lg:p-6 ${card.border}`}
           >
             <div
-              className={`w-10 h-10 lg:w-12 lg:h-12 ${card.iconBg} ${card.iconColor} rounded-2xl flex items-center justify-center`}
+              className={`flex h-10 w-10 items-center justify-center rounded-2xl lg:h-12 lg:w-12 ${card.iconBg} ${card.iconColor}`}
             >
               <Icon size={24} />
             </div>
@@ -75,7 +70,7 @@ export default function TaskSummaryPanel({ summary }: Props) {
               <p className={`text-sm font-medium ${card.textColor ? "text-red-400" : "text-slate-400"}`}>
                 {card.label}
               </p>
-              <p className={`text-xl lg:text-2xl font-bold ${card.textColor}`}>{value}</p>
+              <p className={`text-xl font-bold lg:text-2xl ${card.textColor}`}>{value}</p>
             </div>
           </div>
         );

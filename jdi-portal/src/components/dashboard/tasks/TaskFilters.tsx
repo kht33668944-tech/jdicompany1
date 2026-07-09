@@ -2,20 +2,15 @@
 
 import { useState } from "react";
 import {
-  User,
-  Tag,
   Funnel,
   CaretDown,
-  StackSimple,
   SortAscending,
 } from "phosphor-react";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
-import type { Profile } from "@/lib/attendance/types";
-import type { TaskFilterState, TaskGroupBy, TaskSortBy, TaskStatus } from "@/lib/tasks/types";
-import { CATEGORIES, TASK_STATUSES, GROUP_BY_OPTIONS, SORT_BY_OPTIONS } from "@/lib/tasks/constants";
+import type { TaskFilterState, TaskSortBy, TaskStatus } from "@/lib/tasks/types";
+import { TASK_STATUSES, SORT_BY_OPTIONS } from "@/lib/tasks/constants";
 
 interface Props {
-  profiles: Profile[];
   filters: TaskFilterState;
   onFilterChange: (filters: TaskFilterState) => void;
 }
@@ -85,7 +80,7 @@ function Dropdown({
   );
 }
 
-export default function TaskFilters({ profiles, filters, onFilterChange }: Props) {
+export default function TaskFilters({ filters, onFilterChange }: Props) {
   const update = (partial: Partial<TaskFilterState>) => {
     onFilterChange({ ...filters, ...partial });
   };
@@ -93,20 +88,6 @@ export default function TaskFilters({ profiles, filters, onFilterChange }: Props
   return (
     <div className="flex items-center justify-end">
       <div className="flex items-center flex-wrap gap-2 md:gap-3">
-        <Dropdown
-          label="담당자"
-          icon={User}
-          value={filters.assignee}
-          options={profiles.map((p) => ({ value: p.id, label: p.full_name }))}
-          onChange={(v) => update({ assignee: v })}
-        />
-        <Dropdown
-          label="카테고리"
-          icon={Tag}
-          value={filters.category}
-          options={CATEGORIES.map((c) => ({ value: c, label: c }))}
-          onChange={(v) => update({ category: v })}
-        />
         <Dropdown
           label="상태"
           icon={Funnel}
@@ -117,13 +98,6 @@ export default function TaskFilters({ profiles, filters, onFilterChange }: Props
 
         <div className="w-px h-6 bg-slate-200 hidden md:block" />
 
-        <Dropdown
-          label={`그룹: ${GROUP_BY_OPTIONS[filters.groupBy]}`}
-          icon={StackSimple}
-          value={filters.groupBy}
-          options={Object.entries(GROUP_BY_OPTIONS).map(([value, label]) => ({ value, label }))}
-          onChange={(v) => update({ groupBy: (v as TaskGroupBy) ?? "status" })}
-        />
         <Dropdown
           label={`정렬: ${SORT_BY_OPTIONS[filters.sortBy]}`}
           icon={SortAscending}

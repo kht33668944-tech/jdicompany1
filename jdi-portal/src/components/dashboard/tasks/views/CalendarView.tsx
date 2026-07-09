@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { CaretLeft, CaretRight } from "phosphor-react";
 import { toDateString, getDaysInMonth, getFirstDayOfMonth } from "@/lib/utils/date";
-import { PRIORITY_CONFIG } from "@/lib/tasks/constants";
 import type { TaskWithDetails } from "@/lib/tasks/types";
 
 interface Props {
@@ -212,21 +211,16 @@ export default function CalendarView({ tasks, onTaskClick }: Props) {
 
               {/* Task pills */}
               <div className="flex flex-col gap-1">
-                {visibleTasks.map((task) => {
-                  const config = PRIORITY_CONFIG[task.priority];
-                  return (
-                    <button
-                      key={task.id}
-                      onClick={() => onTaskClick(task.id)}
-                      className={`flex items-center gap-1 px-1 py-0.5 md:px-2 md:py-1 rounded md:rounded-lg text-[8px] md:text-[10px] font-bold truncate w-full text-left ${config.bg} ${config.text} hover:opacity-80 transition-opacity`}
-                    >
-                      <span
-                        className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full flex-shrink-0 ${config.dot}`}
-                      />
-                      <span className="truncate">{task.title}</span>
-                    </button>
-                  );
-                })}
+                {visibleTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => onTaskClick(task.id)}
+                    className="flex w-full items-center gap-1 truncate rounded bg-slate-100 px-1 py-0.5 text-left text-[8px] font-bold text-slate-600 transition-opacity hover:opacity-80 md:rounded-lg md:px-2 md:py-1 md:text-[10px]"
+                  >
+                    <span className="h-1 w-1 flex-shrink-0 rounded-full bg-slate-400 md:h-1.5 md:w-1.5" />
+                    <span className="truncate">{task.title}</span>
+                  </button>
+                ))}
 
                 {overflowCount > 0 && (
                   <div className="text-[10px] font-bold text-slate-400 px-2 py-0.5">
