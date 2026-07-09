@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarBlank, CheckSquare, Clock, Square } from "phosphor-react";
+import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { CalendarBlank, CheckSquare, Clock, DotsSixVertical, Square, Trash } from "phosphor-react";
 import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import type { TaskStatus, TaskWithDetails } from "@/lib/tasks/types";
 import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
 import { formatDueDate, isOverdue } from "@/lib/tasks/utils";
-import { updateTask } from "@/lib/tasks/actions";
+import { deleteTask, moveTask, updateTask } from "@/lib/tasks/actions";
 import { formatTime, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import UserAvatar from "@/components/shared/UserAvatar";
 
@@ -59,6 +60,8 @@ function taskBelongsToProfile(task: TaskWithDetails, profileId: string): boolean
 function sortTasksForToday(a: TaskWithDetails, b: TaskWithDetails): number {
   const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
   if (statusDiff !== 0) return statusDiff;
+  const positionDiff = a.position - b.position;
+  if (positionDiff !== 0) return positionDiff;
   if (!a.due_date && !b.due_date) return a.created_at.localeCompare(b.created_at);
   if (!a.due_date) return 1;
   if (!b.due_date) return -1;
@@ -113,20 +116,25 @@ export default function TodayWorkBoardWidget({
 }: Props) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [localTasks, setLocalTasks] = useState(tasks);
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    setLocalTasks(tasks);
+  }, [tasks]);
 
   const today = toDateString();
   const approvedProfiles = profiles.filter((profile) => profile.is_approved);
   const attendanceByUser = new Map(attendanceRecords.map((record) => [record.user_id, record]));
 
   const todayOpenTasks = useMemo(
-    () => tasks.filter((task) => isTodayWorkTask(task, today)),
-    [tasks, today]
+    () => localTasks.filter((task) => isTodayWorkTask(task, today)),
+    [localTasks, today]
   );
   const completedTodayTasks = useMemo(
-    () => tasks.filter((task) => isCompletedToday(task, today)),
-    [tasks, today]
+    () => localTasks.filter((task) => isCompletedToday(task, today)),
+    [localTasks, today]
   );
   const todayBoardTasks = useMemo(
     () => [...todayOpenTasks, ...completedTodayTasks].sort(sortTasksForToday),
@@ -155,15 +163,96 @@ export default function TodayWorkBoardWidget({
   const cycleTaskStatus = (task: TaskWithDetails) => {
     if (pendingTaskIds.has(task.id)) return;
 
+    const nextStatus = getNextTaskStatus(task.status);
+    const previousTasks = localTasks;
+
+    setLocalTasks((current) =>
+      current.map((item) =>
+        item.id === task.id
+          ? { ...item, status: nextStatus, updated_at: new Date().toISOString() }
+          : item
+      )
+    );
     setPendingTaskIds((prev) => new Set(prev).add(task.id));
     startTransition(async () => {
       try {
-        await updateTask(task.id, { status: getNextTaskStatus(task.status) });
+        await updateTask(task.id, { status: nextStatus });
         router.refresh();
+      } catch (error) {
+        setLocalTasks(previousTasks);
+        console.error("Failed to update task status", error);
       } finally {
         setPendingTaskIds((prev) => {
           const next = new Set(prev);
           next.delete(task.id);
+          return next;
+        });
+      }
+    });
+  };
+
+  const handleDeleteTask = (task: TaskWithDetails) => {
+    if (pendingTaskIds.has(task.id)) return;
+    if (!window.confirm(`"${task.title}" 업무를 삭제할까요?`)) return;
+
+    const previousTasks = localTasks;
+    setLocalTasks((current) => current.filter((item) => item.id !== task.id));
+    setPendingTaskIds((prev) => new Set(prev).add(task.id));
+    startTransition(async () => {
+      try {
+        await deleteTask(task.id);
+        router.refresh();
+      } catch (error) {
+        setLocalTasks(previousTasks);
+        console.error("Failed to delete task", error);
+      } finally {
+        setPendingTaskIds((prev) => {
+          const next = new Set(prev);
+          next.delete(task.id);
+          return next;
+        });
+      }
+    });
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    const { destination, source } = result;
+    if (!destination) return;
+    if (destination.droppableId !== source.droppableId) return;
+    if (destination.index === source.index) return;
+
+    const profileId = source.droppableId.replace("profile-", "");
+    const profileTasks = filteredTasks.filter((task) => taskBelongsToProfile(task, profileId));
+    const draggedTask = profileTasks[source.index];
+    if (!draggedTask || pendingTaskIds.has(draggedTask.id)) return;
+
+    const reorderedTasks = [...profileTasks];
+    reorderedTasks.splice(source.index, 1);
+    reorderedTasks.splice(destination.index, 0, draggedTask);
+
+    const previousTasks = localTasks;
+    const nextPositionByTaskId = new Map(reorderedTasks.map((task, index) => [task.id, index]));
+
+    setLocalTasks((current) =>
+      current.map((task) =>
+        nextPositionByTaskId.has(task.id)
+          ? { ...task, position: nextPositionByTaskId.get(task.id)! }
+          : task
+      )
+    );
+    setPendingTaskIds((prev) => new Set(prev).add(draggedTask.id));
+
+    startTransition(async () => {
+      try {
+        await moveTask(draggedTask.id, draggedTask.status, destination.index);
+        router.refresh();
+      } catch (error) {
+        setLocalTasks(previousTasks);
+        console.error("Failed to reorder task", error);
+      } finally {
+        setPendingTaskIds((prev) => {
+          const next = new Set(prev);
+          next.delete(draggedTask.id);
           return next;
         });
       }
@@ -291,6 +380,7 @@ export default function TodayWorkBoardWidget({
             <p className="mt-1 text-xs text-slate-400">출근 후 오늘 할 일을 등록하면 이곳에 표시됩니다.</p>
           </div>
         ) : (
+          <DragDropContext onDragEnd={handleDragEnd}>
           <div className="divide-y divide-slate-100">
             {approvedProfiles.map((profile) => {
               const profileTasks = filteredTasks.filter((task) => taskBelongsToProfile(task, profile.id));
@@ -308,20 +398,43 @@ export default function TodayWorkBoardWidget({
                       {doneCount}/{profileTasks.length} 완료
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    {profileTasks.map((task) => {
+                  <Droppable droppableId={`profile-${profile.id}`}>
+                    {(dropProvided) => (
+                  <div
+                    ref={dropProvided.innerRef}
+                    {...dropProvided.droppableProps}
+                    className="space-y-2"
+                  >
+                    {profileTasks.map((task, index) => {
                       const statusConfig = TASK_STATUS_CONFIG[task.status];
                       const due = formatDueDate(task.due_date, task.status);
                       const isDone = task.status === "완료";
-                      const isTaskPending = pendingTaskIds.has(task.id) || isPending;
+                      const isTaskPending = pendingTaskIds.has(task.id);
 
                       return (
-                        <div
+                        <Draggable
                           key={task.id}
-                          className={`grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-slate-100 px-3 py-3 ${
-                            isDone ? "bg-slate-50" : "bg-white"
-                          }`}
+                          draggableId={`${profile.id}-${task.id}`}
+                          index={index}
+                          isDragDisabled={isTaskPending}
                         >
+                          {(dragProvided, snapshot) => (
+                        <div
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          className={`grid grid-cols-[auto_auto_minmax(0,1fr)_auto] gap-3 rounded-lg border border-slate-100 px-3 py-3 transition-colors ${
+                            isDone ? "bg-slate-50" : "bg-white"
+                          } ${snapshot.isDragging ? "shadow-lg ring-1 ring-indigo-100" : ""}`}
+                        >
+                          <button
+                            type="button"
+                            {...dragProvided.dragHandleProps}
+                            disabled={isTaskPending}
+                            className="mt-0.5 cursor-grab text-slate-300 transition-colors hover:text-slate-500 active:cursor-grabbing disabled:cursor-default disabled:opacity-40"
+                            aria-label={`${task.title} 순서 변경`}
+                          >
+                            <DotsSixVertical size={20} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => cycleTaskStatus(task)}
@@ -342,7 +455,7 @@ export default function TodayWorkBoardWidget({
                               <p className={`truncate text-sm font-bold ${isDone ? "text-slate-400 line-through" : "text-slate-800"}`}>
                                 {task.title}
                               </p>
-                              <div className="flex shrink-0 items-center gap-2">
+                              <div className="flex shrink-0 items-center gap-4">
                                 <span className={`rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
                                   {task.status}
                                 </span>
@@ -355,14 +468,29 @@ export default function TodayWorkBoardWidget({
                               <p className="mt-1 truncate text-xs text-slate-400">{getTaskOwnerLabel(task)}</p>
                             )}
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTask(task)}
+                            disabled={isTaskPending}
+                            className="mt-0.5 text-slate-300 transition-colors hover:text-red-500 disabled:cursor-default disabled:opacity-40"
+                            aria-label={`${task.title} 삭제`}
+                          >
+                            <Trash size={18} />
+                          </button>
                         </div>
+                          )}
+                        </Draggable>
                       );
                     })}
+                    {dropProvided.placeholder}
                   </div>
+                    )}
+                  </Droppable>
                 </div>
               );
             })}
           </div>
+          </DragDropContext>
         )}
       </section>
 

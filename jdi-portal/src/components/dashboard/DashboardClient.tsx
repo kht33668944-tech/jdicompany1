@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { DashboardData } from "@/lib/dashboard/queries";
 import type { TaskWithDetails } from "@/lib/tasks/types";
 import { toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
@@ -23,7 +24,8 @@ function isCompletedToday(task: TaskWithDetails, today: string): boolean {
 }
 
 export default function DashboardClient({ userName, initialData }: Props) {
-  const [data] = useState<DashboardData | null>(initialData);
+  const router = useRouter();
+  const data = initialData;
   // 시간 기반 문자열은 서버(싱가포르)와 브라우저(한국)의 시각 차이로
   // hydration mismatch를 일으켜 전체 재렌더링을 유발 → 마운트 후에만 계산
   const [timeInfo, setTimeInfo] = useState<{ dateStr: string; greeting: string } | null>(null);
@@ -48,6 +50,21 @@ export default function DashboardClient({ userName, initialData }: Props) {
     });
     return () => cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    const refreshDashboard = () => router.refresh();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshDashboard();
+    };
+
+    refreshDashboard();
+    window.addEventListener("focus", refreshDashboard);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", refreshDashboard);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [router]);
 
   const status = data?.todayRecord?.status ?? "미출근";
   const today = toDateString();

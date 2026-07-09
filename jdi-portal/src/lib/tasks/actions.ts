@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { TASK_PRIORITIES, TASK_STATUSES } from "./constants";
 import { validateFile } from "@/lib/utils/upload";
@@ -24,6 +25,12 @@ async function getNextPosition(supabase: Awaited<ReturnType<typeof createClient>
 
   if (error) throw error;
   return (maxRow?.position ?? -1) + 1;
+}
+
+function revalidateTaskViews(taskId?: string) {
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tasks");
+  if (taskId) revalidatePath(`/dashboard/tasks/${taskId}`);
 }
 
 async function logActivity(
@@ -113,6 +120,7 @@ export async function createTask(params: {
     throw assigneeError;
   }
 
+  revalidateTaskViews(data.id);
   return data;
 }
 
@@ -181,13 +189,15 @@ export async function updateTask(
   if (params.category !== undefined) updateData.category = params.category;
   if (params.dueDate !== undefined) updateData.due_date = params.dueDate;
   if (params.startDate !== undefined) updateData.start_date = params.startDate;
+  if (statusChanged) updateData.updated_at = new Date().toISOString();
 
   // 변경된 필드가 없으면 (상태만 변경된 경우 포함) 바로 리턴
   if (Object.keys(updateData).length === 0) {
+    revalidateTaskViews(taskId);
     return currentTask;
   }
 
-  updateData.updated_at = new Date().toISOString();
+  updateData.updated_at = updateData.updated_at ?? new Date().toISOString();
 
   const { data, error } = await supabase
     .from("tasks")
@@ -197,6 +207,7 @@ export async function updateTask(
     .maybeSingle();
 
   if (error) throw error;
+  revalidateTaskViews(taskId);
   return data ?? currentTask;
 }
 
@@ -204,6 +215,7 @@ export async function deleteTask(taskId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw error;
+  revalidateTaskViews(taskId);
 }
 
 export async function moveTask(taskId: string, newStatus: TaskStatus, newPosition: number) {
@@ -214,6 +226,7 @@ export async function moveTask(taskId: string, newStatus: TaskStatus, newPositio
     p_new_position: newPosition,
   });
   if (error) throw error;
+  revalidateTaskViews(taskId);
 }
 
 // ============================================================
@@ -248,6 +261,7 @@ export async function addAssignee(taskId: string, userId: string) {
       metadata: { task_id: taskId },
     });
   }
+  revalidateTaskViews(taskId);
 }
 
 export async function removeAssignee(taskId: string, userId: string) {
@@ -263,6 +277,7 @@ export async function removeAssignee(taskId: string, userId: string) {
   await logActivity(taskId, currentUserId, "assignee_change", null, {
     removed: [userId],
   });
+  revalidateTaskViews(taskId);
 }
 
 // ============================================================
@@ -289,6 +304,7 @@ export async function addChecklistItem(taskId: string, content: string): Promise
     .single();
 
   if (error) throw error;
+  revalidateTaskViews(taskId);
   return data as TaskChecklistItem;
 }
 
@@ -302,6 +318,7 @@ export async function updateChecklistItem(
     .update(updates)
     .eq("id", itemId);
   if (error) throw error;
+  revalidateTaskViews();
 }
 
 export async function deleteChecklistItem(itemId: string) {
@@ -311,6 +328,7 @@ export async function deleteChecklistItem(itemId: string) {
     .delete()
     .eq("id", itemId);
   if (error) throw error;
+  revalidateTaskViews();
 }
 
 export async function reorderChecklist(taskId: string, itemIds: string[]) {
@@ -320,6 +338,7 @@ export async function reorderChecklist(taskId: string, itemIds: string[]) {
   );
   // 체크리스트 항목은 보통 20개 미만이므로 개별 업데이트 허용
   await Promise.all(updates);
+  revalidateTaskViews(taskId);
 }
 
 // ============================================================
