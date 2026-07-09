@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { Channel, Message, MessageReadReceipt, MessageReaction } from "./types";
+import { summarizeReactionsByMessage, type ReactionRow } from "./reactions";
 
 function getSupabase() {
   return createClient();
@@ -58,7 +59,7 @@ export async function createChannel(params: {
   // 생성된 채널 조회
   const { data: channel, error: fetchErr } = await supabase
     .from("channels")
-    .select("*")
+    .select("id, name, description, type, created_by, created_at, updated_at, dm_pair_key")
     .eq("id", channelId)
     .single();
 
@@ -221,7 +222,7 @@ export async function sendMessage(params: {
       type: params.type ?? "text",
       parent_message_id: params.parentMessageId ?? null,
     })
-    .select()
+    .select("id, channel_id, user_id, content, type, is_edited, is_deleted, is_pinned, pinned_by, pinned_at, parent_message_id, created_at, updated_at")
     .single();
 
   if (error) throw error;
@@ -346,7 +347,7 @@ export async function ensureMemoChannel(): Promise<Channel> {
   // 본인 소유 메모 채널만 조회
   const { data: existing } = await supabase
     .from("channels")
-    .select("*")
+    .select("id, name, description, type, created_by, created_at, updated_at, dm_pair_key")
     .eq("type", "memo")
     .eq("created_by", user.id)
     .maybeSingle();
@@ -366,7 +367,7 @@ export async function ensureMemoChannel(): Promise<Channel> {
     if (error.code === "23505") {
       const { data: retry } = await supabase
         .from("channels")
-        .select("*")
+        .select("id, name, description, type, created_by, created_at, updated_at, dm_pair_key")
         .eq("type", "memo")
         .eq("created_by", user.id)
         .maybeSingle();
@@ -377,7 +378,7 @@ export async function ensureMemoChannel(): Promise<Channel> {
 
   const { data: channel } = await supabase
     .from("channels")
-    .select("*")
+    .select("id, name, description, type, created_by, created_at, updated_at, dm_pair_key")
     .eq("id", channelId)
     .single();
 
@@ -585,6 +586,23 @@ export async function getReactions(messageId: string, userId: string): Promise<M
   }
 
   return Array.from(emojiMap.entries()).map(([emoji, { count, reacted }]) => ({ emoji, count, reacted }));
+}
+
+export async function getReactionsForMessages(
+  messageIds: string[],
+  userId: string
+): Promise<Record<string, MessageReaction[]>> {
+  const uniqueIds = Array.from(new Set(messageIds)).filter(Boolean);
+  if (uniqueIds.length === 0) return {};
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("message_reactions")
+    .select("message_id, emoji, user_id")
+    .in("message_id", uniqueIds);
+
+  if (error) throw error;
+  return summarizeReactionsByMessage((data ?? []) as ReactionRow[], userId);
 }
 
 // ============================================

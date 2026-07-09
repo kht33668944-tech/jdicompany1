@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Pencil, Trash, File as FileIcon, DownloadSimple, Copy, ArrowBendUpLeft, Smiley, PushPin } from "phosphor-react";
 import { toast } from "sonner";
 import type { Message, MessageReaction } from "@/lib/chat/types";
-import { formatMessageTime, formatFileSize, parseFileContent } from "@/lib/chat/utils";
-import { getChatFileUrl, toggleReaction, getReactions } from "@/lib/chat/actions";
+import { formatMessageTime, formatFileSize, getFilePreviewPath, parseFileContent } from "@/lib/chat/utils";
+import { toggleReaction, getReactions } from "@/lib/chat/actions";
 import { parseMessageContent } from "@/lib/chat/mentions";
-import { useChatFileUrls } from "./ChatFileUrlsContext";
+import { useChatFileUrl } from "./ChatFileUrlsContext";
 import ReadReceiptModal from "./ReadReceiptModal";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏", "🎉"];
@@ -17,6 +17,8 @@ interface MessageItemProps {
   isOwn: boolean;
   userId: string;
   parentMessage?: Message | null;
+  reactions?: MessageReaction[];
+  onReactionsChange?: (messageId: string, reactions: MessageReaction[]) => void;
   onEdit?: (message: Message) => void;
   onDelete?: (message: Message) => void;
   onReply?: (message: Message) => void;
@@ -40,35 +42,26 @@ interface ContextMenuState {
 }
 
 /** 리액션 바 */
-function ReactionBar({ message, userId }: { message: Message; userId: string }) {
-  const [reactions, setReactions] = useState<MessageReaction[]>([]);
-  // loaded 를 별도 상태로 두지 않고, "어떤 메시지에 대해 로드 끝났는지" 로 추적
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  const loaded = loadedFor === message.id;
-
-  useEffect(() => {
-    let cancelled = false;
-    getReactions(message.id, userId)
-      .then((r) => {
-        if (cancelled) return;
-        setReactions(r);
-        setLoadedFor(message.id);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadedFor(message.id);
-      });
-    return () => { cancelled = true; };
-  }, [message.id, userId]);
-
+function ReactionBar({
+  message,
+  userId,
+  reactions,
+  onReactionsChange,
+}: {
+  message: Message;
+  userId: string;
+  reactions: MessageReaction[];
+  onReactionsChange?: (messageId: string, reactions: MessageReaction[]) => void;
+}) {
   async function handleToggle(emoji: string) {
     try {
       await toggleReaction(message.id, emoji);
       const updated = await getReactions(message.id, userId);
-      setReactions(updated);
+      onReactionsChange?.(message.id, updated);
     } catch { /* ignore */ }
   }
 
-  if (!loaded || reactions.length === 0) return null;
+  if (reactions.length === 0) return null;
 
   return (
     <div className="flex items-center gap-1 flex-wrap mt-1">
@@ -276,32 +269,11 @@ function ReadCountButton({ message }: { message: Message }) {
 }
 
 /** 이미지 메시지 렌더러 */
-function ChatImage({ storagePath, fileName }: { storagePath: string; fileName: string }) {
-  const { urls: batchUrls } = useChatFileUrls();
-  const batched = batchUrls[storagePath];
-  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+function ChatImage({ storagePath, previewPath, fileName }: { storagePath: string; previewPath: string; fileName: string }) {
+  const previewUrl = useChatFileUrl(previewPath);
+  const originalUrl = useChatFileUrl(storagePath);
 
-  useEffect(() => {
-    if (batched) return;
-    let cancelled = false;
-    getChatFileUrl(storagePath)
-      .then((u) => { if (!cancelled) setFallbackUrl(u); })
-      .catch(() => { if (!cancelled) setError(true); });
-    return () => { cancelled = true; };
-  }, [storagePath, batched]);
-
-  const url = batched ?? fallbackUrl;
-
-  if (error) {
-    return (
-      <div className="px-4 py-3 bg-red-50 rounded-xl text-xs text-red-400">
-        이미지를 불러올 수 없습니다
-      </div>
-    );
-  }
-
-  if (!url) {
+  if (!previewUrl) {
     return (
       <div className="w-48 h-32 bg-slate-100 rounded-xl animate-pulse flex items-center justify-center">
         <span className="text-[10px] text-slate-400">로딩 중...</span>
@@ -310,10 +282,12 @@ function ChatImage({ storagePath, fileName }: { storagePath: string; fileName: s
   }
 
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+    <a href={originalUrl ?? previewUrl} target="_blank" rel="noopener noreferrer" className="block">
       <img
-        src={url}
+        src={previewUrl}
         alt={fileName}
+        loading="lazy"
+        decoding="async"
         className="max-w-[280px] max-h-[200px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
       />
     </a>
@@ -322,20 +296,7 @@ function ChatImage({ storagePath, fileName }: { storagePath: string; fileName: s
 
 /** 파일 메시지 렌더러 */
 function ChatFile({ storagePath, fileName, fileSize }: { storagePath: string; fileName: string; fileSize: number }) {
-  const { urls: batchUrls } = useChatFileUrls();
-  const batched = batchUrls[storagePath];
-  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (batched) return;
-    let cancelled = false;
-    getChatFileUrl(storagePath)
-      .then((u) => { if (!cancelled) setFallbackUrl(u); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [storagePath, batched]);
-
-  const url = batched ?? fallbackUrl;
+  const url = useChatFileUrl(storagePath);
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl min-w-[200px]">
@@ -372,7 +333,8 @@ function MessageContent({ message, isOwn, parentMessage }: { message: Message; i
     const fileData = parseFileContent(message.content);
     if (fileData) {
       if (message.type === "image") {
-        return <ChatImage storagePath={fileData.path} fileName={fileData.name} />;
+        const previewPath = getFilePreviewPath(fileData) ?? fileData.path;
+        return <ChatImage storagePath={fileData.path} previewPath={previewPath} fileName={fileData.name} />;
       }
       return <ChatFile storagePath={fileData.path} fileName={fileData.name} fileSize={fileData.size} />;
     }
@@ -457,6 +419,8 @@ export default function MessageItem({
   onDelete,
   onReply,
   onPin,
+  reactions = [],
+  onReactionsChange,
 }: MessageItemProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
@@ -549,7 +513,12 @@ export default function MessageItem({
               <MessageContent message={message} isOwn parentMessage={parentMessage} />
             </div>
             {!message.is_deleted && (
-              <ReactionBar message={message} userId={userId} />
+              <ReactionBar
+                message={message}
+                userId={userId}
+                reactions={reactions}
+                onReactionsChange={onReactionsChange}
+              />
             )}
             {!message.is_deleted && <ReadCountButton message={message} />}
           </div>
@@ -577,6 +546,8 @@ export default function MessageItem({
                   onClick={async () => {
                     try {
                       await toggleReaction(message.id, emoji);
+                      const updated = await getReactions(message.id, userId);
+                      onReactionsChange?.(message.id, updated);
                     } catch { /* ignore */ }
                     setShowReactionPicker(false);
                   }}
@@ -629,7 +600,12 @@ export default function MessageItem({
             <MessageContent message={message} isOwn={false} parentMessage={parentMessage} />
           </div>
           {!message.is_deleted && (
-            <ReactionBar message={message} userId={userId} />
+            <ReactionBar
+              message={message}
+              userId={userId}
+              reactions={reactions}
+              onReactionsChange={onReactionsChange}
+            />
           )}
           {!message.is_deleted && <ReadCountButton message={message} />}
         </div>
@@ -657,6 +633,8 @@ export default function MessageItem({
                 onClick={async () => {
                   try {
                     await toggleReaction(message.id, emoji);
+                    const updated = await getReactions(message.id, userId);
+                    onReactionsChange?.(message.id, updated);
                   } catch { /* ignore */ }
                   setShowReactionPicker(false);
                 }}

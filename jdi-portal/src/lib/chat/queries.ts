@@ -28,7 +28,7 @@ export async function getChannelById(
 ): Promise<ChannelWithDetails | null> {
   const { data: channel, error } = await supabase
     .from("channels")
-    .select("*")
+    .select("id, name, description, type, created_by, created_at, updated_at, dm_pair_key")
     .eq("id", channelId)
     .single();
 
@@ -36,7 +36,7 @@ export async function getChannelById(
 
   const { data: members } = await supabase
     .from("channel_members")
-    .select("*")
+    .select("id, channel_id, user_id, role, last_read_at, joined_at")
     .eq("channel_id", channelId)
     .order("joined_at", { ascending: true });
 
@@ -89,7 +89,7 @@ export async function getMemoChannel(
 ): Promise<ChannelWithDetails | null> {
   const { data, error } = await supabase
     .from("channels")
-    .select("*")
+    .select("id, name, description, type, created_by, created_at, updated_at, dm_pair_key")
     .eq("type", "memo")
     .eq("created_by", userId)
     .single();
@@ -110,8 +110,7 @@ export async function getMemoChannel(
  * - 단일 RPC 호출 (이전: 채널 수만큼 N+1 쿼리)
  */
 export async function getTotalUnreadCount(
-  supabase: SupabaseClient,
-  _userId: string
+  supabase: SupabaseClient
 ): Promise<number> {
   const { data, error } = await supabase.rpc("get_total_unread_count");
   if (error) return 0;

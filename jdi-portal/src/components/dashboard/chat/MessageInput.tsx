@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { PaperPlaneRight, Paperclip, X, Image as ImageIcon } from "phosphor-react";
 import { toast } from "sonner";
 import type { Message } from "@/lib/chat/types";
@@ -46,6 +46,21 @@ export default function MessageInput({
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [mentionActive, setMentionActive] = useState(0);
 
+  const addFiles = useCallback((files: File[]) => {
+    const valid: File[] = [];
+    for (const file of files) {
+      const error = validateFile(file);
+      if (error) {
+        toast.error(error);
+        continue;
+      }
+      valid.push(file);
+    }
+    if (valid.length > 0) {
+      setPendingFiles((prev) => [...prev, ...valid]);
+    }
+  }, []);
+
   const filteredMentionCandidates = mentionOpen
     ? channelMembers
         .filter((m) => m.full_name.toLowerCase().includes(mentionQuery))
@@ -88,7 +103,7 @@ export default function MessageInput({
       addFiles(externalFiles);
       onExternalFilesConsumed?.();
     }
-  }, [externalFiles]);
+  }, [addFiles, externalFiles, onExternalFilesConsumed]);
 
   // Generate preview URLs
   useEffect(() => {
@@ -174,9 +189,7 @@ export default function MessageInput({
     try {
       // 파일 업로드
       if (hasFiles) {
-        for (const file of pendingFiles) {
-          await onFileUpload(file);
-        }
+        await Promise.all(pendingFiles.map((file) => onFileUpload(file)));
         setPendingFiles([]);
       }
       // 텍스트 전송 (파일과 함께 또는 단독)
@@ -191,21 +204,6 @@ export default function MessageInput({
     } finally {
       setSending(false);
       textareaRef.current?.focus();
-    }
-  }
-
-  function addFiles(files: File[]) {
-    const valid: File[] = [];
-    for (const file of files) {
-      const error = validateFile(file);
-      if (error) {
-        toast.error(error);
-        continue;
-      }
-      valid.push(file);
-    }
-    if (valid.length > 0) {
-      setPendingFiles((prev) => [...prev, ...valid]);
     }
   }
 

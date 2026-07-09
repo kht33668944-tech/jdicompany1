@@ -119,7 +119,16 @@ export default function TaskDetailClient({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [task.id]);
+  }, [
+    task.category,
+    task.description,
+    task.due_date,
+    task.id,
+    task.priority,
+    task.start_date,
+    task.status,
+    task.title,
+  ]);
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -142,7 +151,16 @@ export default function TaskDetailClient({
     setCategory(task.category ?? "");
     setDueDate(task.due_date ?? "");
     setStartDate(task.start_date ?? "");
-  }, [task.id]);
+  }, [
+    task.category,
+    task.description,
+    task.due_date,
+    task.id,
+    task.priority,
+    task.start_date,
+    task.status,
+    task.title,
+  ]);
 
   const currentProfile = profiles.find((p) => p.id === userId);
   const isAdmin = currentProfile?.role === "admin";
@@ -339,7 +357,7 @@ export default function TaskDetailClient({
             <TaskActivityTimeline activities={liveActivities} userId={userId} />
           </div>
           <div className="px-4 py-3 border-t border-slate-100 shrink-0">
-            <TaskCommentInput taskId={task.id} userId={userId} mode={mode} onRefresh={onRefresh} />
+            <TaskCommentInput taskId={task.id} mode={mode} onRefresh={onRefresh} />
           </div>
         </div>
       </div>
@@ -450,7 +468,7 @@ export default function TaskDetailClient({
             <h3 className="font-bold text-slate-700 mb-4">활동</h3>
             <ActivityScrollArea activities={liveActivities} userId={userId} />
             <div className="mt-4 pt-4 border-t border-slate-100">
-              <TaskCommentInput taskId={task.id} userId={userId} />
+              <TaskCommentInput taskId={task.id} />
             </div>
           </div>
         </div>

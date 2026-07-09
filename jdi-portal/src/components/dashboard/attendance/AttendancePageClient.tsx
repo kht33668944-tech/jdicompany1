@@ -91,7 +91,6 @@ export default function AttendancePageClient({ profile, initialData }: Attendanc
     const supabase = createClient();
     const { start: weekStart, end: weekEnd } = getWeekRange(new Date());
 
-    setCheckInLoading(true);
     Promise.all([
       getTodayRecord(supabase, profile.id).catch(() => null),
       getWeekRecords(supabase, profile.id, weekStart, weekEnd).catch(() => []),

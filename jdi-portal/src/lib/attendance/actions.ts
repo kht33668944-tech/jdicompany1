@@ -2,7 +2,6 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { CorrectionRequest } from "./types";
-import { toDateString } from "@/lib/utils/date";
 import type { VacationType } from "./types";
 import { createNotification } from "@/lib/notifications/actions";
 

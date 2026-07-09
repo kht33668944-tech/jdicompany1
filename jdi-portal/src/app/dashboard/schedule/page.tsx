@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import SchedulePageClient from "@/components/dashboard/schedule/SchedulePageClient";
 import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
+import { getMonthSchedules } from "@/lib/schedule/queries";
 import { toDateString } from "@/lib/utils/date";
 import { getSingleValue, parseYearParam, parseMonthParam } from "@/lib/utils/params";
 import type { Profile } from "@/lib/attendance/types";
+import type { ScheduleWithProfile } from "@/lib/schedule/types";
 
 type SchedulePageProps = {
   searchParams: Promise<{
@@ -25,9 +27,13 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   const currentMonth = parseMonthParam(getSingleValue(query.month), defaultMonth);
 
   let profiles: Profile[] = [];
+  let schedules: ScheduleWithProfile[] = [];
 
   try {
-    profiles = await getCachedAllProfiles();
+    [profiles, schedules] = await Promise.all([
+      getCachedAllProfiles(),
+      getMonthSchedules(auth.supabase, currentYear, currentMonth),
+    ]);
   } catch {
     return (
       <div className="rounded-2xl bg-red-50 border border-red-200 p-6 text-center">
@@ -39,7 +45,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
 
   return (
     <SchedulePageClient
-      schedules={[]}
+      schedules={schedules}
       profiles={profiles}
       currentYear={currentYear}
       currentMonth={currentMonth}

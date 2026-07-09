@@ -18,7 +18,6 @@ async function apiCheckOut() {
 }
 
 interface Props {
-  userId: string;
   attendanceStatus: "미출근" | "근무중" | "퇴근";
   checkInTime: string | null;
   checkOutTime: string | null;
@@ -61,7 +60,6 @@ function getTodayWeekdayIndex(): number {
 }
 
 export default function QuickStatsWidget({
-  userId,
   attendanceStatus,
   checkInTime,
   checkOutTime,

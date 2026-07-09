@@ -4,7 +4,6 @@ import type { AttendanceRecord, VacationType } from "./types";
 export type VacationByDate = Record<string, VacationType>;
 
 const LUNCH_MINUTES = 60;
-const LUNCH_THRESHOLD = 240; // 4시간 초과 시 점심 공제
 
 const DEFAULT_WORK_START = "09:00:00";
 const DEFAULT_WORK_END = "18:00:00";

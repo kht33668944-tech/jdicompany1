@@ -8,12 +8,11 @@ import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
 
 interface Props {
   taskId: string;
-  userId: string;
   mode?: "page" | "panel";
   onRefresh?: () => void;
 }
 
-export default function TaskCommentInput({ taskId, userId, mode = "page", onRefresh }: Props) {
+export default function TaskCommentInput({ taskId, mode = "page", onRefresh }: Props) {
   const router = useRouter();
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);

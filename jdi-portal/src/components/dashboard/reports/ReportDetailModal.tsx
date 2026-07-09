@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { X, PencilSimple, TrashSimple, CaretDown, Browser, Calendar, CloudArrowUp, Bug, SmileySad, Lightbulb } from "phosphor-react";
 import UserAvatar from "@/components/shared/UserAvatar";
 import { toast } from "sonner";
@@ -9,7 +9,6 @@ import {
   updateReport,
   updateReportStatus,
   deleteReport,
-  uploadReportAttachment,
   deleteReportAttachment,
   getAttachmentUrl,
 } from "@/lib/reports/actions";
@@ -81,18 +80,7 @@ export default function ReportDetailModal({
   const isAdmin = userRole === "admin";
   const canManageStatus = userRole === "admin" || userRole === "developer";
 
-  useEffect(() => {
-    if (!open || !report) return;
-    setEditing(false);
-    setConfirmDelete(false);
-    setEditType(report.type);
-    setEditPage(report.page);
-    setEditTitle(report.title);
-    setEditContent(report.content);
-    loadAttachments(report.id);
-  }, [open, report?.id]);
-
-  async function loadAttachments(reportId: string) {
+  const loadAttachments = useCallback(async (reportId: string) => {
     setLoadingAttachments(true);
     setAttachmentUrls(new Map());
     try {
@@ -120,7 +108,18 @@ export default function ReportDetailModal({
     } finally {
       setLoadingAttachments(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !report) return;
+    setEditing(false);
+    setConfirmDelete(false);
+    setEditType(report.type);
+    setEditPage(report.page);
+    setEditTitle(report.title);
+    setEditContent(report.content);
+    loadAttachments(report.id);
+  }, [loadAttachments, open, report]);
 
   function isImageFile(fileName: string): boolean {
     const ext = fileName.toLowerCase().split(".").pop() ?? "";

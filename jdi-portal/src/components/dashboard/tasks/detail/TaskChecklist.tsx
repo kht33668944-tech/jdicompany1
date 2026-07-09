@@ -25,7 +25,7 @@ export default function TaskChecklist({ taskId, items, canEdit, mode = "page", o
     if (mode === "panel" && onRefresh) {
       onRefresh();
     } else {
-      refresh();
+      router.refresh();
     }
   };
   const [newItem, setNewItem] = useState("");

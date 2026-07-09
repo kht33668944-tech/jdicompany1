@@ -41,13 +41,11 @@ const STATUS_ICONS: Record<TaskStatus, React.ComponentType<IconProps>> = {
 function MobileEditSheet({
   task,
   profiles,
-  userId,
   onClose,
   onRefresh,
 }: {
   task: TaskWithDetails;
   profiles: Profile[];
-  userId: string;
   onClose: () => void;
   onRefresh?: () => void;
 }) {
@@ -342,7 +340,6 @@ function MobileTaskCard({
         <MobileEditSheet
           task={task}
           profiles={profiles}
-          userId={userId}
           onClose={() => setShowSheet(false)}
           onRefresh={onRefresh}
         />

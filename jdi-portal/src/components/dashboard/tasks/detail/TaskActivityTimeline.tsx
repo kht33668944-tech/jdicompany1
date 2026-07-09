@@ -2,18 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  ChatCircleDots,
-  ArrowRight,
-  UserSwitch,
-  Flag,
   Paperclip,
-  CheckSquare,
-  PencilSimple,
   Trash,
   DownloadSimple,
   X,
 } from "phosphor-react";
-import type { TaskActivity, ActivityType } from "@/lib/tasks/types";
+import type { TaskActivity } from "@/lib/tasks/types";
 import { deleteActivity, getAttachmentUrls } from "@/lib/tasks/actions";
 import { useRouter } from "next/navigation";
 import UserAvatar from "@/components/shared/UserAvatar";
@@ -22,26 +16,6 @@ interface Props {
   activities: TaskActivity[];
   userId: string;
 }
-
-const TYPE_ICONS: Record<ActivityType, React.ComponentType<{ size?: number; className?: string }>> = {
-  comment: ChatCircleDots,
-  status_change: ArrowRight,
-  assignee_change: UserSwitch,
-  priority_change: Flag,
-  attachment: Paperclip,
-  checklist: CheckSquare,
-  edit: PencilSimple,
-};
-
-const TYPE_COLORS: Record<ActivityType, string> = {
-  comment: "bg-indigo-100 text-indigo-600",
-  status_change: "bg-amber-100 text-amber-600",
-  assignee_change: "bg-purple-100 text-purple-600",
-  priority_change: "bg-red-100 text-red-600",
-  attachment: "bg-blue-100 text-blue-600",
-  checklist: "bg-emerald-100 text-emerald-600",
-  edit: "bg-slate-100 text-slate-600",
-};
 
 function formatTimeAgo(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
@@ -286,14 +260,14 @@ export default function TaskActivityTimeline({ activities, userId }: Props) {
 
   // 렌더용 URL 맵 — 만료 체크는 useEffect 에서 처리하므로 렌더는 순수하게 노출만
   // 의존성 activities/version 은 외부 Map 변경을 반영하기 위한 의도적 트리거
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const urlCache = useMemo(() => {
+    void version;
     const out: Record<string, string> = {};
     for (const [path, entry] of attachmentUrlCache) {
       out[path] = entry.url;
     }
     return out;
-  }, [activities, version]);
+  }, [version]);
 
   const handleDelete = async (activityId: string) => {
     try {

@@ -22,7 +22,6 @@ import { getErrorMessage } from "@/lib/utils/errors";
 import type { AttendanceRecord } from "@/lib/attendance/types";
 
 interface CheckInOutCardProps {
-  userId: string;
   todayRecord: AttendanceRecord | null;
   allowedIp: string | null;
 }
@@ -43,7 +42,7 @@ async function verifyIpQuick(allowedIp: string | null): Promise<boolean> {
   }
 }
 
-export default function CheckInOutCard({ userId, todayRecord, allowedIp }: CheckInOutCardProps) {
+export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCardProps) {
   const router = useRouter();
   const [status, setStatus] = useState(todayRecord?.status ?? ABSENT_STATUS);
   const [checkInTime, setCheckInTime] = useState(todayRecord?.check_in ?? null);

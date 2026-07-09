@@ -138,7 +138,7 @@ export default function ChannelSettingsDrawer({
         onChannelUpdated({ ...channel, members: full.members, member_count: full.member_count });
       }
     }).catch(() => {});
-  }, [open, channel.id]);
+  }, [open, channel, onChannelUpdated]);
 
   useEffect(() => {
     if (!open) return;

@@ -13,10 +13,10 @@ const nextConfig: NextConfig = {
     // 클라이언트 라우터 캐시 — 방문했던 페이지를 짧은 시간 재사용
     //   dynamic: prefetch={false} 이거나 fully dynamic 한 페이지용 (기본 0초 → 사실상 캐시 없음)
     //   static: prefetch={true} 거나 정적 페이지용 (기본 5분)
-    // 30초/3분으로 둬서 메뉴 빠르게 왔다갔다 할 때 즉시 전환 효과
+    // 3분/10분으로 둬서 메뉴를 빠르게 오갈 때 RSC payload를 재사용
     staleTimes: {
-      dynamic: 30,
-      static: 180,
+      dynamic: 180,
+      static: 600,
     },
   },
   async headers() {

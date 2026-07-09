@@ -7,6 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "dev": "cd jdi-portal && npm run dev",
     "build": "cd jdi-portal && npm ci && npm run build",
     "start": "cd jdi-portal && npm start"
   }

@@ -33,7 +33,7 @@ export default function CheckInOutTab({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CheckInOutCard userId={userId} todayRecord={todayRecord} allowedIp={allowedIp} />
+        <CheckInOutCard todayRecord={todayRecord} allowedIp={allowedIp} />
         <WeekSummaryCard weekRecords={weekRecords} weekStart={weekStart} workSchedules={workSchedules} />
       </div>
       <WorkScheduleCard

@@ -31,12 +31,12 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
     if (now - lastFetchRef.current < FETCH_DEDUP_MS) return;
     lastFetchRef.current = now;
     try {
-      const count = await getTotalUnreadCount(createClient(), userId);
+      const count = await getTotalUnreadCount(createClient());
       onUnreadChange(count);
     } catch {
       // Badge count is non-critical.
     }
-  }, [userId, onUnreadChange]);
+  }, [onUnreadChange]);
 
   const loadMemberships = useCallback(async () => {
     try {

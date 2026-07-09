@@ -13,6 +13,10 @@ const inter = Inter({
 const APP_NAME = "JDI 포털";
 const APP_DESCRIPTION = "JDICOMPANY 내부 시스템 포털";
 
+const SUPABASE_ORIGIN = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
+  : null;
+
 export const metadata: Metadata = {
   applicationName: APP_NAME,
   title: {
@@ -56,6 +60,12 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+        {SUPABASE_ORIGIN && (
+          <>
+            <link rel="preconnect" href={SUPABASE_ORIGIN} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={SUPABASE_ORIGIN} />
+          </>
+        )}
         <link
           rel="stylesheet"
           as="style"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import CaretLeft from "phosphor-react/dist/icons/CaretLeft.esm.js";
 import CaretRight from "phosphor-react/dist/icons/CaretRight.esm.js";
@@ -26,6 +26,7 @@ interface Props {
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MAX_VISIBLE_CHIPS = 3;
 const MOBILE_MAX_DOTS = 6;
+const EMPTY_OVERRIDES = new Map<string, string>();
 
 const MILESTONE_DOT_BG: Record<MilestoneKind, string> = {
   dm: "bg-blue-400",
@@ -46,16 +47,35 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
   const today = kstTodayStr();
   const [year, setYear] = useState(() => Number(today.slice(0, 4)));
   const [month, setMonth] = useState(() => Number(today.slice(5, 7)));
+  const campaignsKey = useMemo(
+    () =>
+      campaigns
+        .map((c) =>
+          [
+            c.id,
+            c.contact_date,
+            c.contract_date,
+            c.ship_date,
+            c.content_deadline,
+            c.expected_post_date,
+          ].join(":"),
+        )
+        .join("|"),
+    [campaigns],
+  );
 
   // 드래그 진행 중 optimistic 오버라이드: `${campaignId}|${kind}` → 새 날짜
-  const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
+  const [overrideState, setOverrideState] = useState<{ key: string; values: Map<string, string> }>(
+    () => ({ key: "", values: new Map() }),
+  );
+  const overrides = overrideState.key === campaignsKey ? overrideState.values : EMPTY_OVERRIDES;
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
   // 서버에서 campaigns prop이 새로 내려오면 오버라이드는 모두 확정/무의미하므로 초기화
-  useEffect(() => {
-    setOverrides((prev) => (prev.size === 0 ? prev : new Map()));
-  }, [campaigns]);
+  // Overrides are ignored automatically when campaignsKey changes.
+    // Overrides are ignored automatically when campaignsKey changes.
+  // Campaign updates naturally invalidate overrideState via campaignsKey.
 
   // 오버라이드 적용된 campaigns
   const effectiveCampaigns = useMemo(() => {
@@ -94,20 +114,20 @@ export default function SeedingCalendar({ campaigns, onDateSelect, selectedDate,
   async function handleDrop(campaignId: string, kind: MilestoneKind, fromDate: string, toDate: string) {
     if (fromDate === toDate) return;
     const key = `${campaignId}|${kind}`;
-    setOverrides((prev) => {
-      const next = new Map(prev);
+    setOverrideState((prev) => {
+      const next = new Map(prev.key === campaignsKey ? prev.values : EMPTY_OVERRIDES);
       next.set(key, toDate);
-      return next;
+      return { key: campaignsKey, values: next };
     });
     try {
       await updateCampaignMilestoneDate(campaignId, kind, toDate);
       toast.success("일정 날짜가 변경되었습니다.");
       onRefresh?.();
     } catch {
-      setOverrides((prev) => {
-        const next = new Map(prev);
+      setOverrideState((prev) => {
+        const next = new Map(prev.key === campaignsKey ? prev.values : EMPTY_OVERRIDES);
         next.delete(key);
-        return next;
+        return { key: campaignsKey, values: next };
       });
       toast.error("날짜 변경에 실패했습니다.");
     }

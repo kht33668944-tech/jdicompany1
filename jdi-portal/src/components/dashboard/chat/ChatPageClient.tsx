@@ -6,12 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import { getMessages as fetchMessages, getChannelById } from "@/lib/chat/queries";
 import { ensureMemoChannel, markAsRead, getAllProfiles } from "@/lib/chat/actions";
 import { openOrCreateDm } from "@/lib/chat/dm";
-import { parseFileContent } from "@/lib/chat/utils";
+import { getFilePreviewPath, parseFileContent } from "@/lib/chat/utils";
 import {
   getCachedMessages,
   cacheMessages,
   upsertCachedMessage,
 } from "@/lib/chat/messageCache";
+import { buildApprovedProfileMap, type ChatProfileSummary } from "@/lib/chat/profileLookup";
 import { showDesktopNotification } from "@/lib/notifications/desktop";
 import type { ChannelWithDetails, Message, Channel, ApprovedProfile } from "@/lib/chat/types";
 import ChannelList from "./ChannelList";
@@ -67,6 +68,7 @@ function ChatPageClientInner({
   const [favoriteChannels, setFavoriteChannels] = useState<Set<string>>(new Set());
   const [people, setPeople] = useState<ApprovedProfile[]>(initialPeople ?? []);
   const [pendingDmForPartner, setPendingDmForPartner] = useState<string | null>(null);
+  const selectedChannelId = selectedChannel?.id ?? null;
   // 온라인 = 오늘(KST) 근무중(출근했고 아직 퇴근하지 않은) 직원
   const onlineUsers = useWorkingUsers();
   // 현재 선택된 채널의 멤버 ID 셋 — 채널별 온라인 인원 계산용
@@ -75,6 +77,9 @@ function ChatPageClientInner({
   const selectedChannelRef = useRef(selectedChannel);
   const mutedChannelsRef = useRef(mutedChannels);
   const channelsRef = useRef(channels);
+  const profileCacheRef = useRef<Map<string, ChatProfileSummary>>(
+    buildApprovedProfileMap(initialPeople ?? [])
+  );
   // 채널별 메시지 캐시 — 채널 전환 시 즉시 표시용 (SSR 초기 메시지로 시드)
   const messagesCacheRef = useRef<Map<string, Message[]>>(
     new Map(initialChannel && initialMessages ? [[initialChannel.id, initialMessages]] : [])
@@ -84,6 +89,9 @@ function ChatPageClientInner({
   useEffect(() => { selectedChannelRef.current = selectedChannel; }, [selectedChannel]);
   useEffect(() => { mutedChannelsRef.current = mutedChannels; }, [mutedChannels]);
   useEffect(() => { channelsRef.current = channels; }, [channels]);
+  useEffect(() => {
+    profileCacheRef.current = buildApprovedProfileMap(people);
+  }, [people]);
 
   // 파일/이미지 메시지의 서명 URL을 batch 로 미리 요청
   // - 메시지 목록 변경 시 누락된 path 만 추출해 단일 createSignedUrls 호출
@@ -95,7 +103,8 @@ function ChatPageClientInner({
       if (m.is_deleted) continue;
       if (m.type !== "image" && m.type !== "file") continue;
       const file = parseFileContent(m.content);
-      if (file?.path) paths.push(file.path);
+      const previewPath = getFilePreviewPath(file);
+      if (previewPath) paths.push(previewPath);
     }
     if (paths.length > 0) ensureFileUrls(paths);
   }, [messages, ensureFileUrls]);
@@ -129,27 +138,24 @@ function ChatPageClientInner({
 
   // 선택된 채널이 바뀔 때마다 멤버 목록 fetch (초기 진입/외부 라우팅 포함)
   useEffect(() => {
-    if (!selectedChannel) return;
+    if (!selectedChannelId) {
+      setSelectedChannelMemberIds(new Set());
+      return;
+    }
     let cancelled = false;
     const supabase = createClient();
     supabase
       .from("channel_members")
       .select("user_id")
-      .eq("channel_id", selectedChannel.id)
+      .eq("channel_id", selectedChannelId)
       .then(({ data }) => {
         if (cancelled) return;
         setSelectedChannelMemberIds(new Set((data ?? []).map((m) => m.user_id as string)));
       });
     return () => { cancelled = true; };
-  }, [selectedChannel?.id]);
+  }, [selectedChannelId]);
 
   // 선택 해제 시 멤버 목록 비우기 (event 처리에서 직접 호출하는 게 맞지만 안전망)
-  useEffect(() => {
-    if (selectedChannel) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedChannelMemberIds(new Set());
-  }, [selectedChannel]);
-
   // DM별 안읽은 수를 상대방 id → count 로 매핑 (직원 목록 뱃지에 사용)
   const dmUnreadByPartner = useMemo(() => {
     const map = new Map<string, number>();
@@ -164,7 +170,6 @@ function ChatPageClientInner({
   const selectedDmPartnerId = selectedChannel?.type === "dm"
     ? selectedChannel.dm_partner_id ?? null
     : null;
-
   // 현재 채널 멤버 중 온라인인 사람 수 (전체 온라인 X)
   const channelOnlineCount = useMemo(() => {
     if (selectedChannelMemberIds.size === 0) return 0;
@@ -239,12 +244,20 @@ function ChatPageClientInner({
 
           // 발신자 프로필 lazy fetch (목록 미리보기에 필요)
           if (fullMsg.user_id !== userId) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("full_name, avatar_url")
-              .eq("id", fullMsg.user_id)
-              .single();
-            if (profile) fullMsg.user_profile = profile;
+            const cachedProfile = profileCacheRef.current.get(fullMsg.user_id);
+            if (cachedProfile) {
+              fullMsg.user_profile = cachedProfile;
+            } else {
+              const { data: profile } = await supabase
+                .from("profiles")
+                .select("full_name, avatar_url")
+                .eq("id", fullMsg.user_id)
+                .single();
+              if (profile) {
+                fullMsg.user_profile = profile;
+                profileCacheRef.current.set(fullMsg.user_id, profile);
+              }
+            }
           }
 
           const currentSelected = selectedChannelRef.current;

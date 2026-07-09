@@ -2,10 +2,10 @@
 
 import { useRef, useEffect, useState, useMemo } from "react";
 import Image from "next/image";
-import type { Message, ChannelWithDetails } from "@/lib/chat/types";
-import { groupMessagesByDate, formatDateDivider, formatMessageTime, parseFileContent } from "@/lib/chat/utils";
-import { getChatFileUrl } from "@/lib/chat/actions";
-import { useChatFileUrls } from "./ChatFileUrlsContext";
+import type { Message, ChannelWithDetails, MessageReaction } from "@/lib/chat/types";
+import { groupMessagesByDate, formatDateDivider, formatMessageTime, getFilePreviewPath, parseFileContent } from "@/lib/chat/utils";
+import { getReactionsForMessages } from "@/lib/chat/actions";
+import { useChatFileUrl } from "./ChatFileUrlsContext";
 import MessageItem from "./MessageItem";
 import EmptyState from "./EmptyState";
 
@@ -45,32 +45,11 @@ function groupConsecutiveImages(messages: Message[]): MessageChunk[] {
 
 // --- GridImage: loads signed URL for a single image in the group grid ---
 
-function GridImage({ storagePath, fileName }: { storagePath: string; fileName: string }) {
-  const { urls: batchUrls } = useChatFileUrls();
-  const batched = batchUrls[storagePath];
-  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+function GridImage({ storagePath, previewPath, fileName }: { storagePath: string; previewPath: string; fileName: string }) {
+  const previewUrl = useChatFileUrl(previewPath);
+  const originalUrl = useChatFileUrl(storagePath);
 
-  // batch 에서 받지 못한 경우에만 개별 요청 (실시간 신규 파일 등 edge case)
-  useEffect(() => {
-    if (batched) return;
-    let cancelled = false;
-    getChatFileUrl(storagePath)
-      .then((u) => { if (!cancelled) setFallbackUrl(u); })
-      .catch(() => { if (!cancelled) setError(true); });
-    return () => { cancelled = true; };
-  }, [storagePath, batched]);
-
-  const url = batched ?? fallbackUrl;
-
-  if (error) {
-    return (
-      <div className="w-full h-28 bg-red-50 rounded-xl flex items-center justify-center text-[10px] text-red-400">
-        오류
-      </div>
-    );
-  }
-  if (!url) {
+  if (!previewUrl) {
     return (
       <div className="w-full h-28 bg-slate-100 rounded-xl animate-pulse flex items-center justify-center">
         <span className="text-[10px] text-slate-400">로딩 중...</span>
@@ -78,10 +57,12 @@ function GridImage({ storagePath, fileName }: { storagePath: string; fileName: s
     );
   }
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+    <a href={originalUrl ?? previewUrl} target="_blank" rel="noopener noreferrer" className="block">
       <img
-        src={url}
+        src={previewUrl}
         alt={fileName}
+        loading="lazy"
+        decoding="async"
         className="w-full h-28 rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
       />
     </a>
@@ -109,7 +90,8 @@ function ImageGroupRenderer({ chunk, isOwn }: { chunk: Extract<MessageChunk, { t
             {chunk.messages.map((msg) => {
               const file = parseFileContent(msg.content);
               if (!file) return null;
-              return <GridImage key={msg.id} storagePath={file.path} fileName={file.name} />;
+              const previewPath = getFilePreviewPath(file) ?? file.path;
+              return <GridImage key={msg.id} storagePath={file.path} previewPath={previewPath} fileName={file.name} />;
             })}
           </div>
         </div>
@@ -141,7 +123,8 @@ function ImageGroupRenderer({ chunk, isOwn }: { chunk: Extract<MessageChunk, { t
           {chunk.messages.map((msg) => {
             const file = parseFileContent(msg.content);
             if (!file) return null;
-            return <GridImage key={msg.id} storagePath={file.path} fileName={file.name} />;
+            const previewPath = getFilePreviewPath(file) ?? file.path;
+            return <GridImage key={msg.id} storagePath={file.path} previewPath={previewPath} fileName={file.name} />;
           })}
         </div>
       </div>
@@ -206,6 +189,32 @@ export default function MessageList({
   const isNearBottom = useRef(true);
   const prevChannelId = useRef(channel.id);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [reactionsByMessage, setReactionsByMessage] = useState<Record<string, MessageReaction[]>>({});
+  const requestedReactionIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const missing = messages
+      .filter((m) => !m.is_deleted && !requestedReactionIds.current.has(m.id))
+      .map((m) => m.id);
+    if (missing.length === 0) return;
+
+    for (const id of missing) requestedReactionIds.current.add(id);
+    let cancelled = false;
+    getReactionsForMessages(missing, userId)
+      .then((map) => {
+        if (cancelled) return;
+        setReactionsByMessage((prev) => ({ ...prev, ...map }));
+      })
+      .catch(() => {
+        for (const id of missing) requestedReactionIds.current.delete(id);
+      });
+    return () => { cancelled = true; };
+  }, [messages, userId]);
+
+  const handleReactionsChange = (messageId: string, reactions: MessageReaction[]) => {
+    requestedReactionIds.current.add(messageId);
+    setReactionsByMessage((prev) => ({ ...prev, [messageId]: reactions }));
+  };
 
   // 채널 전환 시 스크롤 상태 리셋 + 하단으로 이동
   useEffect(() => {
@@ -305,6 +314,8 @@ export default function MessageList({
                   isOwn={chunk.message.user_id === userId}
                   userId={userId}
                   parentMessage={chunk.message.parent_message_id ? messagesById.get(chunk.message.parent_message_id) ?? null : null}
+                  reactions={reactionsByMessage[chunk.message.id] ?? []}
+                  onReactionsChange={handleReactionsChange}
                   onEdit={onEditMessage}
                   onDelete={onDeleteMessage}
                   onReply={onReplyMessage}

@@ -27,9 +27,12 @@ export default function TodayScheduleWidget({ schedules }: Props) {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    setNow(new Date());
+    const frame = requestAnimationFrame(() => setNow(new Date()));
     const timer = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(timer);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearInterval(timer);
+    };
   }, []);
 
   return (

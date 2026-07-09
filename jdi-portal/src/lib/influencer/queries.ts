@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { calcDeltaPct, mapKpiRpcResult, type KpiRpcResult } from "./kpi";
 import type {
   CampaignBasic,
   CampaignStatus,
@@ -99,11 +100,6 @@ export async function getActiveCampaigns(): Promise<InfluencerCampaignWithInflue
   return (data as unknown as InfluencerCampaignWithInfluencer[]) ?? [];
 }
 
-function calcDeltaPct(current: number | null, prev: number | null): number | null {
-  if (current === null || prev === null || prev === 0) return null;
-  return ((current - prev) / Math.abs(prev)) * 100;
-}
-
 export async function getAllCampaignsBasic(): Promise<CampaignBasic[]> {
   const supabase = await createClient();
 
@@ -119,6 +115,11 @@ export async function getAllCampaignsBasic(): Promise<CampaignBasic[]> {
 
 export async function getKpiCards(): Promise<KpiCards> {
   const supabase = await createClient();
+
+  const rpcResult = await supabase.rpc("get_influencer_kpi_cards");
+  if (!rpcResult.error && rpcResult.data) {
+    return mapKpiRpcResult(rpcResult.data as KpiRpcResult);
+  }
 
   const [totalRes, campaignRes, snapshotRes] = await Promise.all([
     supabase

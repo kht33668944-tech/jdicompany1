@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   X,
   Image as ImageIcon,
@@ -13,8 +13,10 @@ import {
   ArrowRight,
 } from "phosphor-react";
 import { toast } from "sonner";
-import { getDrawerItems, getChatFileUrl, type DrawerItem } from "@/lib/chat/actions";
+import { getDrawerItems, type DrawerItem } from "@/lib/chat/actions";
+import { buildItemUrlMap, collectFileUrlRequests } from "@/lib/chat/fileUrlBatch";
 import { formatFileSize, parseFileContent } from "@/lib/chat/utils";
+import { useChatFileUrls } from "./ChatFileUrlsContext";
 
 type Tab = "images" | "files" | "links";
 
@@ -133,27 +135,16 @@ function DrawerImageItem({
   selected,
   onToggleSelect,
   onView,
-  onUrlReady,
+  url,
 }: {
   item: DrawerItem;
   selecting: boolean;
   selected: boolean;
   onToggleSelect: () => void;
   onView: () => void;
-  onUrlReady: (id: string, url: string) => void;
+  url?: string;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
   const fileData = parseFileContent(item.content);
-
-  useEffect(() => {
-    if (!fileData) return;
-    getChatFileUrl(fileData.path).then((u) => {
-      if (u) {
-        setUrl(u);
-        onUrlReady(item.id, u);
-      }
-    }).catch(() => {});
-  }, [item.id]);
 
   if (!url) {
     return <div className="aspect-square bg-slate-100 rounded-xl animate-pulse" />;
@@ -161,7 +152,13 @@ function DrawerImageItem({
 
   return (
     <div className="relative group cursor-pointer" onClick={selecting ? onToggleSelect : onView}>
-      <img src={url} alt={fileData?.name ?? ""} className="aspect-square object-cover rounded-xl w-full" />
+      <img
+        src={url}
+        alt={fileData?.name ?? ""}
+        loading="lazy"
+        decoding="async"
+        className="aspect-square object-cover rounded-xl w-full"
+      />
       {/* Hover overlay */}
       <div className={`absolute inset-0 rounded-xl transition-all ${
         selected ? "bg-blue-600/20 ring-2 ring-blue-500" : "group-hover:bg-black/10"
@@ -199,6 +196,7 @@ const TABS: { key: Tab; label: string; icon: typeof ImageIcon }[] = [
 // 메인 서랍 컴포넌트
 // ============================================
 export default function ChatDrawer({ open, channelId, channelName, onClose }: ChatDrawerProps) {
+  const { urls: fileUrls, ensure: ensureFileUrls } = useChatFileUrls();
   const [tab, setTab] = useState<Tab>("images");
   const [items, setItems] = useState<DrawerItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -209,7 +207,6 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
 
   // 이미지 뷰어 — id 기반으로 추적 (이전: 인덱스 기반 → URL 미준비 이미지가 섞이면 인덱스 mismatch)
   const [viewerImageId, setViewerImageId] = useState<string | null>(null);
-  const [urlMap, setUrlMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (!open) return;
@@ -234,13 +231,17 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
     return () => document.removeEventListener("keydown", handle);
   }, [open, onClose]);
 
-  const handleUrlReady = useCallback((id: string, url: string) => {
-    setUrlMap((prev) => {
-      const next = new Map(prev);
-      next.set(id, url);
-      return next;
-    });
-  }, []);
+  const fileUrlRequests = useMemo(() => collectFileUrlRequests(items), [items]);
+
+  useEffect(() => {
+    if (!open || tab === "links") return;
+    ensureFileUrls(fileUrlRequests.paths);
+  }, [ensureFileUrls, fileUrlRequests.paths, open, tab]);
+
+  const urlMap = useMemo(
+    () => buildItemUrlMap(fileUrlRequests.itemPaths, fileUrls),
+    [fileUrlRequests.itemPaths, fileUrls]
+  );
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -417,7 +418,7 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
                           selected={selectedIds.has(item.id)}
                           onToggleSelect={() => toggleSelect(item.id)}
                           onView={() => setViewerImageId(item.id)}
-                          onUrlReady={handleUrlReady}
+                          url={urlMap.get(item.id)}
                         />
                       ))}
                     </div>
@@ -434,7 +435,7 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
                       {group.items.map((item) => {
                         const fileData = parseFileContent(item.content);
                         return (
-                          <FileItem key={item.id} item={item} fileData={fileData} />
+                          <FileItem key={item.id} item={item} fileData={fileData} url={urlMap.get(item.id)} />
                         );
                       })}
                     </div>
@@ -493,14 +494,15 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
 // ============================================
 // 파일 아이템 (서랍용)
 // ============================================
-function FileItem({ item, fileData }: { item: DrawerItem; fileData: { path: string; name: string; size: number; type: string } | null }) {
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!fileData) return;
-    getChatFileUrl(fileData.path).then(setUrl).catch(() => {});
-  }, [item.id]);
-
+function FileItem({
+  item,
+  fileData,
+  url,
+}: {
+  item: DrawerItem;
+  fileData: { path: string; name: string; size: number; type: string } | null;
+  url?: string;
+}) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 rounded-xl transition-colors">
       <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">

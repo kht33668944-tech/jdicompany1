@@ -13,8 +13,6 @@ import {
   CheckSquare,
   Square,
   Plus,
-  CaretDown,
-  CaretUp,
 } from "phosphor-react";
 import type { TaskWithDetails, TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/tasks/types";
 import type { Profile } from "@/lib/attendance/types";

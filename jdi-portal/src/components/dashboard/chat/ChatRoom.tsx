@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { ChannelWithDetails, Message } from "@/lib/chat/types";
 import { sendMessage, editMessage, deleteMessage, markAsRead, uploadChatFile, pinMessage, unpinMessage, getPinnedMessages } from "@/lib/chat/actions";
-import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
+import { createImageThumbnail, resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import { isImageFile } from "@/lib/chat/utils";
 import { getMessages } from "@/lib/chat/queries";
 import { Paperclip } from "phosphor-react";
@@ -15,6 +15,7 @@ import MessageInput from "./MessageInput";
 import MessageSearch from "./MessageSearch";
 import ChatDrawer from "./ChatDrawer";
 import PinnedMessagesPanel from "./PinnedMessagesPanel";
+import { useChatFileUrls } from "./ChatFileUrlsContext";
 
 interface ChatRoomProps {
   channel: ChannelWithDetails;
@@ -50,6 +51,7 @@ export default function ChatRoom({
   const [dragging, setDragging] = useState(false);
   const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const { ensure: ensureFileUrls } = useChatFileUrls();
   const dragCountRef = useRef(0);
   const isFocused = useRef(true);
   const onMessagesUpdateRef = useRef(onMessagesUpdate);
@@ -220,7 +222,7 @@ export default function ChatRoom({
     return () => {
       supabase.removeChannel(sub);
     };
-  }, [channel.id]);
+  }, [channel.id, userId]);
 
   function broadcastTyping() {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -271,14 +273,25 @@ export default function ChatRoom({
 
   async function handleFileUpload(file: File) {
     try {
-      const processed = await resizeImageIfNeeded(file);
-      const result = await uploadChatFile(channel.id, processed);
+      const processed = await resizeImageIfNeeded(file, { maxDim: 1280, quality: 0.78 });
       const msgType = isImageFile(processed.type) ? "image" : "file";
+      const thumbnail = msgType === "image"
+        ? await createImageThumbnail(processed, { maxDim: 360, quality: 0.68 })
+        : null;
+
+      const [result, thumbnailResult] = await Promise.all([
+        uploadChatFile(channel.id, processed),
+        thumbnail ? uploadChatFile(channel.id, thumbnail) : Promise.resolve(null),
+      ]);
+      const thumbnailPath = thumbnailResult?.path;
+
+      ensureFileUrls(thumbnailPath ? [result.path, thumbnailPath] : [result.path]);
       const content = JSON.stringify({
         path: result.path,
         name: result.fileName,
         size: result.fileSize,
         type: result.fileType,
+        ...(thumbnailPath ? { thumbnailPath } : {}),
       });
       const sent = await sendMessage({ channelId: channel.id, content, type: msgType });
       const sentWithProfile: Message = {

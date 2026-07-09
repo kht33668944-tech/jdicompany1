@@ -8,29 +8,31 @@ import TodayScheduleWidget from "./widgets/TodayScheduleWidget";
 import RecentActivityWidget from "./widgets/RecentActivityWidget";
 
 interface Props {
-  userId: string;
   userName: string;
   initialData: DashboardData;
 }
 
-export default function DashboardClient({ userId, userName, initialData }: Props) {
+export default function DashboardClient({ userName, initialData }: Props) {
   const [data] = useState<DashboardData | null>(initialData);
   // 시간 기반 문자열은 서버(싱가포르)와 브라우저(한국)의 시각 차이로
   // hydration mismatch를 일으켜 전체 재렌더링을 유발 → 마운트 후에만 계산
   const [timeInfo, setTimeInfo] = useState<{ dateStr: string; greeting: string } | null>(null);
 
   useEffect(() => {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString("ko-KR", {
-      timeZone: "Asia/Seoul",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      weekday: "long",
+    const frame = requestAnimationFrame(() => {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString("ko-KR", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        weekday: "long",
+      });
+      const hour = now.getHours();
+      const greeting = hour < 12 ? "좋은 아침이에요" : hour < 18 ? "좋은 오후에요" : "수고하셨습니다";
+      setTimeInfo({ dateStr, greeting });
     });
-    const hour = now.getHours();
-    const greeting = hour < 12 ? "좋은 아침이에요" : hour < 18 ? "좋은 오후에요" : "수고하셨습니다";
-    setTimeInfo({ dateStr, greeting });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   const status = data?.todayRecord?.status ?? "미출근";
@@ -57,7 +59,6 @@ export default function DashboardClient({ userId, userName, initialData }: Props
 
       {/* 상단: 상태 카드 4칸 */}
       <QuickStatsWidget
-        userId={userId}
         attendanceStatus={status}
         checkInTime={data?.todayRecord?.check_in ?? null}
         checkOutTime={data?.todayRecord?.check_out ?? null}

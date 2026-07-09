@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { MemberPreview } from "@/lib/chat/types";
 
 const AVATAR_BG = [
@@ -29,9 +28,6 @@ export default function AvatarStack({
 }: AvatarStackProps) {
   // 하이드레이션 불일치 방지 — 아바타 URL/리스트는 외부 데이터 의존이라
   // SSR 결과와 클라이언트 첫 렌더가 달라질 수 있어 마운트 이후에만 렌더
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
   if (members.length === 0) return null;
   const visible = members.slice(0, max);
   const total = totalCount ?? members.length;

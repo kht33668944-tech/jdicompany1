@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getChatFileUrls } from "@/lib/chat/actions";
 
 /**
@@ -75,4 +75,15 @@ export function useChatFileUrls(): ChatFileUrlsContextValue {
   const ctx = useContext(ChatFileUrlsContext);
   if (ctx) return ctx;
   return { urls: {}, ensure: () => {} };
+}
+
+export function useChatFileUrl(path: string): string | null {
+  const { urls, ensure } = useChatFileUrls();
+
+  useEffect(() => {
+    if (!path) return;
+    ensure([path]);
+  }, [ensure, path]);
+
+  return urls[path] ?? null;
 }

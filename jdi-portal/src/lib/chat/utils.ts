@@ -1,14 +1,27 @@
 import type { Message } from "./types";
 
+export interface ChatFileContent {
+  path: string;
+  name: string;
+  size: number;
+  type: string;
+  thumbnailPath?: string;
+}
+
 /**
  * 파일/이미지 메시지 콘텐츠 파싱
  */
-export function parseFileContent(content: string): { path: string; name: string; size: number; type: string } | null {
+export function parseFileContent(content: string): ChatFileContent | null {
   try {
     const parsed = JSON.parse(content);
     if (parsed.path && parsed.name) return parsed;
   } catch { /* ignore */ }
   return null;
+}
+
+export function getFilePreviewPath(file: Pick<ChatFileContent, "path" | "thumbnailPath"> | null): string | null {
+  if (!file) return null;
+  return file.thumbnailPath || file.path;
 }
 
 function isSameDay(a: Date, b: Date): boolean {

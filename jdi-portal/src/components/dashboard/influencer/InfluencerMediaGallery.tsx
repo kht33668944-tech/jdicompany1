@@ -17,7 +17,7 @@ import Megaphone from "phosphor-react/dist/icons/Megaphone.esm.js";
 import Heart from "phosphor-react/dist/icons/Heart.esm.js";
 import ChatCircle from "phosphor-react/dist/icons/ChatCircle.esm.js";
 import Eye from "phosphor-react/dist/icons/Eye.esm.js";
-import Image from "phosphor-react/dist/icons/Image.esm.js";
+import ImageIcon from "phosphor-react/dist/icons/Image.esm.js";
 
 type MediaFilter = "all" | "photo" | "reel";
 type Sort = "recent" | "er" | "likes" | "views";
@@ -56,7 +56,7 @@ export default function InfluencerMediaGallery({
     onlySponsored: false,
   });
 
-  const allPosts = influencer.recent_posts ?? [];
+  const allPosts = useMemo(() => influencer.recent_posts ?? [], [influencer.recent_posts]);
 
   const visiblePosts = useMemo(() => {
     let list = allPosts;
@@ -151,7 +151,7 @@ export default function InfluencerMediaGallery({
         <FilterChip
           active={media === "photo"}
           onClick={() => setMedia("photo")}
-          icon={<Image size={11} weight="fill" />}
+          icon={<ImageIcon size={11} weight="fill" />}
           label="사진"
         />
         <FilterChip
@@ -246,7 +246,7 @@ function PostGridCell({
       {thumb ? (
         <NextImage
           src={thumb}
-          alt="게시물 썸네일"
+          alt={post.caption ? post.caption.slice(0, 80) : "게시물 썸네일"}
           fill
           sizes="(max-width: 1280px) 33vw, 25vw"
           className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"

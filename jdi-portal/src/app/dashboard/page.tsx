@@ -12,7 +12,6 @@ export default async function DashboardPage() {
 
   return (
     <DashboardClient
-      userId={auth.user.id}
       userName={userName}
       initialData={initialData}
     />
