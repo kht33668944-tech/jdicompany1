@@ -2,6 +2,7 @@
   "name": "jdicompany-monorepo",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@11.9.0",
   "description": "Root wrapper so Railpack detects Node and builds jdi-portal subdirectory",
   "engines": {
     "node": ">=22"
