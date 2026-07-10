@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, XCircle } from "phosphor-react";
 import { createTask } from "@/lib/tasks/actions";
@@ -13,18 +13,77 @@ import UserAvatar from "@/components/shared/UserAvatar";
 interface TaskCreateModalProps {
   userId: string;
   profiles: Profile[];
+  initialDueDate?: string;
+  title?: string;
+  selfOnly?: boolean;
+  draftKey?: string;
   onClose: () => void;
   onCreated?: () => void;
 }
 
-export default function TaskCreateModal({ userId, profiles, onClose, onCreated }: TaskCreateModalProps) {
+interface TaskCreateDraft {
+  title: string;
+  description: string;
+  dueDate: string;
+}
+
+export default function TaskCreateModal({
+  userId,
+  profiles,
+  initialDueDate = "",
+  title: modalTitle = "할 일 추가",
+  selfOnly = false,
+  draftKey,
+  onClose,
+  onCreated,
+}: TaskCreateModalProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(initialDueDate);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([userId]);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(!draftKey);
+
+  useEffect(() => {
+    if (!draftKey) return;
+
+    try {
+      const savedDraft = window.localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft) as Partial<TaskCreateDraft>;
+        setTitle(typeof draft.title === "string" ? draft.title : "");
+        setDescription(typeof draft.description === "string" ? draft.description : "");
+        setDueDate(typeof draft.dueDate === "string" ? draft.dueDate : initialDueDate);
+      }
+    } catch {
+      // localStorage를 사용할 수 없어도 업무 작성은 계속 허용한다.
+    } finally {
+      setDraftReady(true);
+    }
+  }, [draftKey, initialDueDate]);
+
+  useEffect(() => {
+    if (!draftKey || !draftReady) return;
+
+    const timer = window.setTimeout(() => {
+      try {
+        const hasDraft = Boolean(title.trim() || description.trim() || dueDate !== initialDueDate);
+        if (!hasDraft) {
+          window.localStorage.removeItem(draftKey);
+          return;
+        }
+
+        const draft: TaskCreateDraft = { title, description, dueDate };
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {
+        // 저장 공간 오류가 업무 작성 자체를 막지 않도록 한다.
+      }
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [description, draftKey, draftReady, dueDate, initialDueDate, title]);
 
   const addAssignee = (id: string) => {
     if (id && !assigneeIds.includes(id)) {
@@ -47,8 +106,15 @@ export default function TaskCreateModal({ userId, profiles, onClose, onCreated }
         title: title.trim(),
         description: description.trim() || undefined,
         dueDate: dueDate || undefined,
-        assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
+        assigneeIds: selfOnly ? [userId] : assigneeIds.length > 0 ? assigneeIds : undefined,
       });
+      if (draftKey) {
+        try {
+          window.localStorage.removeItem(draftKey);
+        } catch {
+          // 생성은 완료되었으므로 저장 공간 오류는 무시한다.
+        }
+      }
       if (onCreated) {
         onCreated();
       } else {
@@ -65,7 +131,7 @@ export default function TaskCreateModal({ userId, profiles, onClose, onCreated }
   return (
     <ModalContainer onClose={onClose}>
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-bold text-slate-800">할 일 추가</h3>
+        <h3 className="text-lg font-bold text-slate-800">{modalTitle}</h3>
         <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
           <X size={20} />
         </button>
@@ -112,7 +178,7 @@ export default function TaskCreateModal({ userId, profiles, onClose, onCreated }
           />
         </div>
 
-        <div>
+        {!selfOnly && <div>
           <label className="mb-1 block text-sm font-semibold text-slate-700">담당자</label>
           <div className="mb-2 flex flex-wrap gap-2">
             {assigneeIds.map((id) => {
@@ -152,7 +218,7 @@ export default function TaskCreateModal({ userId, profiles, onClose, onCreated }
                 </option>
               ))}
           </select>
-        </div>
+        </div>}
 
         <button
           type="submit"

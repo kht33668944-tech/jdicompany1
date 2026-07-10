@@ -5,11 +5,13 @@ import WeekSummaryCard from "../WeekSummaryCard";
 import WorkScheduleCard from "../WorkScheduleCard";
 import type {
   AttendanceRecord,
+  Profile,
   WorkSchedule,
   WorkScheduleChangeRequest,
 } from "@/lib/attendance/types";
 
 interface CheckInOutTabProps {
+  profile: Profile;
   userId: string;
   isAdmin: boolean;
   todayRecord: AttendanceRecord | null;
@@ -21,6 +23,7 @@ interface CheckInOutTabProps {
 }
 
 export default function CheckInOutTab({
+  profile,
   userId,
   isAdmin,
   todayRecord,
@@ -33,7 +36,12 @@ export default function CheckInOutTab({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CheckInOutCard todayRecord={todayRecord} allowedIp={allowedIp} />
+        <CheckInOutCard
+          userId={userId}
+          profile={profile}
+          todayRecord={todayRecord}
+          allowedIp={allowedIp}
+        />
         <WeekSummaryCard weekRecords={weekRecords} weekStart={weekStart} workSchedules={workSchedules} />
       </div>
       <WorkScheduleCard

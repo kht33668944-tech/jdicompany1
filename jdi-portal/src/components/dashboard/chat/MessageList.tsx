@@ -58,11 +58,12 @@ function GridImage({ storagePath, previewPath, fileName }: { storagePath: string
   }
   return (
     <a href={originalUrl ?? previewUrl} target="_blank" rel="noopener noreferrer" className="block">
-      <img
+      <Image
         src={previewUrl}
         alt={fileName}
-        loading="lazy"
-        decoding="async"
+        width={320}
+        height={112}
+        unoptimized
         className="w-full h-28 rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
       />
     </a>

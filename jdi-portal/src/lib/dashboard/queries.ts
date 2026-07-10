@@ -4,7 +4,7 @@ import type { TaskWithDetails } from "@/lib/tasks/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import { toDateString, getWeekRange, addDays } from "@/lib/utils/date";
 import { getAllProfiles, getAllTodayAttendance, getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
-import { getMyTasksWithDetails, getTasksWithDetails } from "@/lib/tasks/queries";
+import { getTasksWithDetails } from "@/lib/tasks/queries";
 import { getTodaySchedules } from "@/lib/schedule/queries";
 import { sortTasks } from "@/lib/tasks/utils";
 
@@ -49,7 +49,7 @@ export async function getDashboardData(
   const [todayRecord, weekRecords, allTasks, todaySchedules] = await Promise.all([
     getTodayRecord(supabase, userId),
     getWeekRecords(supabase, userId, weekStart, weekEnd),
-    canViewCompanyWork ? getTasksWithDetails(supabase) : getMyTasksWithDetails(supabase, userId, true, 7),
+    getTasksWithDetails(supabase),
     getTodaySchedules(supabase, today),
   ]);
 

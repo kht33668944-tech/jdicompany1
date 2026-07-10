@@ -3,17 +3,35 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { CalendarBlank, CheckSquare, Clock, DotsSixVertical, Square, Trash } from "phosphor-react";
+import {
+  CalendarBlank,
+  CheckCircle,
+  CheckSquare,
+  Clock,
+  DotsSixVertical,
+  Plus,
+  ShareNetwork,
+  SpinnerGap,
+  Square,
+  Trash,
+} from "phosphor-react";
+import { toast } from "sonner";
 import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import type { TaskStatus, TaskWithDetails } from "@/lib/tasks/types";
 import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
-import { formatDueDate, isOverdue } from "@/lib/tasks/utils";
+import { formatDueDate, isOverdue, isTaskCompletedOn } from "@/lib/tasks/utils";
 import { deleteTask, moveTask, updateTask } from "@/lib/tasks/actions";
-import { formatTime, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
+import { formatTime, toDateString } from "@/lib/utils/date";
 import UserAvatar from "@/components/shared/UserAvatar";
+import TaskCreateModal from "@/components/dashboard/tasks/TaskCreateModal";
+import TaskDetailPanel from "@/components/dashboard/tasks/TaskDetailPanel";
+import WorkTimelineCreateModal from "@/components/dashboard/work-timeline/WorkTimelineCreateModal";
+import { getTaskTimelineShare } from "@/lib/work-timeline/actions";
+import type { WorkTimelineTaskShareState } from "@/lib/work-timeline/types";
 
 interface Props {
+  userId: string;
   profiles: Profile[];
   attendanceRecords: AttendanceRecord[];
   tasks: TaskWithDetails[];
@@ -72,11 +90,11 @@ function isTodayWorkTask(task: TaskWithDetails, today: string): boolean {
   if (task.status === "완료") return false;
   if (task.due_date && task.due_date <= today) return true;
   if (task.start_date && task.start_date <= today) return true;
-  return toDateStringFromTimestamp(task.created_at) === today;
+  return !task.due_date && !task.start_date;
 }
 
 function isCompletedToday(task: TaskWithDetails, today: string): boolean {
-  return task.status === "완료" && toDateStringFromTimestamp(task.updated_at) === today;
+  return isTaskCompletedOn(task, today);
 }
 
 function getScheduleTimeText(schedule: ScheduleWithProfile): string {
@@ -107,7 +125,98 @@ function getTaskOwnerLabel(task: TaskWithDetails): string {
   return `${task.assignees[0].full_name} 외 ${task.assignees.length - 1}명`;
 }
 
+function CompletedTaskTimelineAction({
+  task,
+  currentUserId,
+}: {
+  task: TaskWithDetails;
+  currentUserId: string;
+}) {
+  const router = useRouter();
+  const [shareState, setShareState] = useState<WorkTimelineTaskShareState | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+
+  const openShare = async () => {
+    if (shareState?.existingEntryId) {
+      router.push(`/dashboard/work-timeline/${shareState.existingEntryId}`);
+      return;
+    }
+    if (shareState?.canShare && shareState.task) {
+      setShowCreate(true);
+      return;
+    }
+
+    setChecking(true);
+    try {
+      const nextState = await getTaskTimelineShare(task.id);
+      setShareState(nextState);
+      if (nextState.existingEntryId) {
+        router.push(`/dashboard/work-timeline/${nextState.existingEntryId}`);
+      } else if (nextState.canShare && nextState.task) {
+        setShowCreate(true);
+      } else {
+        toast.error("이 업무는 타임라인에 공유할 수 없습니다.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "공유 상태를 확인하지 못했습니다.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const isShared = Boolean(shareState?.existingEntryId);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={openShare}
+        disabled={checking}
+        title={isShared ? "공유된 타임라인 업무 보기" : "타임라인에 공유"}
+        aria-label={isShared ? `${task.title} 공유된 타임라인 업무 보기` : `${task.title} 타임라인에 공유`}
+        className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-wait ${
+          isShared
+            ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+            : "text-slate-300 hover:bg-indigo-50 hover:text-indigo-600"
+        }`}
+      >
+        {checking ? (
+          <SpinnerGap size={17} className="animate-spin" aria-hidden="true" />
+        ) : isShared ? (
+          <CheckCircle size={17} weight="fill" aria-hidden="true" />
+        ) : (
+          <ShareNetwork size={17} weight="bold" aria-hidden="true" />
+        )}
+      </button>
+
+      {showCreate && shareState?.task && (
+        <WorkTimelineCreateModal
+          open
+          currentUserId={currentUserId}
+          onClose={() => setShowCreate(false)}
+          onCreated={(entryId) => {
+            setShareState((current) => current ? {
+              ...current,
+              canShare: false,
+              existingEntryId: entryId,
+              reason: "already_shared",
+            } : current);
+            setShowCreate(false);
+            router.refresh();
+          }}
+          initialTitle={shareState.task.title}
+          initialDescription={shareState.task.description ?? ""}
+          initialCompletedAt={shareState.task.completedAt}
+          taskId={task.id}
+        />
+      )}
+    </>
+  );
+}
+
 export default function TodayWorkBoardWidget({
+  userId,
   profiles,
   attendanceRecords,
   tasks,
@@ -118,6 +227,8 @@ export default function TodayWorkBoardWidget({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [localTasks, setLocalTasks] = useState(tasks);
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
+  const [showCreate, setShowCreate] = useState(false);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -140,18 +251,24 @@ export default function TodayWorkBoardWidget({
     () => [...todayOpenTasks, ...completedTodayTasks].sort(sortTasksForToday),
     [todayOpenTasks, completedTodayTasks]
   );
+  const myTodayBoardTasks = useMemo(
+    () => todayBoardTasks.filter((task) => taskBelongsToProfile(task, userId)),
+    [todayBoardTasks, userId]
+  );
   const filteredTasks = useMemo(
-    () => todayBoardTasks.filter((task) => statusFilter === "all" || task.status === statusFilter),
-    [statusFilter, todayBoardTasks]
+    () => myTodayBoardTasks.filter((task) => statusFilter === "all" || task.status === statusFilter),
+    [myTodayBoardTasks, statusFilter]
   );
 
   const counts = {
-    all: todayBoardTasks.length,
-    대기: todayBoardTasks.filter((task) => task.status === "대기").length,
-    진행중: todayBoardTasks.filter((task) => task.status === "진행중").length,
-    완료: todayBoardTasks.filter((task) => task.status === "완료").length,
+    all: myTodayBoardTasks.length,
+    대기: myTodayBoardTasks.filter((task) => task.status === "대기").length,
+    진행중: myTodayBoardTasks.filter((task) => task.status === "진행중").length,
+    완료: myTodayBoardTasks.filter((task) => task.status === "완료").length,
   };
-  const overdueCount = todayOpenTasks.filter((task) => isOverdue(task.due_date, task.status)).length;
+  const overdueCount = todayOpenTasks.filter(
+    (task) => taskBelongsToProfile(task, userId) && isOverdue(task.due_date, task.status)
+  ).length;
   const checkedInCount = approvedProfiles.filter((profile) => attendanceByUser.get(profile.id)?.check_in).length;
   const unregisteredCount = approvedProfiles.filter((profile) => {
     const hasCheckedIn = attendanceByUser.get(profile.id)?.check_in;
@@ -159,6 +276,14 @@ export default function TodayWorkBoardWidget({
     return hasCheckedIn && !hasTodayTask;
   }).length;
   const visibleSchedules = schedules.slice(0, 5);
+  const detailTask = detailTaskId
+    ? localTasks.find((task) => task.id === detailTaskId) ?? null
+    : null;
+
+  const closeTaskDetail = () => {
+    setDetailTaskId(null);
+    router.refresh();
+  };
 
   const cycleTaskStatus = (task: TaskWithDetails) => {
     if (pendingTaskIds.has(task.id)) return;
@@ -169,7 +294,12 @@ export default function TodayWorkBoardWidget({
     setLocalTasks((current) =>
       current.map((item) =>
         item.id === task.id
-          ? { ...item, status: nextStatus, updated_at: new Date().toISOString() }
+          ? {
+              ...item,
+              status: nextStatus,
+              updated_at: new Date().toISOString(),
+              completed_at: nextStatus === "완료" ? new Date().toISOString() : null,
+            }
           : item
       )
     );
@@ -348,12 +478,18 @@ export default function TodayWorkBoardWidget({
       <section className="overflow-hidden rounded-lg bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-800">
-              {canViewCompanyWork ? "오늘 할 일 전체" : "오늘 할 일"}
-            </h3>
-            <p className="mt-1 text-xs text-slate-400">직원별로 묶어서 체크만으로 완료 처리합니다.</p>
+            <h3 className="text-base font-bold text-slate-800">오늘 내 할 일</h3>
+            <p className="mt-1 text-xs text-slate-400">체크로 상태를 변경하고, 업무를 눌러 상세 내용을 수정합니다.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-indigo-500"
+            >
+              <Plus size={14} weight="bold" />
+              내 할 일
+            </button>
             {FILTERS.map((filter) => {
               const active = statusFilter === filter.value;
               const count = filter.value === "all" ? counts.all : counts[filter.value];
@@ -378,6 +514,14 @@ export default function TodayWorkBoardWidget({
             <Clock size={26} className="mx-auto text-slate-300" />
             <p className="mt-3 text-sm font-semibold text-slate-600">표시할 오늘 할 일이 없습니다</p>
             <p className="mt-1 text-xs text-slate-400">출근 후 오늘 할 일을 등록하면 이곳에 표시됩니다.</p>
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-indigo-500"
+            >
+              <Plus size={14} weight="bold" />
+              내 할 일 추가
+            </button>
           </div>
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
@@ -410,6 +554,9 @@ export default function TodayWorkBoardWidget({
                       const due = formatDueDate(task.due_date, task.status);
                       const isDone = task.status === "완료";
                       const isTaskPending = pendingTaskIds.has(task.id);
+                      const canShareTimeline = isDone && (
+                        task.created_by === userId || task.assignees.some((assignee) => assignee.user_id === userId)
+                      );
 
                       return (
                         <Draggable
@@ -422,7 +569,7 @@ export default function TodayWorkBoardWidget({
                         <div
                           ref={dragProvided.innerRef}
                           {...dragProvided.draggableProps}
-                          className={`grid grid-cols-[auto_auto_minmax(0,1fr)_auto] gap-3 rounded-lg border border-slate-100 px-3 py-3 transition-colors ${
+                          className={`grid ${canShareTimeline ? "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto]" : "grid-cols-[auto_auto_minmax(0,1fr)_auto]"} gap-3 rounded-lg border border-slate-100 px-3 py-3 transition-colors ${
                             isDone ? "bg-slate-50" : "bg-white"
                           } ${snapshot.isDragging ? "shadow-lg ring-1 ring-indigo-100" : ""}`}
                         >
@@ -450,7 +597,13 @@ export default function TodayWorkBoardWidget({
                               <Square size={20} />
                             )}
                           </button>
-                          <div className="min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => setDetailTaskId(task.id)}
+                            disabled={isTaskPending}
+                            className="min-w-0 rounded-md text-left outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-default"
+                            aria-label={`${task.title} 상세 수정`}
+                          >
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                               <p className={`truncate text-sm font-bold ${isDone ? "text-slate-400 line-through" : "text-slate-800"}`}>
                                 {task.title}
@@ -467,7 +620,10 @@ export default function TodayWorkBoardWidget({
                             {task.assignees.length > 1 && (
                               <p className="mt-1 truncate text-xs text-slate-400">{getTaskOwnerLabel(task)}</p>
                             )}
-                          </div>
+                          </button>
+                          {canShareTimeline && (
+                            <CompletedTaskTimelineAction task={task} currentUserId={userId} />
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDeleteTask(task)}
@@ -523,6 +679,24 @@ export default function TodayWorkBoardWidget({
           </div>
         )}
       </section>
+
+      {showCreate && (
+        <TaskCreateModal
+          userId={userId}
+          profiles={profiles}
+          initialDueDate={today}
+          onClose={() => setShowCreate(false)}
+          onCreated={() => router.refresh()}
+        />
+      )}
+
+      <TaskDetailPanel
+        profiles={profiles}
+        userId={userId}
+        taskId={detailTaskId}
+        initialTask={detailTask}
+        onClose={closeTaskDetail}
+      />
     </section>
   );
 }

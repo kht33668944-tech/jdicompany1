@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
 import {
   Paperclip,
   Trash,
@@ -148,9 +149,12 @@ function ImagePreview({ attachment, url }: { attachment: AttachmentMeta; url: st
   return (
     <>
       <div className="inline-flex flex-col gap-1">
-        <img
+        <Image
           src={url}
           alt={attachment.file_name}
+          width={192}
+          height={160}
+          unoptimized
           className="max-w-48 max-h-40 rounded-xl object-cover border border-slate-200 cursor-pointer hover:brightness-95 transition-all"
           onClick={() => setLightbox(true)}
         />
@@ -183,9 +187,12 @@ function ImagePreview({ attachment, url }: { attachment: AttachmentMeta; url: st
               <X size={24} className="text-white" />
             </button>
           </div>
-          <img
+          <Image
             src={url}
             alt={attachment.file_name}
+            width={1600}
+            height={1200}
+            unoptimized
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />

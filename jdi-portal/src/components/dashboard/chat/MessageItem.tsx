@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { Pencil, Trash, File as FileIcon, DownloadSimple, Copy, ArrowBendUpLeft, Smiley, PushPin } from "phosphor-react";
 import { toast } from "sonner";
 import type { Message, MessageReaction } from "@/lib/chat/types";
@@ -283,11 +284,12 @@ function ChatImage({ storagePath, previewPath, fileName }: { storagePath: string
 
   return (
     <a href={originalUrl ?? previewUrl} target="_blank" rel="noopener noreferrer" className="block">
-      <img
+      <Image
         src={previewUrl}
         alt={fileName}
-        loading="lazy"
-        decoding="async"
+        width={280}
+        height={200}
+        unoptimized
         className="max-w-[280px] max-h-[200px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
       />
     </a>
@@ -373,9 +375,12 @@ function MessageContent({ message, isOwn, parentMessage }: { message: Message; i
             <path d="M1 9 V4 Q1 1 4 1 H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           {parentAvatar && (
-            <img
+            <Image
               src={parentAvatar}
               alt={parentName}
+              width={16}
+              height={16}
+              unoptimized
               className="w-4 h-4 rounded-full flex-shrink-0 object-cover"
             />
           )}
@@ -568,9 +573,12 @@ export default function MessageItem({
     <>
       <div className="flex items-start gap-2 sm:gap-3">
         {message.user_profile?.avatar_url ? (
-          <img
+          <Image
             src={message.user_profile.avatar_url}
             alt={message.user_profile.full_name ?? ""}
+            width={36}
+            height={36}
+            unoptimized
             className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl flex-shrink-0 object-cover"
           />
         ) : (

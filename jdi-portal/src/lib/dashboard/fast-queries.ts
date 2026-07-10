@@ -99,7 +99,7 @@ async function getDashboardDataViaPostgres(
           left join public.profiles p on p.id = t.created_by
           where (
             t.status in ('대기', '진행중')
-            or (t.status = '완료' and t.updated_at >= now() - interval '7 days')
+            or (t.status = '완료' and t.completed_at >= now() - interval '7 days')
           )
           order by t.position asc, t.due_date asc nulls last
         `,
@@ -117,7 +117,7 @@ async function getDashboardDataViaPostgres(
           )
           and (
             t.status in ('대기', '진행중')
-            or (t.status = '완료' and t.updated_at >= now() - interval '7 days')
+            or (t.status = '완료' and t.completed_at >= now() - interval '7 days')
           )
           order by t.position asc, t.due_date asc nulls last
         `,

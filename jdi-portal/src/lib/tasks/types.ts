@@ -26,6 +26,7 @@ export interface Task {
   created_by: string;
   created_at: string;
   updated_at: string;
+  completed_at: string | null;
 }
 
 export interface TaskAssignee {

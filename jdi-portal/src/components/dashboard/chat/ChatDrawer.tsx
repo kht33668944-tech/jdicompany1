@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
 import {
   X,
   Image as ImageIcon,
@@ -98,9 +99,12 @@ function ImageViewer({
       </div>
 
       {/* Image */}
-      <img
+      <Image
         src={current.url}
         alt={current.name}
+        width={1600}
+        height={1200}
+        unoptimized
         onClick={(e) => e.stopPropagation()}
         className="max-w-[90vw] max-h-[80vh] object-contain rounded-lg"
       />
@@ -152,11 +156,12 @@ function DrawerImageItem({
 
   return (
     <div className="relative group cursor-pointer" onClick={selecting ? onToggleSelect : onView}>
-      <img
+      <Image
         src={url}
         alt={fileData?.name ?? ""}
-        loading="lazy"
-        decoding="async"
+        width={320}
+        height={320}
+        unoptimized
         className="aspect-square object-cover rounded-xl w-full"
       />
       {/* Hover overlay */}

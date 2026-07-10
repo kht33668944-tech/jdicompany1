@@ -32,6 +32,7 @@ const titles: Record<string, string> = {
   "/dashboard": "대시보드",
   "/dashboard/attendance": "근태관리",
   "/dashboard/tasks": "할일",
+  "/dashboard/work-timeline": "업무 타임라인",
   "/dashboard/schedule": "스케줄",
   "/dashboard/influencer": "인플루언서",
   "/dashboard/influencer/schedule": "인플루언서",

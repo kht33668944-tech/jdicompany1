@@ -4,7 +4,7 @@
   "private": true,
   "description": "Root wrapper so Railpack detects Node and builds jdi-portal subdirectory",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "cd jdi-portal && npm run dev",

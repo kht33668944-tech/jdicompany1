@@ -19,7 +19,7 @@ interface TaskStatsRow {
 const TASK_BASE_SELECT = `
   id, title, description, status, priority, category,
   due_date, start_date, position, parent_id, created_by,
-  created_at, updated_at,
+  created_at, updated_at, completed_at,
   creator_profile:profiles!tasks_created_by_fkey(full_name, avatar_url)
 `;
 
@@ -127,7 +127,7 @@ export async function getTasksWithDetails(supabase: SupabaseClient): Promise<Tas
       .from("tasks")
       .select(TASK_BASE_SELECT)
       .eq("status", "완료")
-      .gte("updated_at", getCompletedCutoff())
+      .gte("completed_at", getCompletedCutoff())
       .order("position", { ascending: true }),
   ]);
 
@@ -143,6 +143,25 @@ export async function getTasksWithDetails(supabase: SupabaseClient): Promise<Tas
   ]);
 
   return enrichTasks(allRaw, assigneeMap, counts);
+}
+
+/** 할 일 메뉴용 전체 기록 조회. 완료 업무도 기간 제한 없이 보존해서 검색할 수 있다. */
+export async function getTaskHistoryWithDetails(supabase: SupabaseClient): Promise<TaskWithDetails[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_BASE_SELECT)
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+
+  const rawTasks = data ?? [];
+  const taskIds = rawTasks.map((task) => task.id as string);
+  const [assigneeMap, counts] = await Promise.all([
+    fetchAssigneesForTasks(supabase, taskIds),
+    fetchCountsForTasks(supabase, taskIds),
+  ]);
+
+  return enrichTasks(rawTasks, assigneeMap, counts);
 }
 
 export async function getTaskById(supabase: SupabaseClient, id: string): Promise<TaskWithDetails | null> {

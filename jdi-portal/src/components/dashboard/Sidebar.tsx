@@ -8,6 +8,7 @@ import LogoutButton from "@/components/LogoutButton";
 import SquaresFour from "phosphor-react/dist/icons/SquaresFour.esm.js";
 import Clock from "phosphor-react/dist/icons/Clock.esm.js";
 import ListChecks from "phosphor-react/dist/icons/ListChecks.esm.js";
+import Activity from "phosphor-react/dist/icons/Activity.esm.js";
 import CalendarBlank from "phosphor-react/dist/icons/CalendarBlank.esm.js";
 import ChatCircle from "phosphor-react/dist/icons/ChatCircle.esm.js";
 import UsersThree from "phosphor-react/dist/icons/UsersThree.esm.js";
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/dashboard", label: "대시보드", icon: SquaresFour },
   { href: "/dashboard/attendance", label: "근태관리", icon: Clock },
   { href: "/dashboard/tasks", label: "할일", icon: ListChecks },
+  { href: "/dashboard/work-timeline", label: "업무 타임라인", icon: Activity },
   { href: "/dashboard/schedule", label: "스케줄", icon: CalendarBlank },
   { href: "/dashboard/influencer", label: "인플루언서", icon: UsersThree },
   { href: "/dashboard/chat", label: "채팅", icon: ChatCircle },

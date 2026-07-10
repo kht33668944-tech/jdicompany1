@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, useEffect } from "react";
+import Image from "next/image";
 import { PaperPlaneRight, Paperclip, X, Image as ImageIcon } from "phosphor-react";
 import { toast } from "sonner";
 import type { Message } from "@/lib/chat/types";
@@ -269,7 +270,14 @@ export default function MessageInput({
               return (
                 <div key={key + i} className="relative group">
                   {preview ? (
-                    <img src={preview} alt={file.name} className="w-20 h-20 rounded-xl object-cover" />
+                    <Image
+                      src={preview}
+                      alt={file.name}
+                      width={80}
+                      height={80}
+                      unoptimized
+                      className="w-20 h-20 rounded-xl object-cover"
+                    />
                   ) : (
                     <div className="w-20 h-20 rounded-xl bg-slate-100 flex flex-col items-center justify-center p-1">
                       <ImageIcon size={18} className="text-slate-400 mb-1" />

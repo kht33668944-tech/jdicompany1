@@ -17,6 +17,8 @@ import {
 
 type Tab = "file" | "paste";
 
+const MAX_BULK_FILE_BYTES = 5 * 1024 * 1024;
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -46,38 +48,52 @@ export default function BulkUploadModal({ open, onClose }: Props) {
   }
 
   async function processFile(file: File) {
-    setFileName(file.name);
-    const isXlsx = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+    try {
+      setFileName(file.name);
+      const lowerName = file.name.toLowerCase();
+      const isXlsx = lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls");
 
-    let items: ParsedUrl[] = [];
-    let rawCount = 0;
+      let items: ParsedUrl[] = [];
+      let rawCount = 0;
 
-    if (isXlsx) {
-      const buffer = await file.arrayBuffer();
-      items = await extractUrlsFromXlsx(buffer);
-      rawCount = items.length;
-    } else {
-      const text = await file.text();
-      const allLines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      rawCount = allLines.length - 1;
-      items = extractUrlsFromCsvText(text);
+      if (isXlsx) {
+        const buffer = await file.arrayBuffer();
+        items = await extractUrlsFromXlsx(buffer);
+        rawCount = items.length;
+      } else {
+        const text = await file.text();
+        const allLines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        rawCount = Math.max(0, allLines.length - 1);
+        items = extractUrlsFromCsvText(text).slice(0, 5_000);
+      }
+
+      const invalid = Math.max(0, rawCount - items.length);
+      setInvalidCount(invalid);
+      setPreviewItems(items);
+    } catch (error) {
+      console.error("Bulk upload parsing failed:", error);
+      setFileName(null);
+      setPreviewItems([]);
+      setInvalidCount(0);
+      toast.error("파일을 읽지 못했습니다. 파일 형식과 내용을 확인해주세요.");
     }
-
-    const invalid = Math.max(0, rawCount - items.length);
-    setInvalidCount(invalid);
-    setPreviewItems(items);
   }
 
   function handleFileInput(file: File) {
+    const lowerName = file.name.toLowerCase();
     if (
-      !file.name.endsWith(".csv") &&
-      !file.name.endsWith(".xlsx") &&
-      !file.name.endsWith(".xls")
+      !lowerName.endsWith(".csv") &&
+      !lowerName.endsWith(".xlsx") &&
+      !lowerName.endsWith(".xls")
     ) {
       toast.error(".csv 또는 .xlsx 파일만 업로드 가능합니다.");
       return;
     }
-    processFile(file);
+    if (file.size > MAX_BULK_FILE_BYTES) {
+      toast.error("파일은 최대 5MB까지 업로드할 수 있습니다.");
+      return;
+    }
+    void processFile(file);
   }
 
   function onDrop(e: React.DragEvent<HTMLDivElement>) {

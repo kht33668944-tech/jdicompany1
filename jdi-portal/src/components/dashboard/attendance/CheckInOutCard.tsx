@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, ListChecks, SignIn, SignOut } from "phosphor-react";
+import { Clock, SignIn, SignOut } from "phosphor-react";
+import TaskCreateModal from "@/components/dashboard/tasks/TaskCreateModal";
 async function checkIn(): Promise<AttendanceRecord> {
   const res = await fetch("/api/attendance/check-in", { method: "POST" });
   const body = await res.json();
@@ -17,11 +18,13 @@ async function checkOut(): Promise<AttendanceRecord> {
   return body;
 }
 import { ATTENDANCE_STATUS_CONFIG } from "@/lib/attendance/constants";
-import { formatMinutes, formatTime } from "@/lib/utils/date";
+import { formatMinutes, formatTime, toDateString } from "@/lib/utils/date";
 import { getErrorMessage } from "@/lib/utils/errors";
-import type { AttendanceRecord } from "@/lib/attendance/types";
+import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
 
 interface CheckInOutCardProps {
+  userId: string;
+  profile: Profile;
   todayRecord: AttendanceRecord | null;
   allowedIp: string | null;
 }
@@ -42,7 +45,7 @@ async function verifyIpQuick(allowedIp: string | null): Promise<boolean> {
   }
 }
 
-export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCardProps) {
+export default function CheckInOutCard({ userId, profile, todayRecord, allowedIp }: CheckInOutCardProps) {
   const router = useRouter();
   const [status, setStatus] = useState(todayRecord?.status ?? ABSENT_STATUS);
   const [checkInTime, setCheckInTime] = useState(todayRecord?.check_in ?? null);
@@ -87,7 +90,15 @@ export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCar
       const record = await checkIn();
       setStatus(record.status);
       setCheckInTime(record.check_in);
-      setShowTaskPrompt(true);
+      const promptKey = `attendance-task-prompt:${userId}:${record.work_date}`;
+      let shouldShowTaskPrompt = true;
+      try {
+        shouldShowTaskPrompt = window.localStorage.getItem(promptKey) !== "shown";
+        window.localStorage.setItem(promptKey, "shown");
+      } catch {
+        // 저장 공간을 사용할 수 없어도 출근과 업무 작성 흐름은 유지한다.
+      }
+      setShowTaskPrompt(shouldShowTaskPrompt);
       setFeedback({ type: "success", message: "출근 처리가 완료되었습니다." });
       router.refresh();
     } catch (error) {
@@ -120,6 +131,7 @@ export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCar
   };
 
   const config = ATTENDANCE_STATUS_CONFIG[status];
+  const today = todayRecord?.work_date ?? toDateString();
 
   return (
     <div className="glass-card rounded-2xl p-6">
@@ -154,34 +166,6 @@ export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCar
         </div>
       )}
 
-      {showTaskPrompt && (
-        <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3">
-          <div className="flex items-start gap-3">
-            <ListChecks size={18} className="mt-0.5 shrink-0 text-indigo-600" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-slate-800">오늘 할 일을 등록해주세요</p>
-              <p className="mt-1 text-xs text-slate-500">
-                오늘 처리할 개인 업무를 등록하면 메인 대시보드에 바로 표시됩니다.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={() => router.push("/dashboard/tasks?new=1")}
-                  className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-indigo-500"
-                >
-                  새 할 일 추가
-                </button>
-                <button
-                  onClick={() => router.push("/dashboard/tasks")}
-                  className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50"
-                >
-                  내 업무 보기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="flex gap-3">
         <button
           onClick={handleCheckIn}
@@ -200,6 +184,19 @@ export default function CheckInOutCard({ todayRecord, allowedIp }: CheckInOutCar
           {checkOutLoading ? "처리 중..." : "퇴근하기"}
         </button>
       </div>
+
+      {showTaskPrompt && (
+        <TaskCreateModal
+          userId={userId}
+          profiles={[profile]}
+          title="오늘 내 업무 작성"
+          selfOnly
+          initialDueDate={today}
+          draftKey={`attendance-task-draft:${userId}:${today}`}
+          onClose={() => setShowTaskPrompt(false)}
+          onCreated={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }

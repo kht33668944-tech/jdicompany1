@@ -124,6 +124,7 @@ export default function AttendancePageClient({ profile, initialData }: Attendanc
           <CheckInOutSkeleton />
         ) : (
           <CheckInOutTab
+            profile={profile}
             userId={profile.id}
             isAdmin={isAdmin}
             todayRecord={checkInData.todayRecord}

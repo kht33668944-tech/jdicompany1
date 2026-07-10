@@ -1,4 +1,4 @@
-import { addDays, toDateString } from "@/lib/utils/date";
+import { addDays, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import type {
   TaskFilterState,
   TaskGroupBy,
@@ -16,6 +16,19 @@ export function calculateProgress(total: number, completed: number): number {
 export function isOverdue(dueDate: string | null, status: TaskStatus): boolean {
   if (!dueDate || status === "완료") return false;
   return dueDate < toDateString();
+}
+
+export function getTaskRecordDate(task: TaskWithDetails): string {
+  if (task.status === "완료" && task.completed_at) {
+    return toDateStringFromTimestamp(task.completed_at);
+  }
+  return task.due_date ?? toDateStringFromTimestamp(task.created_at);
+}
+
+export function isTaskCompletedOn(task: TaskWithDetails, date: string): boolean {
+  return task.status === "완료"
+    && Boolean(task.completed_at)
+    && toDateStringFromTimestamp(task.completed_at!) === date;
 }
 
 export function formatDueDate(dueDate: string | null, status: TaskStatus): { text: string; className: string } {

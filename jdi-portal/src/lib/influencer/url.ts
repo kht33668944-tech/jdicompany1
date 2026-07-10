@@ -1,5 +1,7 @@
 import * as XLSX from "xlsx";
 
+const MAX_XLSX_ROWS = 5_000;
+
 export interface ParsedUrl {
   raw: string;
   url: string;
@@ -87,7 +89,11 @@ export function extractUrlsFromCsvText(
 export async function extractUrlsFromXlsx(
   buffer: ArrayBuffer
 ): Promise<ParsedUrl[]> {
-  const workbook = XLSX.read(buffer, { type: "array" });
+  const workbook = XLSX.read(buffer, {
+    type: "array",
+    dense: true,
+    sheetRows: MAX_XLSX_ROWS + 1,
+  });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return [];
 
@@ -112,7 +118,7 @@ export async function extractUrlsFromXlsx(
   }
 
   const results: ParsedUrl[] = [];
-  for (const row of rows) {
+  for (const row of rows.slice(0, MAX_XLSX_ROWS)) {
     const candidate = urlKey
       ? String(row[urlKey] ?? "")
       : String(Object.values(row)[0] ?? "");

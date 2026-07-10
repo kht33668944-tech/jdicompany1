@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { X, MagnifyingGlass, XCircle } from "phosphor-react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
@@ -149,9 +150,12 @@ export default function ChannelCreateModal({ onClose, userId, onCreated }: Chann
                   className="flex items-center gap-1.5 pl-1 pr-2 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-100"
                 >
                   {p.avatar_url ? (
-                    <img
+                    <Image
                       src={p.avatar_url}
                       alt={p.full_name}
+                      width={24}
+                      height={24}
+                      unoptimized
                       className="w-6 h-6 rounded-full object-cover"
                     />
                   ) : (
@@ -183,9 +187,12 @@ export default function ChannelCreateModal({ onClose, userId, onCreated }: Chann
                     className="w-5 h-5 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   {p.avatar_url ? (
-                    <img
+                    <Image
                       src={p.avatar_url}
                       alt={p.full_name}
+                      width={40}
+                      height={40}
+                      unoptimized
                       className="w-10 h-10 rounded-full object-cover"
                     />
                   ) : (

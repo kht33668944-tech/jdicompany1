@@ -1,6 +1,7 @@
 .bkit/
 .claude/
 node_modules/
+/pnpm-lock.yaml
 .env
 
 .omc/

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import {
   X,
   PencilSimple,
@@ -391,9 +392,12 @@ export default function ChannelSettingsDrawer({
                           className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-blue-50 rounded-lg text-left transition-colors"
                         >
                           {p.avatar_url ? (
-                            <img
+                            <Image
                               src={p.avatar_url}
                               alt={p.full_name}
+                              width={28}
+                              height={28}
+                              unoptimized
                               className="w-7 h-7 rounded-full object-cover"
                             />
                           ) : (
@@ -425,9 +429,12 @@ export default function ChannelSettingsDrawer({
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           {member.profile?.avatar_url ? (
-                            <img
+                            <Image
                               src={member.profile.avatar_url}
                               alt={member.profile.full_name ?? ""}
+                              width={40}
+                              height={40}
+                              unoptimized
                               className="w-10 h-10 rounded-2xl object-cover"
                             />
                           ) : (

@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
+  CheckCircle,
+  ShareNetwork,
+  SpinnerGap,
   Trash,
   XCircle,
   X,
@@ -15,15 +19,24 @@ import type {
   TaskChecklistItem,
   TaskAttachment,
   TaskActivity,
+  TaskPriority,
   TaskStatus,
 } from "@/lib/tasks/types";
-import { TASK_STATUSES, TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
+import {
+  CATEGORIES,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  TASK_STATUS_CONFIG,
+} from "@/lib/tasks/constants";
 import { updateTask, deleteTask, addAssignee, removeAssignee } from "@/lib/tasks/actions";
 import TaskChecklist from "./TaskChecklist";
 import TaskAttachments from "./TaskAttachments";
 import TaskActivityTimeline from "./TaskActivityTimeline";
 import TaskCommentInput from "./TaskCommentInput";
 import UserAvatar from "@/components/shared/UserAvatar";
+import WorkTimelineCreateModal from "@/components/dashboard/work-timeline/WorkTimelineCreateModal";
+import { getTaskTimelineShare } from "@/lib/work-timeline/actions";
+import type { WorkTimelineTaskShareState } from "@/lib/work-timeline/types";
 
 interface Props {
   task: TaskWithDetails;
@@ -41,6 +54,130 @@ interface Props {
 }
 
 import { getErrorMessage } from "@/lib/utils/errors";
+
+interface CompletedTaskTimelineShareProps {
+  task: TaskWithDetails;
+  canShare: boolean;
+  currentUserId: string;
+  onShared: () => void;
+}
+
+function CompletedTaskTimelineShare({
+  task,
+  canShare,
+  currentUserId,
+  onShared,
+}: CompletedTaskTimelineShareProps) {
+  const [shareResult, setShareResult] = useState<{
+    requestKey: string;
+    state: WorkTimelineTaskShareState | null;
+    failed: boolean;
+  } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const requestKey = `${task.id}:${refreshKey}`;
+
+  useEffect(() => {
+    if (task.status !== "완료" || !canShare) return;
+
+    let cancelled = false;
+    getTaskTimelineShare(task.id)
+      .then((nextState) => {
+        if (!cancelled) {
+          setShareResult({ requestKey, state: nextState, failed: false });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setShareResult({ requestKey, state: null, failed: true });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canShare, requestKey, task.id, task.status]);
+
+  if (task.status !== "완료" || !canShare) return null;
+
+  const loading = shareResult?.requestKey !== requestKey;
+  const loadFailed = shareResult?.requestKey === requestKey && shareResult.failed;
+  const shareState = shareResult?.requestKey === requestKey ? shareResult.state : null;
+  const alreadyShared = shareState?.reason === "already_shared";
+  const existingEntryId = alreadyShared ? shareState.existingEntryId : null;
+  const available = shareState?.canShare === true && Boolean(shareState.task);
+
+  const handleButtonClick = () => {
+    if (loadFailed) {
+      setRefreshKey((current) => current + 1);
+      return;
+    }
+    if (available) setShowCreate(true);
+  };
+
+  return (
+    <>
+      {existingEntryId ? (
+        <Link
+          href={`/dashboard/work-timeline/${existingEntryId}`}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-600 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+          aria-label="공유된 타임라인 업무 상세 보기"
+        >
+          <CheckCircle size={15} weight="fill" aria-hidden="true" />
+          타임라인 공유됨
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={handleButtonClick}
+          disabled={loading || alreadyShared || (!available && !loadFailed)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-default disabled:text-slate-400"
+        >
+          {loading ? (
+            <SpinnerGap size={15} className="animate-spin" aria-hidden="true" />
+          ) : alreadyShared ? (
+            <CheckCircle size={15} weight="fill" aria-hidden="true" />
+          ) : (
+            <ShareNetwork size={15} weight="bold" aria-hidden="true" />
+          )}
+          {loading
+            ? "공유 확인 중"
+            : alreadyShared
+              ? "타임라인 공유됨"
+              : loadFailed
+                ? "공유 상태 다시 확인"
+                : "타임라인에 공유"}
+        </button>
+      )}
+
+      {showCreate && shareState?.task && (
+        <WorkTimelineCreateModal
+          open
+          currentUserId={currentUserId}
+          onClose={() => setShowCreate(false)}
+          onCreated={(entryId) => {
+            setShareResult((current) => current?.requestKey === requestKey && current.state ? {
+              requestKey,
+              failed: false,
+              state: {
+                ...current.state,
+                canShare: false,
+                existingEntryId: entryId,
+                reason: "already_shared",
+              },
+            } : current);
+            setShowCreate(false);
+            onShared();
+          }}
+          initialTitle={shareState.task.title}
+          initialDescription={shareState.task.description ?? ""}
+          initialCompletedAt={shareState.task.completedAt}
+          taskId={task.id}
+        />
+      )}
+    </>
+  );
+}
 
 export default function TaskDetailClient({
   task,
@@ -123,6 +260,9 @@ export default function TaskDetailClient({
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
   const [status, setStatus] = useState<TaskStatus>(task.status);
+  const [priority, setPriority] = useState<TaskPriority>(task.priority);
+  const [category, setCategory] = useState(task.category ?? "");
+  const [startDate, setStartDate] = useState(task.start_date ?? "");
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -134,11 +274,17 @@ export default function TaskDetailClient({
     setTitle(task.title);
     setDescription(task.description ?? "");
     setStatus(task.status);
+    setPriority(task.priority);
+    setCategory(task.category ?? "");
+    setStartDate(task.start_date ?? "");
     setDueDate(task.due_date ?? "");
   }, [
+    task.category,
     task.description,
     task.due_date,
     task.id,
+    task.priority,
+    task.start_date,
     task.status,
     task.title,
   ]);
@@ -158,6 +304,9 @@ export default function TaskDetailClient({
         title: title.trim(),
         description: description.trim() || null,
         status,
+        priority,
+        category: category.trim() || null,
+        startDate: startDate || null,
         dueDate: dueDate || null,
       });
       setFeedback({ type: "success", message: "저장되었습니다." });
@@ -218,16 +367,10 @@ export default function TaskDetailClient({
 
   // 패널 모드: 전체 높이 flex 레이아웃
   if (mode === "panel") {
-    const deadlineText = (() => {
-      const fmt = (d: string) => { const [, m, day] = d.split("-"); return `${m}.${day}`; };
-      if (task.due_date) return fmt(task.due_date);
-      return null;
-    })();
-
     return (
-      <div className="flex flex-col h-[calc(100vh-3rem)] sm:h-[calc(100vh-4rem)]">
+      <div className="h-[calc(100vh-3rem)] overflow-y-auto pr-1 sm:h-[calc(100vh-4rem)]">
         {/* 상단 고정: 닫기/저장 */}
-        <div className="flex items-center justify-between mb-3 shrink-0">
+        <div className="sticky top-0 z-10 mb-3 flex items-center justify-between bg-slate-50 py-1">
           <button
             onClick={onClose}
             className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm font-medium"
@@ -236,10 +379,19 @@ export default function TaskDetailClient({
             닫기
           </button>
           <div className="flex items-center gap-2">
+            <CompletedTaskTimelineShare
+              task={task}
+              canShare={isCreator || isAssignee}
+              currentUserId={userId}
+              onShared={() => {
+                onRefresh?.();
+                router.refresh();
+              }}
+            />
             {canEdit && (
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || !title.trim()}
                 className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-40"
               >
                 {saving ? "저장 중..." : "저장"}
@@ -269,8 +421,8 @@ export default function TaskDetailClient({
           </div>
         )}
 
-        {/* 컴팩트 헤더: 제목 + 메타 */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-3 shrink-0">
+        {/* 제목과 주요 속성 */}
+        <div className="mb-3 rounded-lg bg-white p-4 shadow-sm">
           {canEdit ? (
             <input
               value={title}
@@ -281,38 +433,126 @@ export default function TaskDetailClient({
           ) : (
             <h1 className="text-lg font-bold text-slate-800">{title}</h1>
           )}
-          {/* 담당자 + 기간 */}
-          <div className="flex items-center gap-3 mt-2 flex-wrap">
-            {task.assignees.length > 0 && (
-              <div className="flex items-center gap-1">
-                <div className="flex -space-x-1.5">
-                  {task.assignees.slice(0, 3).map((a) => (
-                    <UserAvatar
-                      key={a.user_id}
-                      name={a.full_name}
-                      avatarUrl={a.avatar_url}
-                      size="xs"
-                      className="border border-white"
-                    />
-                  ))}
-                </div>
-                <span className="text-xs text-slate-400 ml-1">
-                  {task.assignees.length > 3
-                    ? `${task.assignees[0].full_name} 외 ${task.assignees.length - 1}명`
-                    : task.assignees.map((a) => a.full_name).join(", ")}
-                </span>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-xs font-bold text-slate-400">설명</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              readOnly={!canEdit}
+              className="glass-input min-h-20 w-full resize-y rounded-lg px-3 py-2 text-sm outline-none read-only:bg-slate-50"
+              placeholder="업무 설명"
+            />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-400">상태</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                disabled={!canEdit}
+                className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none disabled:bg-slate-50"
+              >
+                {TASK_STATUSES.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-400">우선순위</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                disabled={!canEdit}
+                className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none disabled:bg-slate-50"
+              >
+                {TASK_PRIORITIES.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-400">시작일</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                readOnly={!canEdit}
+                className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none read-only:bg-slate-50"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-400">데드라인</label>
+              <input
+                type="date"
+                value={dueDate}
+                min={startDate || undefined}
+                onChange={(e) => setDueDate(e.target.value)}
+                readOnly={!canEdit}
+                className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none read-only:bg-slate-50"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-bold text-slate-400">업무 분류</label>
+              <input
+                type="text"
+                list={`task-categories-${task.id}`}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                readOnly={!canEdit}
+                className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none read-only:bg-slate-50"
+                placeholder="업무 분류 선택 또는 직접 입력"
+              />
+              <datalist id={`task-categories-${task.id}`}>
+                {CATEGORIES.map((item) => <option key={item} value={item} />)}
+              </datalist>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-bold text-slate-400">담당자</label>
+              <div className="flex flex-wrap gap-2">
+                {task.assignees.map((assignee) => (
+                  <span
+                    key={assignee.user_id}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600"
+                  >
+                    <UserAvatar name={assignee.full_name} avatarUrl={assignee.avatar_url} size="xs" />
+                    {assignee.full_name}
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAssignee(assignee.user_id)}
+                        className="text-indigo-300 transition-colors hover:text-red-500"
+                        aria-label={`${assignee.full_name} 담당자 제외`}
+                      >
+                        <XCircle size={14} />
+                      </button>
+                    )}
+                  </span>
+                ))}
               </div>
-            )}
-            {deadlineText && (
-              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                {deadlineText}
-              </span>
-            )}
+              {canEdit && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) handleAddAssignee(e.target.value);
+                  }}
+                  className="glass-input mt-2 w-full rounded-lg px-3 py-2 text-sm text-slate-500 outline-none"
+                >
+                  <option value="">+ 담당자 추가</option>
+                  {profiles
+                    .filter((profile) => !task.assignees.some((assignee) => assignee.user_id === profile.id))
+                    .map((profile) => (
+                      <option key={profile.id} value={profile.id}>{profile.full_name}</option>
+                    ))}
+                </select>
+              )}
+            </div>
           </div>
         </div>
 
         {/* 체크리스트: 접히고 스크롤 가능 */}
-        <div className="bg-white rounded-2xl shadow-sm mb-3 shrink-0 max-h-[30vh] overflow-y-auto">
+        <div className="mb-3 max-h-[30vh] overflow-y-auto rounded-lg bg-white shadow-sm">
           <div className="p-4">
             <TaskChecklist
               taskId={task.id}
@@ -325,7 +565,7 @@ export default function TaskDetailClient({
         </div>
 
         {/* 활동: 나머지 공간 차지 */}
-        <div className="bg-white rounded-2xl shadow-sm flex-1 min-h-0 flex flex-col">
+        <div className="flex min-h-72 flex-col rounded-lg bg-white shadow-sm">
           <div className="px-4 pt-4 pb-2 shrink-0">
             <h3 className="font-bold text-slate-700 text-sm">활동</h3>
           </div>
@@ -353,6 +593,12 @@ export default function TaskDetailClient({
           뒤로 가기
         </button>
         <div className="flex items-center gap-2">
+          <CompletedTaskTimelineShare
+            task={task}
+            canShare={isCreator || isAssignee}
+            currentUserId={userId}
+            onShared={() => router.refresh()}
+          />
           {canEdit && (
             <button
               onClick={handleSave}

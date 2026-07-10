@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { X } from "phosphor-react";
 import ModalContainer from "@/components/shared/ModalContainer";
 import { getReadReceipts } from "@/lib/chat/actions";
@@ -53,7 +54,14 @@ export default function ReadReceiptModal({ messageId, onClose }: ReadReceiptModa
           {receipts.map((r) => (
             <div key={r.user_id} className="flex items-center gap-3">
               {r.avatar_url ? (
-                <img src={r.avatar_url} alt={r.full_name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                <Image
+                  src={r.avatar_url}
+                  alt={r.full_name}
+                  width={36}
+                  height={36}
+                  unoptimized
+                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                />
               ) : (
                 <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
                   {r.full_name.charAt(0)}

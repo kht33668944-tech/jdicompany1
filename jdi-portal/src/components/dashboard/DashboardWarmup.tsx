@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 const WARMUP_ROUTES = [
   "/dashboard/chat",
   "/dashboard/tasks",
+  "/dashboard/work-timeline",
   "/dashboard/schedule",
   "/dashboard/attendance",
   "/dashboard/influencer",
