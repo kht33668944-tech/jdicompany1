@@ -28,6 +28,7 @@ interface Props {
   taskId: string | null;
   initialTask: TaskWithDetails | null;
   onClose: () => void;
+  onTaskMutated?: () => void;
 }
 
 interface TaskDetailData {
@@ -45,6 +46,7 @@ export default function TaskDetailPanel({
   taskId,
   initialTask,
   onClose,
+  onTaskMutated,
 }: Props) {
   const [data, setData] = useState<TaskDetailData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +159,7 @@ export default function TaskDetailPanel({
   }, [taskId]);
 
   const handleRefresh = useCallback(() => {
+    onTaskMutated?.();
     if (!taskId) return;
     const supabase = createClient();
     Promise.all([
@@ -173,7 +176,7 @@ export default function TaskDetailPanel({
     }).catch((err) => {
       console.warn("[TaskDetailPanel] refresh failed:", err);
     });
-  }, [taskId]);
+  }, [onTaskMutated, taskId]);
 
   // ESC 키로 닫기
   useEffect(() => {

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import TasksPageClient from "@/components/dashboard/tasks/TasksPageClient";
 import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
-import { getTaskHistoryWithDetails } from "@/lib/tasks/queries";
+import { getInitialTasksWithDetails } from "@/lib/tasks/queries";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskWithDetails } from "@/lib/tasks/types";
 
@@ -16,7 +16,7 @@ export default async function TasksPage() {
   try {
     [profiles, initialTasks] = await Promise.all([
       getCachedAllProfiles(),
-      getTaskHistoryWithDetails(auth.supabase),
+      getInitialTasksWithDetails(auth.supabase),
     ]);
   } catch {
     profiles = [];

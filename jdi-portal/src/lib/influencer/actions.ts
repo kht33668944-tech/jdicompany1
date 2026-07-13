@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { CampaignStatus, InfluencerCampaign } from "./types";
+import type { CampaignStatus, InfluencerCampaign, InfluencerListItem } from "./types";
 import type { MilestoneKind } from "./calendar";
+import { getInfluencers } from "./queries";
 
 const MILESTONE_COLUMN: Record<
   MilestoneKind,
@@ -48,6 +49,18 @@ function extractUsernameFromUrl(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+export async function loadMoreInfluencers(page: number): Promise<InfluencerListItem[]> {
+  if (!Number.isInteger(page) || page < 2) throw new Error("Invalid influencer page.");
+  await getSessionUserId();
+  return getInfluencers({
+    status: "active",
+    sortBy: "engagement_rate",
+    sortOrder: "desc",
+    page,
+    pageSize: 25,
+  });
 }
 
 // ============================================================

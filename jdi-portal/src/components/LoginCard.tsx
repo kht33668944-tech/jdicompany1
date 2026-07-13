@@ -129,6 +129,8 @@ export default function LoginCard() {
         setShaking(true);
         setTimeout(() => setShaking(false), 500);
       } else {
+        performance.mark("login-auth");
+
         // 승인 여부 확인
         const { data: profile } = await supabase
           .from("profiles")
@@ -142,6 +144,8 @@ export default function LoginCard() {
           setShaking(true);
           setTimeout(() => setShaking(false), 500);
         } else {
+          performance.mark("login-approval");
+
           // 마지막 로그인 이메일 기억 (비밀번호는 저장하지 않음)
           try {
             window.localStorage.setItem("jdi:last-email", username);
@@ -150,6 +154,7 @@ export default function LoginCard() {
           }
 
           const nextPath = sanitizeNext(searchParams.get("next"));
+          performance.mark("login-dashboard-navigation");
           router.replace(nextPath);
         }
       }

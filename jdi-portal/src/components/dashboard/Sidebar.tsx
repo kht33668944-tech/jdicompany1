@@ -65,7 +65,7 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
             <Link
               key={item.href}
               href={item.href}
-              prefetch={true}
+              prefetch={false}
               onClick={onMobileClose}
               className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 active
@@ -131,13 +131,11 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
       </aside>
 
       {/* Mobile Sidebar */}
-      <aside
-        className={`lg:hidden fixed top-0 left-0 h-screen w-64 z-50 glass-sidebar transition-transform duration-300 ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {sidebarContent}
-      </aside>
+      {mobileOpen && (
+        <aside className="lg:hidden fixed top-0 left-0 h-screen w-64 z-50 glass-sidebar transition-transform duration-300 translate-x-0">
+          {sidebarContent}
+        </aside>
+      )}
     </>
   );
 }

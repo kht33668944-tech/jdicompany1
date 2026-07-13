@@ -8,7 +8,6 @@ import NotificationProvider from "./NotificationProvider";
 import ChatUnreadProvider from "./chat/ChatUnreadProvider";
 import AnalysisJobsProvider from "./AnalysisJobsProvider";
 import AnalysisJobsWidget from "./AnalysisJobsWidget";
-import DashboardWarmup from "./DashboardWarmup";
 
 interface DashboardShellProps {
   user: { id: string; email: string; name: string; avatarUrl?: string | null };
@@ -77,7 +76,6 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
       <ChatUnreadProvider userId={user.id} onUnreadChange={setChatUnreadCount} />
 
       <AnalysisJobsWidget />
-      <DashboardWarmup />
 
       <Toaster
         position="bottom-right"

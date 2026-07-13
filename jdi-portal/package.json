@@ -10,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:search-privacy": "node scripts/check-search-privacy.mjs"
+    "test:search-privacy": "node scripts/check-search-privacy.mjs",
+    "perf:audit": "node scripts/performance-audit.mjs",
+    "test:performance": "node --test scripts/performance-audit.test.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

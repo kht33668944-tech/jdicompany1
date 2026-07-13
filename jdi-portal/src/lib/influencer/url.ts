@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 const MAX_XLSX_ROWS = 5_000;
 
 export interface ParsedUrl {
@@ -89,6 +87,7 @@ export function extractUrlsFromCsvText(
 export async function extractUrlsFromXlsx(
   buffer: ArrayBuffer
 ): Promise<ParsedUrl[]> {
+  const XLSX = await import("xlsx");
   const workbook = XLSX.read(buffer, {
     type: "array",
     dense: true,

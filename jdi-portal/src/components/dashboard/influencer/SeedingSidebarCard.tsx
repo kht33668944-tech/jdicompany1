@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { Influencer, InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
+import type { InfluencerListItem, InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 import { kstTodayStr } from "@/lib/influencer/calendar";
 import SeedingFunnel from "./SeedingFunnel";
 import StaleDmList from "./StaleDmList";
 
 interface Props {
-  influencers: Influencer[];
+  influencers: InfluencerListItem[];
   activeCampaigns: InfluencerCampaignWithInfluencer[];
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;

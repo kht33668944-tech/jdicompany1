@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Influencer, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
+import type { InfluencerListItem, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 import { CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 
 interface Props {
-  influencers: Influencer[];
+  influencers: InfluencerListItem[];
   activeCampaigns: InfluencerCampaign[];
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;

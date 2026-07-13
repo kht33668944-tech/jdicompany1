@@ -17,7 +17,7 @@ export default async function InfluencerPage() {
 
   const [kpi, influencers, activeCampaigns, allCampaigns, categories] = await Promise.all([
     getKpiCards(),
-    getInfluencers({ status: "active", sortBy: "engagement_rate", sortOrder: "desc", pageSize: 50 }),
+    getInfluencers({ status: "active", sortBy: "engagement_rate", sortOrder: "desc", pageSize: 25 }),
     getActiveCampaigns(),
     getAllCampaignsBasic(),
     getCategories(),

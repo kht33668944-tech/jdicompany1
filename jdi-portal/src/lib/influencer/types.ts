@@ -36,6 +36,11 @@ export interface Influencer {
   updated_at: string;
 }
 
+export type InfluencerListItem = Omit<
+  Influencer,
+  "bio" | "ai_insights" | "ai_summary" | "notes"
+>;
+
 export interface AiInsights {
   category: string | null;
   persona: string | null;

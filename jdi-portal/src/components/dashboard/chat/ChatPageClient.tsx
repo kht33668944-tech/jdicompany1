@@ -80,10 +80,13 @@ function ChatPageClientInner({
   const profileCacheRef = useRef<Map<string, ChatProfileSummary>>(
     buildApprovedProfileMap(initialPeople ?? [])
   );
+  const channelMemberIdsCacheRef = useRef<Map<string, Set<string>>>(new Map());
   // 채널별 메시지 캐시 — 채널 전환 시 즉시 표시용 (SSR 초기 메시지로 시드)
   const messagesCacheRef = useRef<Map<string, Message[]>>(
     new Map(initialChannel && initialMessages ? [[initialChannel.id, initialMessages]] : [])
   );
+  const hasInitialMemoChannel = initialChannels.some((channel) => channel.type === "memo");
+  const memoEnsureStartedRef = useRef(hasInitialMemoChannel);
 
   // ref 동기화는 effect 로 (React 19: render 중 ref mutation 금지)
   useEffect(() => { selectedChannelRef.current = selectedChannel; }, [selectedChannel]);
@@ -142,6 +145,11 @@ function ChatPageClientInner({
       setSelectedChannelMemberIds(new Set());
       return;
     }
+    const cachedMemberIds = channelMemberIdsCacheRef.current.get(selectedChannelId);
+    if (cachedMemberIds) {
+      setSelectedChannelMemberIds(cachedMemberIds);
+      return;
+    }
     let cancelled = false;
     const supabase = createClient();
     supabase
@@ -150,7 +158,9 @@ function ChatPageClientInner({
       .eq("channel_id", selectedChannelId)
       .then(({ data }) => {
         if (cancelled) return;
-        setSelectedChannelMemberIds(new Set((data ?? []).map((m) => m.user_id as string)));
+        const memberIds = new Set((data ?? []).map((m) => m.user_id as string));
+        channelMemberIdsCacheRef.current.set(selectedChannelId, memberIds);
+        setSelectedChannelMemberIds(memberIds);
       });
     return () => { cancelled = true; };
   }, [selectedChannelId]);
@@ -180,17 +190,17 @@ function ChatPageClientInner({
     return count;
   }, [selectedChannelMemberIds, onlineUsers]);
 
-  // 직원 목록 로드 (본인 제외, 승인된 사용자만)
   useEffect(() => {
+    if (initialPeople !== undefined) return;
     getAllProfiles()
-      .then((list) => {
-        setPeople(list.filter((p) => p.id !== userId));
-      })
-      .catch(() => { /* silent — 직원 섹션만 비어 보임 */ });
-  }, [userId]);
+      .then((list) => setPeople(list.filter((person) => person.id !== userId)))
+      .catch(() => {});
+  }, [initialPeople, userId]);
 
-  // Ensure memo channel exists on mount
+  // SSR 채널에 메모가 없을 때만 한 번 생성한다.
   useEffect(() => {
+    if (memoEnsureStartedRef.current) return;
+    memoEnsureStartedRef.current = true;
     ensureMemoChannel()
       .then((memoChannel) => {
         setChannels((prev) => {
@@ -207,7 +217,7 @@ function ChatPageClientInner({
         });
       })
       .catch(() => {});
-  }, [userId]);
+  }, []);
 
   // 음소거 채널 목록 로드
   useEffect(() => {

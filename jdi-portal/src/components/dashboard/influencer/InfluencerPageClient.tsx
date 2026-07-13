@@ -10,12 +10,13 @@ import SeedingTimeline from "./SeedingTimeline";
 import SeedingSidebarCard from "./SeedingSidebarCard";
 import InfluencerDetailPanel from "./InfluencerDetailPanel";
 import InfluencerTabs from "./InfluencerTabs";
-import type { CampaignBasic, Influencer, InfluencerCampaignWithInfluencer, KpiCards as KpiCardsType } from "@/lib/influencer/types";
+import type { CampaignBasic, InfluencerListItem, InfluencerCampaignWithInfluencer, KpiCards as KpiCardsType } from "@/lib/influencer/types";
+import { loadMoreInfluencers } from "@/lib/influencer/actions";
 import type { FilterState } from "./InfluencerFilters";
 
 interface Props {
   kpi: KpiCardsType;
-  influencers: Influencer[];
+  influencers: InfluencerListItem[];
   activeCampaigns: InfluencerCampaignWithInfluencer[];
   allCampaigns: CampaignBasic[];
   categories: string[];
@@ -23,6 +24,10 @@ interface Props {
 
 export default function InfluencerPageClient({ kpi, influencers, activeCampaigns, allCampaigns, categories }: Props) {
   const router = useRouter();
+  const [loadedInfluencers, setLoadedInfluencers] = useState(influencers);
+  const [nextPage, setNextPage] = useState(2);
+  const [hasMore, setHasMore] = useState(influencers.length === 25);
+  const [loadingMore, startLoadMore] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
@@ -33,6 +38,18 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
       router.refresh();
     });
   }, [router]);
+
+  const handleLoadMore = useCallback(() => {
+    startLoadMore(async () => {
+      const next = await loadMoreInfluencers(nextPage);
+      setLoadedInfluencers((current) => {
+        const ids = new Set(current.map((influencer) => influencer.id));
+        return [...current, ...next.filter((influencer) => !ids.has(influencer.id))];
+      });
+      setNextPage((current) => current + 1);
+      setHasMore(next.length === 25);
+    });
+  }, [nextPage]);
 
   return (
     <div className="flex flex-col gap-3 sm:gap-4 p-3 sm:p-6 min-h-0">
@@ -53,20 +70,23 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 items-start min-h-0">
         {/* 인플루언서 테이블 (좌측) */}
         <InfluencerTable
-          influencers={influencers}
+          influencers={loadedInfluencers}
           activeCampaigns={activeCampaigns}
           allCampaigns={allCampaigns}
           filters={filters}
           onFiltersChange={setFilters}
           onSelectInfluencer={(id) => setSelectedId(id)}
           onRefresh={handleRefresh}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={handleLoadMore}
         />
 
         {/* 우측 사이드바: 시딩 스케줄 + 시딩 깔때기 */}
         <div className="flex flex-col gap-3 sm:gap-4">
           <SeedingTimeline campaigns={activeCampaigns} />
           <SeedingSidebarCard
-            influencers={influencers}
+            influencers={loadedInfluencers}
             activeCampaigns={activeCampaigns}
             filters={filters}
             onFiltersChange={setFilters}

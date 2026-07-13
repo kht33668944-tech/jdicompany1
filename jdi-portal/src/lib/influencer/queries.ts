@@ -4,6 +4,7 @@ import type {
   CampaignBasic,
   CampaignStatus,
   Influencer,
+  InfluencerListItem,
   InfluencerWithPosts,
   InfluencerCampaign,
   InfluencerCampaignWithInfluencer,
@@ -11,7 +12,7 @@ import type {
   KpiCards,
 } from "./types";
 
-export async function getInfluencers(opts: InfluencerFilterOpts = {}): Promise<Influencer[]> {
+export async function getInfluencers(opts: InfluencerFilterOpts = {}): Promise<InfluencerListItem[]> {
   const supabase = await createClient();
   const {
     grade,
@@ -21,15 +22,15 @@ export async function getInfluencers(opts: InfluencerFilterOpts = {}): Promise<I
     sortBy = "engagement_rate",
     sortOrder = "desc",
     page = 1,
-    pageSize = 50,
+    pageSize = 25,
   } = opts;
 
   let query = supabase
     .from("influencers")
     .select(
-      "id, created_by, platform, username, profile_url, display_name, bio, profile_image_url, profile_image_path, " +
+      "id, created_by, platform, username, profile_url, display_name, profile_image_url, profile_image_path, " +
       "follower_count, following_count, post_count, avg_likes, avg_comments, engagement_rate, " +
-      "grade, category, ai_insights, ai_summary, tags, notes, status, last_synced_at, created_at, updated_at"
+      "grade, category, tags, status, last_synced_at, created_at, updated_at"
     );
 
   if (status) query = query.eq("status", status);
@@ -45,7 +46,7 @@ export async function getInfluencers(opts: InfluencerFilterOpts = {}): Promise<I
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data as unknown as Influencer[]) ?? [];
+  return (data as unknown as InfluencerListItem[]) ?? [];
 }
 
 export async function getInfluencerById(id: string): Promise<InfluencerWithPosts | null> {

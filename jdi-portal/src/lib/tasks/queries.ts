@@ -5,6 +5,7 @@ import type {
   TaskAttachment,
   TaskActivity,
   TaskAssignee,
+  TaskStatus,
 } from "./types";
 
 interface TaskStatsRow {
@@ -116,52 +117,138 @@ function enrichTasks(
   });
 }
 
-export async function getTasksWithDetails(supabase: SupabaseClient): Promise<TaskWithDetails[]> {
-  const [activeResult, completedResult] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select(TASK_BASE_SELECT)
-      .in("status", ["대기", "진행중"])
-      .order("position", { ascending: true }),
-    supabase
-      .from("tasks")
-      .select(TASK_BASE_SELECT)
-      .eq("status", "완료")
-      .gte("completed_at", getCompletedCutoff())
-      .order("position", { ascending: true }),
-  ]);
+export const INITIAL_TASK_LIMIT = 50;
+export const TASK_HISTORY_PAGE_SIZE = 30;
 
-  if (activeResult.error) throw activeResult.error;
-  if (completedResult.error) throw completedResult.error;
-
-  const allRaw = [...(activeResult.data ?? []), ...(completedResult.data ?? [])];
-  const taskIds = allRaw.map((t) => t.id as string);
-
-  const [assigneeMap, counts] = await Promise.all([
-    fetchAssigneesForTasks(supabase, taskIds),
-    fetchCountsForTasks(supabase, taskIds),
-  ]);
-
-  return enrichTasks(allRaw, assigneeMap, counts);
+export interface TaskHistoryCursor {
+  updated_at: string;
+  id: string;
 }
 
-/** 할 일 메뉴용 전체 기록 조회. 완료 업무도 기간 제한 없이 보존해서 검색할 수 있다. */
-export async function getTaskHistoryWithDetails(supabase: SupabaseClient): Promise<TaskWithDetails[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(TASK_BASE_SELECT)
-    .order("updated_at", { ascending: false });
+export interface TaskHistoryFilters {
+  query?: string;
+  assigneeId?: string;
+  status?: TaskStatus;
+  date?: string;
+}
 
-  if (error) throw error;
+export interface TaskHistoryPage {
+  tasks: TaskWithDetails[];
+  nextCursor: TaskHistoryCursor | null;
+}
 
-  const rawTasks = data ?? [];
+function getSeoulDayBounds(date: string): { start: string; end: string } {
+  const start = new Date(`${date}T00:00:00+09:00`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+function escapeLikePattern(query: string): string {
+  return query.replace(/[\\%_]/g, "\\$&").replace(/[(),]/g, "\\$&");
+}
+
+async function enrichRawTasks(
+  supabase: SupabaseClient,
+  rawTasks: Record<string, unknown>[]
+): Promise<TaskWithDetails[]> {
   const taskIds = rawTasks.map((task) => task.id as string);
   const [assigneeMap, counts] = await Promise.all([
     fetchAssigneesForTasks(supabase, taskIds),
     fetchCountsForTasks(supabase, taskIds),
   ]);
-
   return enrichTasks(rawTasks, assigneeMap, counts);
+}
+
+/** Dashboard summary data: active work first, then only recent completed work, capped at fifty. */
+export async function getInitialTasksWithDetails(supabase: SupabaseClient): Promise<TaskWithDetails[]> {
+  const activeResult = await supabase
+    .from("tasks")
+    .select(TASK_BASE_SELECT)
+    .in("status", ["대기", "진행중"])
+    .order("position", { ascending: true })
+    .limit(INITIAL_TASK_LIMIT);
+
+  if (activeResult.error) throw activeResult.error;
+
+  const activeTasks = activeResult.data ?? [];
+  const remaining = INITIAL_TASK_LIMIT - activeTasks.length;
+  let completedTasks: Record<string, unknown>[] = [];
+
+  if (remaining > 0) {
+    const completedResult = await supabase
+      .from("tasks")
+      .select(TASK_BASE_SELECT)
+      .eq("status", "완료")
+      .gte("completed_at", getCompletedCutoff())
+      .order("updated_at", { ascending: false })
+      .limit(remaining);
+
+    if (completedResult.error) throw completedResult.error;
+    completedTasks = completedResult.data ?? [];
+  }
+
+  return enrichRawTasks(supabase, [...activeTasks, ...completedTasks]);
+}
+
+/** @deprecated Use getInitialTasksWithDetails for bounded dashboard data. */
+export async function getTasksWithDetails(supabase: SupabaseClient): Promise<TaskWithDetails[]> {
+  return getInitialTasksWithDetails(supabase);
+}
+
+/**
+ * Fetch one history page. All filters are evaluated by Supabase before the
+ * thirty-item page is returned; no client-side full-table history fetch occurs.
+ */
+export async function getTaskHistoryWithDetails(
+  supabase: SupabaseClient,
+  filters: TaskHistoryFilters = {},
+  cursor: TaskHistoryCursor | null = null
+): Promise<TaskHistoryPage> {
+  const select = filters.assigneeId
+    ? `${TASK_BASE_SELECT}, history_assignee:task_assignees!inner(user_id)`
+    : TASK_BASE_SELECT;
+  let query = supabase.from("tasks").select(select);
+
+  const trimmedQuery = filters.query?.trim();
+  if (trimmedQuery) {
+    const pattern = `%${escapeLikePattern(trimmedQuery)}%`;
+    query = query.or(`title.ilike.${pattern},description.ilike.${pattern},category.ilike.${pattern}`);
+  }
+  if (filters.assigneeId) query = query.eq("history_assignee.user_id", filters.assigneeId);
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.date) {
+    const { start, end } = getSeoulDayBounds(filters.date);
+    query = query.or(
+      `and(status.eq.완료,completed_at.gte.${start},completed_at.lt.${end}),` +
+        `and(status.neq.완료,due_date.eq.${filters.date}),` +
+        `and(status.neq.완료,due_date.is.null,created_at.gte.${start},created_at.lt.${end})`
+    );
+  }
+  if (cursor) {
+    query = query.or(
+      `updated_at.lt.${cursor.updated_at},and(updated_at.eq.${cursor.updated_at},id.lt.${cursor.id})`
+    );
+  }
+
+  const { data, error } = await query
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(TASK_HISTORY_PAGE_SIZE + 1);
+
+  if (error) throw error;
+
+  const rawTasks = (data ?? []) as unknown as Record<string, unknown>[];
+  const pageRows = rawTasks.slice(0, TASK_HISTORY_PAGE_SIZE);
+  const lastTask = pageRows.at(-1) as { updated_at: string; id: string } | undefined;
+  const nextCursor = rawTasks.length > TASK_HISTORY_PAGE_SIZE && lastTask
+    ? { updated_at: lastTask.updated_at, id: lastTask.id }
+    : null;
+
+  return {
+    tasks: await enrichRawTasks(supabase, pageRows),
+    nextCursor,
+  };
 }
 
 export async function getTaskById(supabase: SupabaseClient, id: string): Promise<TaskWithDetails | null> {

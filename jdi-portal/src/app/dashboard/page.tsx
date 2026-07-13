@@ -45,6 +45,9 @@ export default async function DashboardPage() {
     ),
     getInitialWorkTimelineData(auth.supabase),
   ]);
+  // The timestamp is intentionally captured once for the server-rendered payload.
+  // eslint-disable-next-line react-hooks/purity
+  const initialLoadedAt = Date.now();
 
   return (
     <DashboardClient
@@ -54,6 +57,7 @@ export default async function DashboardPage() {
       initialTimelineEntries={timelineData.entries}
       timelineProfiles={timelineData.profiles}
       currentUserRole={auth.profile.role}
+      initialLoadedAt={initialLoadedAt}
     />
   );
 }

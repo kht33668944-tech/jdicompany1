@@ -11,6 +11,7 @@ import {
 } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskStatus, TaskWithDetails } from "@/lib/tasks/types";
+import type { TaskHistoryCursor, TaskHistoryFilters } from "@/lib/tasks/queries";
 import {
   formatDueDate,
   getTaskRecordDate,
@@ -19,7 +20,7 @@ import {
 } from "@/lib/tasks/utils";
 import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
 import { addDays, formatDateFull, toDateString } from "@/lib/utils/date";
-import { getTaskHistoryWithDetails } from "@/lib/tasks/queries";
+import { getInitialTasksWithDetails, getTaskHistoryWithDetails } from "@/lib/tasks/queries";
 import { cacheTasks } from "@/lib/tasks/tasksCache";
 import { createClient } from "@/lib/supabase/client";
 import TaskCreateModal from "./TaskCreateModal";
@@ -41,21 +42,6 @@ function isTodayTask(task: TaskWithDetails, today: string): boolean {
 
 type HistoryStatusFilter = "all" | TaskStatus;
 
-function matchesTaskQuery(task: TaskWithDetails, query: string): boolean {
-  if (!query) return true;
-  const searchable = [
-    task.title,
-    task.description,
-    task.category,
-    task.creator_profile.full_name,
-    ...task.assignees.map((assignee) => assignee.full_name),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLocaleLowerCase("ko-KR");
-  return searchable.includes(query.toLocaleLowerCase("ko-KR"));
-}
-
 function formatDueWithWeekday(dueDate: string | null, fallbackText: string, today: string): string {
   if (!dueDate) return fallbackText;
   const [, month, day] = dueDate.split("-");
@@ -71,26 +57,82 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
   const [showCreate, setShowCreate] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [allTasks, setAllTasks] = useState<TaskWithDetails[]>(initialTasks);
+  const [historyTasks, setHistoryTasks] = useState<TaskWithDetails[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<TaskHistoryCursor | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [employeeId, setEmployeeId] = useState(userId);
   const [historyDate, setHistoryDate] = useState("");
   const [historyStatus, setHistoryStatus] = useState<HistoryStatusFilter>("all");
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const historyGenerationRef = useRef(0);
 
-  const refreshTasks = useCallback(async () => {
+  const historyFilters = useMemo<TaskHistoryFilters>(() => ({
+    query: searchQuery.trim() || undefined,
+    assigneeId: employeeId === "all" ? undefined : employeeId,
+    status: historyStatus === "all" ? undefined : historyStatus,
+    date: historyDate || undefined,
+  }), [employeeId, historyDate, historyStatus, searchQuery]);
+  const historyFiltersRef = useRef(historyFilters);
+  historyFiltersRef.current = historyFilters;
+
+  const requestHistoryPage = useCallback(async (
+    filters: TaskHistoryFilters,
+    cursor: TaskHistoryCursor | null,
+    generation: number,
+    append: boolean
+  ) => {
     try {
       const supabase = createClient();
-      const fresh = await getTaskHistoryWithDetails(supabase);
-      setAllTasks(fresh);
-      void cacheTasks(fresh);
+      const page = await getTaskHistoryWithDetails(supabase, filters, cursor);
+      if (generation !== historyGenerationRef.current) return;
+
+      setHistoryTasks((current) => append ? [...current, ...page.tasks] : page.tasks);
+      setHistoryCursor(page.nextCursor);
     } catch (err) {
-      console.warn("[TasksPageClient] refreshTasks failed:", err);
+      if (generation === historyGenerationRef.current) {
+        console.warn("[TasksPageClient] history load failed:", err);
+      }
+    } finally {
+      if (generation === historyGenerationRef.current) setHistoryLoading(false);
     }
   }, []);
 
+  const refreshTasks = useCallback(() => {
+    if (refreshInFlightRef.current) return refreshInFlightRef.current;
+
+    const refresh = (async () => {
+      try {
+        const supabase = createClient();
+        const fresh = await getInitialTasksWithDetails(supabase);
+        setAllTasks(fresh);
+        void cacheTasks(fresh);
+      } catch (err) {
+        console.warn("[TasksPageClient] refreshTasks failed:", err);
+      }
+    })();
+
+    refreshInFlightRef.current = refresh;
+    void refresh.finally(() => {
+      if (refreshInFlightRef.current === refresh) refreshInFlightRef.current = null;
+    });
+    return refresh;
+  }, []);
+
   useEffect(() => {
-    const id = requestAnimationFrame(() => void refreshTasks());
-    return () => cancelAnimationFrame(id);
-  }, [refreshTasks]);
+    const generation = ++historyGenerationRef.current;
+    setHistoryTasks([]);
+    setHistoryCursor(null);
+    setHistoryLoading(true);
+    void requestHistoryPage(historyFilters, null, generation, false);
+  }, [historyFilters, requestHistoryPage]);
+
+  const loadMoreHistory = useCallback(() => {
+    if (!historyCursor || historyLoading) return;
+    const generation = historyGenerationRef.current;
+    setHistoryLoading(true);
+    void requestHistoryPage(historyFiltersRef.current, historyCursor, generation, true);
+  }, [historyCursor, historyLoading, requestHistoryPage]);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
@@ -141,19 +183,6 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
   const progressCount = personalOpenTasks.filter((task) => task.status === "진행중").length;
   const completedCount = personalTasks.filter((task) => task.status === "완료").length;
   const yesterday = addDays(today, -1);
-  const historyTasks = useMemo(() => {
-    const trimmedQuery = searchQuery.trim();
-    return [...allTasks]
-      .filter((task) => employeeId === "all" || task.assignees.some((assignee) => assignee.user_id === employeeId))
-      .filter((task) => historyStatus === "all" || task.status === historyStatus)
-      .filter((task) => !historyDate || getTaskRecordDate(task) === historyDate)
-      .filter((task) => matchesTaskQuery(task, trimmedQuery))
-      .sort((a, b) => {
-        const dateDiff = getTaskRecordDate(b).localeCompare(getTaskRecordDate(a));
-        return dateDiff || b.updated_at.localeCompare(a.updated_at);
-      });
-  }, [allTasks, employeeId, historyDate, historyStatus, searchQuery]);
-
   const historyGroups = useMemo(() => {
     const groups = new Map<string, TaskWithDetails[]>();
     for (const task of historyTasks) {
@@ -174,8 +203,12 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
   }, [setDetailInUrl]);
 
   const initialTask = useMemo(
-    () => (detailTaskId ? allTasks.find((task) => task.id === detailTaskId) ?? null : null),
-    [detailTaskId, allTasks]
+    () => (detailTaskId
+      ? allTasks.find((task) => task.id === detailTaskId)
+        ?? historyTasks.find((task) => task.id === detailTaskId)
+        ?? null
+      : null),
+    [allTasks, detailTaskId, historyTasks]
   );
 
   return (
@@ -371,7 +404,11 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
           </div>
         </div>
 
-        {historyGroups.length === 0 ? (
+        {historyLoading && historyGroups.length === 0 ? (
+          <div className="px-5 py-12 text-center">
+            <p className="text-sm font-semibold text-slate-600">업무 기록을 불러오는 중입니다</p>
+          </div>
+        ) : historyGroups.length === 0 ? (
           <div className="px-5 py-12 text-center">
             <MagnifyingGlass size={26} className="mx-auto text-slate-300" />
             <p className="mt-3 text-sm font-semibold text-slate-600">조건에 맞는 업무가 없습니다</p>
@@ -421,6 +458,18 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
             ))}
           </div>
         )}
+        {historyCursor && (
+          <div className="border-t border-slate-100 px-5 py-3 text-center">
+            <button
+              type="button"
+              onClick={loadMoreHistory}
+              disabled={historyLoading}
+              className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {historyLoading ? '불러오는 중' : '더 불러오기'}
+            </button>
+          </div>
+        )}
       </section>
 
       {showCreate && (
@@ -438,6 +487,7 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
         taskId={detailTaskId}
         initialTask={initialTask}
         onClose={handleClosePanel}
+        onTaskMutated={refreshTasks}
       />
     </div>
   );

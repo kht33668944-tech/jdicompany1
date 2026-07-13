@@ -76,17 +76,6 @@ export default function SchedulePageClient({
   // - fetch 완료 후 null 로 리셋 → 늦게 도착한 캐시 콜백이 fresh 를 덮어쓰지 못함
   const inflightKeyRef = useRef<string | null>(null);
 
-  // 최초 mount 시: IDB 캐시 → 즉시 표시 → 백그라운드 fetch
-  useEffect(() => {
-    // IDB 캐시가 있으면 먼저 표시
-    void getCachedMonth(initialYear, initialMonth).then((cached) => {
-      if (cached && cached.length > 0) setSchedules(cached);
-    });
-    // 백그라운드에서 최신 데이터 fetch
-    void refetchMonth(initialYear, initialMonth);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const filteredSchedules = useMemo(() => schedules.filter((s) => {
     if (visibilityFilter === "all") return true;
     if (visibilityFilter === "company") return s.visibility === "company";

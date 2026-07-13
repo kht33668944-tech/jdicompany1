@@ -20,7 +20,7 @@ import { formatKRW } from "@/lib/influencer/format";
 import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
 import type { InfluencerTier } from "@/lib/influencer/metrics";
-import type { Influencer, InfluencerCampaign, CampaignStatus, CampaignBasic } from "@/lib/influencer/types";
+import type { InfluencerListItem, InfluencerCampaign, CampaignStatus, CampaignBasic } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
 function formatFollowers(n: number | null): string {
@@ -31,8 +31,23 @@ function formatFollowers(n: number | null): string {
 }
 
 function formatEngagementRate(n: number | null): string {
-  if (n === null) return "—";
+  if (n === null) return "-";
   return `${n.toFixed(1)}%`;
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+    const updateIsMobile = () => setIsMobile(mediaQuery.matches);
+
+    updateIsMobile();
+    mediaQuery.addEventListener("change", updateIsMobile);
+    return () => mediaQuery.removeEventListener("change", updateIsMobile);
+  }, []);
+
+  return isMobile;
 }
 
 
@@ -338,17 +353,21 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onO
 }
 
 interface Props {
-  influencers: Influencer[];
+  influencers: InfluencerListItem[];
   activeCampaigns: InfluencerCampaign[];
   allCampaigns: CampaignBasic[];
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;
   onSelectInfluencer: (id: string) => void;
   onRefresh: () => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
 }
 
-export default function InfluencerTable({ influencers, activeCampaigns, allCampaigns, filters, onFiltersChange, onSelectInfluencer, onRefresh }: Props) {
+export default function InfluencerTable({ influencers, activeCampaigns, allCampaigns, filters, onFiltersChange, onSelectInfluencer, onRefresh, hasMore, loadingMore, onLoadMore }: Props) {
   const [resyncingAll, startResyncAll] = useTransition();
+  const isMobile = useIsMobile();
 
   type OpenFilter = "grade" | "tier" | "status" | null;
   const [openFilter, setOpenFilter] = useState<OpenFilter>(null);
@@ -438,8 +457,6 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
             inf.username,
             inf.display_name ?? "",
             inf.category ?? "",
-            inf.bio ?? "",
-            inf.notes ?? "",
             ...(inf.tags ?? []),
           ].join(" ").toLowerCase();
           if (!haystack.includes(q)) return false;
@@ -569,7 +586,8 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       )}
 
       {/* 모바일 카드 리스트 (sm 미만) */}
-      <div className="sm:hidden divide-y divide-slate-100 overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px] no-scrollbar">
+      {isMobile && (<>
+      <div className="sm:hidden">
         {displayed.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-slate-400">
             인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요.
@@ -685,9 +703,12 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       </div>
 
       {/* 데스크탑 테이블 (sm 이상) — 컨테이너 안에서 스크롤 (sticky 헤더, 스크롤바 숨김) */}
-      <div className="hidden sm:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px] no-scrollbar">
+      </>)}
+
+      {!isMobile && (
+      <div className="block overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[320px] no-scrollbar">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
+          <thead className="hidden sm:table-header-group sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
             <tr className="border-b border-slate-100">
               <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">인플루언서</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">ER</th>
@@ -755,7 +776,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
               <th className="px-4 py-3 w-10" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="block sm:table-row-group divide-y divide-slate-50">
             {displayed.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400">
@@ -769,10 +790,10 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                   <tr
                     key={inf.id}
                     onClick={() => onSelectInfluencer(inf.id)}
-                    className="hover:bg-slate-50/60 cursor-pointer transition-colors group"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3 hover:bg-slate-50/60 cursor-pointer transition-colors group sm:table-row sm:px-0 sm:py-0"
                   >
                     {/* 인플루언서 */}
-                    <td className="px-6 py-3">
+                    <td className="px-0 py-0 sm:px-6 sm:py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 ring-1 ring-slate-100 relative">
                           {(() => {
@@ -809,13 +830,13 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                     </td>
 
                     {/* ER */}
-                    <td className="px-4 py-3 text-right tabular-nums">
+                    <td className="hidden sm:table-cell px-4 py-3 text-right tabular-nums">
                       <div className="font-medium text-slate-700">{formatEngagementRate(inf.engagement_rate)}</div>
                       <ErTierEvaluation er={inf.engagement_rate} follower={inf.follower_count} />
                     </td>
 
                     {/* 팔로워 */}
-                    <td className="px-4 py-3 text-right tabular-nums">
+                    <td className="hidden sm:table-cell px-4 py-3 text-right tabular-nums">
                       <div className="text-slate-600">{formatFollowers(inf.follower_count)}</div>
                       {(() => {
                         const tier = getTier(inf.follower_count);
@@ -826,7 +847,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                     </td>
 
                     {/* AI 등급 */}
-                    <td className="px-4 py-3 text-center">
+                    <td className="hidden sm:table-cell px-4 py-3 text-center">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -844,7 +865,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                     </td>
 
                     {/* 시딩 금액 */}
-                    <td className="px-4 py-3 text-right tabular-nums">
+                    <td className="col-start-1 px-0 py-0 text-left tabular-nums sm:table-cell sm:px-4 sm:py-3 sm:text-right">
                       <div className="font-medium text-slate-700">
                         {seeding ? formatKRW(seeding.totalCost, { dashOnZero: true }) : "—"}
                       </div>
@@ -854,7 +875,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                     </td>
 
                     {/* 상태 */}
-                    <td className="px-4 py-3">
+                    <td className="col-start-1 px-0 py-0 sm:table-cell sm:px-4 sm:py-3">
                       <StatusCell
                         campaign={campaignMap.get(inf.id)}
                         influencerId={inf.id}
@@ -865,7 +886,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                     </td>
 
                     {/* 메뉴 */}
-                    <td className="px-4 py-3">
+                    <td className="col-start-2 row-start-1 px-0 py-0 sm:table-cell sm:px-4 sm:py-3">
                       <RowMenu
                         influencerId={inf.id}
                         onViewDetail={() => onSelectInfluencer(inf.id)}
@@ -879,6 +900,21 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
           </tbody>
         </table>
       </div>
+
+      )}
+
+      {hasMore && (
+        <div className="px-4 sm:px-6 py-3 border-t border-slate-100 text-center">
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loadingMore ? "불러오는 중..." : "더 불러오기"}
+          </button>
+        </div>
+      )}
 
       {sorted.length > 50 && (
         <div className="px-4 sm:px-6 py-3 border-t border-slate-100 text-center text-xs text-slate-400">

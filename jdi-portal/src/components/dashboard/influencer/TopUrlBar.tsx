@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import Link from "phosphor-react/dist/icons/Link.esm.js";
 import FunnelSimple from "phosphor-react/dist/icons/FunnelSimple.esm.js";
@@ -13,7 +14,10 @@ import CaretRight from "phosphor-react/dist/icons/CaretRight.esm.js";
 import X from "phosphor-react/dist/icons/X.esm.js";
 import { useAnalysisJobs } from "@/components/dashboard/AnalysisJobsProvider";
 import { parseInstagramUrl } from "@/lib/influencer/url";
-import BulkUploadModal from "./BulkUploadModal";
+
+const BulkUploadModal = dynamic(() => import("./BulkUploadModal"), {
+  ssr: false,
+});
 
 interface Props {
   onFilterClick: () => void;
@@ -272,10 +276,12 @@ export default function TopUrlBar({ onFilterClick, dateMilestone, onDateMileston
         />
       )}
 
-      <BulkUploadModal
-        open={bulkOpen}
-        onClose={() => setBulkOpen(false)}
-      />
+      {bulkOpen && (
+        <BulkUploadModal
+          open={bulkOpen}
+          onClose={() => setBulkOpen(false)}
+        />
+      )}
     </>
   );
 }
