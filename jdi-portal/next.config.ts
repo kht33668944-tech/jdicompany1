@@ -36,6 +36,10 @@ const nextConfig: NextConfig = {
             value: "DENY",
           },
           {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive, nosnippet",
+          },
+          {
             key: "Referrer-Policy",
             value: "strict-origin-when-cross-origin",
           },
