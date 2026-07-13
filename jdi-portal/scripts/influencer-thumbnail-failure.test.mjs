@@ -44,3 +44,10 @@ test("thumbnail proxy serves cacheable SVG placeholders for remediated upstream 
   assert.match(route, /"cache-control": `public, max-age=\$\{cacheSeconds\}`/);
   assert.doesNotMatch(route, /console\.(?:error|warn|log)\(/);
 });
+
+test("thumbnail proxy negative-caches every non-OK upstream response as an upstream error", () => {
+  assert.match(
+    route,
+    /if \(!r\.ok\) \{\s+const failure = cacheFailure\(url, NEGATIVE_CACHE_SECONDS\.upstreamError\);\s+return placeholderResponse\(failure\.cacheSeconds\);\s+\}/,
+  );
+});

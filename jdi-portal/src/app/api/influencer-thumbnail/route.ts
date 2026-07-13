@@ -103,7 +103,10 @@ export async function GET(req: NextRequest) {
       const failure = cacheFailure(url, NEGATIVE_CACHE_SECONDS.upstreamError);
       return placeholderResponse(failure.cacheSeconds);
     }
-    if (!r.ok) return new Response("not found", { status: 404 });
+    if (!r.ok) {
+      const failure = cacheFailure(url, NEGATIVE_CACHE_SECONDS.upstreamError);
+      return placeholderResponse(failure.cacheSeconds);
+    }
 
     const buf = await r.arrayBuffer();
     return new Response(buf, {
