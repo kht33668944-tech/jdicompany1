@@ -26,6 +26,10 @@ export interface AttendanceRecord {
   status: "미출근" | "근무중" | "퇴근";
   note: string | null;
 }
+export interface TodayAttendanceStatus {
+  user_id: string;
+  status: AttendanceRecord["status"];
+}
 
 export type VacationType = "연차" | "반차-오전" | "반차-오후" | "병가" | "특별휴가";
 export type RequestStatus = "대기중" | "승인" | "반려" | "취소요청" | "취소";

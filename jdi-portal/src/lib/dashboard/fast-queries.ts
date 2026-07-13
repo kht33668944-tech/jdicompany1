@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Profile } from "@/lib/attendance/types";
 import { getWeekRange, toDateString } from "@/lib/utils/date";
 import { getPool, isPostgresUsable, markPostgresUnavailable } from "@/lib/db/postgres";
 import { measureOperation } from "@/lib/performance/timing";
@@ -19,8 +18,7 @@ const DASHBOARD_SNAPSHOT_QUERY = `
       $4::date as week_end,
       $5::timestamptz as day_start,
       $6::timestamptz as day_end,
-      $7::boolean as can_view_company_work,
-      $8::jsonb as current_profile
+      $7::boolean as can_view_company_work
   ),
   today_record as (
     select to_jsonb(ar) as value
@@ -137,30 +135,20 @@ const DASHBOARD_SNAPSHOT_QUERY = `
         and ar.work_date <= prm.week_end
     ), '[]'::jsonb),
     'tasks', (select value from tasks),
-    'profiles', (
-      select case
-        when prm.can_view_company_work then coalesce((
-          select jsonb_agg(to_jsonb(p) order by p.full_name asc)
-          from public.profiles p
-        ), '[]'::jsonb)
-        else jsonb_build_array(prm.current_profile)
-      end
-      from parameters prm
-    ),
-    'todayAttendanceRecords', (
-      select case
-        when prm.can_view_company_work then coalesce((
-          select jsonb_agg(to_jsonb(ar) order by ar.check_in asc)
-          from public.attendance_records ar
-          where ar.work_date = prm.today
-        ), '[]'::jsonb)
-        else coalesce((
-          select jsonb_build_array(value)
-          from today_record
-        ), '[]'::jsonb)
-      end
-      from parameters prm
-    ),
+    'profiles', coalesce((
+      select jsonb_agg(to_jsonb(p) order by p.full_name asc)
+      from public.profiles p
+      where p.is_approved = true
+    ), '[]'::jsonb),
+    'todayAttendanceStatuses', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('user_id', ar.user_id, 'status', ar.status)
+        order by ar.check_in asc
+      )
+      from public.attendance_records ar
+      cross join parameters prm
+      where ar.work_date = prm.today
+    ), '[]'::jsonb),
     'schedules', (select value from schedules)
   ) as snapshot
 `;
@@ -173,7 +161,6 @@ async function getDashboardDataViaPostgres(
   userId: string,
   userName: string,
   canViewCompanyWork: boolean,
-  currentProfile: Profile,
   requestId: string
 ): Promise<DashboardData> {
   const today = toDateString();
@@ -195,7 +182,6 @@ async function getDashboardDataViaPostgres(
       dayStart,
       dayEnd,
       canViewCompanyWork,
-      JSON.stringify(currentProfile),
     ])
   );
   const snapshot = result.rows[0]?.snapshot;
@@ -215,11 +201,10 @@ export async function getDashboardDataFast(
   supabase: SupabaseClient,
   userId: string,
   userName: string,
-  canViewCompanyWork: boolean,
-  currentProfile: Profile
+  canViewCompanyWork: boolean
 ): Promise<DashboardData> {
   if (!isPostgresUsable()) {
-    return getDashboardData(supabase, userId, userName, canViewCompanyWork, currentProfile);
+    return getDashboardData(supabase, userId, userName, canViewCompanyWork);
   }
 
   try {
@@ -227,11 +212,10 @@ export async function getDashboardDataFast(
       userId,
       userName,
       canViewCompanyWork,
-      currentProfile,
       randomUUID()
     );
   } catch {
     markPostgresUnavailable();
-    return getDashboardData(supabase, userId, userName, canViewCompanyWork, currentProfile);
+    return getDashboardData(supabase, userId, userName, canViewCompanyWork);
   }
 }

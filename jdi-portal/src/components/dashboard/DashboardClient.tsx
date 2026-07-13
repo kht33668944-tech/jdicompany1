@@ -119,7 +119,7 @@ export default function DashboardClient({
       <TodayWorkBoardWidget
         userId={userId}
         profiles={data?.allProfiles ?? []}
-        attendanceRecords={data?.todayAttendanceRecords ?? []}
+        attendanceStatuses={data?.todayAttendanceStatuses ?? []}
         tasks={data?.allTasks ?? []}
         schedules={data?.todaySchedules ?? []}
         canViewCompanyWork={data?.canViewCompanyWork ?? false}

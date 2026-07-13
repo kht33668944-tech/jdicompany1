@@ -16,7 +16,7 @@ import {
   Trash,
 } from "phosphor-react";
 import { toast } from "sonner";
-import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
+import type { Profile, TodayAttendanceStatus } from "@/lib/attendance/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import type { TaskStatus, TaskWithDetails } from "@/lib/tasks/types";
 import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
@@ -33,7 +33,7 @@ import type { WorkTimelineTaskShareState } from "@/lib/work-timeline/types";
 interface Props {
   userId: string;
   profiles: Profile[];
-  attendanceRecords: AttendanceRecord[];
+  attendanceStatuses: TodayAttendanceStatus[];
   tasks: TaskWithDetails[];
   schedules: ScheduleWithProfile[];
   canViewCompanyWork: boolean;
@@ -54,15 +54,19 @@ const STATUS_ORDER: Record<TaskStatus, number> = {
   완료: 2,
 };
 
-function getAttendanceText(record: AttendanceRecord | undefined): string {
-  if (!record?.check_in) return "미출근";
-  if (record.status === "퇴근") return "퇴근 완료";
+function hasCheckedIn(attendance: TodayAttendanceStatus | undefined): boolean {
+  return attendance !== undefined && attendance.status !== "미출근";
+}
+
+function getAttendanceText(attendance: TodayAttendanceStatus | undefined): string {
+  if (!hasCheckedIn(attendance)) return "미출근";
+  if (attendance?.status === "퇴근") return "퇴근 완료";
   return "출근 완료";
 }
 
-function getAttendanceTone(record: AttendanceRecord | undefined): string {
-  if (!record?.check_in) return "bg-slate-100 text-slate-500";
-  if (record.status === "퇴근") return "bg-emerald-50 text-emerald-700";
+function getAttendanceTone(attendance: TodayAttendanceStatus | undefined): string {
+  if (!hasCheckedIn(attendance)) return "bg-slate-100 text-slate-500";
+  if (attendance?.status === "퇴근") return "bg-emerald-50 text-emerald-700";
   return "bg-indigo-50 text-indigo-700";
 }
 
@@ -218,7 +222,7 @@ function CompletedTaskTimelineAction({
 export default function TodayWorkBoardWidget({
   userId,
   profiles,
-  attendanceRecords,
+  attendanceStatuses,
   tasks,
   schedules,
   canViewCompanyWork,
@@ -237,7 +241,7 @@ export default function TodayWorkBoardWidget({
 
   const today = toDateString();
   const approvedProfiles = profiles.filter((profile) => profile.is_approved);
-  const attendanceByUser = new Map(attendanceRecords.map((record) => [record.user_id, record]));
+  const attendanceByUser = new Map(attendanceStatuses.map((attendance) => [attendance.user_id, attendance]));
 
   const todayOpenTasks = useMemo(
     () => localTasks.filter((task) => isTodayWorkTask(task, today)),
@@ -269,11 +273,11 @@ export default function TodayWorkBoardWidget({
   const overdueCount = todayOpenTasks.filter(
     (task) => taskBelongsToProfile(task, userId) && isOverdue(task.due_date, task.status)
   ).length;
-  const checkedInCount = approvedProfiles.filter((profile) => attendanceByUser.get(profile.id)?.check_in).length;
+  const checkedInCount = approvedProfiles.filter((profile) => hasCheckedIn(attendanceByUser.get(profile.id))).length;
   const unregisteredCount = approvedProfiles.filter((profile) => {
-    const hasCheckedIn = attendanceByUser.get(profile.id)?.check_in;
+    const profileHasCheckedIn = hasCheckedIn(attendanceByUser.get(profile.id));
     const hasTodayTask = todayOpenTasks.some((task) => taskBelongsToProfile(task, profile.id));
-    return hasCheckedIn && !hasTodayTask;
+    return profileHasCheckedIn && !hasTodayTask;
   }).length;
   const visibleSchedules = schedules.slice(0, 5);
   const detailTask = detailTaskId

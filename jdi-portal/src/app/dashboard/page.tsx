@@ -40,8 +40,7 @@ export default async function DashboardPage() {
       auth.supabase,
       auth.user.id,
       userName,
-      canViewCompanyWork,
-      auth.profile
+      canViewCompanyWork
     ),
     getInitialWorkTimelineData(auth.supabase),
   ]);

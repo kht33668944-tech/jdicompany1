@@ -9,6 +9,8 @@ import { execFileSync } from "node:child_process";
 const appRoot = path.resolve(import.meta.dirname, "..");
 const mapperSource = path.join(appRoot, "src", "lib", "dashboard", "dashboard-snapshot.ts");
 const fastQueriesSource = path.join(appRoot, "src", "lib", "dashboard", "fast-queries.ts");
+const dashboardQueriesSource = path.join(appRoot, "src", "lib", "dashboard", "queries.ts");
+const statusMigrationSource = path.join(appRoot, "supabase", "migrations", "086_today_attendance_statuses_rpc.sql");
 
 function loadSnapshotMapper() {
   assert.ok(existsSync(mapperSource), "dashboard snapshot mapper must exist");
@@ -130,7 +132,7 @@ test("maps a single-query dashboard snapshot to the existing DashboardData shape
         weekRecords: [attendance("attendance-mon", "2026-07-13", 480), attendance("attendance-wed", "2026-07-15", 360)],
         tasks: [mineLater, otherTask, completedMine, mineEarlier],
         profiles: [memberProfile],
-        todayAttendanceRecords: [todayRecord],
+        todayAttendanceStatuses: [{ user_id: "member-1", status: "working" }],
         schedules: [schedule],
       },
       {
@@ -151,7 +153,7 @@ test("maps a single-query dashboard snapshot to the existing DashboardData shape
       allTasksForUser: [mineLater, completedMine, mineEarlier],
       allTasks: [mineLater, otherTask, completedMine, mineEarlier],
       allProfiles: [memberProfile],
-      todayAttendanceRecords: [todayRecord],
+      todayAttendanceStatuses: [{ user_id: "member-1", status: "working" }],
       todaySchedules: [schedule],
       recentActivities: [],
       nextScheduleMinutes: 30,
@@ -172,7 +174,7 @@ test("preserves empty employee dashboard data without inventing company records"
         weekRecords: [],
         tasks: [],
         profiles: [memberProfile],
-        todayAttendanceRecords: [],
+        todayAttendanceStatuses: [],
         schedules: [],
       },
       {
@@ -193,7 +195,7 @@ test("preserves empty employee dashboard data without inventing company records"
       allTasksForUser: [],
       allTasks: [],
       allProfiles: [memberProfile],
-      todayAttendanceRecords: [],
+      todayAttendanceStatuses: [],
       todaySchedules: [],
       recentActivities: [],
       nextScheduleMinutes: null,
@@ -205,16 +207,29 @@ test("preserves empty employee dashboard data without inventing company records"
   }
 });
 
-test("uses one parameterized dashboard snapshot query and preserves the caller profile for employees", () => {
+test("loads approved profiles and minimal attendance statuses for every dashboard role", () => {
   const source = readFileSync(fastQueriesSource, "utf8");
 
   assert.match(source, /with parameters as/i);
   assert.match(source, /jsonb_agg/i);
   assert.equal((source.match(/pool\.query/g) ?? []).length, 1);
   assert.doesNotMatch(source, /Promise\.all/);
-  assert.match(source, /\$8::jsonb as current_profile/);
-  assert.match(source, /else jsonb_build_array\(prm\.current_profile\)/);
-  assert.match(source, /JSON\.stringify\(currentProfile\)/);
+  assert.doesNotMatch(source, /current_profile/);
+  assert.match(source, /where p\.is_approved = true/i);
+  assert.match(source, /'todayAttendanceStatuses'/);
+  assert.match(source, /jsonb_build_object\('user_id', ar\.user_id, 'status', ar\.status\)/);
   assert.match(source, /today_record as \(/);
   assert.match(source, /from today_record/);
+});
+
+test("uses an approved-user RPC for fallback attendance status visibility", () => {
+  const querySource = readFileSync(dashboardQueriesSource, "utf8");
+  const migrationSource = readFileSync(statusMigrationSource, "utf8");
+
+  assert.match(querySource, /getTodayAttendanceStatuses\(supabase\)/);
+  assert.doesNotMatch(querySource, /canViewCompanyWork\s*\?\s*await/);
+  assert.match(migrationSource, /RETURNS TABLE \(user_id UUID, status TEXT\)/);
+  assert.match(migrationSource, /public\.is_approved_user\(\)/);
+  assert.match(migrationSource, /AT TIME ZONE 'Asia\/Seoul'/);
+  assert.doesNotMatch(migrationSource, /check_in|check_out|total_minutes|note/);
 });

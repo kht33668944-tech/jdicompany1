@@ -1,4 +1,4 @@
-import type { AttendanceRecord, Profile } from "../attendance/types";
+import type { AttendanceRecord, Profile, TodayAttendanceStatus } from "../attendance/types";
 import type { ScheduleWithProfile } from "../schedule/types";
 import type { TaskWithDetails } from "../tasks/types";
 
@@ -7,7 +7,7 @@ export interface DashboardSnapshot {
   weekRecords: AttendanceRecord[];
   tasks: TaskWithDetails[];
   profiles: Profile[];
-  todayAttendanceRecords: AttendanceRecord[];
+  todayAttendanceStatuses: TodayAttendanceStatus[];
   schedules: ScheduleWithProfile[];
 }
 
@@ -28,7 +28,7 @@ export interface DashboardSnapshotData {
   allTasksForUser: TaskWithDetails[];
   allTasks: TaskWithDetails[];
   allProfiles: Profile[];
-  todayAttendanceRecords: AttendanceRecord[];
+  todayAttendanceStatuses: TodayAttendanceStatus[];
   todaySchedules: ScheduleWithProfile[];
   recentActivities: [];
   nextScheduleMinutes: number | null;
@@ -86,7 +86,7 @@ export function buildDashboardDataFromSnapshot(
     allTasksForUser,
     allTasks: snapshot.tasks,
     allProfiles: snapshot.profiles,
-    todayAttendanceRecords: snapshot.todayAttendanceRecords,
+    todayAttendanceStatuses: snapshot.todayAttendanceStatuses,
     todaySchedules: snapshot.schedules,
     recentActivities: [],
     nextScheduleMinutes,

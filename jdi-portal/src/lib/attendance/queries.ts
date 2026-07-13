@@ -3,6 +3,7 @@ import { toDateString, getMonthRange } from "@/lib/utils/date";
 import type {
   Profile,
   AttendanceRecord,
+  TodayAttendanceStatus,
   VacationBalance,
   VacationRequest,
   CorrectionRequest,
@@ -165,6 +166,13 @@ export async function getEmployeeRecordsByRange(
   return data ?? [];
 }
 
+export async function getTodayAttendanceStatuses(
+  supabase: SupabaseClient
+): Promise<TodayAttendanceStatus[]> {
+  const { data, error } = await supabase.rpc("get_today_attendance_statuses");
+  if (error) throw error;
+  return (data as TodayAttendanceStatus[]) ?? [];
+}
 // Admin queries
 export async function getAllTodayAttendance(
   supabase: SupabaseClient

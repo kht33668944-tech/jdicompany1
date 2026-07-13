@@ -1,9 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
+import type { AttendanceRecord, Profile, TodayAttendanceStatus } from "@/lib/attendance/types";
 import type { TaskWithDetails } from "@/lib/tasks/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import { toDateString, getWeekRange, addDays } from "@/lib/utils/date";
-import { getAllProfiles, getAllTodayAttendance, getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
+import { getAllProfiles, getTodayAttendanceStatuses, getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
 import { getTasksWithDetails } from "@/lib/tasks/queries";
 import { getTodaySchedules } from "@/lib/schedule/queries";
 import { sortTasks } from "@/lib/tasks/utils";
@@ -28,7 +28,7 @@ export interface DashboardData {
   allTasksForUser: TaskWithDetails[];
   allTasks: TaskWithDetails[];
   allProfiles: Profile[];
-  todayAttendanceRecords: AttendanceRecord[];
+  todayAttendanceStatuses: TodayAttendanceStatus[];
   todaySchedules: ScheduleWithProfile[];
   recentActivities: RecentActivity[];
   nextScheduleMinutes: number | null;
@@ -40,22 +40,19 @@ export async function getDashboardData(
   supabase: SupabaseClient,
   userId: string,
   userName: string,
-  canViewCompanyWork: boolean,
-  currentProfile: Profile
+  canViewCompanyWork: boolean
 ): Promise<DashboardData> {
   const today = toDateString();
   const { start: weekStart, end: weekEnd } = getWeekRange();
 
-  const [todayRecord, weekRecords, allTasks, todaySchedules] = await Promise.all([
+  const [todayRecord, weekRecords, allTasks, todaySchedules, allProfiles, todayAttendanceStatuses] = await Promise.all([
     getTodayRecord(supabase, userId),
     getWeekRecords(supabase, userId, weekStart, weekEnd),
     getTasksWithDetails(supabase),
     getTodaySchedules(supabase, today),
+    getAllProfiles(supabase),
+    getTodayAttendanceStatuses(supabase),
   ]);
-
-  const [allProfiles, todayAttendanceRecords] = canViewCompanyWork
-    ? await Promise.all([getAllProfiles(supabase), getAllTodayAttendance(supabase)])
-    : [[currentProfile], todayRecord ? [todayRecord] : []];
 
   const allTasksForUser = allTasks.filter((task) =>
     task.assignees.some((assignee) => assignee.user_id === userId)
@@ -99,7 +96,7 @@ export async function getDashboardData(
     allTasksForUser,
     allTasks,
     allProfiles,
-    todayAttendanceRecords,
+    todayAttendanceStatuses,
     todaySchedules,
     recentActivities: [],
     nextScheduleMinutes,
