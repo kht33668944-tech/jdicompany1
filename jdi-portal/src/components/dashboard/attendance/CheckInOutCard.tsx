@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, SignIn, SignOut } from "phosphor-react";
-import TaskCreateModal from "@/components/dashboard/tasks/TaskCreateModal";
+import AttendanceTaskCreateModal from "./AttendanceTaskCreateModal";
 async function checkIn(): Promise<AttendanceRecord> {
   const res = await fetch("/api/attendance/check-in", { method: "POST" });
   const body = await res.json();
@@ -21,7 +21,6 @@ import { ATTENDANCE_STATUS_CONFIG } from "@/lib/attendance/constants";
 import { formatMinutes, formatTime, toDateString } from "@/lib/utils/date";
 import { getErrorMessage } from "@/lib/utils/errors";
 import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
-import { toDashboardTaskPerson } from "@/lib/dashboard/dashboard-task-summary";
 
 interface CheckInOutCardProps {
   userId: string;
@@ -46,7 +45,7 @@ async function verifyIpQuick(allowedIp: string | null): Promise<boolean> {
   }
 }
 
-export default function CheckInOutCard({ userId, profile, todayRecord, allowedIp }: CheckInOutCardProps) {
+export default function CheckInOutCard({ userId, todayRecord, allowedIp }: CheckInOutCardProps) {
   const router = useRouter();
   const [status, setStatus] = useState(todayRecord?.status ?? ABSENT_STATUS);
   const [checkInTime, setCheckInTime] = useState(todayRecord?.check_in ?? null);
@@ -187,15 +186,10 @@ export default function CheckInOutCard({ userId, profile, todayRecord, allowedIp
       </div>
 
       {showTaskPrompt && (
-        <TaskCreateModal
-          userId={userId}
-          profiles={[toDashboardTaskPerson(profile)]}
-          title="오늘 내 업무 작성"
-          selfOnly
+        <AttendanceTaskCreateModal
           initialDueDate={today}
           draftKey={`attendance-task-draft:${userId}:${today}`}
           onClose={() => setShowTaskPrompt(false)}
-          onCreated={() => router.refresh()}
         />
       )}
     </div>

@@ -124,6 +124,76 @@ export async function createTask(params: {
   return data;
 }
 
+export interface CreateSelfTaskInput {
+  title: string;
+  description?: string;
+  dueDate?: string;
+}
+
+const MAX_SELF_TASKS_PER_BATCH = 20;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 출근 직후 작성한 본인 업무를 한 번에 생성한다. */
+export async function createSelfTasks(tasks: CreateSelfTaskInput[]) {
+  const userId = await getSessionUserId();
+
+  if (tasks.length === 0 || tasks.length > MAX_SELF_TASKS_PER_BATCH) {
+    throw new Error(`업무는 한 번에 1개부터 ${MAX_SELF_TASKS_PER_BATCH}개까지 등록할 수 있습니다.`);
+  }
+
+  const normalizedTasks = tasks.map((task) => ({
+    title: task.title.trim(),
+    description: task.description?.trim() || null,
+    dueDate: task.dueDate || null,
+  }));
+
+  if (normalizedTasks.some((task) => !task.title)) {
+    throw new Error("모든 업무의 제목을 입력해주세요.");
+  }
+
+  if (normalizedTasks.some((task) => task.dueDate && !ISO_DATE_PATTERN.test(task.dueDate))) {
+    throw new Error("올바른 데드라인을 입력해주세요.");
+  }
+
+  const normalizedTitles = normalizedTasks.map((task) => task.title.toLocaleLowerCase("ko-KR"));
+  if (new Set(normalizedTitles).size !== normalizedTitles.length) {
+    throw new Error("같은 제목의 업무가 중복되어 있습니다.");
+  }
+
+  const supabase = await createClient();
+  const targetStatus = TASK_STATUSES[0];
+  const nextPosition = await getNextPosition(supabase, targetStatus);
+  const taskRows = normalizedTasks.map((task, index) => ({
+    title: task.title,
+    description: task.description,
+    status: targetStatus,
+    priority: TASK_PRIORITIES[2],
+    due_date: task.dueDate,
+    position: nextPosition + index,
+    created_by: userId,
+  }));
+
+  const { data: createdTasks, error: taskError } = await supabase
+    .from("tasks")
+    .insert(taskRows)
+    .select();
+
+  if (taskError) throw taskError;
+
+  const createdIds = createdTasks.map((task) => task.id);
+  const { error: assigneeError } = await supabase
+    .from("task_assignees")
+    .insert(createdIds.map((taskId) => ({ task_id: taskId, user_id: userId })));
+
+  if (assigneeError) {
+    await supabase.from("tasks").delete().in("id", createdIds);
+    throw assigneeError;
+  }
+
+  revalidateTaskViews();
+  return createdTasks;
+}
+
 export async function updateTask(
   taskId: string,
   params: {
