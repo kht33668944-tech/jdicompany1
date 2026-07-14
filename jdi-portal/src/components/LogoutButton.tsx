@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { clearWorkTimelineCache } from "@/lib/work-timeline/timelineCache";
 
 interface LogoutButtonProps {
   children: ReactNode;
@@ -24,6 +25,7 @@ export default function LogoutButton({ children, className, title }: LogoutButto
     } catch {
       /* 무시 */
     }
+    await clearWorkTimelineCache();
     try {
       await fetch("/auth/signout", { method: "POST" });
     } catch {

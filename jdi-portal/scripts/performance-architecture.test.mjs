@@ -32,20 +32,31 @@ test("approved login avoids a client profile query and rejected users are signed
   assert.match(rejected, /redirect\(["']\/login\?error=not_approved["']\)/);
 });
 
-test("dashboard streams timeline after the snapshot critical path", () => {
+test("dashboard renders a user-scoped cached timeline before a lightweight refresh", () => {
   const page = source("src/app/dashboard/page.tsx");
   const dashboard = source("src/components/dashboard/DashboardClient.tsx");
   const timeline = source("src/components/dashboard/DashboardTimelineClient.tsx");
+  const section = source("src/components/dashboard/work-timeline/WorkTimelineSection.tsx");
+  const queries = source("src/lib/work-timeline/queries.ts");
+  const cache = source("src/lib/work-timeline/timelineCache.ts");
 
-  const dashboardStart = page.indexOf("const dashboardDataPromise = getDashboardDataFast");
-  const timelineStart = page.indexOf("const timelineDataPromise = getInitialWorkTimelineData");
-  const dashboardAwait = page.indexOf("const initialData = await dashboardDataPromise");
-  assert.ok(dashboardStart >= 0 && timelineStart > dashboardStart && dashboardAwait > timelineStart);
-  assert.match(page, /<Suspense fallback=\{<DashboardTimelineSkeleton \/>\}>/);
-  assert.match(page, /timelineData=\{timelineDataPromise\}/);
+  assert.doesNotMatch(page, /getInitialWorkTimelineData|timelineDataPromise|<Suspense/);
+  assert.match(page, /<DashboardTimelineClient/);
   assert.doesNotMatch(dashboard, /getWorkTimeline|WorkTimelineSection|initialTimelineEntries|timelineProfiles/);
-  assert.match(timeline, /dynamic\(/);
-  assert.match(timeline, /ssr: false/);
+
+  assert.match(timeline, /getCachedWorkTimeline\(currentUserId\)/);
+  assert.match(timeline, /getWorkTimelineEntries\(supabase,[\s\S]*includeAttachments: false/);
+  assert.match(timeline, /cacheWorkTimeline\(currentUserId, entries, profiles\)/);
+  assert.ok(
+    timeline.indexOf("if (cached) setData(cached)") <
+      timeline.indexOf("const [entries, profiles] = await Promise.all"),
+  );
+
+  assert.match(queries, /if \(filters\.includeAttachments === false\) return attachFiles\(rows, \[\]\)/);
+  assert.match(section, /getWorkTimelineAttachments\(/);
+  assert.match(cache, /function timelineKey\(userId: string\)/);
+  assert.match(cache, /attachments: \[\]/);
+  assert.match(cache, /24 \* 60 \* 60/);
 });
 
 test("Railway healthcheck bypasses auth while startup warms one persistent DB connection", () => {

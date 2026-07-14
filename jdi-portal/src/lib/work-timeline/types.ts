@@ -41,6 +41,7 @@ export interface WorkTimelineFilters {
   employeeId?: string | null;
   date?: string | null;
   query?: string | null;
+  includeAttachments?: boolean;
 }
 
 export interface CreateWorkTimelineEntryInput {

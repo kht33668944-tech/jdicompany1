@@ -117,6 +117,8 @@ export async function getWorkTimelineEntries(
   if (error) throw error;
 
   const rows = (data ?? []) as Record<string, unknown>[];
+  if (filters.includeAttachments === false) return attachFiles(rows, []);
+
   const attachments = await getWorkTimelineAttachments(
     supabase,
     rows.map((row) => row.id as string),
