@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getTaskBasic,
   getTaskDetails,
 } from "@/lib/tasks/queries";
-import type { Profile } from "@/lib/attendance/types";
+import type { DashboardTaskPerson } from "@/lib/dashboard/dashboard-task-summary";
 import type {
   TaskWithDetails,
   TaskChecklistItem,
@@ -21,9 +21,18 @@ const taskDetailsMemCache = new Map<
   string,
   { checklist: TaskChecklistItem[]; activities: TaskActivity[] }
 >();
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(", ");
+
 
 interface Props {
-  profiles: Profile[];
+  profiles: DashboardTaskPerson[];
   userId: string;
   taskId: string | null;
   initialTask: TaskWithDetails | null;
@@ -53,6 +62,14 @@ export default function TaskDetailPanel({
   const [phase, setPhase] = useState<PanelPhase>("closed");
   const [prevTaskId, setPrevTaskId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const activeTaskIdRef = useRef<string | null>(taskId);
+  const taskRequestGenerationRef = useRef(0);
+  const openerRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    activeTaskIdRef.current = taskId;
+    taskRequestGenerationRef.current += 1;
+  }, [taskId]);
 
   const visible = phase !== "closed";
   const sliding = phase === "open";
@@ -133,9 +150,14 @@ export default function TaskDetailPanel({
       ? Promise.resolve<TaskWithDetails | null>(initialTask)
       : getTaskBasic(supabase, taskId);
 
+    const requestGeneration = taskRequestGenerationRef.current;
     Promise.all([detailsPromise, taskPromise])
       .then(([details, fetchedTask]) => {
-        if (cancelled) return;
+        if (
+          cancelled
+          || activeTaskIdRef.current !== taskId
+          || taskRequestGenerationRef.current !== requestGeneration
+        ) return;
         const task = fetchedTask ?? (hasCachedTask ? initialTask : null);
         if (!task) {
           setError("할일을 찾을 수 없습니다.");
@@ -149,7 +171,11 @@ export default function TaskDetailPanel({
         setData({ task, checklist, attachments: [], activities });
       })
       .catch(() => {
-        if (cancelled) return;
+        if (
+          cancelled
+          || activeTaskIdRef.current !== taskId
+          || taskRequestGenerationRef.current !== requestGeneration
+        ) return;
         setError("데이터를 불러오는데 실패했습니다.");
       });
 
@@ -161,28 +187,96 @@ export default function TaskDetailPanel({
   const handleRefresh = useCallback(() => {
     onTaskMutated?.();
     if (!taskId) return;
+    const refreshTaskId = taskId;
+    const requestGeneration = taskRequestGenerationRef.current + 1;
+    taskRequestGenerationRef.current = requestGeneration;
     const supabase = createClient();
     Promise.all([
-      getTaskBasic(supabase, taskId),
-      getTaskDetails(supabase, taskId),
+      getTaskBasic(supabase, refreshTaskId),
+      getTaskDetails(supabase, refreshTaskId),
     ]).then(([task, details]) => {
-      if (!task) return;
+      if (
+        !task
+        || activeTaskIdRef.current !== refreshTaskId
+        || taskRequestGenerationRef.current !== requestGeneration
+      ) return;
       const { checklist, activities } = details;
       task.checklist_total = checklist.length;
       task.checklist_completed = checklist.filter((c) => c.is_completed).length;
       task.comment_count = activities.filter((a) => a.type === "comment").length;
-      taskDetailsMemCache.set(taskId, { checklist, activities });
+      taskDetailsMemCache.set(refreshTaskId, { checklist, activities });
       setData({ task, checklist, attachments: [], activities });
     }).catch((err) => {
       console.warn("[TaskDetailPanel] refresh failed:", err);
     });
   }, [onTaskMutated, taskId]);
 
-  // ESC 키로 닫기
+  useEffect(() => {
+    if (visible) {
+      const activeElement = document.activeElement;
+      if (
+        !openerRef.current
+        && activeElement instanceof HTMLElement
+        && activeElement !== document.body
+      ) {
+        openerRef.current = activeElement;
+      }
+      panelRef.current?.focus();
+      return;
+    }
+
+    const opener = openerRef.current;
+    if (opener?.isConnected) opener.focus();
+    openerRef.current = null;
+  }, [visible]);
+
+  useEffect(() => () => {
+    const opener = openerRef.current;
+    if (opener?.isConnected) opener.focus();
+  }, []);
+
   useEffect(() => {
     if (!visible) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusableElements = Array.from(
+        panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((element) => element.tabIndex >= 0 && !element.hasAttribute("disabled"));
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+      if (event.shiftKey) {
+        if (
+          activeElement === panel
+          || activeElement === first
+          || !panel.contains(activeElement)
+        ) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (
+        activeElement === panel
+        || activeElement === last
+        || !panel.contains(activeElement)
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -213,6 +307,8 @@ export default function TaskDetailPanel({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
+        aria-label="할일 상세"
+        tabIndex={-1}
         className={`absolute top-0 right-0 h-full w-full sm:w-[55%] sm:min-w-[480px] bg-slate-50 shadow-2xl transform transition-transform duration-200 ease-out overflow-hidden ${
           sliding ? "translate-x-0" : "translate-x-full"
         }`}

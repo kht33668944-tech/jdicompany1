@@ -21,6 +21,7 @@ import { ATTENDANCE_STATUS_CONFIG } from "@/lib/attendance/constants";
 import { formatMinutes, formatTime, toDateString } from "@/lib/utils/date";
 import { getErrorMessage } from "@/lib/utils/errors";
 import type { AttendanceRecord, Profile } from "@/lib/attendance/types";
+import { toDashboardTaskPerson } from "@/lib/dashboard/dashboard-task-summary";
 
 interface CheckInOutCardProps {
   userId: string;
@@ -188,7 +189,7 @@ export default function CheckInOutCard({ userId, profile, todayRecord, allowedIp
       {showTaskPrompt && (
         <TaskCreateModal
           userId={userId}
-          profiles={[profile]}
+          profiles={[toDashboardTaskPerson(profile)]}
           title="오늘 내 업무 작성"
           selfOnly
           initialDueDate={today}

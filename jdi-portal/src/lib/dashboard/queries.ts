@@ -1,12 +1,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AttendanceRecord, Profile, TodayAttendanceStatus } from "@/lib/attendance/types";
-import type { TaskWithDetails } from "@/lib/tasks/types";
-import type { ScheduleWithProfile } from "@/lib/schedule/types";
-import { toDateString, getWeekRange, addDays } from "@/lib/utils/date";
-import { getAllProfiles, getTodayAttendanceStatuses, getTodayRecord, getWeekRecords } from "@/lib/attendance/queries";
-import { getTasksWithDetails } from "@/lib/tasks/queries";
+import { getWeekRange } from "@/lib/utils/date";
+import {
+  getTodayAttendanceStatuses,
+  getTodayRecord,
+  getWeekRecords,
+} from "@/lib/attendance/queries";
 import { getTodaySchedules } from "@/lib/schedule/queries";
-import { sortTasks } from "@/lib/tasks/utils";
+import {
+  getDashboardTaskSummaryWindow,
+  normalizeDashboardTaskSummarySnapshot,
+  type DashboardTaskSummaryResult,
+  type DashboardTaskSummaryWindow,
+} from "./dashboard-task-summary";
+import {
+  buildDashboardDataFromSnapshot,
+  type DashboardSnapshotData,
+} from "./dashboard-snapshot";
 
 export interface RecentActivity {
   id: string;
@@ -20,87 +29,64 @@ export interface RecentActivity {
   created_at: string;
 }
 
-export interface DashboardData {
-  todayRecord: AttendanceRecord | null;
-  weeklyMinutes: number;
-  weekdayWorked: boolean[];
-  myTasks: TaskWithDetails[];
-  allTasksForUser: TaskWithDetails[];
-  allTasks: TaskWithDetails[];
-  allProfiles: Profile[];
-  todayAttendanceStatuses: TodayAttendanceStatus[];
-  todaySchedules: ScheduleWithProfile[];
+export interface DashboardData extends DashboardSnapshotData {
   recentActivities: RecentActivity[];
-  nextScheduleMinutes: number | null;
-  userName: string;
-  canViewCompanyWork: boolean;
+}
+
+export function mapRpcDashboardTaskSummarySnapshot(
+  snapshot: unknown,
+  window: DashboardTaskSummaryWindow
+): DashboardTaskSummaryResult {
+  return normalizeDashboardTaskSummarySnapshot(snapshot, window);
+}
+
+export async function getDashboardTaskSummaryFallback(
+  supabase: SupabaseClient,
+  window: DashboardTaskSummaryWindow
+): Promise<DashboardTaskSummaryResult> {
+  const { data, error } = await supabase.rpc("get_dashboard_task_summaries", {
+    p_day_start: window.dayStart,
+    p_next_day_start: window.nextDayStart,
+    p_limit: 101,
+  });
+  if (error) throw error;
+
+  return mapRpcDashboardTaskSummarySnapshot(data, window);
 }
 
 export async function getDashboardData(
   supabase: SupabaseClient,
   userId: string,
   userName: string,
-  canViewCompanyWork: boolean
+  canViewCompanyWork: boolean,
+  taskSummaryWindow: DashboardTaskSummaryWindow = getDashboardTaskSummaryWindow()
 ): Promise<DashboardData> {
-  const today = toDateString();
-  const { start: weekStart, end: weekEnd } = getWeekRange();
+  const today = taskSummaryWindow.today;
+  const { start: weekStart, end: weekEnd } = getWeekRange(new Date(taskSummaryWindow.dayStart));
+  const now = new Date();
 
-  const [todayRecord, weekRecords, allTasks, todaySchedules, allProfiles, todayAttendanceStatuses] = await Promise.all([
+  const [todayRecord, weekRecords, taskSummary, todaySchedules, todayAttendanceStatuses] = await Promise.all([
     getTodayRecord(supabase, userId),
     getWeekRecords(supabase, userId, weekStart, weekEnd),
-    getTasksWithDetails(supabase),
+    getDashboardTaskSummaryFallback(supabase, taskSummaryWindow),
     getTodaySchedules(supabase, today),
-    getAllProfiles(supabase),
     getTodayAttendanceStatuses(supabase),
   ]);
 
-  const allTasksForUser = allTasks.filter((task) =>
-    task.assignees.some((assignee) => assignee.user_id === userId)
-  );
-
-  // 미완료만, 마감일순 정렬
-  const myTasks = sortTasks(
-    allTasksForUser.filter((t) => t.status !== "완료"),
-    "due_date"
-  );
-
-  // 주간 근무시간 합산
-  const weeklyMinutes = weekRecords.reduce(
-    (sum, r) => sum + (r.total_minutes ?? 0),
-    0
-  );
-
-  // 요일별 출근 여부 (월~금)
-  const weekdayWorked: boolean[] = [];
-  for (let i = 0; i < 5; i++) {
-    const dateStr = addDays(weekStart, i);
-    weekdayWorked.push(weekRecords.some((r) => r.work_date === dateStr));
-  }
-
-  // 다음 일정까지 남은 분
-  const now = new Date();
-  let nextScheduleMinutes: number | null = null;
-  for (const s of todaySchedules) {
-    const start = new Date(s.start_time);
-    if (start > now) {
-      nextScheduleMinutes = Math.round((start.getTime() - now.getTime()) / 60000);
-      break;
-    }
-  }
-
-  return {
+  const snapshotData = buildDashboardDataFromSnapshot({
     todayRecord,
-    weeklyMinutes,
-    weekdayWorked,
-    myTasks,
-    allTasksForUser,
-    allTasks,
-    allProfiles,
+    weekRecords,
+    taskSummary,
     todayAttendanceStatuses,
-    todaySchedules,
-    recentActivities: [],
-    nextScheduleMinutes,
+    schedules: todaySchedules,
+  }, {
     userName,
     canViewCompanyWork,
+    weekStart,
+    now,
+  });
+  return {
+    ...snapshotData,
+    recentActivities: [],
   };
 }

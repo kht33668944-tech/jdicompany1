@@ -11,6 +11,7 @@ import {
 } from "phosphor-react";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskStatus, TaskWithDetails } from "@/lib/tasks/types";
+import { toDashboardTaskPerson } from "@/lib/dashboard/dashboard-task-summary";
 import type { TaskHistoryCursor, TaskHistoryFilters } from "@/lib/tasks/queries";
 import {
   formatDueDate,
@@ -66,6 +67,10 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
   const [historyStatus, setHistoryStatus] = useState<HistoryStatusFilter>("all");
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
   const historyGenerationRef = useRef(0);
+  const dashboardTaskProfiles = useMemo(
+    () => profiles.map(toDashboardTaskPerson),
+    [profiles]
+  );
 
   const historyFilters = useMemo<TaskHistoryFilters>(() => ({
     query: searchQuery.trim() || undefined,
@@ -475,14 +480,14 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
       {showCreate && (
         <TaskCreateModal
           userId={userId}
-          profiles={profiles}
+          profiles={dashboardTaskProfiles}
           onClose={() => setShowCreate(false)}
           onCreated={refreshTasks}
         />
       )}
 
       <TaskDetailPanel
-        profiles={profiles}
+        profiles={dashboardTaskProfiles}
         userId={userId}
         taskId={detailTaskId}
         initialTask={initialTask}

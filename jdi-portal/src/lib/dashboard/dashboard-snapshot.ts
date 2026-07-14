@@ -1,36 +1,30 @@
-import type { AttendanceRecord, Profile, TodayAttendanceStatus } from "../attendance/types";
+import type { AttendanceRecord, TodayAttendanceStatus } from "../attendance/types";
 import type { ScheduleWithProfile } from "../schedule/types";
-import type { TaskWithDetails } from "../tasks/types";
+import type { DashboardTaskSummaryResult } from "./dashboard-task-summary";
 
 export interface DashboardSnapshot {
   todayRecord: AttendanceRecord | null;
   weekRecords: AttendanceRecord[];
-  tasks: TaskWithDetails[];
-  profiles: Profile[];
+  taskSummary: DashboardTaskSummaryResult;
   todayAttendanceStatuses: TodayAttendanceStatus[];
   schedules: ScheduleWithProfile[];
 }
 
 export interface DashboardSnapshotContext {
-  userId: string;
   userName: string;
   canViewCompanyWork: boolean;
   weekStart: string;
   now: Date;
-  completedTaskStatus: string;
 }
 
 export interface DashboardSnapshotData {
   todayRecord: AttendanceRecord | null;
   weeklyMinutes: number;
   weekdayWorked: boolean[];
-  myTasks: TaskWithDetails[];
-  allTasksForUser: TaskWithDetails[];
-  allTasks: TaskWithDetails[];
-  allProfiles: Profile[];
+  taskSummary: DashboardTaskSummaryResult;
   todayAttendanceStatuses: TodayAttendanceStatus[];
   todaySchedules: ScheduleWithProfile[];
-  recentActivities: [];
+  recentActivities: unknown[];
   nextScheduleMinutes: number | null;
   userName: string;
   canViewCompanyWork: boolean;
@@ -41,25 +35,10 @@ function addDays(dateString: string, days: number): string {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
-function sortTasksByDueDate(tasks: TaskWithDetails[]): TaskWithDetails[] {
-  return [...tasks].sort((a, b) => {
-    if (!a.due_date && !b.due_date) return 0;
-    if (!a.due_date) return 1;
-    if (!b.due_date) return -1;
-    return a.due_date.localeCompare(b.due_date);
-  });
-}
-
 export function buildDashboardDataFromSnapshot(
   snapshot: DashboardSnapshot,
   context: DashboardSnapshotContext
 ): DashboardSnapshotData {
-  const allTasksForUser = snapshot.tasks.filter((task) =>
-    task.assignees.some((assignee) => assignee.user_id === context.userId)
-  );
-  const myTasks = sortTasksByDueDate(
-    allTasksForUser.filter((task) => task.status !== context.completedTaskStatus)
-  );
   const weeklyMinutes = snapshot.weekRecords.reduce(
     (total, record) => total + (record.total_minutes ?? 0),
     0
@@ -82,10 +61,7 @@ export function buildDashboardDataFromSnapshot(
     todayRecord: snapshot.todayRecord,
     weeklyMinutes,
     weekdayWorked,
-    myTasks,
-    allTasksForUser,
-    allTasks: snapshot.tasks,
-    allProfiles: snapshot.profiles,
+    taskSummary: snapshot.taskSummary,
     todayAttendanceStatuses: snapshot.todayAttendanceStatuses,
     todaySchedules: snapshot.schedules,
     recentActivities: [],

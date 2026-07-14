@@ -33,6 +33,7 @@ export default async function DashboardPage() {
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
 
+  const defaultTaskAssigneeFilter = auth.profile.role === "admin" ? "all" : auth.user.id;
   const userName = auth.profile.full_name ?? auth.user.email?.split("@")[0] ?? "사용자";
   const canViewCompanyWork = auth.profile.role !== "employee";
   const [initialData, timelineData] = await Promise.all([
@@ -57,6 +58,7 @@ export default async function DashboardPage() {
       timelineProfiles={timelineData.profiles}
       currentUserRole={auth.profile.role}
       initialLoadedAt={initialLoadedAt}
+      defaultTaskAssigneeFilter={defaultTaskAssigneeFilter}
     />
   );
 }

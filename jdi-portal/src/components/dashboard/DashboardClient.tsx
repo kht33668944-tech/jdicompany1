@@ -33,6 +33,7 @@ interface Props {
   timelineProfiles: WorkTimelineProfile[];
   currentUserRole: Profile["role"];
   initialLoadedAt: number;
+  defaultTaskAssigneeFilter: string;
 }
 
 export default function DashboardClient({
@@ -43,6 +44,7 @@ export default function DashboardClient({
   timelineProfiles,
   currentUserRole,
   initialLoadedAt,
+  defaultTaskAssigneeFilter,
 }: Props) {
   const router = useRouter();
   const data = initialData;
@@ -118,11 +120,11 @@ export default function DashboardClient({
 
       <TodayWorkBoardWidget
         userId={userId}
-        profiles={data?.allProfiles ?? []}
-        attendanceStatuses={data?.todayAttendanceStatuses ?? []}
-        tasks={data?.allTasks ?? []}
-        schedules={data?.todaySchedules ?? []}
-        canViewCompanyWork={data?.canViewCompanyWork ?? false}
+        profiles={data.taskSummary.profiles}
+        taskSummary={data.taskSummary}
+        attendanceStatuses={data.todayAttendanceStatuses}
+        schedules={data.todaySchedules}
+        defaultAssigneeFilter={defaultTaskAssigneeFilter}
       />
     </div>
   );

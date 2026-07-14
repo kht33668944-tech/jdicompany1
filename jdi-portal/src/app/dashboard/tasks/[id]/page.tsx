@@ -8,6 +8,7 @@ import {
 } from "@/lib/tasks/queries";
 import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import TaskDetailClient from "@/components/dashboard/tasks/detail/TaskDetailClient";
+import { toDashboardTaskPerson } from "@/lib/dashboard/dashboard-task-summary";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -41,7 +42,7 @@ export default async function TaskDetailPage({ params }: Props) {
       checklist={checklist}
       attachments={attachments}
       activities={activities}
-      profiles={profiles}
+      profiles={profiles.map(toDashboardTaskPerson)}
       userId={auth.user.id}
     />
   );

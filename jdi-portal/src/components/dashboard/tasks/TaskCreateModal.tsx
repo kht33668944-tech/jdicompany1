@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { X, XCircle } from "phosphor-react";
 import { createTask } from "@/lib/tasks/actions";
 import { toDateString } from "@/lib/utils/date";
-import type { Profile } from "@/lib/attendance/types";
+import type { DashboardTaskPerson } from "@/lib/dashboard/dashboard-task-summary";
 import { getErrorMessage } from "@/lib/utils/errors";
 import ModalContainer from "@/components/shared/ModalContainer";
 import UserAvatar from "@/components/shared/UserAvatar";
 
 interface TaskCreateModalProps {
   userId: string;
-  profiles: Profile[];
+  profiles: DashboardTaskPerson[];
   initialDueDate?: string;
   title?: string;
   selfOnly?: boolean;

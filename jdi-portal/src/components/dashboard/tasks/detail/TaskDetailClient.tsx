@@ -13,7 +13,7 @@ import {
   XCircle,
   X,
 } from "phosphor-react";
-import type { Profile } from "@/lib/attendance/types";
+import type { DashboardTaskPerson } from "@/lib/dashboard/dashboard-task-summary";
 import type {
   TaskWithDetails,
   TaskChecklistItem,
@@ -43,7 +43,7 @@ interface Props {
   checklist: TaskChecklistItem[];
   attachments: TaskAttachment[];
   activities: TaskActivity[];
-  profiles: Profile[];
+  profiles: DashboardTaskPerson[];
   userId: string;
   /** "page" (기본값) = 기존 전체 페이지, "panel" = 슬라이드 패널 */
   mode?: "page" | "panel";
@@ -295,6 +295,7 @@ export default function TaskDetailClient({
   const isAssignee = task.assignees.some((a) => a.user_id === userId);
   const canEdit = isCreator || isAssignee || isAdmin;
   const canDelete = isCreator || isAdmin;
+  const canManageAssignees = isCreator || isAdmin;
 
   const handleSave = async () => {
     setSaving(true);
@@ -390,6 +391,8 @@ export default function TaskDetailClient({
             />
             {canEdit && (
               <button
+                type="button"
+                aria-label="업무 저장"
                 onClick={handleSave}
                 disabled={saving || !title.trim()}
                 className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-all disabled:opacity-40"
@@ -399,6 +402,8 @@ export default function TaskDetailClient({
             )}
             {canDelete && (
               <button
+                type="button"
+                aria-label={`${task.title} 삭제`}
                 onClick={handleDelete}
                 disabled={deleting}
                 className="p-2 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
@@ -425,6 +430,7 @@ export default function TaskDetailClient({
         <div className="mb-3 rounded-lg bg-white p-4 shadow-sm">
           {canEdit ? (
             <input
+              aria-label="할일 제목"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full text-lg font-bold text-slate-800 outline-none bg-transparent"
@@ -437,6 +443,7 @@ export default function TaskDetailClient({
           <div className="mt-4">
             <label className="mb-1 block text-xs font-bold text-slate-400">설명</label>
             <textarea
+              aria-label="업무 설명"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               readOnly={!canEdit}
@@ -449,6 +456,7 @@ export default function TaskDetailClient({
             <div>
               <label className="mb-1 block text-xs font-bold text-slate-400">상태</label>
               <select
+                aria-label="업무 상태"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as TaskStatus)}
                 disabled={!canEdit}
@@ -462,6 +470,7 @@ export default function TaskDetailClient({
             <div>
               <label className="mb-1 block text-xs font-bold text-slate-400">우선순위</label>
               <select
+                aria-label="업무 우선순위"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as TaskPriority)}
                 disabled={!canEdit}
@@ -475,6 +484,7 @@ export default function TaskDetailClient({
             <div>
               <label className="mb-1 block text-xs font-bold text-slate-400">시작일</label>
               <input
+                aria-label="업무 시작일"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -485,6 +495,7 @@ export default function TaskDetailClient({
             <div>
               <label className="mb-1 block text-xs font-bold text-slate-400">데드라인</label>
               <input
+                aria-label="업무 데드라인"
                 type="date"
                 value={dueDate}
                 min={startDate || undefined}
@@ -496,6 +507,7 @@ export default function TaskDetailClient({
             <div className="sm:col-span-2">
               <label className="mb-1 block text-xs font-bold text-slate-400">업무 분류</label>
               <input
+                aria-label="업무 분류"
                 type="text"
                 list={`task-categories-${task.id}`}
                 value={category}
@@ -518,7 +530,7 @@ export default function TaskDetailClient({
                   >
                     <UserAvatar name={assignee.full_name} avatarUrl={assignee.avatar_url} size="xs" />
                     {assignee.full_name}
-                    {canEdit && (
+                    {canManageAssignees && (
                       <button
                         type="button"
                         onClick={() => handleRemoveAssignee(assignee.user_id)}
@@ -531,8 +543,9 @@ export default function TaskDetailClient({
                   </span>
                 ))}
               </div>
-              {canEdit && (
+              {canManageAssignees && (
                 <select
+                  aria-label="담당자 추가"
                   value=""
                   onChange={(e) => {
                     if (e.target.value) handleAddAssignee(e.target.value);
@@ -610,6 +623,8 @@ export default function TaskDetailClient({
           )}
           {canDelete && (
             <button
+              type="button"
+              aria-label={`${task.title} 삭제`}
               onClick={handleDelete}
               disabled={deleting}
               className="p-2 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
@@ -640,6 +655,7 @@ export default function TaskDetailClient({
           <div className="bg-white rounded-3xl shadow-sm p-6">
             {canEdit ? (
               <input
+                aria-label="할일 제목"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full text-xl font-bold text-slate-800 outline-none bg-transparent"
@@ -653,6 +669,7 @@ export default function TaskDetailClient({
               <label className="text-sm font-semibold text-slate-500 mb-2 block">설명</label>
               {canEdit ? (
                 <textarea
+                  aria-label="업무 설명"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full glass-input px-4 py-3 rounded-xl text-sm outline-none resize-none min-h-[80px]"
@@ -694,6 +711,7 @@ export default function TaskDetailClient({
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">상태</label>
               {canEdit ? (
                 <select
+                  aria-label="업무 상태"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as TaskStatus)}
                   className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
@@ -714,6 +732,7 @@ export default function TaskDetailClient({
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">데드라인</label>
               {canEdit ? (
                 <input
+                  aria-label="업무 데드라인"
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
@@ -734,7 +753,7 @@ export default function TaskDetailClient({
                       <UserAvatar name={a.full_name} avatarUrl={a.avatar_url} size="sm" />
                       <span className="text-sm text-slate-600">{a.full_name}</span>
                     </div>
-                    {canEdit && (
+                    {canManageAssignees && (
                       <button
                         onClick={() => handleRemoveAssignee(a.user_id)}
                         className="text-slate-300 hover:text-red-500 transition-colors"
@@ -744,8 +763,9 @@ export default function TaskDetailClient({
                     )}
                   </div>
                 ))}
-                {canEdit && (
+                {canManageAssignees && (
                   <select
+                    aria-label="담당자 추가"
                     value=""
                     onChange={(e) => {
                       if (e.target.value) handleAddAssignee(e.target.value);

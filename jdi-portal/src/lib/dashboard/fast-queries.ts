@@ -1,8 +1,19 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getWeekRange, toDateString } from "@/lib/utils/date";
-import { getPool, isPostgresUsable, markPostgresUnavailable } from "@/lib/db/postgres";
+import { getWeekRange } from "@/lib/utils/date";
+import {
+  getPool,
+  hasPostgresUrl,
+  isPostgresUsable,
+  markPostgresUnavailable,
+} from "@/lib/db/postgres";
 import { measureOperation } from "@/lib/performance/timing";
+import {
+  getDashboardTaskSummaryWindow,
+  normalizeDashboardTaskSummaryResult,
+  type DashboardTaskSummaryResult,
+  type DashboardTaskSummaryWindow,
+} from "./dashboard-task-summary";
 import {
   buildDashboardDataFromSnapshot,
   type DashboardSnapshot,
@@ -18,7 +29,15 @@ const DASHBOARD_SNAPSHOT_QUERY = `
       $4::date as week_end,
       $5::timestamptz as day_start,
       $6::timestamptz as day_end,
-      $7::boolean as can_view_company_work
+      $7::timestamptz as next_day_start,
+      $8::boolean as can_view_company_work
+  ),
+  approved_requester as (
+    select requester.id
+    from public.profiles requester
+    cross join parameters prm
+    where requester.id = prm.user_id
+      and requester.is_approved = true
   ),
   today_record as (
     select to_jsonb(ar) as value
@@ -27,60 +46,128 @@ const DASHBOARD_SNAPSHOT_QUERY = `
     where ar.user_id = prm.user_id and ar.work_date = prm.today
     limit 1
   ),
-  task_rows as (
-    select t.*, p.full_name as creator_full_name, p.avatar_url as creator_avatar_url
+  classified_task_rows as (
+    select
+      t.id,
+      t.title,
+      t.status,
+      t.priority,
+      t.due_date,
+      t.start_date,
+      t.position,
+      t.parent_id,
+      t.created_by,
+      t.created_at,
+      t.updated_at,
+      t.completed_at,
+      case
+        when t.status in ('대기', '진행중')
+          and t.due_date is not null and t.due_date < prm.today then 0
+        when t.status in ('대기', '진행중')
+          and t.due_date = prm.today then 1
+        when t.status in ('대기', '진행중')
+          and t.start_date is not null
+          and t.start_date < (prm.next_day_start at time zone 'Asia/Seoul')::date then 2
+        when t.status in ('대기', '진행중')
+          and t.due_date is null and t.start_date is null then 3
+        when t.status = '완료'
+          and t.completed_at >= prm.day_start
+          and t.completed_at < prm.next_day_start then 4
+        else null
+      end as class_rank
     from public.tasks t
     cross join parameters prm
-    left join public.profiles p on p.id = t.created_by
-    where (
-      prm.can_view_company_work
-      or exists (
-        select 1
-        from public.task_assignees ta
-        where ta.task_id = t.id and ta.user_id = prm.user_id
-      )
-    )
-    and (
-      t.status in ('\uB300\uAE30', '\uC9C4\uD589\uC911')
-      or (
-        t.status = '\uC644\uB8CC'
-        and t.completed_at >= (
-          (now() at time zone 'Asia/Seoul') - interval '7 days'
-        ) at time zone 'Asia/Seoul'
-      )
-    )
+    cross join approved_requester
   ),
-  tasks as (
+  ranked_task_rows as (
+    select
+      t.*,
+      case
+        when t.class_rank in (0, 1) then t.due_date::timestamp at time zone 'Asia/Seoul'
+        when t.class_rank = 2 then t.start_date::timestamp at time zone 'Asia/Seoul'
+        when t.class_rank = 3 then t.created_at
+        when t.class_rank = 4 then t.completed_at
+        else null
+      end as relevant_at,
+      case
+        when t.status = '진행중' then 0
+        when t.status = '대기' then 1
+        else 2
+      end as status_rank
+    from classified_task_rows t
+    where t.class_rank is not null
+  ),
+  task_summary_rows as (
+    select *
+    from ranked_task_rows t
+    order by
+      t.class_rank asc,
+      case when t.class_rank = 4 then t.relevant_at end desc nulls last,
+      case when t.class_rank <> 4 then t.relevant_at end asc nulls last,
+      t.status_rank asc,
+      t.position asc nulls last,
+      t.created_at asc,
+      t.id asc
+    limit 101
+  ),
+  dashboard_tasks as (
     select coalesce(
       jsonb_agg(
-        (
-          to_jsonb(t) - 'creator_full_name' - 'creator_avatar_url'
-        ) || jsonb_build_object(
-          'creator_profile', jsonb_build_object(
-            'full_name', coalesce(t.creator_full_name, ''),
-            'avatar_url', t.creator_avatar_url
-          ),
+        jsonb_build_object(
+          'id', t.id,
+          'title', t.title,
+          'status', t.status,
+          'priority', t.priority,
+          'due_date', t.due_date,
+          'start_date', t.start_date,
+          'position', t.position,
+          'parent_id', t.parent_id,
+          'created_by', t.created_by,
+          'created_at', t.created_at,
+          'updated_at', t.updated_at,
+          'completed_at', t.completed_at,
           'assignees', coalesce((
-            select jsonb_agg(jsonb_build_object(
-              'user_id', ta.user_id,
-              'full_name', coalesce(assignee_profile.full_name, ''),
-              'avatar_url', assignee_profile.avatar_url
-            ))
+            select jsonb_agg(
+              jsonb_build_object(
+                'user_id', ta.user_id,
+                'full_name', assignee.full_name,
+                'avatar_url', assignee.avatar_url
+              ) order by ta.user_id asc
+            )
             from public.task_assignees ta
-            left join public.profiles assignee_profile on assignee_profile.id = ta.user_id
+            join public.profiles assignee
+              on assignee.id = ta.user_id
+              and assignee.is_approved = true
             where ta.task_id = t.id
-          ), '[]'::jsonb),
-          'checklist_total', 0,
-          'checklist_completed', 0,
-          'subtask_count', 0,
-          'comment_count', 0,
-          'attachment_count', 0
-        )
-        order by t.position asc, t.due_date asc nulls last
+          ), '[]'::jsonb)
+        ) order by
+          t.class_rank asc,
+          case when t.class_rank = 4 then t.relevant_at end desc nulls last,
+          case when t.class_rank <> 4 then t.relevant_at end asc nulls last,
+          t.status_rank asc,
+          t.position asc nulls last,
+          t.created_at asc,
+          t.id asc
       ),
       '[]'::jsonb
     ) as value
-    from task_rows t
+    from task_summary_rows t
+  ),
+  dashboard_profiles as (
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'id', p.id,
+          'full_name', p.full_name,
+          'avatar_url', p.avatar_url,
+          'role', p.role
+        ) order by p.id asc
+      ),
+      '[]'::jsonb
+    ) as value
+    from public.profiles p
+    cross join approved_requester
+    where p.is_approved = true
   ),
   schedule_rows as (
     select s.*, p.full_name as creator_full_name
@@ -134,12 +221,10 @@ const DASHBOARD_SNAPSHOT_QUERY = `
         and ar.work_date >= prm.week_start
         and ar.work_date <= prm.week_end
     ), '[]'::jsonb),
-    'tasks', (select value from tasks),
-    'profiles', coalesce((
-      select jsonb_agg(to_jsonb(p) order by p.full_name asc)
-      from public.profiles p
-      where p.is_approved = true
-    ), '[]'::jsonb),
+    'taskSummary', jsonb_build_object(
+      'tasks', (select value from dashboard_tasks),
+      'profiles', (select value from dashboard_profiles)
+    ),
     'todayAttendanceStatuses', coalesce((
       select jsonb_agg(
         jsonb_build_object('user_id', ar.user_id, 'status', ar.status)
@@ -151,22 +236,106 @@ const DASHBOARD_SNAPSHOT_QUERY = `
     ), '[]'::jsonb),
     'schedules', (select value from schedules)
   ) as snapshot
+  from approved_requester
 `;
 
+interface DashboardTaskSummaryWire {
+  tasks: unknown;
+  profiles: unknown;
+}
+
+interface DashboardSnapshotWire extends Omit<DashboardSnapshot, "taskSummary"> {
+  taskSummary: DashboardTaskSummaryWire;
+}
+
 interface DashboardSnapshotRow {
-  snapshot: DashboardSnapshot;
+  snapshot: DashboardSnapshotWire;
+}
+
+type DashboardTaskSummarySource = "pool" | "rpc";
+type DashboardTaskSummaryReason =
+  | "database-url-absent"
+  | "pool-circuit-open"
+  | "transient-pool-error"
+  | "truncated";
+
+function logDashboardTaskSummary(
+  requestId: string,
+  source: DashboardTaskSummarySource,
+  reasonClass: DashboardTaskSummaryReason,
+  taskSummary: DashboardTaskSummaryResult
+): void {
+  console.info("dashboard task summary", {
+    route: "/dashboard",
+    requestId,
+    source,
+    reasonClass,
+    count: taskSummary.tasks.length,
+    truncated: taskSummary.truncated,
+  });
+}
+
+const TRANSIENT_NETWORK_CODES = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+]);
+const TRANSIENT_POSTGRES_CODES = new Set([
+  "08000",
+  "08001",
+  "08003",
+  "08004",
+  "08006",
+  "08007",
+  "08P01",
+  "57P01",
+  "57P02",
+  "57P03",
+]);
+
+function getErrorCode(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("code" in error)) return null;
+  const code = error.code;
+  return typeof code === "string" ? code : null;
+}
+
+function getErrorMessage(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("message" in error)) return null;
+  const message = error.message;
+  return typeof message === "string" ? message : null;
+}
+
+export function isTransientDashboardPoolError(error: unknown): boolean {
+  const code = getErrorCode(error);
+  if (code !== null && (TRANSIENT_NETWORK_CODES.has(code) || TRANSIENT_POSTGRES_CODES.has(code))) {
+    return true;
+  }
+
+  const message = getErrorMessage(error);
+  return message === "Connection terminated due to connection timeout"
+    || message?.startsWith("timeout exceeded when trying to connect") === true;
+}
+
+export function mapFastDashboardTaskSummaryRows(
+  rows: unknown,
+  profiles: unknown,
+  window: DashboardTaskSummaryWindow
+): DashboardTaskSummaryResult {
+  return normalizeDashboardTaskSummaryResult(rows, profiles, window);
 }
 
 async function getDashboardDataViaPostgres(
   userId: string,
   userName: string,
   canViewCompanyWork: boolean,
-  requestId: string
+  requestId: string,
+  taskSummaryWindow: DashboardTaskSummaryWindow,
+  now: Date
 ): Promise<DashboardData> {
-  const today = toDateString();
-  const { start: weekStart, end: weekEnd } = getWeekRange();
-  const dayStart = `${today}T00:00:00+09:00`;
-  const dayEnd = `${today}T23:59:59+09:00`;
+  const { start: weekStart, end: weekEnd } = getWeekRange(new Date(taskSummaryWindow.dayStart));
+  const dayEnd = `${taskSummaryWindow.today}T23:59:59+09:00`;
   const pool = getPool();
   const result = await measureOperation(
     {
@@ -176,25 +345,61 @@ async function getDashboardDataViaPostgres(
     },
     () => pool.query<DashboardSnapshotRow>(DASHBOARD_SNAPSHOT_QUERY, [
       userId,
-      today,
+      taskSummaryWindow.today,
       weekStart,
       weekEnd,
-      dayStart,
+      taskSummaryWindow.dayStart,
       dayEnd,
+      taskSummaryWindow.nextDayStart,
       canViewCompanyWork,
     ])
   );
   const snapshot = result.rows[0]?.snapshot;
   if (!snapshot) throw new Error("Dashboard snapshot query returned no data");
 
-  return buildDashboardDataFromSnapshot(snapshot, {
-    userId,
+  const taskSummary = mapFastDashboardTaskSummaryRows(
+    snapshot.taskSummary.tasks,
+    snapshot.taskSummary.profiles,
+    taskSummaryWindow
+  );
+  const snapshotDataWithSummary = buildDashboardDataFromSnapshot({
+    ...snapshot,
+    taskSummary,
+  }, {
     userName,
     canViewCompanyWork,
     weekStart,
-    now: new Date(),
-    completedTaskStatus: "\uC644\uB8CC",
+    now,
   });
+  const data: DashboardData = {
+    ...snapshotDataWithSummary,
+    recentActivities: [],
+  };
+
+  if (taskSummary.truncated) {
+    logDashboardTaskSummary(requestId, "pool", "truncated", taskSummary);
+  }
+  return data;
+}
+
+async function getDashboardDataViaFallback(
+  supabase: SupabaseClient,
+  userId: string,
+  userName: string,
+  canViewCompanyWork: boolean,
+  requestId: string,
+  taskSummaryWindow: DashboardTaskSummaryWindow,
+  reasonClass: Exclude<DashboardTaskSummaryReason, "truncated">
+): Promise<DashboardData> {
+  const data = await getDashboardData(
+    supabase,
+    userId,
+    userName,
+    canViewCompanyWork,
+    taskSummaryWindow
+  );
+  logDashboardTaskSummary(requestId, "rpc", reasonClass, data.taskSummary);
+  return data;
 }
 
 export async function getDashboardDataFast(
@@ -203,8 +408,31 @@ export async function getDashboardDataFast(
   userName: string,
   canViewCompanyWork: boolean
 ): Promise<DashboardData> {
+  const now = new Date();
+  const taskSummaryWindow = getDashboardTaskSummaryWindow(now);
+  const requestId = randomUUID();
+
+  if (!hasPostgresUrl()) {
+    return getDashboardDataViaFallback(
+      supabase,
+      userId,
+      userName,
+      canViewCompanyWork,
+      requestId,
+      taskSummaryWindow,
+      "database-url-absent"
+    );
+  }
   if (!isPostgresUsable()) {
-    return getDashboardData(supabase, userId, userName, canViewCompanyWork);
+    return getDashboardDataViaFallback(
+      supabase,
+      userId,
+      userName,
+      canViewCompanyWork,
+      requestId,
+      taskSummaryWindow,
+      "pool-circuit-open"
+    );
   }
 
   try {
@@ -212,10 +440,28 @@ export async function getDashboardDataFast(
       userId,
       userName,
       canViewCompanyWork,
-      randomUUID()
+      requestId,
+      taskSummaryWindow,
+      now
     );
-  } catch {
+  } catch (error) {
+    if (!isTransientDashboardPoolError(error)) throw error;
     markPostgresUnavailable();
-    return getDashboardData(supabase, userId, userName, canViewCompanyWork);
+    try {
+      return await getDashboardDataViaFallback(
+        supabase,
+        userId,
+        userName,
+        canViewCompanyWork,
+        requestId,
+        taskSummaryWindow,
+        "transient-pool-error"
+      );
+    } catch (fallbackError) {
+      throw new AggregateError(
+        [error, fallbackError],
+        "Dashboard task summary fallback failed"
+      );
+    }
   }
 }
