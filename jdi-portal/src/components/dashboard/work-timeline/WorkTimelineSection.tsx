@@ -9,10 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { addDays, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { WORK_TIMELINE_PAGE_SIZE } from "@/lib/work-timeline/constants";
 import { retryPendingWorkTimelineStorageCleanup } from "@/lib/work-timeline/actions";
-import {
-  getWorkTimelineAttachments,
-  getWorkTimelineEntries,
-} from "@/lib/work-timeline/queries";
+import { getWorkTimelineEntries } from "@/lib/work-timeline/queries";
 import { getKstDayRange } from "@/lib/work-timeline/utils";
 import type {
   WorkTimelineEntryWithProfile,
@@ -146,7 +143,6 @@ export default function WorkTimelineSection({
   const requestVersionRef = useRef(0);
   const didMountRef = useRef(false);
   const urlSyncMountedRef = useRef(false);
-  const attachmentRequestKeyRef = useRef("");
   const groups = groupEntriesByKstDate(entries);
   const today = toDateString();
   const yesterday = addDays(today, -1);
@@ -154,48 +150,14 @@ export default function WorkTimelineSection({
   const searchPending = !compact && trimmedSearchInput !== query;
   const searchTooShort = !compact && query.length === 1;
 
+  // compact(대시보드) 모드는 부모(DashboardTimelineClient)가 첨부까지 하이드레이션한
+  // entries 를 그대로 내려주므로 여기서는 표시만 한다.
   useEffect(() => {
     if (!compact) return;
-    setEntries((current) => initialEntries.map((entry) => {
-      if (entry.attachments.length > 0) return entry;
-      const currentEntry = current.find((item) => item.id === entry.id);
-      return currentEntry?.attachments.length
-        ? { ...entry, attachments: currentEntry.attachments }
-        : entry;
-    }));
+    setEntries(initialEntries);
     setHasMore(initialEntries.length === WORK_TIMELINE_PAGE_SIZE);
   }, [compact, initialEntries]);
 
-  useEffect(() => {
-    if (!compact || entries.length === 0) return;
-
-    const requestKey = entries
-      .map((entry) => `${entry.id}:${entry.updated_at}`)
-      .join("|");
-    if (attachmentRequestKeyRef.current === requestKey) return;
-    attachmentRequestKeyRef.current = requestKey;
-
-    void getWorkTimelineAttachments(
-      createClient(),
-      entries.map((entry) => entry.id),
-      { thumbnailOnly: true },
-    ).then((attachments) => {
-      if (attachmentRequestKeyRef.current !== requestKey) return;
-      const byEntry = new Map<string, typeof attachments>();
-      for (const attachment of attachments) {
-        const current = byEntry.get(attachment.entry_id) ?? [];
-        current.push(attachment);
-        byEntry.set(attachment.entry_id, current);
-      }
-      setEntries((current) => current.map((entry) => ({
-        ...entry,
-        attachments: byEntry.get(entry.id) ?? [],
-      })));
-    }).catch((error) => {
-      console.warn("[work-timeline] attachment preview load failed:", error);
-    });
-
-  }, [compact, entries]);
   useEffect(() => {
     void retryPendingWorkTimelineStorageCleanup().catch((error) => {
       console.warn("업무 타임라인 Storage 정리 재시도에 실패했습니다.", error);

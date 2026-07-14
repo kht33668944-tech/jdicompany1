@@ -36,7 +36,6 @@ test("dashboard renders a user-scoped cached timeline before a lightweight refre
   const page = source("src/app/dashboard/page.tsx");
   const dashboard = source("src/components/dashboard/DashboardClient.tsx");
   const timeline = source("src/components/dashboard/DashboardTimelineClient.tsx");
-  const section = source("src/components/dashboard/work-timeline/WorkTimelineSection.tsx");
   const queries = source("src/lib/work-timeline/queries.ts");
   const cache = source("src/lib/work-timeline/timelineCache.ts");
 
@@ -47,13 +46,20 @@ test("dashboard renders a user-scoped cached timeline before a lightweight refre
   assert.match(timeline, /getCachedWorkTimeline\(currentUserId\)/);
   assert.match(timeline, /getWorkTimelineEntries\(supabase,[\s\S]*includeAttachments: false/);
   assert.match(timeline, /cacheWorkTimeline\(currentUserId, entries, profiles\)/);
+  // fresh fetch를 캐시 읽기보다 먼저 시작해 두 I/O가 겹치게 한다
+  assert.ok(
+    timeline.indexOf("const freshPromise = Promise.all") <
+      timeline.indexOf("cached = await getCachedWorkTimeline"),
+  );
+  // 캐시 표시는 fresh 결과 소비보다 먼저다
   assert.ok(
     timeline.indexOf("if (cached) setData(cached)") <
-      timeline.indexOf("const [entries, profiles] = await Promise.all"),
+      timeline.indexOf("const [entries, profiles] = await freshPromise"),
   );
 
   assert.match(queries, /if \(filters\.includeAttachments === false\) return attachFiles\(rows, \[\]\)/);
-  assert.match(section, /getWorkTimelineAttachments\(/);
+  // 본문 표시 후 썸네일 첨부 하이드레이션은 부모(DashboardTimelineClient)가 담당한다
+  assert.match(timeline, /getWorkTimelineAttachments\(/);
   assert.match(cache, /function timelineKey\(userId: string\)/);
   assert.match(cache, /attachments: \[\]/);
   assert.match(cache, /24 \* 60 \* 60/);

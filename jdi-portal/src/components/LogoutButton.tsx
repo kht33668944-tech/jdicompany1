@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { clearWorkTimelineCache } from "@/lib/work-timeline/timelineCache";
+import { clearAllLocalCaches } from "@/lib/cache/clearAllLocalCaches";
 
 interface LogoutButtonProps {
   children: ReactNode;
@@ -25,12 +25,13 @@ export default function LogoutButton({ children, className, title }: LogoutButto
     } catch {
       /* 무시 */
     }
-    await clearWorkTimelineCache();
-    try {
-      await fetch("/auth/signout", { method: "POST" });
-    } catch {
-      /* 무시 */
-    }
+    // 로컬 캐시 정리와 서버 로그아웃은 서로 독립적이므로 함께 진행한다.
+    await Promise.all([
+      clearAllLocalCaches(),
+      fetch("/auth/signout", { method: "POST" }).catch(() => {
+        /* 무시 */
+      }),
+    ]);
     // 서버가 /login 으로 redirect 하지만 fetch는 따라가지 않으므로 명시 이동
     window.location.href = "/login";
   };

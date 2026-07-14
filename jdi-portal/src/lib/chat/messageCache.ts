@@ -140,6 +140,23 @@ export async function clearChannelCache(channelId: string): Promise<void> {
 }
 
 /**
+ * 모든 채널 캐시 전체 삭제 (로그아웃 용).
+ */
+export async function clearAllMessageCache(): Promise<void> {
+  const dbp = getDB();
+  if (!dbp) return;
+  try {
+    const db = await dbp;
+    const tx = db.transaction([MESSAGES_STORE, META_STORE], "readwrite");
+    await tx.objectStore(MESSAGES_STORE).clear();
+    await tx.objectStore(META_STORE).clear();
+    await tx.done;
+  } catch (err) {
+    console.warn("[messageCache] clearAllMessageCache failed:", err);
+  }
+}
+
+/**
  * 채널의 캐시 크기를 MAX_PER_CHANNEL 이하로 정리.
  * - 가장 오래된 메시지부터 삭제
  */

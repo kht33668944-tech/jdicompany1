@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import type { Profile } from "@/lib/attendance/types";
 import { createClient } from "@/lib/supabase/client";
 import {
+  getWorkTimelineAttachments,
   getWorkTimelineEntries,
   getWorkTimelineProfiles,
+  groupAttachmentsByEntry,
 } from "@/lib/work-timeline/queries";
 import {
   cacheWorkTimeline,
@@ -53,25 +55,50 @@ export default function DashboardTimelineClient({
     let active = true;
 
     const loadTimeline = async () => {
-      const cached = await getCachedWorkTimeline(currentUserId);
-      if (!active) return;
-      if (cached) setData(cached);
+      let cached: TimelineData | null = null;
 
       try {
+        // 네트워크 fetch를 먼저 시작해 IndexedDB 캐시 읽기와 겹치게 한다.
         const supabase = createClient();
-        const [entries, profiles] = await Promise.all([
+        const freshPromise = Promise.all([
           getWorkTimelineEntries(supabase, {
             limit: 15,
             includeAttachments: false,
           }),
           getWorkTimelineProfiles(supabase),
         ]);
+
+        cached = await getCachedWorkTimeline(currentUserId);
+        if (!active) return;
+        if (cached) setData(cached);
+
+        const [entries, profiles] = await freshPromise;
         if (!active) return;
 
-        const fresh = { entries, profiles };
-        setData(fresh);
-        setLoadFailed(false);
+        setData({ entries, profiles });
         void cacheWorkTimeline(currentUserId, entries, profiles);
+
+        // 본문을 먼저 보여준 뒤 썸네일 첨부를 별도로 하이드레이션한다.
+        // (signed URL 은 만료되므로 캐시에 저장하지 않고 매번 새로 가져온다)
+        if (entries.length === 0) return;
+        try {
+          const attachments = await getWorkTimelineAttachments(
+            supabase,
+            entries.map((entry) => entry.id),
+            { thumbnailOnly: true },
+          );
+          if (!active) return;
+          const byEntry = groupAttachmentsByEntry(attachments);
+          setData({
+            entries: entries.map((entry) => ({
+              ...entry,
+              attachments: byEntry.get(entry.id) ?? [],
+            })),
+            profiles,
+          });
+        } catch (error) {
+          console.warn("[dashboard] timeline attachment preview failed:", error);
+        }
       } catch (error) {
         console.error("[dashboard] work timeline refresh failed:", error);
         if (active && !cached) setLoadFailed(true);

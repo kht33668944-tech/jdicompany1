@@ -66,16 +66,23 @@ export async function getWorkTimelineAttachments(
   }));
 }
 
-function attachFiles(
-  rows: Record<string, unknown>[],
+export function groupAttachmentsByEntry(
   attachments: WorkTimelineAttachment[],
-): WorkTimelineEntryWithProfile[] {
+): Map<string, WorkTimelineAttachment[]> {
   const byEntry = new Map<string, WorkTimelineAttachment[]>();
   for (const attachment of attachments) {
     const current = byEntry.get(attachment.entry_id) ?? [];
     current.push(attachment);
     byEntry.set(attachment.entry_id, current);
   }
+  return byEntry;
+}
+
+function attachFiles(
+  rows: Record<string, unknown>[],
+  attachments: WorkTimelineAttachment[],
+): WorkTimelineEntryWithProfile[] {
+  const byEntry = groupAttachmentsByEntry(attachments);
   return rows.map((row) => ({
     ...(row as unknown as Omit<WorkTimelineEntryWithProfile, "attachments">),
     attachments: byEntry.get(row.id as string) ?? [],
