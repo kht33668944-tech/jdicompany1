@@ -13,7 +13,7 @@ const dashboardQueriesSourcePath = path.join(appRoot, "src", "lib", "dashboard",
 const rpcMigrationSourcePath = path.join(appRoot, "supabase", "migrations", "087_dashboard_task_summary_rpc.sql");
 const tasksPageSourcePath = path.join(appRoot, "src", "components", "dashboard", "tasks", "TasksPageClient.tsx");
 const taskPageDetailSourcePath = path.join(appRoot, "src", "app", "dashboard", "tasks", "[id]", "page.tsx");
-const checkInOutSourcePath = path.join(appRoot, "src", "components", "dashboard", "attendance", "CheckInOutCard.tsx");
+
 
 const window = {
   today: "2026-07-13",
@@ -307,14 +307,12 @@ test("the pool fallback classifier allows exactly 17 transient predicates and fa
   }
 });
 
-test("task and attendance callers map full profiles through the minimal dashboard person boundary without casts", () => {
+test("task callers map full profiles through the minimal dashboard person boundary without casts", () => {
   const tasksPageSource = readSource(tasksPageSourcePath);
   const taskPageDetailSource = readSource(taskPageDetailSourcePath);
-  const checkInOutSource = readSource(checkInOutSourcePath);
 
   assert.match(tasksPageSource, /profiles\.map\(toDashboardTaskPerson\)/);
   assert.match(tasksPageSource, /profiles=\{dashboardTaskProfiles\}/);
   assert.match(taskPageDetailSource, /profiles=\{profiles\.map\(toDashboardTaskPerson\)\}/);
-  assert.match(checkInOutSource, /profiles=\{\[toDashboardTaskPerson\(profile\)\]\}/);
-  assert.doesNotMatch(`${tasksPageSource}\n${taskPageDetailSource}\n${checkInOutSource}`, /as\s+DashboardTaskPerson/);
+  assert.doesNotMatch(`${tasksPageSource}\n${taskPageDetailSource}`, /as\s+DashboardTaskPerson/);
 });

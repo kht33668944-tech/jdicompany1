@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { getDashboardDataFast } from "@/lib/dashboard/fast-queries";
@@ -10,9 +11,12 @@ import type {
   WorkTimelineProfile,
 } from "@/lib/work-timeline/types";
 import DashboardClient from "@/components/dashboard/DashboardClient";
+import DashboardTimelineClient from "@/components/dashboard/DashboardTimelineClient";
+
+type AuthenticatedUser = NonNullable<Awaited<ReturnType<typeof getAuthUser>>>;
 
 async function getInitialWorkTimelineData(
-  supabase: NonNullable<Awaited<ReturnType<typeof getAuthUser>>>["supabase"],
+  supabase: AuthenticatedUser["supabase"],
 ): Promise<{
   entries: WorkTimelineEntryWithProfile[];
   profiles: WorkTimelineProfile[];
@@ -29,6 +33,39 @@ async function getInitialWorkTimelineData(
   }
 }
 
+interface DashboardTimelineProps {
+  timelineData: ReturnType<typeof getInitialWorkTimelineData>;
+  currentUserId: string;
+  currentUserRole: AuthenticatedUser["profile"]["role"];
+}
+
+async function DashboardTimeline({
+  timelineData,
+  currentUserId,
+  currentUserRole,
+}: DashboardTimelineProps) {
+  const { entries, profiles } = await timelineData;
+
+  return (
+    <DashboardTimelineClient
+      initialEntries={entries}
+      profiles={profiles}
+      currentUserId={currentUserId}
+      currentUserRole={currentUserRole}
+    />
+  );
+}
+
+function DashboardTimelineSkeleton() {
+  return (
+    <div
+      className="h-24 animate-pulse rounded-xl border border-slate-100 bg-slate-50/60"
+      aria-label="업무 타임라인을 불러오는 중"
+      aria-busy="true"
+    />
+  );
+}
+
 export default async function DashboardPage() {
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
@@ -36,15 +73,14 @@ export default async function DashboardPage() {
   const defaultTaskAssigneeFilter = auth.profile.role === "admin" ? "all" : auth.user.id;
   const userName = auth.profile.full_name ?? auth.user.email?.split("@")[0] ?? "사용자";
   const canViewCompanyWork = auth.profile.role !== "employee";
-  const [initialData, timelineData] = await Promise.all([
-    getDashboardDataFast(
-      auth.supabase,
-      auth.user.id,
-      userName,
-      canViewCompanyWork
-    ),
-    getInitialWorkTimelineData(auth.supabase),
-  ]);
+  const dashboardDataPromise = getDashboardDataFast(
+    auth.supabase,
+    auth.user.id,
+    userName,
+    canViewCompanyWork
+  );
+  const timelineDataPromise = getInitialWorkTimelineData(auth.supabase);
+  const initialData = await dashboardDataPromise;
   // The timestamp is intentionally captured once for the server-rendered payload.
   // eslint-disable-next-line react-hooks/purity
   const initialLoadedAt = Date.now();
@@ -54,11 +90,16 @@ export default async function DashboardPage() {
       userId={auth.user.id}
       userName={userName}
       initialData={initialData}
-      initialTimelineEntries={timelineData.entries}
-      timelineProfiles={timelineData.profiles}
-      currentUserRole={auth.profile.role}
       initialLoadedAt={initialLoadedAt}
       defaultTaskAssigneeFilter={defaultTaskAssigneeFilter}
-    />
+    >
+      <Suspense fallback={<DashboardTimelineSkeleton />}>
+        <DashboardTimeline
+          timelineData={timelineDataPromise}
+          currentUserId={auth.user.id}
+          currentUserRole={auth.profile.role}
+        />
+      </Suspense>
+    </DashboardClient>
   );
 }

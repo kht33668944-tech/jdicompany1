@@ -1,37 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import dynamic from "next/dynamic";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardData } from "@/lib/dashboard/queries";
-import type { Profile } from "@/lib/attendance/types";
-import type {
-  WorkTimelineEntryWithProfile,
-  WorkTimelineProfile,
-} from "@/lib/work-timeline/types";
 import TodayWorkBoardWidget from "./widgets/TodayWorkBoardWidget";
-
-const WorkTimelineSection = dynamic(
-  () => import("./work-timeline/WorkTimelineSection"),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className="h-24 animate-pulse rounded-xl border border-slate-100 bg-slate-50/60"
-        aria-label="업무 타임라인을 불러오는 중"
-        aria-busy="true"
-      />
-    ),
-  },
-);
 
 interface Props {
   userId: string;
   userName: string;
   initialData: DashboardData;
-  initialTimelineEntries: WorkTimelineEntryWithProfile[];
-  timelineProfiles: WorkTimelineProfile[];
-  currentUserRole: Profile["role"];
+  children: ReactNode;
   initialLoadedAt: number;
   defaultTaskAssigneeFilter: string;
 }
@@ -40,9 +18,7 @@ export default function DashboardClient({
   userId,
   userName,
   initialData,
-  initialTimelineEntries,
-  timelineProfiles,
-  currentUserRole,
+  children,
   initialLoadedAt,
   defaultTaskAssigneeFilter,
 }: Props) {
@@ -110,13 +86,7 @@ export default function DashboardClient({
         </p>
       </div>
 
-      <WorkTimelineSection
-        initialEntries={initialTimelineEntries}
-        profiles={timelineProfiles}
-        currentUserId={userId}
-        currentUserRole={currentUserRole}
-        compact
-      />
+      {children}
 
       <TodayWorkBoardWidget
         userId={userId}

@@ -115,7 +115,7 @@ export default function LoginCard() {
 
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: username,
         password,
       });
@@ -131,32 +131,16 @@ export default function LoginCard() {
       } else {
         performance.mark("login-auth");
 
-        // 승인 여부 확인
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("is_approved")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profile && !profile.is_approved) {
-          await supabase.auth.signOut();
-          setErrorMessage("관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다.");
-          setShaking(true);
-          setTimeout(() => setShaking(false), 500);
-        } else {
-          performance.mark("login-approval");
-
-          // 마지막 로그인 이메일 기억 (비밀번호는 저장하지 않음)
-          try {
-            window.localStorage.setItem("jdi:last-email", username);
-          } catch {
-            /* 무시 */
-          }
-
-          const nextPath = sanitizeNext(searchParams.get("next"));
-          performance.mark("login-dashboard-navigation");
-          router.replace(nextPath);
+        // 마지막 로그인 이메일 기억 (비밀번호는 저장하지 않음)
+        try {
+          window.localStorage.setItem("jdi:last-email", username);
+        } catch {
+          /* 무시 */
         }
+
+        const nextPath = sanitizeNext(searchParams.get("next"));
+        performance.mark("login-dashboard-navigation");
+        router.replace(nextPath);
       }
     } catch {
       setErrorMessage("로그인 중 오류가 발생했습니다.");

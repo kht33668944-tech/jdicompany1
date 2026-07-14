@@ -5,7 +5,7 @@
  *  - 캐시는 표시용일 뿐 권한 검증은 항상 서버 RLS 가 담당
  *  - 캐시 hit → 즉시 표시 → 백그라운드 fetch → 최신 데이터로 교체
  *  - IndexedDB 미지원/실패 시 모든 함수가 graceful no-op
- *  - 키: "YYYY-MM" 문자열
+ *  - 키: userId + year + month 튜플 문자열
  */
 
 import { openDB, type IDBPDatabase } from "idb";
@@ -16,7 +16,7 @@ const DB_VERSION = 1;
 const MONTH_STORE = "month_schedules";
 
 interface CachedMonthRecord {
-  key: string; // "YYYY-MM"
+  key: string; // userId + year + month 튜플 문자열
   schedules: ScheduleWithProfile[];
   cached_at: string; // ISO
 }
@@ -43,14 +43,15 @@ function getDB(): Promise<IDBPDatabase> | null {
   return dbPromise;
 }
 
-function monthKey(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, "0")}`;
+function monthKey(userId: string, year: number, month: number): string {
+  return JSON.stringify([userId, year, month]);
 }
 
 /**
  * 캐시된 월별 일정 반환. 없거나 IndexedDB 미지원이면 null.
  */
 export async function getCachedMonth(
+  userId: string,
   year: number,
   month: number
 ): Promise<ScheduleWithProfile[] | null> {
@@ -58,7 +59,7 @@ export async function getCachedMonth(
   if (!dbp) return null;
   try {
     const db = await dbp;
-    const row = (await db.get(MONTH_STORE, monthKey(year, month))) as
+    const row = (await db.get(MONTH_STORE, monthKey(userId, year, month))) as
       | CachedMonthRecord
       | undefined;
     if (!row) return null;
@@ -73,6 +74,7 @@ export async function getCachedMonth(
  * 월별 일정 캐시 저장 (upsert).
  */
 export async function cacheMonth(
+  userId: string,
   year: number,
   month: number,
   schedules: ScheduleWithProfile[]
@@ -83,7 +85,7 @@ export async function cacheMonth(
     const db = await dbp;
     // Supabase 응답은 plain JSON 이라 IndexedDB 의 structured clone 이 그대로 처리
     const record: CachedMonthRecord = {
-      key: monthKey(year, month),
+      key: monthKey(userId, year, month),
       schedules,
       cached_at: new Date().toISOString(),
     };
@@ -96,12 +98,16 @@ export async function cacheMonth(
 /**
  * 특정 월 캐시 무효화 (mutation 후 호출).
  */
-export async function invalidateMonthCache(year: number, month: number): Promise<void> {
+export async function invalidateMonthCache(
+  userId: string,
+  year: number,
+  month: number
+): Promise<void> {
   const dbp = getDB();
   if (!dbp) return;
   try {
     const db = await dbp;
-    await db.delete(MONTH_STORE, monthKey(year, month));
+    await db.delete(MONTH_STORE, monthKey(userId, year, month));
   } catch (err) {
     console.warn("[scheduleCache] invalidateMonthCache failed:", err);
   }

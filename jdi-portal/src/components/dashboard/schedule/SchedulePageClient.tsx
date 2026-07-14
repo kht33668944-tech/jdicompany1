@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { CalendarBlank, List, CalendarCheck, Calendar, Plus, Buildings, User, FunnelSimple } from "phosphor-react";
 import MonthlyCalendar from "./MonthlyCalendar";
 import WeeklyView from "./WeeklyView";
@@ -59,7 +58,6 @@ export default function SchedulePageClient({
   userId,
   userRole,
 }: SchedulePageClientProps) {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ScheduleTabId>(getInitialTab);
   const [selectedDate, setSelectedDate] = useState<string>(toDateString());
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -96,7 +94,7 @@ export default function SchedulePageClient({
       const fresh = await getMonthSchedules(supabase, year, month);
       if (inflightKeyRef.current !== key) return;
       setSchedules(fresh);
-      void cacheMonth(year, month, fresh);
+      void cacheMonth(userId, year, month, fresh);
     } catch (err) {
       console.warn("[schedule] refetch failed:", err);
     } finally {
@@ -115,7 +113,7 @@ export default function SchedulePageClient({
     inflightKeyRef.current = key;
 
     // IDB 캐시 → 즉시 표시 (단 fresh 가 먼저 도착했으면 무시)
-    void getCachedMonth(year, month).then((cached) => {
+    void getCachedMonth(userId, year, month).then((cached) => {
       if (!cached) return;
       if (inflightKeyRef.current !== key) return;
       setSchedules(cached);
@@ -123,11 +121,14 @@ export default function SchedulePageClient({
 
     void refetchMonth(year, month);
 
-    router.replace(`/dashboard/schedule?year=${year}&month=${month}`, { scroll: false });
+    const url = new URL(window.location.href);
+    url.searchParams.set("year", String(year));
+    url.searchParams.set("month", String(month));
+    window.history.replaceState(window.history.state, "", url);
   };
 
   const revalidateCurrentMonth = async () => {
-    await invalidateMonthCache(currentYear, currentMonth);
+    await invalidateMonthCache(userId, currentYear, currentMonth);
     await refetchMonth(currentYear, currentMonth);
   };
 

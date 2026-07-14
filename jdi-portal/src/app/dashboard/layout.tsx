@@ -9,7 +9,7 @@ export default async function DashboardLayout({
 }) {
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
-  if (!auth.profile.is_approved) redirect("/login?error=not_approved");
+  if (!auth.profile.is_approved) redirect("/auth/not-approved");
 
   const userData = {
     id: auth.user.id,

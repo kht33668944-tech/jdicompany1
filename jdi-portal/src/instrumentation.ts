@@ -1,24 +1,24 @@
+import { getPool, hasPostgresUrl, markPostgresUnavailable } from "@/lib/db/postgres";
+
+type InstrumentationGlobal = typeof globalThis & {
+  __jdiPgWarmStarted?: boolean;
+};
+
 /**
- * Next.js instrumentation hook.
- *
- * Keep this lightweight: importing dashboard UI modules here loads large
- * client-only libraries during server startup and can slow Railway cold starts.
+ * Railway 프로세스 시작 시 직접 PostgreSQL 연결을 한 번 준비한다.
+ * 주기적인 self-ping 없이 첫 사용자가 연결 생성 비용을 부담하지 않게 한다.
  */
+export async function register() {
+  if (process.env.NEXT_RUNTIME !== "nodejs" || !hasPostgresUrl()) return;
 
-const KEEP_WARM_INTERVAL_MS = 4 * 60 * 1000;
-const KEEP_WARM_PATH = "/api/keep-warm";
+  const g = globalThis as InstrumentationGlobal;
+  if (g.__jdiPgWarmStarted) return;
+  g.__jdiPgWarmStarted = true;
 
-export function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
-
-  const g = globalThis as { __jdiWarmStarted?: boolean };
-  if (g.__jdiWarmStarted) return;
-  g.__jdiWarmStarted = true;
-
-  const port = process.env.PORT || "3000";
-  const selfUrl = `http://127.0.0.1:${port}${KEEP_WARM_PATH}`;
-  const timer = setInterval(() => {
-    fetch(selfUrl).catch(() => {});
-  }, KEEP_WARM_INTERVAL_MS);
-  timer.unref();
+  try {
+    await getPool().query("select 1");
+  } catch (error) {
+    markPostgresUnavailable();
+    console.error("[startup] postgres warm-up failed; fallback enabled:", error);
+  }
 }

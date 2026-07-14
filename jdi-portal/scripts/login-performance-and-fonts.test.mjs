@@ -23,21 +23,19 @@ test("Stage 7 removes Google Inter while retaining the existing Pretendard style
   );
 });
 
-test("Stage 7 records privacy-safe successful login milestones in order", () => {
-  const marks = ["login-auth", "login-approval", "login-dashboard-navigation"];
+test("successful login records privacy-safe milestones without an approval round trip", () => {
+  const marks = ["login-auth", "login-dashboard-navigation"];
   for (const mark of marks) {
     assert.match(loginCard, new RegExp(`performance\\.mark\\("${mark}"\\)`));
   }
 
   const authMark = loginCard.indexOf('performance.mark("login-auth")');
-  const approvalMark = loginCard.indexOf('performance.mark("login-approval")');
   const navigationMark = loginCard.indexOf('performance.mark("login-dashboard-navigation")');
   const signIn = loginCard.indexOf("await supabase.auth.signInWithPassword");
-  const approvalCheck = loginCard.indexOf('select("is_approved")');
   const navigation = loginCard.indexOf("router.replace(nextPath)");
 
-  assert.ok(signIn < authMark && authMark < approvalCheck);
-  assert.ok(approvalCheck < approvalMark && approvalMark < navigation);
+  assert.ok(signIn < authMark && authMark < navigationMark);
   assert.ok(navigationMark < navigation);
+  assert.doesNotMatch(loginCard, /\.from\(["']profiles["']\)|select\(["']is_approved["']\)/);
   assert.doesNotMatch(loginCard, /performance\.mark\([^)]*(?:username|email|user\.id|password|nextPath|error)/i);
 });

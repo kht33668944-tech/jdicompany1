@@ -35,8 +35,11 @@ export function getPool() {
     g.__jdiPgPool = new Pool({
       connectionString: getConnectionString(),
       max: 3,
-      idleTimeoutMillis: 30_000,
+      min: 1,
+      idleTimeoutMillis: 10 * 60_000,
       connectionTimeoutMillis: 2_500,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
       ssl: { rejectUnauthorized: false },
     });
   }
