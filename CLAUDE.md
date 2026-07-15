@@ -50,7 +50,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 
 **Edge Functions** (`supabase/functions/`, **Deno 런타임** — Node 전용 패키지 금지): `influencer-analyze`, `influencer-extract`(인플루언서 자동 분석), `push-dispatch`(웹 푸시). PWA/웹 푸시는 `src/lib/push/`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
 
-**마이그레이션**: `supabase/migrations/NNN_설명.sql` 순차 번호. 현재 최신은 **`087_dashboard_task_summary_rpc.sql`** — 기존 파일 수정 대신 다음 번호로 **추가**합니다.
+**마이그레이션**: `supabase/migrations/NNN_설명.sql` 순차 번호. 현재 최신은 **`088_dashboard_task_summary_prefilter.sql`** — 기존 파일 수정 대신 다음 번호로 **추가**합니다.
 
 ## 반드시 지킬 제약
 
