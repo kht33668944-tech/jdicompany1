@@ -4,7 +4,7 @@ JDICOMPANY 사내 업무 포털입니다. 근태, 업무, 채팅, 일정, 리포
 
 ## 스택
 
-- Next.js 16.2.2 App Router
+- Next.js 16.2.10 App Router
 - React 19.2.4
 - TypeScript strict
 - Tailwind CSS 4
