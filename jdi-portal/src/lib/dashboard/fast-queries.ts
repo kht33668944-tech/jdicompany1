@@ -78,6 +78,15 @@ const DASHBOARD_SNAPSHOT_QUERY = `
     from public.tasks t
     cross join parameters prm
     cross join approved_requester
+    -- 인덱스 활용을 위한 사전 필터: class_rank 가 non-null 이 될 수 있는 행만 스캔한다.
+    -- (미완료 업무 전체 + 오늘 완료된 업무) 이외의 과거 완료 업무는 결과에서 어차피
+    -- class_rank is null 로 제외되므로, 여기서 미리 걸러도 결과는 동일하다.
+    where t.status in ('대기', '진행중')
+      or (
+        t.status = '완료'
+        and t.completed_at >= prm.day_start
+        and t.completed_at < prm.next_day_start
+      )
   ),
   ranked_task_rows as (
     select
