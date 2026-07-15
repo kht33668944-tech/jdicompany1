@@ -162,31 +162,31 @@ async function enrichRawTasks(
 
 /** Dashboard summary data: active work first, then only recent completed work, capped at fifty. */
 export async function getInitialTasksWithDetails(supabase: SupabaseClient): Promise<TaskWithDetails[]> {
-  const activeResult = await supabase
-    .from("tasks")
-    .select(TASK_BASE_SELECT)
-    .in("status", ["대기", "진행중"])
-    .order("position", { ascending: true })
-    .limit(INITIAL_TASK_LIMIT);
-
-  if (activeResult.error) throw activeResult.error;
-
-  const activeTasks = activeResult.data ?? [];
-  const remaining = INITIAL_TASK_LIMIT - activeTasks.length;
-  let completedTasks: Record<string, unknown>[] = [];
-
-  if (remaining > 0) {
-    const completedResult = await supabase
+  // 미완료/완료 목록을 병렬로 조회해 순차 왕복(콜드 시 왕복당 수백 ms)을 줄인다.
+  // 완료 목록은 최대치로 받아두고 아래에서 remaining 만큼만 사용 — 결과는 순차 방식과 동일.
+  const [activeResult, completedResult] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select(TASK_BASE_SELECT)
+      .in("status", ["대기", "진행중"])
+      .order("position", { ascending: true })
+      .limit(INITIAL_TASK_LIMIT),
+    supabase
       .from("tasks")
       .select(TASK_BASE_SELECT)
       .eq("status", "완료")
       .gte("completed_at", getCompletedCutoff())
       .order("updated_at", { ascending: false })
-      .limit(remaining);
+      .limit(INITIAL_TASK_LIMIT),
+  ]);
 
-    if (completedResult.error) throw completedResult.error;
-    completedTasks = completedResult.data ?? [];
-  }
+  if (activeResult.error) throw activeResult.error;
+  if (completedResult.error) throw completedResult.error;
+
+  const activeTasks = activeResult.data ?? [];
+  const remaining = INITIAL_TASK_LIMIT - activeTasks.length;
+  const completedTasks =
+    remaining > 0 ? (completedResult.data ?? []).slice(0, remaining) : [];
 
   return enrichRawTasks(supabase, [...activeTasks, ...completedTasks]);
 }

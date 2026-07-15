@@ -3,6 +3,7 @@ import { getPool, hasPostgresUrl, markPostgresUnavailable } from "@/lib/db/postg
 type InstrumentationGlobal = typeof globalThis & {
   __jdiPgWarmStarted?: boolean;
   __jdiPgKeepAlive?: ReturnType<typeof setInterval>;
+  __jdiSupabaseKeepAlive?: ReturnType<typeof setInterval>;
 };
 
 /**
@@ -13,13 +14,51 @@ type InstrumentationGlobal = typeof globalThis & {
 const PG_KEEPALIVE_INTERVAL_MS = 2 * 60_000;
 
 /**
+ * Supabase HTTPS 경로(인증 서버 + REST) keepalive.
+ * 계측 결과([stage] 로그) 유휴 후 첫 요청의 지연은 pg 가 아니라 Supabase HTTPS
+ * 호출(미들웨어 auth.getUser, PostgREST 쿼리)이 건당 400~700ms 로 부푸는 것이
+ * 원인이었다. 1분마다 가볍게 두 경로를 두드려 Supabase 쪽 서비스와 연결 경로를
+ * 데워둔다. (실사용자 요청과 동일한 도메인/경로를 사용)
+ */
+const SUPABASE_KEEPALIVE_INTERVAL_MS = 60_000;
+
+async function pingSupabase(): Promise<void> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return;
+  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  await Promise.allSettled([
+    // 인증 서버(GoTrue) — 미들웨어의 auth.getUser 가 매 요청 거치는 경로
+    fetch(`${url}/auth/v1/health`, { headers, cache: "no-store" }),
+    // PostgREST — supabase-js 쿼리(프로필/할일 등)가 쓰는 경로 (RLS 로 행은 반환되지 않음)
+    fetch(`${url}/rest/v1/profiles?select=id&limit=1`, {
+      method: "HEAD",
+      headers,
+      cache: "no-store",
+    }),
+  ]);
+}
+
+/**
  * Railway 프로세스 시작 시 직접 PostgreSQL 연결을 준비하고(첫 사용자가 연결 생성
  * 비용을 부담하지 않게), 이후 주기적으로 가볍게 ping 하여 유휴 연결이 끊기지 않게 한다.
  */
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs" || !hasPostgresUrl()) return;
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   const g = globalThis as InstrumentationGlobal;
+
+  // Supabase HTTPS keepalive — pg(DATABASE_URL) 유무와 무관하게 항상 켠다.
+  if (!g.__jdiSupabaseKeepAlive) {
+    void pingSupabase();
+    const supabaseTimer = setInterval(() => {
+      void pingSupabase();
+    }, SUPABASE_KEEPALIVE_INTERVAL_MS);
+    supabaseTimer.unref?.();
+    g.__jdiSupabaseKeepAlive = supabaseTimer;
+  }
+
+  if (!hasPostgresUrl()) return;
   if (g.__jdiPgWarmStarted) return;
   g.__jdiPgWarmStarted = true;
 
