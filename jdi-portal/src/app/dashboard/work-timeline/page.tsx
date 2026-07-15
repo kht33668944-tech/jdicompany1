@@ -6,6 +6,7 @@ import {
   getWorkTimelineProfiles,
 } from "@/lib/work-timeline/queries";
 import { getKstDayRange } from "@/lib/work-timeline/utils";
+import { toDateString } from "@/lib/utils/date";
 
 interface WorkTimelinePageProps {
   searchParams: Promise<{
@@ -38,7 +39,11 @@ export default async function WorkTimelinePage({ searchParams }: WorkTimelinePag
   const params = await searchParams;
   const initialQuery = firstValue(params.q);
   const initialEmployeeId = firstValue(params.employee);
-  const initialDate = validDate(firstValue(params.date));
+  // 날짜 파라미터가 없으면(처음 진입) 기본을 KST '오늘'로 둔다.
+  // 전체 보기는 date 파라미터를 삭제하므로, 파라미터 유무로 처음 진입을 구분한다.
+  // 이렇게 하면 서버 초기 조회도 오늘로 좁혀져 전체 조회의 지연이 사라진다.
+  const dateParam = firstValue(params.date);
+  const initialDate = dateParam ? validDate(dateParam) : toDateString();
   const employeeId = UUID_PATTERN.test(initialEmployeeId) ? initialEmployeeId : "";
   const entriesPromise = initialQuery.length === 1
     ? Promise.resolve([])
