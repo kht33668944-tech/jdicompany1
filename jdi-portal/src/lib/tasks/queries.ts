@@ -24,7 +24,7 @@ const TASK_BASE_SELECT = `
   creator_profile:profiles!tasks_created_by_fkey(full_name, avatar_url)
 `;
 
-function getCompletedCutoff(): string {
+export function getCompletedCutoff(): string {
   const d = new Date();
   d.setDate(d.getDate() - 7);
   return d.toISOString();

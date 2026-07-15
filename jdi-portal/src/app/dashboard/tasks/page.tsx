@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
 import TasksPageClient from "@/components/dashboard/tasks/TasksPageClient";
-import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
-import { getInitialTasksWithDetails } from "@/lib/tasks/queries";
+import { getTasksPagePayloadFast } from "@/lib/tasks/fast-queries";
 import { timeStage } from "@/lib/performance/timing";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskWithDetails } from "@/lib/tasks/types";
@@ -15,10 +14,14 @@ export default async function TasksPage() {
   let initialTasks: TaskWithDetails[] = [];
 
   try {
-    [profiles, initialTasks] = await Promise.all([
-      timeStage("/dashboard/tasks", "profiles", getCachedAllProfiles()),
-      timeStage("/dashboard/tasks", "initialTasks", getInitialTasksWithDetails(auth.supabase)),
-    ]);
+    // 직원목록 + 초기 할일을 단일 pg 왕복으로 조회(빠른 경로). 실패 시 REST 폴백.
+    const payload = await timeStage(
+      "/dashboard/tasks",
+      "pagePayload",
+      getTasksPagePayloadFast(auth.supabase, auth.user.id)
+    );
+    profiles = payload.profiles;
+    initialTasks = payload.tasks;
   } catch {
     profiles = [];
     initialTasks = [];
