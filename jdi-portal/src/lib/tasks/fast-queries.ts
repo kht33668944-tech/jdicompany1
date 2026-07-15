@@ -144,8 +144,7 @@ const INITIAL_TASKS_PAGE_QUERY = `
             select count(*)::int from public.task_checklist_items ci
             where ci.task_id = t.id and ci.is_completed
           ), 0)
-          order by s.grp asc, s.ord asc
-        )
+        ) order by s.grp asc, s.ord asc
       ),
       '[]'::jsonb
     ) as value
@@ -258,8 +257,14 @@ export async function getTasksPagePayloadFast(
     logTasksPagePayload(requestId, "pool", "ok", payload);
     return payload;
   } catch (error) {
-    if (!isTransientDashboardPoolError(error)) throw error;
-    markPostgresUnavailable();
+    // 일시적 연결 오류면 회로를 열어 잠시 REST 로 우회한다.
+    // 그 외(쿼리 오류 등)는 회로를 열지 않되, 페이지가 빈 채로 깨지지 않도록
+    // 반드시 REST 로 폴백하고 오류를 로그로 남긴다(조용한 실패 금지).
+    if (isTransientDashboardPoolError(error)) {
+      markPostgresUnavailable();
+    } else {
+      console.error("[tasks-fast] postgres path failed, falling back to REST:", error);
+    }
     const payload = await getTasksPagePayloadViaRest(supabase);
     logTasksPagePayload(requestId, "rest", "transient-pool-error", payload);
     return payload;
