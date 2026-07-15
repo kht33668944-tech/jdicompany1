@@ -53,7 +53,17 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // 콜드 지연 추적: 매 요청마다 Supabase 인증 서버로 나가는 네트워크 검증 시간 측정
+  const authStartedAt = Date.now();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const authMs = Date.now() - authStartedAt;
+  if (authMs >= 300) {
+    console.info("[stage]", {
+      route: request.nextUrl.pathname,
+      stage: "middleware.getUser",
+      ms: authMs,
+    });
+  }
 
   // 네트워크 일시 오류는 "로그아웃"으로 취급하지 않음 — 기존 쿠키/세션 그대로 통과
   const isTransientAuthError = isTransientError(authError);

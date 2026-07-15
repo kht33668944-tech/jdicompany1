@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/supabase/auth";
 import TasksPageClient from "@/components/dashboard/tasks/TasksPageClient";
 import { getCachedAllProfiles } from "@/lib/attendance/queries.server";
 import { getInitialTasksWithDetails } from "@/lib/tasks/queries";
+import { timeStage } from "@/lib/performance/timing";
 import type { Profile } from "@/lib/attendance/types";
 import type { TaskWithDetails } from "@/lib/tasks/types";
 
@@ -15,8 +16,8 @@ export default async function TasksPage() {
 
   try {
     [profiles, initialTasks] = await Promise.all([
-      getCachedAllProfiles(),
-      getInitialTasksWithDetails(auth.supabase),
+      timeStage("/dashboard/tasks", "profiles", getCachedAllProfiles()),
+      timeStage("/dashboard/tasks", "initialTasks", getInitialTasksWithDetails(auth.supabase)),
     ]);
   } catch {
     profiles = [];

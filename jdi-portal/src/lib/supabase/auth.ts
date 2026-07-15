@@ -29,6 +29,7 @@ async function getProfileViaPostgres(userId: string): Promise<Profile | null> {
  * - layout + page에서 여러 번 호출해도 React cache() 로 1회만 실행
  */
 export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
+  const startedAt = Date.now();
   const supabase = await createClient();
   const {
     data: { session },
@@ -46,6 +47,12 @@ export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
 
   profile ??= await getProfile(supabase, user.id);
   if (!profile) return null;
+
+  // 콜드 지연 추적: 세션 읽기 + 프로필 조회 합산 시간
+  const ms = Date.now() - startedAt;
+  if (ms >= 300) {
+    console.info("[stage]", { route: "(auth)", stage: "getAuthUser", ms });
+  }
 
   return { user, profile, supabase };
 });
