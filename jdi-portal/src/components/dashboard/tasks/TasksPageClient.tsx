@@ -63,7 +63,8 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
   const [historyLoading, setHistoryLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [employeeId, setEmployeeId] = useState(userId);
-  const [historyDate, setHistoryDate] = useState("");
+  // 할 일 기록 기본값을 '오늘'로 둔다(전체 날짜는 불러올 범위가 넓어 느림).
+  const [historyDate, setHistoryDate] = useState(() => toDateString());
   const [historyStatus, setHistoryStatus] = useState<HistoryStatusFilter>("all");
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
   const historyGenerationRef = useRef(0);
