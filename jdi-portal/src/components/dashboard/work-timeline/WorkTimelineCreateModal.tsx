@@ -324,7 +324,7 @@ export default function WorkTimelineCreateModal({
     try {
       const processedImages = await Promise.all(
         images.map(async ({ file }) => {
-          const resized = await resizeImageIfNeeded(file);
+          const resized = await resizeImageIfNeeded(file, { maxDim: 2560, quality: 0.92 });
           const thumbnail = await createImageThumbnail(resized);
           return { file: resized, thumbnail };
         }),

@@ -204,7 +204,7 @@ export default function WorkTimelineDetailClient({
     try {
       const processed = await Promise.all(selected.map(async (file) => {
         validateWorkTimelineImage(file);
-        const resized = await resizeImageIfNeeded(file);
+        const resized = await resizeImageIfNeeded(file, { maxDim: 2560, quality: 0.92 });
         const thumbnail = await createImageThumbnail(resized);
         return { file: resized, thumbnail };
       }));

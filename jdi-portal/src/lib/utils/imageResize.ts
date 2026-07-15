@@ -39,6 +39,7 @@ export async function resizeImageIfNeeded(
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) return file;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, w, h);
 
   // PNG는 투명도 유지 위해 그대로, 나머지(JPEG/WEBP 등)는 JPEG로 압축
@@ -82,6 +83,7 @@ export async function createImageThumbnail(
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, w, h);
 
   const blob = await new Promise<Blob | null>((resolve) =>
