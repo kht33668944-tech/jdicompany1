@@ -225,6 +225,121 @@ function CompletedTaskTimelineAction({
   );
 }
 
+function CompletedTaskTimelineSnackbar({
+  taskId,
+  taskTitle,
+  currentUserId,
+  onClose,
+}: {
+  taskId: string;
+  taskTitle: string;
+  currentUserId: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [shareState, setShareState] = useState<WorkTimelineTaskShareState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  // 작성창을 열지 않은 동안에는 8초 뒤 자동으로 사라집니다(= 그냥 넘기기).
+  useEffect(() => {
+    if (showCreate) return;
+    const timer = setTimeout(onClose, 8000);
+    return () => clearTimeout(timer);
+  }, [showCreate, onClose]);
+
+  const handleRecord = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const nextState = await getTaskTimelineShare(taskId);
+      setShareState(nextState);
+      if (nextState.existingEntryId) {
+        router.push(`/dashboard/work-timeline/${nextState.existingEntryId}`);
+        onClose();
+      } else if (nextState.canShare && nextState.task) {
+        setShowCreate(true);
+      } else {
+        toast.error("이 업무는 타임라인에 공유할 수 없습니다.");
+        onClose();
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "공유 상태를 확인하지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      {!showCreate && (
+        <div
+          role="status"
+          className={`fixed bottom-5 right-5 z-50 w-[min(20rem,calc(100vw-2.5rem))] rounded-xl border border-slate-200 bg-white p-4 shadow-lg transition-all duration-300 ${
+            visible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <CheckCircle size={22} weight="fill" className="mt-0.5 shrink-0 text-emerald-500" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-slate-800">{taskTitle}</p>
+              <p className="mt-0.5 text-xs text-slate-500">완료했어요. 업무 타임라인에 기록할까요?</p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-100"
+            >
+              넘기기
+            </button>
+            <button
+              type="button"
+              onClick={handleRecord}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-70"
+            >
+              {loading ? (
+                <SpinnerGap size={14} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <ShareNetwork size={14} weight="bold" aria-hidden="true" />
+              )}
+              타임라인에 기록하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showCreate && shareState?.task && (
+        <WorkTimelineCreateModal
+          open
+          currentUserId={currentUserId}
+          onClose={() => {
+            setShowCreate(false);
+            onClose();
+          }}
+          onCreated={() => {
+            setShowCreate(false);
+            onClose();
+            router.refresh();
+          }}
+          initialTitle={shareState.task.title}
+          initialDescription=""
+          initialCompletedAt={shareState.task.completedAt}
+          taskId={taskId}
+        />
+      )}
+    </>
+  );
+}
+
 export default function TodayWorkBoardWidget({
   userId,
   profiles,
@@ -240,6 +355,7 @@ export default function TodayWorkBoardWidget({
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [completionPrompt, setCompletionPrompt] = useState<{ taskId: string; taskTitle: string } | null>(null);
   const [, startTransition] = useTransition();
   const currentUserRole = profiles.find((profile) => profile.id === userId)?.role ?? "employee";
 
@@ -357,9 +473,14 @@ export default function TodayWorkBoardWidget({
       ),
     );
     setPendingTaskIds((prev) => new Set(prev).add(task.id));
+    const canShareTimeline = task.created_by === userId
+      || task.assignees.some((assignee) => assignee.user_id === userId);
     startTransition(async () => {
       try {
         await updateTask(task.id, { status: nextStatus });
+        if (nextStatus === "완료" && canShareTimeline) {
+          setCompletionPrompt({ taskId: task.id, taskTitle: task.title });
+        }
         router.refresh();
       } catch (error) {
         setLocalTasks((current) => current.map((item) => item.id === task.id ? task : item));
@@ -711,6 +832,16 @@ export default function TodayWorkBoardWidget({
         initialTask={null}
         onClose={closeTaskDetail}
       />
+
+      {completionPrompt && (
+        <CompletedTaskTimelineSnackbar
+          key={completionPrompt.taskId}
+          taskId={completionPrompt.taskId}
+          taskTitle={completionPrompt.taskTitle}
+          currentUserId={userId}
+          onClose={() => setCompletionPrompt(null)}
+        />
+      )}
     </section>
   );
 }
