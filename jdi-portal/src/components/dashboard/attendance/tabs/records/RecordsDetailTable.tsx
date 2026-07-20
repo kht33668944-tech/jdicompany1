@@ -194,7 +194,8 @@ export default function RecordsDetailTable({
         </div>
       </div>
 
-      <div className="max-h-[400px] overflow-y-auto overflow-x-auto rounded-xl">
+      {/* 데스크톱: 표 (md 이상) */}
+      <div className="hidden md:block max-h-[400px] overflow-y-auto overflow-x-auto rounded-xl">
         <table className="w-full text-sm min-w-[600px]">
           <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-sm">
             <tr>
@@ -251,6 +252,66 @@ export default function RecordsDetailTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* 모바일: 카드 목록 (md 미만) */}
+      <div className="md:hidden max-h-[440px] overflow-y-auto space-y-2 pr-0.5">
+        {rows.length === 0 ? (
+          <div className="text-center py-8 text-sm text-slate-400">
+            해당 기간의 기록이 없습니다.
+          </div>
+        ) : (
+          rows.map((row) => {
+            const status = getRecordStatus(row.record, row.vacationType, workSchedules, row.workDate);
+            const note = getNoteDisplay(row, workSchedules);
+            const key = row.record?.id ?? `vac-${row.workDate}`;
+            const rowRecord = row.record;
+            return (
+              <div key={key} className="rounded-xl border border-slate-100 bg-white p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-slate-700">{formatDate(row.workDate)}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${status.color}`}>
+                    {status.label}
+                  </span>
+                </div>
+                <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-0.5">출근</div>
+                    <div className="text-sm font-medium text-slate-700 tabular-nums">
+                      {row.record ? formatTime(row.record.check_in) : "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-0.5">퇴근</div>
+                    <div className="text-sm font-medium text-slate-700 tabular-nums">
+                      {row.record ? formatTime(row.record.check_out) : "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-0.5">근무</div>
+                    <div className="text-sm font-medium text-slate-700 tabular-nums">
+                      {getWorkTimeDisplay(row)}
+                    </div>
+                  </div>
+                </div>
+                {(note.text !== "-" || (isOwnRecord && rowRecord)) && (
+                  <div className="mt-2.5 pt-2.5 border-t border-slate-50 flex items-center justify-between gap-2">
+                    <span className={`text-xs ${note.color}`}>{note.text !== "-" ? note.text : ""}</span>
+                    {isOwnRecord && rowRecord && (
+                      <button
+                        onClick={() => setSelectedRecord(rowRecord)}
+                        className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium whitespace-nowrap px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+                      >
+                        <PencilSimple size={14} />
+                        수정 요청
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {selectedRecord && (

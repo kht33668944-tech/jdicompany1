@@ -71,7 +71,7 @@ export default function InstallAppCard() {
   // 설치 완료 상태
   if (installed) {
     return (
-      <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-8">
+      <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-5 sm:p-8">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
             <CheckCircle size={24} weight="fill" className="text-emerald-500" />
@@ -88,7 +88,7 @@ export default function InstallAppCard() {
   }
 
   return (
-    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-8">
+    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-5 sm:p-8">
       <div className="flex items-start gap-4 mb-6">
         <button
           type="button"

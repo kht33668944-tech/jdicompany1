@@ -52,7 +52,7 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
   }, [nextPage]);
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 p-3 sm:p-6 min-h-0">
+    <div className="flex flex-col gap-3 sm:gap-4 px-0 py-3 sm:p-6 min-h-0">
       {/* 탭 네비게이션 */}
       <InfluencerTabs />
 

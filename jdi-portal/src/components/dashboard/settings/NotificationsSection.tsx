@@ -138,7 +138,7 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
   const childDisabled = !settings.push_enabled;
 
   return (
-    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-8">
+    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-5 sm:p-8">
       <div className="mb-8">
         <h2 className="text-lg font-bold text-slate-800">알림 설정</h2>
         <p className="text-xs text-slate-400 mt-1">업무 관련 알림 수신 여부를 개별적으로 설정할 수 있습니다.</p>

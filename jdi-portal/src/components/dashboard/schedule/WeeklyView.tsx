@@ -94,7 +94,8 @@ export default function WeeklyView({
         </button>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* 데스크톱: 주간 전체 그리드 (md 이상) */}
+      <div className="hidden md:block overflow-x-auto">
         <div className="min-w-[700px]">
           {/* 요일 헤더 */}
           <div className="grid grid-cols-8 gap-px mb-1">
@@ -231,6 +232,117 @@ export default function WeeklyView({
             ))}
           </div>
         </div>
+      </div>
+
+      {/* 모바일: 요일 선택 + 선택한 하루 타임라인 (md 미만) */}
+      <div className="md:hidden">
+        {/* 요일 선택 스트립 */}
+        <div className="grid grid-cols-7 gap-1 mb-4">
+          {weekDays.map((day, i) => {
+            const isToday = day === todayStr;
+            const isSelected = day === selectedDate;
+            const dayNum = Number(day.slice(8, 10));
+            const isRed = isRedDay(day, i);
+            const isSat = i === 6;
+            const labelColor = isRed ? "text-red-400" : isSat ? "text-blue-400" : "text-slate-400";
+            const numColor = isSelected
+              ? "bg-brand-500 text-white"
+              : isToday
+                ? "text-brand-600 font-bold"
+                : isRed
+                  ? "text-red-400"
+                  : isSat
+                    ? "text-blue-400"
+                    : "text-slate-700";
+            return (
+              <button
+                key={day}
+                onClick={() => onDateSelect(day)}
+                className={`flex flex-col items-center py-1.5 rounded-xl transition-colors ${
+                  isSelected ? "bg-brand-50" : "hover:bg-slate-50"
+                }`}
+              >
+                <span className={`text-[11px] font-semibold ${labelColor}`}>{DAY_LABELS[i]}</span>
+                <span className={`mt-1 w-8 h-8 flex items-center justify-center rounded-full text-sm font-semibold ${numColor}`}>
+                  {dayNum}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 선택한 날짜의 종일 이벤트 */}
+        {(() => {
+          const allday = eventsByDayAndHour.get(`${selectedDate}-allday`) ?? [];
+          if (allday.length === 0) return null;
+          return (
+            <div className="space-y-1.5 mb-3">
+              {allday.map((event) => {
+                const config = getCategoryStyle(event.category);
+                return (
+                  <button
+                    key={event.id}
+                    onClick={() => onEventClick(event)}
+                    className={`w-full text-left text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 ${config.badge} ${event.visibility === "private" ? "border border-dashed border-slate-300" : ""}`}
+                    title={event.title}
+                  >
+                    <span className="text-[10px] font-semibold opacity-60 shrink-0">종일</span>
+                    {event.visibility === "private" && <Lock size={11} className="shrink-0" />}
+                    <span className="truncate font-medium">{event.title}</span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* 선택한 날짜의 시간별 일정 (일정이 있는 시간만 표시) */}
+        {(() => {
+          const hoursWithEvents = HOURS.filter(
+            (hour) => (eventsByDayAndHour.get(`${selectedDate}-${hour}`) ?? []).length > 0
+          );
+          const alldayCount = (eventsByDayAndHour.get(`${selectedDate}-allday`) ?? []).length;
+          if (hoursWithEvents.length === 0) {
+            return alldayCount === 0 ? (
+              <div className="text-center py-8 text-sm text-slate-400">
+                이 날짜에 예정된 일정이 없습니다.
+              </div>
+            ) : null;
+          }
+          return (
+            <div className="max-h-[440px] overflow-y-auto divide-y divide-slate-50">
+              {hoursWithEvents.map((hour) => {
+                const events = eventsByDayAndHour.get(`${selectedDate}-${hour}`) ?? [];
+                return (
+                  <div key={hour} className="flex gap-3 py-2">
+                    <div className="w-12 shrink-0 text-xs text-slate-400 font-medium tabular-nums pt-1.5">
+                      {String(hour).padStart(2, "0")}:00
+                    </div>
+                    <div className="flex-1 space-y-1.5">
+                      {events.map((event) => {
+                        const config = getCategoryStyle(event.category);
+                        return (
+                          <button
+                            key={event.id}
+                            onClick={() => onEventClick(event)}
+                            className={`w-full text-left text-xs px-3 py-2 rounded-lg ${config.badge} hover:opacity-80 transition-opacity ${event.visibility === "private" ? "border border-dashed border-slate-300" : ""}`}
+                            title={event.title}
+                          >
+                            <div className="font-medium flex items-center gap-1">
+                              {event.visibility === "private" && <Lock size={11} className="shrink-0" />}
+                              <span className="truncate">{event.title}</span>
+                            </div>
+                            <div className="opacity-70 text-[11px] mt-0.5">{formatTime(event.start_time)}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

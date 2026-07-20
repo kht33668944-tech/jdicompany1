@@ -39,14 +39,14 @@ export default function TabNavigation({ activeTab, onTabChange, isAdmin }: TabNa
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
               active
                 ? "bg-white text-brand-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
             }`}
           >
             <Icon size={18} weight={active ? "fill" : "regular"} />
-            <span className="hidden sm:inline">{tab.label}</span>
+            <span>{tab.label}</span>
           </button>
         );
       })}

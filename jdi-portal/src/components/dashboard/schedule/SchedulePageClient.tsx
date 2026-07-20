@@ -167,8 +167,8 @@ export default function SchedulePageClient({
           })}
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="glass-card rounded-2xl p-1.5 flex gap-1">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="glass-card rounded-2xl p-1.5 flex gap-1 shrink-0">
             {([
               { id: "all" as const, label: "전체", icon: FunnelSimple },
               { id: "company" as const, label: "회사", icon: Buildings },
@@ -180,7 +180,7 @@ export default function SchedulePageClient({
                 <button
                   key={filter.id}
                   onClick={() => setVisibilityFilter(filter.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-200 ${
                     active
                       ? "bg-white text-brand-600 shadow-sm"
                       : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
@@ -195,10 +195,11 @@ export default function SchedulePageClient({
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/20 transition-all duration-200"
+            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold text-white whitespace-nowrap shrink-0 ml-auto sm:ml-0 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/20 transition-all duration-200"
           >
-          <Plus size={18} weight="bold" />
-            새 일정 추가
+            <Plus size={18} weight="bold" />
+            <span className="hidden sm:inline">새 일정 추가</span>
+            <span className="sm:hidden">추가</span>
           </button>
         </div>
       </div>

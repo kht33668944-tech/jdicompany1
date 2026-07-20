@@ -98,7 +98,7 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
   const avatarColors = ["bg-indigo-100 text-indigo-600", "bg-blue-100 text-blue-600", "bg-purple-100 text-purple-600", "bg-emerald-100 text-emerald-600", "bg-amber-100 text-amber-600"];
 
   return (
-    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-8">
+    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-5 sm:p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <div className="flex items-center gap-2">

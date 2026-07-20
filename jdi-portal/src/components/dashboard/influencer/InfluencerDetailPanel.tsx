@@ -735,7 +735,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
               </div>
 
               {/* 통계 */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: "팔로워", value: formatNumber(influencer.follower_count) },
                   { label: "참여율", value: formatPct(influencer.engagement_rate) },

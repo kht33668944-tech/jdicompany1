@@ -69,7 +69,7 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
             unreadCount={unreadCount}
             onUnreadCountChange={setUnreadCount}
           />
-          <main className="p-6">{children}</main>
+          <main className="p-4 sm:p-6">{children}</main>
         </div>
       </div>
 

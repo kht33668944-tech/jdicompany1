@@ -67,7 +67,7 @@ export default function ProfileSection({ profile, onUpdated }: ProfileSectionPro
   };
 
   return (
-    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-8">
+    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-5 sm:p-8">
       <div className="mb-8">
         <h2 className="text-lg font-bold text-slate-800">프로필 설정</h2>
         <p className="text-xs text-slate-400 mt-1">회사 내에서 표시될 개인 정보를 관리합니다.</p>

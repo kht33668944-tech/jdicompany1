@@ -223,7 +223,7 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
   };
 
   return (
-    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-8">
+    <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-5 sm:p-8">
       {reauthOpen && (
         <ReauthModal
           email={profile.email}
