@@ -66,13 +66,15 @@ const DASHBOARD_SNAPSHOT_QUERY = `
         when t.status in ('대기', '진행중')
           and t.due_date = prm.today then 1
         when t.status in ('대기', '진행중')
-          and t.start_date is not null
-          and t.start_date < (prm.next_day_start at time zone 'Asia/Seoul')::date then 2
+          and t.due_date is not null and t.due_date > prm.today then 2
         when t.status in ('대기', '진행중')
-          and t.due_date is null and t.start_date is null then 3
+          and t.start_date is not null
+          and t.start_date < (prm.next_day_start at time zone 'Asia/Seoul')::date then 3
+        when t.status in ('대기', '진행중')
+          and t.due_date is null and t.start_date is null then 4
         when t.status = '완료'
           and t.completed_at >= prm.day_start
-          and t.completed_at < prm.next_day_start then 4
+          and t.completed_at < prm.next_day_start then 5
         else null
       end as class_rank
     from public.tasks t
@@ -92,10 +94,10 @@ const DASHBOARD_SNAPSHOT_QUERY = `
     select
       t.*,
       case
-        when t.class_rank in (0, 1) then t.due_date::timestamp at time zone 'Asia/Seoul'
-        when t.class_rank = 2 then t.start_date::timestamp at time zone 'Asia/Seoul'
-        when t.class_rank = 3 then t.created_at
-        when t.class_rank = 4 then t.completed_at
+        when t.class_rank in (0, 1, 2) then t.due_date::timestamp at time zone 'Asia/Seoul'
+        when t.class_rank = 3 then t.start_date::timestamp at time zone 'Asia/Seoul'
+        when t.class_rank = 4 then t.created_at
+        when t.class_rank = 5 then t.completed_at
         else null
       end as relevant_at,
       case
@@ -111,8 +113,8 @@ const DASHBOARD_SNAPSHOT_QUERY = `
     from ranked_task_rows t
     order by
       t.class_rank asc,
-      case when t.class_rank = 4 then t.relevant_at end desc nulls last,
-      case when t.class_rank <> 4 then t.relevant_at end asc nulls last,
+      case when t.class_rank = 5 then t.relevant_at end desc nulls last,
+      case when t.class_rank <> 5 then t.relevant_at end asc nulls last,
       t.status_rank asc,
       t.position asc nulls last,
       t.created_at asc,
@@ -151,8 +153,8 @@ const DASHBOARD_SNAPSHOT_QUERY = `
           ), '[]'::jsonb)
         ) order by
           t.class_rank asc,
-          case when t.class_rank = 4 then t.relevant_at end desc nulls last,
-          case when t.class_rank <> 4 then t.relevant_at end asc nulls last,
+          case when t.class_rank = 5 then t.relevant_at end desc nulls last,
+          case when t.class_rank <> 5 then t.relevant_at end asc nulls last,
           t.status_rank asc,
           t.position asc nulls last,
           t.created_at asc,

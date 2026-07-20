@@ -10,7 +10,7 @@ const appRoot = path.resolve(import.meta.dirname, "..");
 const summarySourcePath = path.join(appRoot, "src", "lib", "dashboard", "dashboard-task-summary.ts");
 const fastQueriesSourcePath = path.join(appRoot, "src", "lib", "dashboard", "fast-queries.ts");
 const dashboardQueriesSourcePath = path.join(appRoot, "src", "lib", "dashboard", "queries.ts");
-const rpcMigrationSourcePath = path.join(appRoot, "supabase", "migrations", "087_dashboard_task_summary_rpc.sql");
+const rpcMigrationSourcePath = path.join(appRoot, "supabase", "migrations", "089_dashboard_task_summary_future_due.sql");
 const tasksPageSourcePath = path.join(appRoot, "src", "components", "dashboard", "tasks", "TasksPageClient.tsx");
 const taskPageDetailSourcePath = path.join(appRoot, "src", "app", "dashboard", "tasks", "[id]", "page.tsx");
 
@@ -88,11 +88,11 @@ function normalizeSql(sql) {
 function assertClassifierAndProjectionSource(source, variableName, nextDayDateExpression) {
   const sql = normalizeSql(source);
   assert.match(sql, new RegExp(
-    `CASE WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.due_date IS NOT NULL AND t\\.due_date < ${variableName} THEN 0 WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.due_date = ${variableName} THEN 1 WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.start_date IS NOT NULL AND t\\.start_date < ${nextDayDateExpression} THEN 2 WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.due_date IS NULL AND t\\.start_date IS NULL THEN 3 WHEN t\\.status = '완료' AND t\\.completed_at >= [^ ]+ AND t\\.completed_at < [^ ]+ THEN 4 ELSE NULL END(?: AS| as) class_rank`,
+    `CASE WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.due_date IS NOT NULL AND t\\.due_date < ${variableName} THEN 0 WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.due_date = ${variableName} THEN 1 WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.due_date IS NOT NULL AND t\\.due_date > ${variableName} THEN 2 WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.start_date IS NOT NULL AND t\\.start_date < ${nextDayDateExpression} THEN 3 WHEN t\\.status IN \\('대기', '진행중'\\) AND t\\.due_date IS NULL AND t\\.start_date IS NULL THEN 4 WHEN t\\.status = '완료' AND t\\.completed_at >= [^ ]+ AND t\\.completed_at < [^ ]+ THEN 5 ELSE NULL END(?: AS| as) class_rank`,
     "i"
   ));
   assert.match(sql, /CASE WHEN t\.status = '진행중' THEN 0 WHEN t\.status = '대기' THEN 1 ELSE 2 END AS status_rank/i);
-  assert.match(sql, /ORDER BY t\.class_rank ASC, CASE WHEN t\.class_rank = 4 THEN t\.relevant_at END DESC NULLS LAST, CASE WHEN t\.class_rank <> 4 THEN t\.relevant_at END ASC NULLS LAST, t\.status_rank ASC, t\.position ASC NULLS LAST, t\.created_at ASC, t\.id ASC/i);
+  assert.match(sql, /ORDER BY t\.class_rank ASC, CASE WHEN t\.class_rank = 5 THEN t\.relevant_at END DESC NULLS LAST, CASE WHEN t\.class_rank <> 5 THEN t\.relevant_at END ASC NULLS LAST, t\.status_rank ASC, t\.position ASC NULLS LAST, t\.created_at ASC, t\.id ASC/i);
   assert.match(sql, /JOIN public\.profiles assignee ON assignee\.id = ta\.user_id AND assignee\.is_approved = true/i);
   assert.match(sql, /ORDER BY ta\.user_id ASC/i);
   for (const field of ["id", "title", "status", "priority", "due_date", "start_date", "position", "parent_id", "created_by", "created_at", "updated_at", "completed_at"]) {
@@ -178,6 +178,7 @@ test("the normalizer validates class precedence, exact microsecond order, row sh
   const orderedRows = [
     task("overdue", { due_date: "2026-07-12", start_date: "2026-07-01" }),
     task("due-today", { due_date: "2026-07-13", start_date: "2026-07-01" }),
+    task("future-due", { due_date: "2026-07-20" }),
     task("started", { start_date: "2026-07-13" }),
     task("undated", { created_at: "2026-07-02T00:00:00Z", position: null }),
     task("completed", {
@@ -189,7 +190,7 @@ test("the normalizer validates class precedence, exact microsecond order, row sh
 
   assert.deepEqual(
     orderedRows.map((row) => summary.getDashboardTaskSummaryClass(row, window)),
-    [0, 1, 2, 3, 4]
+    [0, 1, 2, 3, 4, 5]
   );
   assert.deepEqual(
     summary.normalizeDashboardTaskSummaryResult(orderedRows, profiles, window).tasks.map((row) => row.id),

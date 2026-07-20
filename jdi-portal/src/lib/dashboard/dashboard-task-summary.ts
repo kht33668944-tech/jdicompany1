@@ -326,20 +326,25 @@ export function getDashboardTaskSummaryClass(
     return 1;
   }
   if ((task.status === "대기" || task.status === "진행중")
+    && task.due_date !== null
+    && task.due_date > window.today) {
+    return 2;
+  }
+  if ((task.status === "대기" || task.status === "진행중")
     && task.start_date !== null
     && task.start_date < addDays(window.today, 1)) {
-    return 2;
+    return 3;
   }
   if ((task.status === "대기" || task.status === "진행중")
     && task.due_date === null
     && task.start_date === null) {
-    return 3;
+    return 4;
   }
   if (task.status === "완료"
     && task.completed_at !== null
     && compareCanonicalTimestamps(task.completed_at, window.dayStart) >= 0
     && compareCanonicalTimestamps(task.completed_at, window.nextDayStart) < 0) {
-    return 4;
+    return 5;
   }
   return null;
 }
@@ -348,12 +353,13 @@ function getRelevantAt(task: DashboardTaskSummary, classRank: number): string {
   switch (classRank) {
     case 0:
     case 1:
-      return `${task.due_date}T00:00:00+09:00`;
     case 2:
-      return `${task.start_date}T00:00:00+09:00`;
+      return `${task.due_date}T00:00:00+09:00`;
     case 3:
-      return task.created_at;
+      return `${task.start_date}T00:00:00+09:00`;
     case 4:
+      return task.created_at;
+    case 5:
       if (task.completed_at === null) {
         return contractFailure("completed dashboard task is missing completed_at");
       }
@@ -391,7 +397,7 @@ export function compareDashboardTaskSummaries(
   const rightRelevantAt = getRelevantAt(right, rightClass);
   const relevantAtDifference = compareCanonicalTimestamps(leftRelevantAt, rightRelevantAt);
   if (relevantAtDifference !== 0) {
-    return leftClass === 4 ? -relevantAtDifference : relevantAtDifference;
+    return leftClass === 5 ? -relevantAtDifference : relevantAtDifference;
   }
 
   const statusRank = (status: TaskStatus) => {
