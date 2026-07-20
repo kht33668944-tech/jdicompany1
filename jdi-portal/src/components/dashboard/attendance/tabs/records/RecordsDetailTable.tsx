@@ -33,9 +33,9 @@ interface DisplayRow {
 function formatLateDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h && m) return `+${h}h ${m}m`;
-  if (h) return `+${h}h`;
-  return `+${m}m`;
+  if (h && m) return `${h}시간 ${m}분`;
+  if (h) return `${h}시간`;
+  return `${m}분`;
 }
 
 function getRecordStatus(
@@ -99,7 +99,9 @@ function getNoteDisplay(
 function getWorkTimeDisplay(row: DisplayRow): string {
   const { record, vacationType } = row;
   if (vacationType && !record) return "-";
-  if (!record) return "0시간 0분";
+  if (!record || !record.check_in) return "-";
+  // 출근은 했지만 아직 퇴근 기록이 없으면 근무시간은 0이 아니라 "미퇴근"이다.
+  if (!record.check_out) return "미퇴근";
   if (vacationType === "반차-오전" || vacationType === "반차-오후") {
     const actual = calcDayActualMinutes(record, vacationType);
     return formatMinutes(actual);

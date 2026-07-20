@@ -24,15 +24,18 @@ export default function RecordsSummaryCards({ stats, prevStats }: RecordsSummary
       unit: "일",
       diff: daysDiff !== null ? `전월 대비 ${Math.abs(daysDiff)}건 ${daysDiff >= 0 ? "증가" : "감소"}` : null,
       diffPositive: daysDiff !== null ? daysDiff >= 0 : null,
+      diffDirectionUp: daysDiff !== null ? daysDiff >= 0 : null,
       icon: Briefcase,
       iconColor: "text-brand-500",
+      valueColor: null as string | null,
     },
     {
       label: "평균 근무시간",
-      value: formatMinutes(stats.avgWorkMinutes).replace("시간", "h ").replace("분", "m"),
+      value: formatMinutes(stats.avgWorkMinutes),
       unit: "",
       diff: null,
       diffPositive: null,
+      diffDirectionUp: null,
       icon: ClockAfternoon,
       iconColor: "text-emerald-500",
       valueColor: null as string | null,
@@ -43,6 +46,7 @@ export default function RecordsSummaryCards({ stats, prevStats }: RecordsSummary
       unit: "",
       diff: null,
       diffPositive: null,
+      diffDirectionUp: null,
       icon: Scales,
       iconColor: diffIsZero ? "text-slate-400" : diffIsPositive ? "text-emerald-500" : "text-red-500",
       valueColor: diffIsZero ? "text-slate-600" : diffIsPositive ? "text-emerald-600" : "text-red-600",
@@ -54,9 +58,12 @@ export default function RecordsSummaryCards({ stats, prevStats }: RecordsSummary
       diff: lateTimeDiff !== null && lateTimeDiff !== 0
         ? `전월 대비 ${Math.abs(lateTimeDiff)}분 ${lateTimeDiff > 0 ? "증가" : "감소"}`
         : null,
+      // 색은 좋음/나쁨(지각이 줄면 좋음), 화살표는 방향(증가/감소)으로 분리한다.
       diffPositive: lateTimeDiff !== null ? lateTimeDiff <= 0 : null,
+      diffDirectionUp: lateTimeDiff !== null ? lateTimeDiff > 0 : null,
       icon: Warning,
       iconColor: "text-amber-500",
+      valueColor: null as string | null,
     },
   ];
 
@@ -70,13 +77,13 @@ export default function RecordsSummaryCards({ stats, prevStats }: RecordsSummary
               <span className="text-xs font-medium text-slate-500">{card.label}</span>
               <Icon size={18} className={card.iconColor} />
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-2xl font-bold ${("valueColor" in card && card.valueColor) || "text-slate-800"}`}>{card.value}</span>
-              {card.unit && <span className="text-sm text-slate-500">{card.unit}</span>}
+            <div className="flex items-baseline gap-1 whitespace-nowrap">
+              <span className={`text-2xl font-bold tabular-nums ${card.valueColor ?? "text-slate-800"}`}>{card.value}</span>
+              {card.unit && <span className="text-sm font-medium text-slate-500">{card.unit}</span>}
             </div>
             {card.diff && (
               <p className={`text-xs mt-1 ${card.diffPositive ? "text-brand-600" : "text-red-500"}`}>
-                {card.diffPositive ? "▲" : "▼"} {card.diff}
+                {card.diffDirectionUp ? "▲" : "▼"} {card.diff}
               </p>
             )}
           </div>
