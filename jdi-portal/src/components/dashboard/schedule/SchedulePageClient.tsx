@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CalendarBlank, List, CalendarCheck, Calendar, Plus, Buildings, User, FunnelSimple } from "phosphor-react";
 import MonthlyCalendar from "./MonthlyCalendar";
 import WeeklyView from "./WeeklyView";
@@ -37,7 +37,9 @@ interface Tab {
   icon: React.ElementType;
 }
 
-const STORAGE_KEY = "schedule-active-tab";
+// v2: 기존에는 마운트마다 현재 탭이 자동 저장되어 기기 기본값(모바일=목록)이 적용되지
+// 않았다. 키를 갱신해 저장된 탭을 한 번 초기화하고, 이후에는 사용자가 직접 고른 탭만 저장한다.
+const STORAGE_KEY = "schedule-active-tab-v2";
 const tabs: Tab[] = [
   { id: "monthly", label: "월간", icon: CalendarBlank },
   { id: "weekly", label: "주간", icon: Calendar },
@@ -47,7 +49,10 @@ const tabs: Tab[] = [
 
 function getInitialTab(): ScheduleTabId {
   if (typeof window === "undefined") return "monthly";
-  return (window.localStorage.getItem(STORAGE_KEY) as ScheduleTabId | null) ?? "monthly";
+  const stored = window.localStorage.getItem(STORAGE_KEY) as ScheduleTabId | null;
+  if (stored) return stored;
+  // 저장된 선택이 없으면 모바일(<768px)은 보기 편한 목록, PC는 월간 달력을 기본으로 한다.
+  return window.matchMedia("(max-width: 767px)").matches ? "list" : "monthly";
 }
 
 export default function SchedulePageClient({
@@ -82,9 +87,11 @@ export default function SchedulePageClient({
     return isCreator || isParticipant;
   }), [schedules, visibilityFilter, userId]);
 
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, activeTab);
-  }, [activeTab]);
+  // 탭은 사용자가 직접 고를 때만 저장한다(기기 기본값이 자동 저장되어 굳지 않도록).
+  const handleTabChange = (tabId: ScheduleTabId) => {
+    setActiveTab(tabId);
+    window.localStorage.setItem(STORAGE_KEY, tabId);
+  };
 
   const refetchMonth = async (year: number, month: number) => {
     const key = `${year}-${month}`;
@@ -153,7 +160,7 @@ export default function SchedulePageClient({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                   active
                     ? "bg-white text-brand-600 shadow-sm"

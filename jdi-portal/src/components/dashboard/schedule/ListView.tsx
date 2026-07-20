@@ -80,8 +80,8 @@ export default function ListView({ schedules, onEventClick }: ListViewProps) {
                   onClick={() => onEventClick(event)}
                   className="w-full text-left flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors"
                 >
-                  {/* 시간 */}
-                  <div className="shrink-0 w-20 text-right">
+                  {/* 시간 (왼쪽 정렬) */}
+                  <div className="shrink-0 w-14 text-left">
                     {event.is_all_day ? (
                       <span className="text-xs font-medium text-slate-400">종일</span>
                     ) : (
@@ -99,11 +99,14 @@ export default function ListView({ schedules, onEventClick }: ListViewProps) {
                   {/* 컬러 바 */}
                   <div className={`w-1 self-stretch rounded-full ${config.dot}`} />
 
-                  {/* 내용 */}
+                  {/* 내용 (모두 왼쪽 정렬) */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${config.badge}`}>
                         {config.label}
+                      </span>
+                      <span className="text-xs text-slate-400 truncate">
+                        {event.creator_profile.full_name}
                       </span>
                     </div>
                     <h5 className="text-sm font-semibold text-slate-700 truncate flex items-center gap-1">
@@ -120,11 +123,6 @@ export default function ListView({ schedules, onEventClick }: ListViewProps) {
                         {event.location}
                       </p>
                     )}
-                  </div>
-
-                  {/* 작성자 */}
-                  <div className="shrink-0 text-xs text-slate-400">
-                    {event.creator_profile.full_name}
                   </div>
                 </button>
               );
