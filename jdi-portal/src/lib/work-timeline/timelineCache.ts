@@ -14,15 +14,16 @@ import type { WorkTimelineEntryWithProfile, WorkTimelineProfile } from "./types"
 const DB_NAME = "jdi-work-timeline-cache";
 const DB_VERSION = 1;
 const TIMELINE_STORE = "recent_work_timeline";
-const CACHE_SCHEMA_VERSION = 1;
+const CACHE_SCHEMA_VERSION = 2;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const MAX_ENTRIES = 15;
+const MAX_ENTRIES = 50;
 
 interface CachedWorkTimelineRecord {
   key: string;
   entries: WorkTimelineEntryWithProfile[];
   profiles: WorkTimelineProfile[];
   cached_at: string;
+  date?: string | null;
 }
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -62,6 +63,7 @@ function isExpired(cachedAt: string): boolean {
  */
 export async function getCachedWorkTimeline(
   userId: string,
+  date?: string,
 ): Promise<{ entries: WorkTimelineEntryWithProfile[]; profiles: WorkTimelineProfile[] } | null> {
   const dbp = getDB();
   if (!dbp) return null;
@@ -73,6 +75,12 @@ export async function getCachedWorkTimeline(
     if (!record || !Array.isArray(record.entries) || !Array.isArray(record.profiles)) return null;
 
     if (isExpired(record.cached_at)) {
+      await db.delete(TIMELINE_STORE, key);
+      return null;
+    }
+
+    // 날짜가 지정된(오늘만 보여주는) 미리보기는 다른 날짜에 저장된 캐시를 무시한다.
+    if (date !== undefined && (record.date ?? null) !== date) {
       await db.delete(TIMELINE_STORE, key);
       return null;
     }
@@ -92,6 +100,7 @@ export async function cacheWorkTimeline(
   userId: string,
   entries: WorkTimelineEntryWithProfile[],
   profiles: WorkTimelineProfile[],
+  date?: string,
 ): Promise<void> {
   const dbp = getDB();
   if (!dbp) return;
@@ -106,6 +115,7 @@ export async function cacheWorkTimeline(
       })),
       profiles,
       cached_at: new Date().toISOString(),
+      date: date ?? null,
     };
     await db.put(TIMELINE_STORE, record);
   } catch (err) {

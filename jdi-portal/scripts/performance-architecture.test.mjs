@@ -43,9 +43,10 @@ test("dashboard renders a user-scoped cached timeline before a lightweight refre
   assert.match(page, /<DashboardTimelineClient/);
   assert.doesNotMatch(dashboard, /getWorkTimeline|WorkTimelineSection|initialTimelineEntries|timelineProfiles/);
 
-  assert.match(timeline, /getCachedWorkTimeline\(currentUserId\)/);
-  assert.match(timeline, /getWorkTimelineEntries\(supabase,[\s\S]*includeAttachments: false/);
-  assert.match(timeline, /cacheWorkTimeline\(currentUserId, entries, profiles\)/);
+  // 대시보드 미리보기는 오늘(KST)만 조회·캐시한다.
+  assert.match(timeline, /getCachedWorkTimeline\(currentUserId, today\)/);
+  assert.match(timeline, /getWorkTimelineEntries\(supabase,[\s\S]*date: today,[\s\S]*includeAttachments: false/);
+  assert.match(timeline, /cacheWorkTimeline\(currentUserId, entries, profiles, today\)/);
   // fresh fetch를 캐시 읽기보다 먼저 시작해 두 I/O가 겹치게 한다
   assert.ok(
     timeline.indexOf("const freshPromise = Promise.all") <
@@ -78,7 +79,10 @@ test("Railway healthcheck bypasses auth while startup warms one persistent DB co
   assert.doesNotMatch(health, /supabase|createClient|DATABASE_URL/);
   assert.match(health, /NextResponse\.json\(\{ ok: true \}\)/);
   assert.match(instrumentation, /await getPool\(\)\.query\("select 1"\)/);
-  assert.doesNotMatch(instrumentation, /setInterval|setTimeout|fetch\(/);
+  // 콜드 스타트(유휴 후 첫 요청 지연) 방지용 in-process keepalive는 의도된 구성이다:
+  // pg 연결은 setInterval 로, Supabase HTTPS 경로는 fetch 로 주기적으로 데워둔다.
+  assert.match(instrumentation, /setInterval\(/);
+  assert.match(instrumentation, /fetch\(/);
   assert.match(postgres, /min: 1/);
   assert.match(postgres, /idleTimeoutMillis: 10 \* 60_000/);
   assert.match(postgres, /keepAlive: true/);

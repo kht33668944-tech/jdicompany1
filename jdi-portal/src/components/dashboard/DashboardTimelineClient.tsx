@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import type { Profile } from "@/lib/attendance/types";
 import { createClient } from "@/lib/supabase/client";
+import { toDateString } from "@/lib/utils/date";
 import {
   getWorkTimelineAttachments,
   getWorkTimelineEntries,
@@ -58,17 +59,21 @@ export default function DashboardTimelineClient({
       let cached: TimelineData | null = null;
 
       try {
+        // 대시보드 미리보기는 오늘(KST) 완료한 업무만 보여준다.
+        // 과거 전체는 "전체 보기"에서 확인한다(목록이 커져도 미리보기는 가볍게 유지).
+        const today = toDateString();
         // 네트워크 fetch를 먼저 시작해 IndexedDB 캐시 읽기와 겹치게 한다.
         const supabase = createClient();
         const freshPromise = Promise.all([
           getWorkTimelineEntries(supabase, {
-            limit: 15,
+            date: today,
+            limit: 50,
             includeAttachments: false,
           }),
           getWorkTimelineProfiles(supabase),
         ]);
 
-        cached = await getCachedWorkTimeline(currentUserId);
+        cached = await getCachedWorkTimeline(currentUserId, today);
         if (!active) return;
         if (cached) setData(cached);
 
@@ -76,7 +81,7 @@ export default function DashboardTimelineClient({
         if (!active) return;
 
         setData({ entries, profiles });
-        void cacheWorkTimeline(currentUserId, entries, profiles);
+        void cacheWorkTimeline(currentUserId, entries, profiles, today);
 
         // 본문을 먼저 보여준 뒤 썸네일 첨부를 별도로 하이드레이션한다.
         // (signed URL 은 만료되므로 캐시에 저장하지 않고 매번 새로 가져온다)
@@ -143,6 +148,8 @@ export default function DashboardTimelineClient({
       currentUserId={currentUserId}
       currentUserRole={currentUserRole}
       compact
+      // 미리보기에서 업무를 추가한 뒤 재조회할 때도 오늘 기준을 유지한다.
+      initialDate={toDateString()}
     />
   );
 }

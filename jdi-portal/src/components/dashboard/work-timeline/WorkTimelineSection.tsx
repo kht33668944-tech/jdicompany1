@@ -133,7 +133,7 @@ export default function WorkTimelineSection({
   const [searchInput, setSearchInput] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery.trim());
   const [hasMore, setHasMore] = useState(
-    initialEntries.length === WORK_TIMELINE_PAGE_SIZE,
+    !compact && initialEntries.length === WORK_TIMELINE_PAGE_SIZE,
   );
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -149,8 +149,9 @@ export default function WorkTimelineSection({
   const trimmedSearchInput = searchInput.trim();
   const searchPending = !compact && trimmedSearchInput !== query;
   const searchTooShort = !compact && query.length === 1;
-  const timelineSubtitle =
-    profiles.length > 0
+  const timelineSubtitle = compact
+    ? "오늘 완료한 업무입니다."
+    : profiles.length > 0
       ? `${profiles.length}명의 최근 완료 업무를 공유합니다.`
       : "최근 완료한 업무를 공유합니다.";
 
@@ -159,7 +160,8 @@ export default function WorkTimelineSection({
   useEffect(() => {
     if (!compact) return;
     setEntries(initialEntries);
-    setHasMore(initialEntries.length === WORK_TIMELINE_PAGE_SIZE);
+    // 미리보기(오늘만)는 과거를 더 불러오지 않는다. 전체 이력은 "전체 보기"에서 확인.
+    setHasMore(false);
   }, [compact, initialEntries]);
 
   useEffect(() => {
@@ -280,6 +282,7 @@ export default function WorkTimelineSection({
   }, [compact]);
 
   useEffect(() => {
+    if (compact) return;
     const sentinel = sentinelRef.current;
     const root = scrollRootRef.current;
     if (!sentinel || !root || !hasMore || searchPending || searchTooShort) return;
@@ -457,14 +460,18 @@ export default function WorkTimelineSection({
         ) : groups.length === 0 ? (
           <div className="flex min-h-48 flex-col items-center justify-center px-4 text-center">
             <p className="text-sm font-semibold text-slate-600">
-              {query.length >= 2 || employeeId || date
-                ? "조건에 맞는 업무가 없습니다"
-                : "아직 공유된 완료 업무가 없습니다"}
+              {compact
+                ? "오늘 공유된 완료 업무가 없습니다"
+                : query.length >= 2 || employeeId || date
+                  ? "조건에 맞는 업무가 없습니다"
+                  : "아직 공유된 완료 업무가 없습니다"}
             </p>
             <p className="mt-1 text-xs text-slate-400">
-              {query.length >= 2 || employeeId || date
-                ? "검색어나 필터 조건을 조정해 보세요."
-                : "첫 완료 업무를 등록해 팀에 공유해보세요."}
+              {compact
+                ? "오늘 완료한 업무가 여기에 표시됩니다."
+                : query.length >= 2 || employeeId || date
+                  ? "검색어나 필터 조건을 조정해 보세요."
+                  : "첫 완료 업무를 등록해 팀에 공유해보세요."}
             </p>
           </div>
         ) : (
