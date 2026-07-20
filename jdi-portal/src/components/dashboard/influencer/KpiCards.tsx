@@ -40,11 +40,11 @@ function KpiCard({ title, value, delta, icon, iconBg }: CardProps) {
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide truncate">{title}</p>
+        <p className="text-[11px] font-medium text-slate-500 truncate">{title}</p>
+        <div className="mt-0.5 flex items-center gap-2">
+          <p className="text-lg font-bold text-slate-800 leading-tight">{value}</p>
           {delta}
         </div>
-        <p className="text-lg font-bold text-slate-800 leading-tight mt-0.5">{value}</p>
       </div>
     </div>
   );
@@ -63,21 +63,21 @@ export default function KpiCards({ data }: Props) {
       <KpiCard
         title="시딩 중 캠페인"
         value={`${data.activeCampaigns.value}건`}
-        delta={<span />}
+        delta={null}
         icon={<PaperPlaneTilt size={16} weight="duotone" className="text-cyan-600" />}
         iconBg="bg-cyan-50"
       />
       <KpiCard
         title="완료 캠페인"
         value={`${data.doneCampaigns.value}건`}
-        delta={<span />}
+        delta={null}
         icon={<CheckCircle size={16} weight="duotone" className="text-emerald-600" />}
         iconBg="bg-emerald-50"
       />
       <KpiCard
         title="총 시딩 금액"
         value={formatKRW(data.totalSeedingCost.value)}
-        delta={<span />}
+        delta={null}
         icon={<CurrencyKrw size={16} weight="duotone" className="text-amber-600" />}
         iconBg="bg-amber-50"
       />

@@ -629,8 +629,8 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                   <div className="flex-1 min-w-0">
                     {/* 1행: 아이디 + 등급 + 메뉴 */}
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium text-slate-800 truncate text-sm">@{inf.username}</p>
-                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <p className="font-medium text-slate-800 truncate text-sm">@{inf.username}</p>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -641,10 +641,12 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                             onFiltersChange({ ...filters, grades: next });
                           }}
                           title="이 등급으로 필터"
-                          className="cursor-pointer hover:opacity-80 transition-opacity"
+                          className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                         >
-                          <GradeBadge grade={inf.grade} />
+                          <GradeBadge grade={inf.grade} size="sm" />
                         </button>
+                      </div>
+                      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                         <RowMenu
                           influencerId={inf.id}
                           onViewDetail={() => onSelectInfluencer(inf.id)}
@@ -684,16 +686,18 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                         </span>
                       )}
                     </div>
-                    {/* 4행: 상태 */}
-                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                      <StatusCell
-                        campaign={campaignMap.get(inf.id)}
-                        influencerId={inf.id}
-                        influencerUsername={inf.username}
-                        onRefresh={onRefresh}
-                        onOpenDetail={onSelectInfluencer}
-                      />
-                    </div>
+                    {/* 4행: 상태 — 진행 중 캠페인이 있을 때만 표시(시딩 시작 버튼은 목록에서 숨김, 상세에서 진행) */}
+                    {campaignMap.get(inf.id) && (
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                        <StatusCell
+                          campaign={campaignMap.get(inf.id)}
+                          influencerId={inf.id}
+                          influencerUsername={inf.username}
+                          onRefresh={onRefresh}
+                          onOpenDetail={onSelectInfluencer}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

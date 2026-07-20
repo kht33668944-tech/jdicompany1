@@ -569,41 +569,56 @@ export default function TodayWorkBoardWidget({
               const doneCount = profileTasks.filter((task) => task.status === "완료").length;
 
               return (
-                <div
-                  key={profile.id}
-                  className="grid grid-cols-2 gap-3 px-5 py-4 lg:grid-cols-[minmax(180px,1.4fr)_110px_90px_90px_90px_minmax(120px,0.8fr)] lg:items-center"
-                >
-                  <div className="col-span-2 flex min-w-0 items-center gap-3 lg:col-span-1">
-                    <UserAvatar name={profile.full_name} avatarUrl={profile.avatar_url} size="md" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-slate-800">{profile.full_name}</p>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
-                      </p>
+                <div key={profile.id} className="px-5 py-4">
+                  {/* 모바일: 이름 줄 + 통계 한 줄 (아바타 제거) */}
+                  <div className="lg:hidden">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-800">{profile.full_name}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
+                        </p>
+                      </div>
+                      <span className={`inline-flex shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${getAttendanceTone(attendance)}`}>
+                        {getAttendanceText(attendance)}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center gap-4 text-xs font-bold text-slate-400">
+                      <span>대기 <span className="ml-0.5 text-slate-700">{pendingCount}</span></span>
+                      <span>진행중 <span className="ml-0.5 text-amber-600">{progressCount}</span></span>
+                      <span>완료 <span className="ml-0.5 text-emerald-600">{doneCount}</span></span>
+                      <span>일정 <span className="ml-0.5 text-slate-800">{profileSchedules.length}</span></span>
                     </div>
                   </div>
 
-                  <div>
-                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">출근</p>
-                    <span className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-bold ${getAttendanceTone(attendance)}`}>
-                      {getAttendanceText(attendance)}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">대기</p>
-                    <p className="text-sm font-bold text-slate-700">{pendingCount}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">진행중</p>
-                    <p className="text-sm font-bold text-amber-600">{progressCount}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">완료</p>
-                    <p className="text-sm font-bold text-emerald-600">{doneCount}</p>
-                  </div>
-                  <div className="text-left lg:text-right">
-                    <p className="mb-1 text-[11px] font-bold text-slate-400 lg:hidden">일정</p>
-                    <p className="text-sm font-bold text-slate-800">{profileSchedules.length}</p>
+                  {/* 데스크톱: 기존 표 행 그대로 */}
+                  <div className="hidden grid-cols-[minmax(180px,1.4fr)_110px_90px_90px_90px_minmax(120px,0.8fr)] items-center gap-3 lg:grid">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar name={profile.full_name} avatarUrl={profile.avatar_url} size="md" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-800">{profile.full_name}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-bold ${getAttendanceTone(attendance)}`}>
+                        {getAttendanceText(attendance)}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-700">{pendingCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-amber-600">{progressCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-emerald-600">{doneCount}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-slate-800">{profileSchedules.length}</p>
+                    </div>
                   </div>
                 </div>
               );

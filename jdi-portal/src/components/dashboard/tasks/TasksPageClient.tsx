@@ -219,31 +219,34 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-lg bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold text-slate-400">내 진행 업무</p>
-          <p className="mt-2 text-2xl font-bold text-slate-800">{personalOpenTasks.length}</p>
+      <section className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
+        <div className="rounded-lg bg-white p-2.5 shadow-sm sm:p-4">
+          <p className="truncate text-[11px] font-bold text-slate-400 sm:text-xs">
+            <span className="sm:hidden">진행업무</span>
+            <span className="hidden sm:inline">내 진행 업무</span>
+          </p>
+          <p className="mt-1 text-lg font-bold text-slate-800 sm:mt-2 sm:text-2xl">{personalOpenTasks.length}</p>
         </div>
-        <div className="rounded-lg bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-            <ClockCounterClockwise size={14} />
+        <div className="rounded-lg bg-white p-2.5 shadow-sm sm:p-4">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 sm:text-xs">
+            <ClockCounterClockwise size={14} className="hidden sm:block" />
             대기
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-800">{pendingCount}</p>
+          <p className="mt-1 text-lg font-bold text-slate-800 sm:mt-2 sm:text-2xl">{pendingCount}</p>
         </div>
-        <div className="rounded-lg bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
-            <CalendarBlank size={14} />
+        <div className="rounded-lg bg-white p-2.5 shadow-sm sm:p-4">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-500 sm:text-xs">
+            <CalendarBlank size={14} className="hidden sm:block" />
             진행중
           </div>
-          <p className="mt-2 text-2xl font-bold text-amber-600">{progressCount}</p>
+          <p className="mt-1 text-lg font-bold text-amber-600 sm:mt-2 sm:text-2xl">{progressCount}</p>
         </div>
-        <div className="rounded-lg bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-500">
-            <CheckCircle size={14} />
+        <div className="rounded-lg bg-white p-2.5 shadow-sm sm:p-4">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-500 sm:text-xs">
+            <CheckCircle size={14} className="hidden sm:block" />
             완료
           </div>
-          <p className="mt-2 text-2xl font-bold text-emerald-600">{completedCount}</p>
+          <p className="mt-1 text-lg font-bold text-emerald-600 sm:mt-2 sm:text-2xl">{completedCount}</p>
         </div>
       </section>
 
@@ -279,34 +282,39 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
                 <button
                   key={task.id}
                   onClick={() => handleTaskClick(task.id)}
-                  className="grid w-full grid-cols-1 gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50 lg:grid-cols-[minmax(0,1fr)_120px_120px]"
+                  className="flex w-full flex-col gap-2 px-5 py-3.5 text-left transition-colors hover:bg-slate-50 lg:flex-row lg:items-center lg:gap-4 lg:py-4"
                 >
-                  <div className="flex min-w-0 items-center gap-3">
+                  {/* 제목 줄 (PC에선 왼쪽 flex-1) */}
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusConfig.dot}`} />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-slate-800">{task.title}</p>
                       {task.description && (
-                        <p className="mt-1 truncate text-xs text-slate-400">{task.description}</p>
+                        <p className="mt-1 hidden truncate text-xs text-slate-400 lg:block">{task.description}</p>
                       )}
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 lg:justify-center">
-                    {mainAssignee && (
-                      <>
-                        <UserAvatar name={mainAssignee.full_name} avatarUrl={mainAssignee.avatar_url} size="sm" />
-                        <span className="truncate text-xs font-semibold text-slate-500 lg:hidden">
-                          {mainAssignee.full_name}
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 lg:justify-end">
-                    <span className={`rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
+                    {/* 모바일 전용: 제목 오른쪽 상태 뱃지 */}
+                    <span className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold lg:hidden ${statusConfig.bg} ${statusConfig.text}`}>
                       {task.status}
                     </span>
-                    <span className={`text-xs font-bold ${due.className}`}>
+                  </div>
+
+                  {/* 메타 줄 (모바일: 제목 아래 옅게 / PC: 오른쪽 인라인) */}
+                  <div className="flex shrink-0 items-center gap-2 pl-[22px] text-xs lg:gap-3 lg:pl-0">
+                    {mainAssignee && (
+                      <>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <UserAvatar name={mainAssignee.full_name} avatarUrl={mainAssignee.avatar_url} size="sm" />
+                          <span className="truncate font-semibold text-slate-500">{mainAssignee.full_name}</span>
+                        </div>
+                        <span aria-hidden="true" className="text-slate-300 lg:hidden">·</span>
+                      </>
+                    )}
+                    {/* PC 전용: 상태 뱃지 */}
+                    <span className={`hidden shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold lg:inline-flex ${statusConfig.bg} ${statusConfig.text}`}>
+                      {task.status}
+                    </span>
+                    <span className={`shrink-0 font-bold ${due.className}`}>
                       {formatDueWithWeekday(task.due_date, due.text, today)}
                     </span>
                   </div>

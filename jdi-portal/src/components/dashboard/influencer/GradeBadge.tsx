@@ -33,7 +33,7 @@ export default function GradeBadge({ grade, size = "md" }: Props) {
 
   const sizeClasses =
     size === "sm"
-      ? "h-5 w-5 text-[10px] rounded"
+      ? "h-4 w-4 text-[10px] rounded"
       : "h-6 w-6 text-xs rounded-md";
 
   return (
