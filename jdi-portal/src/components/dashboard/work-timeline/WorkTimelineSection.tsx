@@ -478,7 +478,7 @@ export default function WorkTimelineSection({
           <div className="space-y-1">
             {groups.map((group) => (
               <section key={group.date} aria-labelledby={`timeline-date-${group.date}`}>
-                <div className="sticky top-0 z-10 bg-white/95 py-3 backdrop-blur-sm">
+                <div className="py-3">
                   <h3
                     id={`timeline-date-${group.date}`}
                     className="text-xs font-bold text-slate-500"
