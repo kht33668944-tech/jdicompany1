@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { X, Plus } from "phosphor-react";
-import { addDepartment, deleteDepartment, updateUserRole, approveUser, rejectUser } from "@/lib/settings/actions";
+import { addDepartment, deleteDepartment, updateUserRole, approveUser, rejectUser, setSensitiveExpenseAccess } from "@/lib/settings/actions";
 import type { Profile } from "@/lib/attendance/types";
 import type { Department } from "@/lib/settings/types";
 
@@ -55,6 +55,20 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
     try {
       await updateUserRole(userId, role);
       setFeedback({ type: "success", message: "권한이 변경되었습니다." });
+      router.refresh();
+    } catch {
+      setFeedback({ type: "error", message: "권한 변경에 실패했습니다." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSensitiveAccessChange = async (userId: string, allowed: boolean) => {
+    setLoading(true);
+    setFeedback(null);
+    try {
+      await setSensitiveExpenseAccess(userId, allowed);
+      setFeedback({ type: "success", message: "민감 지출 열람 권한이 변경되었습니다." });
       router.refresh();
     } catch {
       setFeedback({ type: "error", message: "권한 변경에 실패했습니다." });
@@ -230,6 +244,7 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
               <th className="pb-4 text-xs font-bold text-slate-400 uppercase tracking-wider px-2">이메일</th>
               <th className="pb-4 text-xs font-bold text-slate-400 uppercase tracking-wider px-2">부서</th>
               <th className="pb-4 text-xs font-bold text-slate-400 uppercase tracking-wider px-2">권한</th>
+              <th className="pb-4 text-xs font-bold text-slate-400 uppercase tracking-wider px-2">민감 지출</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -260,6 +275,18 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
                     <option value="developer">개발자</option>
                     <option value="employee">사용자</option>
                   </select>
+                </td>
+                <td className="py-4 px-2">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={p.can_view_sensitive_expenses}
+                      disabled={loading}
+                      onChange={(e) => handleSensitiveAccessChange(p.id, e.target.checked)}
+                      className="accent-blue-600 w-4 h-4"
+                    />
+                    민감 지출
+                  </label>
                 </td>
               </tr>
             ))}

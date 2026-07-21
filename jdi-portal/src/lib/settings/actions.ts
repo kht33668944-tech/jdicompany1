@@ -352,6 +352,16 @@ export async function updateUserRole(
   if (error) throw error;
 }
 
+export async function setSensitiveExpenseAccess(userId: string, allowed: boolean) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_expense_sensitive_access", {
+    target_user_id: userId,
+    allowed,
+  });
+  if (error) throw new Error(`권한 변경에 실패했습니다: ${error.message}`);
+}
+
 export async function approveUser(userId: string) {
   await requireAdmin();
   const supabase = await createClient();

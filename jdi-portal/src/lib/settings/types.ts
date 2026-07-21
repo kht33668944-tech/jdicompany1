@@ -8,6 +8,7 @@ export interface NotificationSettings {
   system_announce: boolean;
   push_enabled: boolean;
   chat_message_notify: boolean;
+  expense_notify: boolean;
 }
 
 export interface Department {

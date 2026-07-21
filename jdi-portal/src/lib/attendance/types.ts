@@ -14,6 +14,7 @@ export interface Profile {
   work_end_time: string | null;    // "HH:MM:SS" format or null
   allowed_ip: string | null;
   allowed_ip_locked: boolean;
+  can_view_sensitive_expenses: boolean;
 }
 
 export interface AttendanceRecord {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AirplaneTilt, CalendarPlus, Timer, Megaphone, ChatCircle, BellRinging } from "phosphor-react";
+import { AirplaneTilt, CalendarPlus, Timer, Megaphone, ChatCircle, BellRinging, Receipt } from "phosphor-react";
 import { updateNotificationSettings } from "@/lib/settings/actions";
 import { subscribeToPush, unsubscribeFromPush, checkPushSupport, getCurrentSubscription } from "@/lib/push/subscribe";
 import type { NotificationSettings } from "@/lib/settings/types";
@@ -52,6 +52,14 @@ const TOGGLE_ITEMS = [
     iconBg: "bg-slate-100",
     iconColor: "text-slate-500",
   },
+  {
+    key: "expense_notify" as const,
+    label: "지출 결제 예정",
+    description: "결제일이 임박한 지출 항목에 대해 안내 알림을 받습니다.",
+    icon: Receipt,
+    iconBg: "bg-teal-50",
+    iconColor: "text-teal-500",
+  },
 ];
 
 const DEFAULT_SETTINGS = {
@@ -61,6 +69,7 @@ const DEFAULT_SETTINGS = {
   system_announce: true,
   push_enabled: false,
   chat_message_notify: true,
+  expense_notify: true,
 };
 
 export default function NotificationsSection({ userId, initialSettings }: NotificationsSectionProps) {
@@ -71,6 +80,7 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
     system_announce: initialSettings?.system_announce ?? DEFAULT_SETTINGS.system_announce,
     push_enabled: initialSettings?.push_enabled ?? DEFAULT_SETTINGS.push_enabled,
     chat_message_notify: initialSettings?.chat_message_notify ?? DEFAULT_SETTINGS.chat_message_notify,
+    expense_notify: initialSettings?.expense_notify ?? DEFAULT_SETTINGS.expense_notify,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
