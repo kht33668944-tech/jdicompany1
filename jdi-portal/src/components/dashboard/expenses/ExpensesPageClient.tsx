@@ -136,7 +136,9 @@ export default function ExpensesPageClient({
             <button onClick={() => moveMonth(1)} className="p-2 rounded-xl hover:bg-slate-100" aria-label="다음 달">
               <CaretRight size={18} />
             </button>
-            <ExcelDownloadButton expenses={expenses} year={year} month={month} />
+            <div className="hidden md:block">
+              <ExcelDownloadButton expenses={expenses} year={year} month={month} />
+            </div>
           </div>
         )}
       </div>

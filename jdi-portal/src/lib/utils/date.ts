@@ -128,6 +128,11 @@ export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+/** 현재 시각을 KST(Asia/Seoul) 벽시계 기준 Date로 반환 (getFullYear/getMonth/getDate가 KST값). */
+export function kstNow(): Date {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: APP_TIME_ZONE }));
+}
+
 export function getHourFromTimestamp(isoString: string): number {
   const hour = new Intl.DateTimeFormat("en-US", {
     timeZone: APP_TIME_ZONE,

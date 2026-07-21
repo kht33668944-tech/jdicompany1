@@ -69,3 +69,20 @@ export async function getRecurringExpenses(
   if (error) throw error;
   return (data ?? []) as unknown as RecurringExpenseWithMeta[];
 }
+
+/** 지정 기간에 자동 기록(source='recurring')된 고정지출의 recurring_id 집합 — "이번 달 기록됨" 배지용 */
+export async function getRecurringRecordedIds(
+  supabase: SupabaseClient,
+  startDate: string,
+  endDate: string
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("expenses")
+    .select("recurring_id")
+    .eq("source", "recurring")
+    .not("recurring_id", "is", null)
+    .gte("expense_date", startDate)
+    .lte("expense_date", endDate);
+  if (error) throw error;
+  return [...new Set((data ?? []).map((r) => r.recurring_id as string))];
+}
