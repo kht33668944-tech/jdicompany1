@@ -43,9 +43,11 @@ export default async function ExpensesPage() {
         userId={auth.user.id}
         userRole={auth.profile.role}
         profiles={profilesRes.data ?? []}
+        canViewSensitive={auth.profile.can_view_sensitive_expenses}
       />
     );
-  } catch {
+  } catch (error) {
+    console.error("[expenses] 초기 데이터 로드 실패", error);
     return (
       <div className="rounded-2xl bg-red-50 border border-red-200 p-6 text-sm text-red-600">
         지출 데이터를 불러오지 못했습니다. 잠시 후 새로고침해주세요.

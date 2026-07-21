@@ -73,6 +73,7 @@ export default function ExpenseEditModal({ expense, categories, onClose, onChang
   };
 
   const handleReceiptUpload = async (file: File) => {
+    if (busy) return;
     setBusy(true);
     try {
       const path = await uploadExpenseReceipt(expense.id, file);
@@ -189,6 +190,7 @@ export default function ExpenseEditModal({ expense, categories, onClose, onChang
             type="file"
             accept="image/*,application/pdf"
             onChange={(e) => e.target.files?.[0] && handleReceiptUpload(e.target.files[0])}
+            disabled={busy}
             className="w-full text-sm text-slate-500 ml-1"
           />
         </div>

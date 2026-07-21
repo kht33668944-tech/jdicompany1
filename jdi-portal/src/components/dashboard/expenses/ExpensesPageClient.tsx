@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { getExpensesByRange, getRangeKrwTotal } from "@/lib/expenses/queries";
@@ -32,6 +32,7 @@ interface ExpensesPageClientProps {
   userId: string;
   userRole: "employee" | "admin" | "developer";
   profiles: { id: string; full_name: string }[];
+  canViewSensitive: boolean;
 }
 
 export default function ExpensesPageClient({
@@ -42,6 +43,7 @@ export default function ExpensesPageClient({
   userId,
   userRole,
   profiles,
+  canViewSensitive,
 }: ExpensesPageClientProps) {
   const kstNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
   const [tab, setTab] = useState<"list" | "recurring">("list");
@@ -51,6 +53,12 @@ export default function ExpensesPageClient({
   const [prevTotal, setPrevTotal] = useState(initialPrevTotal);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<ExpenseWithMeta | null>(null);
+  const didMount = useRef(false);
+
+  const inputCategories = useMemo(
+    () => (canViewSensitive ? categories : categories.filter((c) => !c.is_sensitive)),
+    [canViewSensitive, categories]
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -72,6 +80,10 @@ export default function ExpensesPageClient({
   }, [year, month]);
 
   useEffect(() => {
+    if (!didMount.current) {
+      didMount.current = true;
+      return;
+    }
     refresh();
   }, [refresh]);
 
@@ -120,13 +132,13 @@ export default function ExpensesPageClient({
       {tab === "list" ? (
         <>
           <ExpenseSummary expenses={expenses} prevMonthTotal={prevTotal} />
-          <ExpenseQuickInput categories={categories} onCreated={refresh} />
+          <ExpenseQuickInput categories={inputCategories} onCreated={refresh} />
           <ExpenseList expenses={expenses} categories={categories} onChanged={refresh} loading={loading} onSelect={setSelected} />
         </>
       ) : (
         <RecurringTab
           recurring={recurring}
-          categories={categories}
+          categories={inputCategories}
           profiles={profiles}
           userId={userId}
           userRole={userRole}
@@ -136,7 +148,7 @@ export default function ExpensesPageClient({
       {selected && (
         <ExpenseEditModal
           expense={selected}
-          categories={categories}
+          categories={inputCategories}
           onClose={() => setSelected(null)}
           onChanged={refresh}
         />

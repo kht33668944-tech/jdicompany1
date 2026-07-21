@@ -64,11 +64,22 @@ export async function deleteExpense(id: string) {
 
 export async function setExpenseReceipt(id: string, path: string | null) {
   const { supabase, userId } = await getSessionUserId();
+  const { data: prev, error: prevError } = await supabase
+    .from("expenses")
+    .select("receipt_path")
+    .eq("id", id)
+    .single();
+  if (prevError) throw new Error(`지출 조회에 실패했습니다: ${prevError.message}`);
+
   const { error } = await supabase
     .from("expenses")
     .update({ receipt_path: path, updated_by: userId, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw new Error(`영수증 저장에 실패했습니다: ${error.message}`);
+
+  if (prev?.receipt_path && prev.receipt_path !== path) {
+    await supabase.storage.from("expense-receipts").remove([prev.receipt_path]).catch(() => {});
+  }
 }
 
 function validateRecurringInput(input: RecurringInput) {
