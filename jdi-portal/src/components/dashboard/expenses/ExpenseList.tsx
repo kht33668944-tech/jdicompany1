@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/utils/date";
 import { formatKrw, formatForeign } from "@/lib/expenses/format";
-import { EXPENSE_SOURCE_LABEL } from "@/lib/expenses/constants";
+import { EXPENSE_SOURCE_LABEL, CATEGORY_STYLE, CATEGORY_STYLE_FALLBACK } from "@/lib/expenses/constants";
 import type { ExpenseCategory, ExpenseWithMeta } from "@/lib/expenses/types";
 import Paperclip from "phosphor-react/dist/icons/Paperclip.esm.js";
+import ArrowsClockwise from "phosphor-react/dist/icons/ArrowsClockwise.esm.js";
 
 interface ExpenseListProps {
   expenses: ExpenseWithMeta[];
@@ -95,18 +96,31 @@ export default function ExpenseList({ expenses, categories, loading, onSelect }:
         <div key={date}>
           <p className="text-xs font-bold text-slate-500 mb-2 ml-1">{formatDate(date)}</p>
           <div className="space-y-2">
-            {rows.map((e) => (
+            {rows.map((e) => {
+              const style = CATEGORY_STYLE[e.category?.name ?? ""] ?? CATEGORY_STYLE_FALLBACK;
+              const isRecurring = e.source === "recurring";
+              return (
               <button
                 key={e.id}
                 onClick={() => onSelect?.(e)}
-                className="w-full text-left rounded-2xl bg-white/65 backdrop-blur-sm border border-white/80 shadow-sm hover:shadow-md px-5 py-3.5 hover:bg-white transition-all flex items-center gap-3"
+                className={`w-full text-left rounded-2xl backdrop-blur-sm border shadow-sm hover:shadow-md px-5 py-3.5 hover:bg-white transition-all flex items-center gap-3 ${style.card}`}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">
-                    {e.vendor ? `${e.vendor} · ` : ""}{e.description}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">
-                    {e.category?.name ?? "미분류"} · {e.payment_method} · {EXPENSE_SOURCE_LABEL[e.source]}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">
+                      {e.vendor ? `${e.vendor} · ` : ""}{e.description}
+                    </p>
+                    {isRecurring && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-bold px-2 py-0.5 shrink-0">
+                        <ArrowsClockwise size={11} weight="bold" />
+                        고정
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5 truncate flex items-center gap-1">
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
+                    {e.category?.name ?? "미분류"} · {e.payment_method}
+                    {!isRecurring ? ` · ${EXPENSE_SOURCE_LABEL[e.source]}` : ""}
                     {e.author_profile ? ` · ${e.author_profile.full_name}` : ""}
                   </p>
                 </div>
@@ -118,7 +132,8 @@ export default function ExpenseList({ expenses, categories, loading, onSelect }:
                   )}
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
