@@ -5,7 +5,9 @@ import Image from "next/image";
 import type { Message, ChannelWithDetails, MessageReaction } from "@/lib/chat/types";
 import { groupMessagesByDate, formatDateDivider, formatMessageTime, getFilePreviewPath, parseFileContent } from "@/lib/chat/utils";
 import { getReactionsForMessages } from "@/lib/chat/actions";
-import { useChatFileUrl } from "./ChatFileUrlsContext";
+import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
+import { DownloadSimple } from "phosphor-react";
+import { useChatFileUrl, useChatFileUrls } from "./ChatFileUrlsContext";
 import MessageItem from "./MessageItem";
 import EmptyState from "./EmptyState";
 
@@ -56,17 +58,33 @@ function GridImage({ storagePath, previewPath, fileName }: { storagePath: string
       </div>
     );
   }
+  const downloadUrl = originalUrl ?? previewUrl;
   return (
-    <a href={originalUrl ?? previewUrl} target="_blank" rel="noopener noreferrer" className="block">
-      <Image
-        src={previewUrl}
-        alt={fileName}
-        width={320}
-        height={112}
-        unoptimized
-        className="w-full h-28 rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-      />
-    </a>
+    <div className="relative group">
+      <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="block">
+        <Image
+          src={previewUrl}
+          alt={fileName}
+          width={320}
+          height={112}
+          unoptimized
+          className="w-full h-28 rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+        />
+      </a>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          triggerDownload(downloadUrl, fileName);
+        }}
+        aria-label="이미지 저장"
+        title="저장"
+        className="absolute top-1.5 right-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/45 text-white opacity-100 transition-opacity hover:bg-black/65 sm:opacity-0 sm:group-hover:opacity-100"
+      >
+        <DownloadSimple size={14} weight="bold" aria-hidden="true" />
+      </button>
+    </div>
   );
 }
 
@@ -78,6 +96,41 @@ function ImageGroupRenderer({ chunk, isOwn }: { chunk: Extract<MessageChunk, { t
   const lastMsg = chunk.messages[chunk.messages.length - 1];
   const cols = chunk.messages.length === 2 ? "grid-cols-2" : "grid-cols-3";
 
+  const { urls, ensure } = useChatFileUrls();
+  const groupFiles = useMemo(
+    () =>
+      chunk.messages
+        .map((msg) => parseFileContent(msg.content))
+        .filter((file): file is NonNullable<typeof file> => file !== null)
+        .map((file) => ({ path: file.path, name: file.name })),
+    [chunk.messages]
+  );
+
+  useEffect(() => {
+    ensure(groupFiles.map((f) => f.path));
+  }, [ensure, groupFiles]);
+
+  const handleDownloadAll = () => {
+    const ready = groupFiles.flatMap((f) => {
+      const url = urls[f.path];
+      return url ? [{ url, fileName: f.name }] : [];
+    });
+    if (ready.length === 0) return;
+    void triggerDownloadAll(ready);
+  };
+
+  const downloadAllButton = (
+    <button
+      type="button"
+      onClick={handleDownloadAll}
+      title="전체 저장"
+      className="inline-flex items-center gap-0.5 text-[10px] font-medium text-indigo-500 hover:text-indigo-600"
+    >
+      <DownloadSimple size={12} weight="bold" aria-hidden="true" />
+      전체 저장
+    </button>
+  );
+
   if (isOwn) {
     return (
       <div className="flex flex-row-reverse items-start gap-3">
@@ -86,6 +139,7 @@ function ImageGroupRenderer({ chunk, isOwn }: { chunk: Extract<MessageChunk, { t
             <span className="text-[10px] text-slate-400">
               {formatMessageTime(lastMsg.created_at)}
             </span>
+            {downloadAllButton}
           </div>
           <div className={`grid ${cols} gap-1`}>
             {chunk.messages.map((msg) => {
@@ -119,6 +173,7 @@ function ImageGroupRenderer({ chunk, isOwn }: { chunk: Extract<MessageChunk, { t
         <div className="flex items-end gap-1.5 sm:gap-2">
           <span className="text-[11px] sm:text-xs font-bold text-slate-800">{profile?.full_name}</span>
           <span className="text-[10px] text-slate-400">{formatMessageTime(lastMsg.created_at)}</span>
+          {downloadAllButton}
         </div>
         <div className={`grid ${cols} gap-1`}>
           {chunk.messages.map((msg) => {

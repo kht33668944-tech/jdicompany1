@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, CalendarBlank, CaretLeft, CaretRight, ImageSquare, LinkSimple, PencilSimple, TrashSimple, X } from "phosphor-react";
+import { ArrowLeft, CalendarBlank, CaretLeft, CaretRight, DownloadSimple, ImageSquare, LinkSimple, PencilSimple, TrashSimple, X } from "phosphor-react";
 import { toast } from "sonner";
 import UserAvatar from "@/components/shared/UserAvatar";
 import {
@@ -23,6 +23,7 @@ import {
 import type { WorkTimelineEntryWithProfile } from "@/lib/work-timeline/types";
 import { validateWorkTimelineImage } from "@/lib/work-timeline/utils";
 import { createImageThumbnail, resizeImageIfNeeded } from "@/lib/utils/imageResize";
+import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
 
 interface WorkTimelineDetailClientProps {
   initialEntry: WorkTimelineEntryWithProfile;
@@ -92,6 +93,15 @@ export default function WorkTimelineDetailClient({
   );
   const activeViewerAttachment = viewerIndex === null ? null : viewableAttachments[viewerIndex] ?? null;
   const activeViewerUrl = activeViewerAttachment?.original_url ?? activeViewerAttachment?.thumbnail_url ?? null;
+
+  const handleDownloadAllAttachments = () => {
+    const ready = viewableAttachments.flatMap((attachment) => {
+      const url = attachment.original_url ?? attachment.thumbnail_url;
+      return url ? [{ url, fileName: attachment.file_name }] : [];
+    });
+    if (ready.length === 0) return;
+    void triggerDownloadAll(ready);
+  };
 
   useEffect(() => {
     if (viewerIndex === null) return;
@@ -402,9 +412,22 @@ export default function WorkTimelineDetailClient({
 
         {entry.attachments.length > 0 && (
           <section className="border-t border-slate-100 px-5 py-6 sm:px-7" aria-labelledby="timeline-images-title">
-            <h2 id="timeline-images-title" className="mb-4 text-sm font-bold text-slate-800">
-              첨부 이미지 {entry.attachments.length}
-            </h2>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h2 id="timeline-images-title" className="text-sm font-bold text-slate-800">
+                첨부 이미지 {entry.attachments.length}
+              </h2>
+              {viewableAttachments.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={handleDownloadAllAttachments}
+                  title="전체 저장"
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  <DownloadSimple size={15} weight="bold" aria-hidden="true" />
+                  전체 저장
+                </button>
+              )}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               {viewableAttachments.map((attachment, index) => {
                 const imageUrl = attachment.original_url ?? attachment.thumbnail_url;
@@ -426,7 +449,7 @@ export default function WorkTimelineDetailClient({
                         className="h-auto max-h-[70vh] w-full object-contain"
                       />
                     </button>
-                    {isOwner && editing && (
+                    {isOwner && editing ? (
                       <button
                         type="button"
                         onClick={() => handleDeleteAttachment(attachment.id)}
@@ -435,6 +458,16 @@ export default function WorkTimelineDetailClient({
                         className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/95 text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
                       >
                         <X size={17} weight="bold" aria-hidden="true" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => triggerDownload(imageUrl, attachment.file_name)}
+                        aria-label={`${attachment.file_name} 저장`}
+                        title="저장"
+                        className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-md bg-black/50 text-white shadow-sm hover:bg-black/70"
+                      >
+                        <DownloadSimple size={17} weight="bold" aria-hidden="true" />
                       </button>
                     )}
                   </div>
@@ -493,6 +526,17 @@ export default function WorkTimelineDetailClient({
               priority
               className="max-h-full w-auto max-w-full object-contain"
             />
+            {activeViewerAttachment && (
+              <button
+                type="button"
+                onClick={() => triggerDownload(activeViewerUrl, activeViewerAttachment.file_name)}
+                aria-label={`${activeViewerAttachment.file_name} 저장`}
+                title="저장"
+                className="absolute right-12 top-0 inline-flex h-10 w-10 items-center justify-center rounded-md bg-black/60 text-white hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <DownloadSimple size={20} weight="bold" aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setViewerIndex(null)}

@@ -15,6 +15,7 @@ import {
 } from "phosphor-react";
 import { toast } from "sonner";
 import { getDrawerItems, type DrawerItem } from "@/lib/chat/actions";
+import { triggerDownload } from "@/lib/utils/download";
 import { buildItemUrlMap, collectFileUrlRequests } from "@/lib/chat/fileUrlBatch";
 import { formatFileSize, parseFileContent } from "@/lib/chat/utils";
 import { useChatFileUrls } from "./ChatFileUrlsContext";
@@ -84,14 +85,15 @@ function ImageViewer({
       <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-10">
         <span className="text-white/70 text-sm">{current.name} ({currentIndex + 1}/{images.length})</span>
         <div className="flex items-center gap-2">
-          <a
-            href={current.url}
-            download={current.name}
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); triggerDownload(current.url, current.name); }}
+            aria-label={`${current.name} 저장`}
+            title="저장"
             className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
           >
             <DownloadSimple size={20} />
-          </a>
+          </button>
           <button onClick={onClose} className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
             <X size={20} />
           </button>
@@ -264,13 +266,7 @@ export default function ChatDrawer({ open, channelId, channelName, onClose }: Ch
       if (!url) continue;
       const item = items.find((i) => i.id === id);
       const fileData = item ? parseFileContent(item.content) : null;
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileData?.name ?? "download";
-      link.target = "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      triggerDownload(url, fileData?.name);
       downloaded++;
     }
     if (downloaded > 0) {
@@ -522,9 +518,15 @@ function FileItem({
         </div>
       </div>
       {url && (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-slate-200 rounded-lg transition-colors flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => triggerDownload(url, fileData?.name)}
+          aria-label={`${fileData?.name ?? "파일"} 저장`}
+          title="저장"
+          className="p-2 hover:bg-slate-200 rounded-lg transition-colors flex-shrink-0"
+        >
           <DownloadSimple size={16} className="text-slate-500" />
-        </a>
+        </button>
       )}
     </div>
   );
