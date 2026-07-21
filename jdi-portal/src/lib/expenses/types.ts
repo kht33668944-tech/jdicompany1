@@ -9,6 +9,11 @@ export interface ExpenseCategory {
   is_active: boolean;
 }
 
+export interface PaymentMethod {
+  id: string;
+  name: string;
+}
+
 export interface Expense {
   id: string;
   expense_date: string; // "YYYY-MM-DD"

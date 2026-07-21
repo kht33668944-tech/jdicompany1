@@ -50,6 +50,11 @@
   40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 
+@keyframes sheet-up {
+  0% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
+}
+
 body {
   background-color: #f8fafc;
   overflow-x: hidden;
@@ -80,6 +85,10 @@ input:-webkit-autofill:active {
 
 .animate-shake {
   animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+.animate-sheet-up {
+  animation: sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card {

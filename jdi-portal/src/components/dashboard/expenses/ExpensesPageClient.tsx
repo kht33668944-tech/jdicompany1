@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
-import { getExpensesByRange, getRangeKrwTotal } from "@/lib/expenses/queries";
+import { getExpensesByRange, getPaymentMethods, getRangeKrwTotal } from "@/lib/expenses/queries";
 import { getMonthRange } from "@/lib/utils/date";
 import type {
   ExpenseCategory,
   ExpenseWithMeta,
+  PaymentMethod,
   RecurringExpenseWithMeta,
 } from "@/lib/expenses/types";
 import ExpenseSummary from "./ExpenseSummary";
@@ -33,6 +34,7 @@ interface ExpensesPageClientProps {
   userRole: "employee" | "admin" | "developer";
   profiles: { id: string; full_name: string }[];
   canViewSensitive: boolean;
+  initialPaymentMethods: PaymentMethod[];
 }
 
 export default function ExpensesPageClient({
@@ -44,6 +46,7 @@ export default function ExpensesPageClient({
   userRole,
   profiles,
   canViewSensitive,
+  initialPaymentMethods,
 }: ExpensesPageClientProps) {
   const kstNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
   const [tab, setTab] = useState<"list" | "recurring">("list");
@@ -53,12 +56,21 @@ export default function ExpensesPageClient({
   const [prevTotal, setPrevTotal] = useState(initialPrevTotal);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<ExpenseWithMeta | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(initialPaymentMethods);
   const didMount = useRef(false);
 
   const inputCategories = useMemo(
     () => (canViewSensitive ? categories : categories.filter((c) => !c.is_sensitive)),
     [canViewSensitive, categories]
   );
+
+  const refreshPaymentMethods = useCallback(async () => {
+    try {
+      setPaymentMethods(await getPaymentMethods(createClient()));
+    } catch {
+      // 목록 갱신 실패는 조용히 무시 (다음 새로고침에서 반영)
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -132,7 +144,7 @@ export default function ExpensesPageClient({
       {tab === "list" ? (
         <>
           <ExpenseSummary expenses={expenses} prevMonthTotal={prevTotal} />
-          <ExpenseQuickInput categories={inputCategories} onCreated={refresh} />
+          <ExpenseQuickInput categories={inputCategories} paymentMethods={paymentMethods} onMethodsChanged={refreshPaymentMethods} onCreated={refresh} />
           <ExpenseList expenses={expenses} categories={categories} onChanged={refresh} loading={loading} onSelect={setSelected} />
         </>
       ) : (
@@ -142,6 +154,8 @@ export default function ExpensesPageClient({
           profiles={profiles}
           userId={userId}
           userRole={userRole}
+          paymentMethods={paymentMethods}
+          onMethodsChanged={refreshPaymentMethods}
         />
       )}
 
@@ -149,6 +163,8 @@ export default function ExpensesPageClient({
         <ExpenseEditModal
           expense={selected}
           categories={inputCategories}
+          paymentMethods={paymentMethods}
+          onMethodsChanged={refreshPaymentMethods}
           onClose={() => setSelected(null)}
           onChanged={refresh}
         />

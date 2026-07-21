@@ -4,6 +4,7 @@ import { getMonthRange } from "@/lib/utils/date";
 import {
   getExpenseCategories,
   getExpensesByRange,
+  getPaymentMethods,
   getRangeKrwTotal,
   getRecurringExpenses,
 } from "@/lib/expenses/queries";
@@ -25,11 +26,12 @@ export default async function ExpensesPage() {
   const prevRange = getMonthRange(prevYear, prevMonth);
 
   try {
-    const [expenses, categories, recurring, prevMonthTotal, profilesRes] = await Promise.all([
+    const [expenses, categories, recurring, prevMonthTotal, paymentMethods, profilesRes] = await Promise.all([
       getExpensesByRange(auth.supabase, start, end),
       getExpenseCategories(auth.supabase),
       getRecurringExpenses(auth.supabase),
       getRangeKrwTotal(auth.supabase, prevRange.start, prevRange.end),
+      getPaymentMethods(auth.supabase),
       auth.supabase.from("profiles").select("id, full_name").eq("is_approved", true).order("full_name"),
     ]);
     if (profilesRes.error) throw profilesRes.error;
@@ -44,6 +46,7 @@ export default async function ExpensesPage() {
         userRole={auth.profile.role}
         profiles={profilesRes.data ?? []}
         canViewSensitive={auth.profile.can_view_sensitive_expenses}
+        initialPaymentMethods={paymentMethods}
       />
     );
   } catch (error) {

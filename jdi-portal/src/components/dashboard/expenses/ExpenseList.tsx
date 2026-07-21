@@ -53,38 +53,40 @@ export default function ExpenseList({ expenses, categories, loading, onSelect }:
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="내용·거래처 검색"
-          className="flex-1 min-w-[160px] bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full md:flex-1 md:min-w-[160px] bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-        >
-          <option value="">전체 분류</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        <select
-          value={methodFilter}
-          onChange={(e) => setMethodFilter(e.target.value)}
-          className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-        >
-          <option value="">전체 결제수단</option>
-          {methods.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
+        <div className="grid grid-cols-2 gap-2 md:contents">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+          >
+            <option value="">전체 분류</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <select
+            value={methodFilter}
+            onChange={(e) => setMethodFilter(e.target.value)}
+            className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+          >
+            <option value="">전체 결제수단</option>
+            {methods.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading && <p className="text-sm text-slate-400">불러오는 중…</p>}
       {!loading && grouped.length === 0 && (
-        <div className="rounded-2xl bg-white/65 border border-white/80 p-10 text-center text-sm text-slate-400">
+        <div className="rounded-2xl bg-white/65 border border-white/80 shadow-sm p-10 text-center text-sm text-slate-400">
           이 달에 기록된 지출이 없습니다.
         </div>
       )}
@@ -97,7 +99,7 @@ export default function ExpenseList({ expenses, categories, loading, onSelect }:
               <button
                 key={e.id}
                 onClick={() => onSelect?.(e)}
-                className="w-full text-left rounded-2xl bg-white/65 backdrop-blur-sm border border-white/80 px-5 py-3.5 hover:bg-white transition-all flex items-center gap-3"
+                className="w-full text-left rounded-2xl bg-white/65 backdrop-blur-sm border border-white/80 shadow-sm hover:shadow-md px-5 py-3.5 hover:bg-white transition-all flex items-center gap-3"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-800 truncate">

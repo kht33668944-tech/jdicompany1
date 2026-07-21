@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { createRecurringExpense, updateRecurringExpense, deleteRecurringExpense } from "@/lib/expenses/actions";
-import { PAYMENT_METHOD_SUGGESTIONS } from "@/lib/expenses/constants";
-import type { ExpenseCategory, ExpenseCurrency, RecurringExpenseWithMeta, RecurringInput } from "@/lib/expenses/types";
+import type { ExpenseCategory, ExpenseCurrency, PaymentMethod, RecurringExpenseWithMeta, RecurringInput } from "@/lib/expenses/types";
+import PaymentMethodField from "./PaymentMethodField";
 
 interface RecurringFormModalProps {
   initial: RecurringExpenseWithMeta | null;
   categories: ExpenseCategory[];
   profiles: { id: string; full_name: string }[];
+  paymentMethods: PaymentMethod[];
+  onMethodsChanged: () => void;
   defaultOwnerId: string;
   onClose: () => void;
   onChanged: () => void;
@@ -19,6 +21,8 @@ export default function RecurringFormModal({
   initial,
   categories,
   profiles,
+  paymentMethods,
+  onMethodsChanged,
   defaultOwnerId,
   onClose,
   onChanged,
@@ -157,19 +161,14 @@ export default function RecurringFormModal({
 
         <div className="space-y-1.5">
           <label className={labelCls}>결제수단</label>
-          <input
-            list="recurring-payment-methods"
+          <PaymentMethodField
+            methods={paymentMethods}
             value={method}
-            onChange={(e) => setMethod(e.target.value)}
-            placeholder="결제수단"
+            onChange={setMethod}
+            onMethodsChanged={onMethodsChanged}
             className={inputCls}
             required
           />
-          <datalist id="recurring-payment-methods">
-            {PAYMENT_METHOD_SUGGESTIONS.map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
         </div>
 
         <div className="space-y-1.5">

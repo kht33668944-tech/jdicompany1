@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ExpenseCategory, ExpenseWithMeta, RecurringExpenseWithMeta } from "./types";
+import type { ExpenseCategory, ExpenseWithMeta, PaymentMethod, RecurringExpenseWithMeta } from "./types";
 
 const EXPENSE_SELECT = `*,
   category:expense_categories(id, name, is_sensitive, sort_order, is_active),
@@ -43,6 +43,17 @@ export async function getRangeKrwTotal(
     .lte("expense_date", endDate);
   if (error) throw error;
   return (data ?? []).reduce((sum, row) => sum + Number(row.amount_krw), 0);
+}
+
+/** 공용 결제수단 목록 (드롭다운 선택/추가용) */
+export async function getPaymentMethods(supabase: SupabaseClient): Promise<PaymentMethod[]> {
+  const { data, error } = await supabase
+    .from("payment_methods")
+    .select("id, name")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as PaymentMethod[];
 }
 
 export async function getRecurringExpenses(

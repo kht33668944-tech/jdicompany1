@@ -12,6 +12,25 @@ async function getSessionUserId() {
   return { supabase, userId: session.user.id };
 }
 
+export async function createPaymentMethod(name: string) {
+  const { supabase, userId } = await getSessionUserId();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("결제수단 이름을 입력해주세요.");
+  const { error } = await supabase
+    .from("payment_methods")
+    .insert({ name: trimmed, created_by: userId });
+  if (error) {
+    if (error.code === "23505") throw new Error("이미 등록된 결제수단입니다.");
+    throw new Error(`결제수단 추가에 실패했습니다: ${error.message}`);
+  }
+}
+
+export async function deletePaymentMethod(id: string) {
+  const { supabase } = await getSessionUserId();
+  const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+  if (error) throw new Error(`결제수단 삭제에 실패했습니다: ${error.message}`);
+}
+
 function validateExpenseInput(input: ExpenseInput) {
   if (!input.expense_date) throw new Error("날짜를 입력해주세요.");
   if (!input.description.trim()) throw new Error("내용을 입력해주세요.");

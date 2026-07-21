@@ -4,17 +4,19 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { updateExpense, deleteExpense, setExpenseReceipt } from "@/lib/expenses/actions";
 import { uploadExpenseReceipt, getExpenseReceiptUrl } from "@/lib/expenses/receipts";
-import { PAYMENT_METHOD_SUGGESTIONS } from "@/lib/expenses/constants";
-import type { ExpenseCategory, ExpenseCurrency, ExpenseWithMeta } from "@/lib/expenses/types";
+import type { ExpenseCategory, ExpenseCurrency, ExpenseWithMeta, PaymentMethod } from "@/lib/expenses/types";
+import PaymentMethodField from "./PaymentMethodField";
 
 interface ExpenseEditModalProps {
   expense: ExpenseWithMeta;
   categories: ExpenseCategory[];
+  paymentMethods: PaymentMethod[];
+  onMethodsChanged: () => void;
   onClose: () => void;
   onChanged: () => void;
 }
 
-export default function ExpenseEditModal({ expense, categories, onClose, onChanged }: ExpenseEditModalProps) {
+export default function ExpenseEditModal({ expense, categories, paymentMethods, onMethodsChanged, onClose, onChanged }: ExpenseEditModalProps) {
   const [date, setDate] = useState(expense.expense_date);
   const [vendor, setVendor] = useState(expense.vendor ?? "");
   const [description, setDescription] = useState(expense.description);
@@ -154,19 +156,14 @@ export default function ExpenseEditModal({ expense, categories, onClose, onChang
 
         <div className="space-y-1.5">
           <label className={labelCls}>결제수단</label>
-          <input
-            list="expense-edit-payment-methods"
+          <PaymentMethodField
+            methods={paymentMethods}
             value={method}
-            onChange={(e) => setMethod(e.target.value)}
-            placeholder="결제수단"
+            onChange={setMethod}
+            onMethodsChanged={onMethodsChanged}
             className={inputCls}
             required
           />
-          <datalist id="expense-edit-payment-methods">
-            {PAYMENT_METHOD_SUGGESTIONS.map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
         </div>
 
         <div className="space-y-1.5">

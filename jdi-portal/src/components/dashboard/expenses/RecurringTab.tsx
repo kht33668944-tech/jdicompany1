@@ -8,6 +8,7 @@ import { setRecurringActive } from "@/lib/expenses/actions";
 import { formatKrw, formatForeign } from "@/lib/expenses/format";
 import type {
   ExpenseCategory,
+  PaymentMethod,
   RecurringExpenseWithMeta,
 } from "@/lib/expenses/types";
 import RecurringFormModal from "./RecurringFormModal";
@@ -19,9 +20,11 @@ interface RecurringTabProps {
   profiles: { id: string; full_name: string }[];
   userId: string;
   userRole: "employee" | "admin" | "developer";
+  paymentMethods: PaymentMethod[];
+  onMethodsChanged: () => void;
 }
 
-export default function RecurringTab({ recurring: initial, categories, profiles, userId }: RecurringTabProps) {
+export default function RecurringTab({ recurring: initial, categories, profiles, userId, paymentMethods, onMethodsChanged }: RecurringTabProps) {
   const [rows, setRows] = useState(initial);
   const [editing, setEditing] = useState<RecurringExpenseWithMeta | null>(null);
   const [creating, setCreating] = useState(false);
@@ -54,7 +57,7 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="rounded-2xl bg-white/65 backdrop-blur-sm border border-white/80 px-5 py-4">
+        <div className="rounded-2xl bg-white/65 backdrop-blur-sm border border-white/80 shadow-sm px-5 py-4">
           <p className="text-xs font-bold text-slate-500">월 고정비 총액 (원화 기준)</p>
           <p className="text-xl font-bold text-slate-800 mt-0.5">{formatKrw(monthlyTotal)}</p>
         </div>
@@ -68,14 +71,14 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
 
       <div className="space-y-2">
         {rows.length === 0 && (
-          <div className="rounded-2xl bg-white/65 border border-white/80 p-10 text-center text-sm text-slate-400">
+          <div className="rounded-2xl bg-white/65 border border-white/80 shadow-sm p-10 text-center text-sm text-slate-400">
             등록된 고정 지출이 없습니다. 구독·월세·관리비를 등록해보세요.
           </div>
         )}
         {rows.map((r) => (
           <div
             key={r.id}
-            className={`rounded-2xl border px-5 py-3.5 flex items-center gap-3 ${r.is_active ? "bg-white/65 backdrop-blur-sm border-white/80" : "bg-slate-100/60 border-slate-200 opacity-60"}`}
+            className={`rounded-2xl border px-5 py-3.5 flex items-center gap-3 ${r.is_active ? "bg-white/65 backdrop-blur-sm border-white/80 shadow-sm" : "bg-slate-100/60 border-slate-200 opacity-60"}`}
           >
             <button onClick={() => setEditing(r)} className="flex-1 min-w-0 text-left">
               <p className="text-sm font-bold text-slate-800 truncate">
@@ -108,6 +111,8 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
           initial={editing}
           categories={categories}
           profiles={profiles}
+          paymentMethods={paymentMethods}
+          onMethodsChanged={onMethodsChanged}
           defaultOwnerId={userId}
           onClose={() => {
             setCreating(false);
