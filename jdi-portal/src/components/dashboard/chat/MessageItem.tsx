@@ -8,6 +8,7 @@ import type { Message, MessageReaction } from "@/lib/chat/types";
 import { formatMessageTime, formatFileSize, getFilePreviewPath, parseFileContent } from "@/lib/chat/utils";
 import { toggleReaction, getReactions } from "@/lib/chat/actions";
 import { parseMessageContent } from "@/lib/chat/mentions";
+import { triggerDownload } from "@/lib/utils/download";
 import { useChatFileUrl } from "./ChatFileUrlsContext";
 import ReadReceiptModal from "./ReadReceiptModal";
 
@@ -282,17 +283,35 @@ function ChatImage({ storagePath, previewPath, fileName }: { storagePath: string
     );
   }
 
+  const downloadUrl = originalUrl ?? previewUrl;
+
   return (
-    <a href={originalUrl ?? previewUrl} target="_blank" rel="noopener noreferrer" className="block">
-      <Image
-        src={previewUrl}
-        alt={fileName}
-        width={280}
-        height={200}
-        unoptimized
-        className="max-w-[280px] max-h-[200px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-      />
-    </a>
+    <div className="relative inline-block group">
+      <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="block">
+        <Image
+          src={previewUrl}
+          alt={fileName}
+          width={280}
+          height={200}
+          unoptimized
+          className="max-w-[280px] max-h-[200px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+        />
+      </a>
+      {/* 저장 버튼 — 모바일은 항상, 데스크톱은 마우스 올렸을 때 표시 */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          triggerDownload(downloadUrl, fileName);
+        }}
+        aria-label="이미지 저장"
+        title="저장"
+        className="absolute top-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-black/45 text-white opacity-100 transition-opacity hover:bg-black/65 sm:opacity-0 sm:group-hover:opacity-100"
+      >
+        <DownloadSimple size={16} weight="bold" aria-hidden="true" />
+      </button>
+    </div>
   );
 }
 
@@ -308,9 +327,15 @@ function ChatFile({ storagePath, fileName, fileSize }: { storagePath: string; fi
         <p className="text-[10px] text-slate-400">{formatFileSize(fileSize)}</p>
       </div>
       {url && (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors">
+        <button
+          type="button"
+          onClick={() => triggerDownload(url, fileName)}
+          aria-label={`${fileName} 저장`}
+          title="저장"
+          className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+        >
           <DownloadSimple size={16} className="text-slate-500" />
-        </a>
+        </button>
       )}
     </div>
   );

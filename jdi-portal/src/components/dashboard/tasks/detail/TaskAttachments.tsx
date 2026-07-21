@@ -6,6 +6,7 @@ import { Paperclip, Trash, DownloadSimple, Image as ImageIcon, File } from "phos
 import { uploadAttachment, deleteAttachment, getAttachmentUrl } from "@/lib/tasks/actions";
 import type { TaskAttachment } from "@/lib/tasks/types";
 import { validateFile } from "@/lib/utils/upload";
+import { triggerDownload } from "@/lib/utils/download";
 import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import { toast } from "sonner";
 
@@ -31,12 +32,13 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
-  const handleDownload = async (filePath: string) => {
+  const handleDownload = async (attachment: TaskAttachment) => {
     try {
-      const url = await getAttachmentUrl(filePath);
-      window.open(url, "_blank", "noopener,noreferrer");
+      const url = await getAttachmentUrl(attachment.file_path);
+      triggerDownload(url, attachment.file_name);
     } catch (error) {
       console.error("첨부파일 URL 조회 실패:", error);
+      toast.error("첨부파일을 저장하지 못했습니다.");
     }
   };
 
@@ -117,9 +119,11 @@ export default function TaskAttachments({ taskId, attachments, userId, canEdit }
                   {formatFileSize(attachment.file_size)} · {attachment.uploader_profile.full_name}
                 </p>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+              <div className="flex items-center gap-1 opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100">
                 <button
-                  onClick={() => handleDownload(attachment.file_path)}
+                  onClick={() => handleDownload(attachment)}
+                  aria-label={`${attachment.file_name} 저장`}
+                  title="저장"
                   className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
                 >
                   <DownloadSimple size={14} />
