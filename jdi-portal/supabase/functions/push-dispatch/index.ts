@@ -126,6 +126,7 @@ const SETTING_KEY_BY_TYPE: Record<string, string> = {
   chat_message: "chat_message_notify",
   report_submitted: "system_announce",
   report_status_changed: "system_announce",
+  expense_due: "expense_notify",
 };
 
 // ============================================================
