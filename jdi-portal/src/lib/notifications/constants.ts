@@ -25,6 +25,7 @@ export const NOTIFICATION_TYPE_CONFIG: Record<
   ip_change_rejected: { label: "IP 변경 반려", icon: "XCircle", color: "text-red-500" },
   report_submitted: { label: "새 오류접수", icon: "Bug", color: "text-rose-500" },
   report_status_changed: { label: "오류접수 처리 상태", icon: "ArrowsClockwise", color: "text-amber-500" },
+  expense_due: { label: "지출 결제 예정", icon: "Receipt", color: "text-teal-500" },
 };
 
 /** notification_settings 컬럼 → NotificationType[] 매핑 */
@@ -34,4 +35,5 @@ export const SETTING_TYPE_MAP: Record<string, NotificationType[]> = {
   task_deadline: ["task_deadline", "task_assigned", "task_comment", "task_status_changed"],
   system_announce: ["system_announce", "signup_pending", "report_submitted", "report_status_changed"],
   chat_message_notify: ["chat_message"],
+  expense_notify: ["expense_due"],
 };

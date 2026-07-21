@@ -19,7 +19,8 @@ export type NotificationType =
   | "ip_change_approved"
   | "ip_change_rejected"
   | "report_submitted"
-  | "report_status_changed";
+  | "report_status_changed"
+  | "expense_due";
 
 export interface Notification {
   id: string;
