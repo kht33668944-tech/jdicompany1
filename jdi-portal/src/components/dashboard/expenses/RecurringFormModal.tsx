@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createRecurringExpense, updateRecurringExpense, deleteRecurringExpense } from "@/lib/expenses/actions";
-import type { ExpenseCategory, ExpenseCurrency, PaymentMethod, RecurringExpenseWithMeta, RecurringInput } from "@/lib/expenses/types";
+import { getRecurringHistory } from "@/lib/expenses/queries";
+import { createClient } from "@/lib/supabase/client";
+import { formatKrw, formatForeign } from "@/lib/expenses/format";
+import { formatDate } from "@/lib/utils/date";
+import type { ExpenseCategory, ExpenseCurrency, PaymentMethod, RecurringExpenseWithMeta, RecurringHistoryItem, RecurringInput } from "@/lib/expenses/types";
 import PaymentMethodField from "./PaymentMethodField";
 
 interface RecurringFormModalProps {
@@ -38,6 +42,17 @@ export default function RecurringFormModal({
   const [ownerId, setOwnerId] = useState(initial?.owner_id ?? defaultOwnerId);
   const [note, setNote] = useState(initial?.note ?? "");
   const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState<RecurringHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (!initial) return;
+    setHistoryLoading(true);
+    getRecurringHistory(createClient(), initial.id)
+      .then(setHistory)
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false));
+  }, [initial]);
 
   const handleSave = async () => {
     if (busy) return;
@@ -195,6 +210,31 @@ export default function RecurringFormModal({
           <label className={labelCls}>메모(선택)</label>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="메모(선택)" className={inputCls} />
         </div>
+
+        {initial && (
+          <div className="space-y-1.5">
+            <label className={labelCls}>최근 자동 기록</label>
+            {historyLoading ? (
+              <p className="text-xs text-slate-400 ml-1">불러오는 중…</p>
+            ) : history.length === 0 ? (
+              <p className="text-xs text-slate-400 ml-1">아직 자동 기록된 내역이 없습니다.</p>
+            ) : (
+              <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-40 overflow-y-auto bg-white/60">
+                {history.map((h) => (
+                  <div key={h.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <span className="text-slate-600">{formatDate(h.expense_date)}</span>
+                    <span className="font-bold text-slate-800">
+                      {formatKrw(Number(h.amount_krw))}
+                      {h.currency === "USD" && h.amount_foreign != null && (
+                        <span className="text-xs font-medium text-slate-400 ml-1">({formatForeign(Number(h.amount_foreign), "USD")})</span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-between pt-2">
           {initial ? (

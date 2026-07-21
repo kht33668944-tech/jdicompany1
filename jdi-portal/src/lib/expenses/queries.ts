@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ExpenseCategory, ExpenseWithMeta, PaymentMethod, RecurringExpenseWithMeta } from "./types";
+import type { ExpenseCategory, ExpenseWithMeta, PaymentMethod, RecurringExpenseWithMeta, RecurringHistoryItem } from "./types";
 
 const EXPENSE_SELECT = `*,
   category:expense_categories(id, name, is_sensitive, sort_order, is_active),
@@ -85,4 +85,20 @@ export async function getRecurringRecordedIds(
     .lte("expense_date", endDate);
   if (error) throw error;
   return [...new Set((data ?? []).map((r) => r.recurring_id as string))];
+}
+
+/** 특정 고정지출의 최근 자동 기록 이력 (최신순) — 항목별 이력 타임라인용 */
+export async function getRecurringHistory(
+  supabase: SupabaseClient,
+  recurringId: string,
+  limit = 6
+): Promise<RecurringHistoryItem[]> {
+  const { data, error } = await supabase
+    .from("expenses")
+    .select("id, expense_date, amount_krw, currency, amount_foreign")
+    .eq("recurring_id", recurringId)
+    .order("expense_date", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as unknown as RecurringHistoryItem[];
 }

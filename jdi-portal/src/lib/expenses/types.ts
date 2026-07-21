@@ -72,6 +72,15 @@ export interface RecurringExpenseWithMeta extends RecurringExpense {
   owner_profile: { full_name: string } | null;
 }
 
+/** 고정지출 항목의 최근 자동 기록 이력 한 건 */
+export interface RecurringHistoryItem {
+  id: string;
+  expense_date: string;
+  amount_krw: number;
+  currency: ExpenseCurrency;
+  amount_foreign: number | null;
+}
+
 export interface RecurringInput {
   name: string;
   vendor: string | null;
