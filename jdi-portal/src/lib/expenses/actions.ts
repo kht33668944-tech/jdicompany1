@@ -54,12 +54,12 @@ export async function deleteExpense(id: string) {
     .single();
   if (readError) throw new Error(`지출 조회에 실패했습니다: ${readError.message}`);
 
-  const { error } = await supabase.from("expenses").delete().eq("id", id);
-  if (error) throw new Error(`지출 삭제에 실패했습니다: ${error.message}`);
-
   if (row?.receipt_path) {
     await supabase.storage.from("expense-receipts").remove([row.receipt_path]).catch(() => {});
   }
+
+  const { error } = await supabase.from("expenses").delete().eq("id", id);
+  if (error) throw new Error(`지출 삭제에 실패했습니다: ${error.message}`);
 }
 
 export async function setExpenseReceipt(id: string, path: string | null) {
