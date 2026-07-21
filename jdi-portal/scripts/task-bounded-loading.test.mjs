@@ -36,10 +36,16 @@ test("history filters are applied to the Supabase query", () => {
 });
 
 test("tasks page loads bounded initial data, not a history page", () => {
-  const source = readSource("src/app/dashboard/tasks/page.tsx");
+  const page = readSource("src/app/dashboard/tasks/page.tsx");
+  const fast = readSource("src/lib/tasks/fast-queries.ts");
 
-  assert.match(source, /getInitialTasksWithDetails\(auth\.supabase\)/);
-  assert.doesNotMatch(source, /getTaskHistoryWithDetails\(/);
+  // 페이지는 단일 pg 왕복(빠른 경로)으로 초기 데이터를 가져오고, 히스토리 페이지는 로드하지 않는다.
+  assert.match(page, /getTasksPagePayloadFast\(auth\.supabase, auth\.user\.id\)/);
+  assert.doesNotMatch(page, /getTaskHistoryWithDetails\(/);
+
+  // 빠른 경로도 초기 로드를 INITIAL_TASK_LIMIT 로 제한하고, 실패 시 bounded 폴백(getInitialTasksWithDetails)을 쓴다.
+  assert.match(fast, /INITIAL_TASK_LIMIT/);
+  assert.match(fast, /getInitialTasksWithDetails/);
 });
 
 test("task history reloads filtered pages and ignores stale client responses", () => {

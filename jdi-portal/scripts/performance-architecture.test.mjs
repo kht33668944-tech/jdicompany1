@@ -88,3 +88,29 @@ test("Railway healthcheck bypasses auth while startup warms one persistent DB co
   assert.match(postgres, /keepAlive: true/);
   assert.equal(existsSync(path.join(appRoot, "src/app/api/keep-warm/route.ts")), false);
 });
+
+test("middleware caches auth verification so every request skips the auth server round trip", () => {
+  // 사이트 전역 지연의 최대 원인이었던 "매 요청마다 getUser() 네트워크 왕복"을 제거한
+  // 5분 TTL 인증 검증 캐시. 이 로직이 사라지면 페이지 이동/prefetch 때마다 서울 인증
+  // 서버 왕복(평시 300~500ms, 폭주 시 2~4초)이 되살아나므로 반드시 유지한다.
+  const middleware = source("src/lib/supabase/middleware.ts");
+
+  assert.match(middleware, /AUTH_CACHE_TTL_MS\s*=\s*5\s*\*\s*60_000/);
+  assert.match(middleware, /TOKEN_EXP_MARGIN_MS\s*=\s*2\s*\*\s*60_000/);
+  assert.match(middleware, /function getAuthVerifyCache\(\)/);
+
+  // 캐시 확인이 네트워크 getUser() 호출보다 먼저 일어나야 왕복을 생략할 수 있다.
+  assert.ok(
+    middleware.indexOf("cache.get(cookieKey)") <
+      middleware.indexOf("supabase.auth.getUser()"),
+  );
+
+  // 캐시 히트 조건: 최근 5분 내 검증 + 토큰 만료 임박(2분) 전. 만료 임박이면 캐시를
+  // 무시하고 네트워크 경로로 보내 세션 갱신을 유지한다.
+  assert.match(middleware, /nowMs - cached\.verifiedAtMs < AUTH_CACHE_TTL_MS/);
+  assert.match(middleware, /nowMs < cached\.expiresAtMs - TOKEN_EXP_MARGIN_MS/);
+
+  // 실제 검증에 성공한 쿠키만 캐시에 기록한다(위조 토큰은 캐시 미스 → 네트워크 검증 → 거부).
+  assert.match(middleware, /if \(user && cookieKey\)/);
+  assert.match(middleware, /cache\.set\(cookieKey,/);
+});

@@ -52,6 +52,18 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 
 **마이그레이션**: `supabase/migrations/NNN_설명.sql` 순차 번호. 현재 최신은 **`089_dashboard_task_summary_future_due.sql`** — 기존 파일 수정 대신 다음 번호로 **추가**합니다.
 
+## 성능 불변조건 (속도 회귀 방지 — 되돌리지 말 것)
+
+이 앱은 여러 차례 성능 최적화를 거쳤고, 아래 장치들이 사이트 속도를 유지합니다. **큰 작업 중 실수로 이것들을 지우거나 우회하면 사이트가 다시 3~7초로 느려집니다.** 관련 파일을 수정할 땐 아래를 깨지 않는지 확인하고, **작업 후 반드시 `cd jdi-portal && npm run test:performance`로 검증**합니다(회귀가 있으면 테스트가 실패). 자동 검증은 세션 종료 시 성능 회귀 방지 훅(`jdi-portal/scripts/perf-guard-hook.mjs`)이 코드 변경을 감지해 이 테스트를 돌립니다.
+
+1. **미들웨어 인증 캐시** (`jdi-portal/src/lib/supabase/middleware.ts`): 5분 내 검증된 로그인 쿠키는 `getUser()` 네트워크 왕복(서울 인증 서버, 평시 300~500ms)을 생략합니다. **최대 개선(전역 지연 제거)** 이므로 `getAuthVerifyCache`/`AUTH_CACHE_TTL_MS` 로직을 제거·우회하지 않습니다.
+2. **DB/HTTPS keepalive** (`jdi-portal/src/instrumentation.ts`): 2분 주기로 pg 풀과 Supabase 경로를 데워 콜드 스타트(유휴 후 첫 요청 3~7초)를 방지합니다. `setInterval`/keepalive와 pg 풀 설정(`min:1`, `keepAlive:true`, `idleTimeoutMillis: 10*60_000` — `src/lib/db/postgres.ts`)을 유지합니다.
+3. **빠른 경로(직접 Postgres) + 폴백**: 대시보드·할일 초기 데이터는 단일 pg 왕복(`src/lib/dashboard/fast-queries.ts`, `src/lib/tasks/fast-queries.ts`). 성능 최적화 시 **빠른 경로와 Supabase RPC 폴백 양쪽**을 함께 고쳐야 운영에 반영됩니다(운영이 쓰는 경로는 로그 `source`로 확인).
+4. **대시보드 업무 요약 사전 필터** (마이그레이션 088 + `get_dashboard_task_summaries` RPC): `tasks` 전체 스캔 금지 — status/completed_at 사전 필터와 부분 인덱스를 유지합니다.
+5. **초기 JS 예산**: 무거운 라이브러리(xlsx 등)는 지연 로드, 라우트별 초기 JS 예산 준수(`npm run perf:audit`), 전역 prefetch 남용 금지, `/api/health`는 인증 우회 유지.
+
+기준선: `jdi-portal/docs/performance/production-baseline.md`. 회귀 방지 테스트: `jdi-portal/scripts/performance-architecture.test.mjs` 등(`npm run test:performance` = 40개 검사).
+
 ## 반드시 지킬 제약
 
 - **KST 날짜**: 서비스 기준은 Asia/Seoul. SQL에서 `CURRENT_DATE`/`NOW()`를 그대로 쓰지 말고 `(NOW() AT TIME ZONE 'Asia/Seoul')::DATE`로 명시. 클라이언트 날짜는 `src/lib/utils/date.ts` 우선. 근태/휴가 버그는 UTC 경계를 먼저 의심.
