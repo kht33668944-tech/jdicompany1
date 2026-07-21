@@ -15,7 +15,7 @@ async function getSessionUserId() {
 function validateExpenseInput(input: ExpenseInput) {
   if (!input.expense_date) throw new Error("날짜를 입력해주세요.");
   if (!input.description.trim()) throw new Error("내용을 입력해주세요.");
-  if (!Number.isFinite(input.amount_krw) || input.amount_krw <= 0)
+  if (!Number.isFinite(input.amount_krw) || input.amount_krw <= 0 || !Number.isInteger(input.amount_krw))
     throw new Error("금액(원)을 올바르게 입력해주세요.");
   if (!input.payment_method.trim()) throw new Error("결제수단을 입력해주세요.");
   if (!input.category_id) throw new Error("분류를 선택해주세요.");
@@ -73,7 +73,7 @@ export async function setExpenseReceipt(id: string, path: string | null) {
 
 function validateRecurringInput(input: RecurringInput) {
   if (!input.name.trim()) throw new Error("이름을 입력해주세요.");
-  if (!Number.isFinite(input.amount_krw) || input.amount_krw <= 0)
+  if (!Number.isFinite(input.amount_krw) || input.amount_krw <= 0 || !Number.isInteger(input.amount_krw))
     throw new Error("금액(원)을 올바르게 입력해주세요.");
   if (input.billing_day < 1 || input.billing_day > 31)
     throw new Error("결제일은 1~31 사이여야 합니다.");
