@@ -31,18 +31,8 @@ export function validateWorkTimelineInput(input: {
   return { title, description, completedAt: new Date(completedAt).toISOString() };
 }
 
-export function validateWorkTimelineImage(file: File): void {
-  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("JPG, PNG, WebP, GIF 이미지만 첨부할 수 있습니다.");
-  }
-  if (file.size > WORK_TIMELINE_MAX_IMAGE_SIZE) {
-    throw new Error("이미지는 파일당 10MB 이하만 첨부할 수 있습니다.");
-  }
-  if (file.size <= 0) throw new Error("내용이 없는 이미지는 첨부할 수 없습니다.");
-}
-
 export function isWorkTimelineImage(mimeType: string): boolean {
-  return (WORK_TIMELINE_IMAGE_MIME_TYPES as readonly string[]).includes(mimeType);
+  return ALLOWED_IMAGE_TYPES.has(mimeType);
 }
 
 /** 차단 확장자면 그 확장자를, 아니면 null. 확장자 없으면 빈 문자열("")을 반환해 거부 유도. */
