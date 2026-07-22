@@ -53,3 +53,12 @@ test("work-timeline: project 조인·필터·캐시 버전", () => {
   const cache = read("src/lib/work-timeline/timelineCache.ts");
   assert.match(cache, /CACHE_SCHEMA_VERSION = 3/);
 });
+
+test("사이드바: 타임라인 하위 메뉴", () => {
+  const sidebar = read("src/components/dashboard/Sidebar.tsx");
+  assert.match(sidebar, /useProjects/);
+  assert.match(sidebar, /project=none/);
+  assert.match(sidebar, /미분류/);
+  // 하위 링크 포함 모든 Link 는 prefetch 금지 유지
+  assert.doesNotMatch(sidebar, /prefetch=\{true\}/);
+});

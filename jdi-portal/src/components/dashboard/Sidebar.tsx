@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
+import { useProjects } from "@/lib/projects/useProjects";
 // 아이콘별 deep import — 전체 phosphor-react 배럴 로드 회피 (서버 cold-start ↓)
 import SquaresFour from "phosphor-react/dist/icons/SquaresFour.esm.js";
 import Clock from "phosphor-react/dist/icons/Clock.esm.js";
@@ -40,6 +41,19 @@ const navItems = [
 
 export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, chatUnreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { activeProjects } = useProjects();
+  const onTimeline = pathname.startsWith("/dashboard/work-timeline");
+  const currentProject = searchParams.get("project") ?? "";
+  const timelineSubItems = [
+    { value: "", label: "전체", color: null as string | null },
+    ...activeProjects.map((project) => ({
+      value: project.id,
+      label: project.name,
+      color: project.color as string | null,
+    })),
+    { value: "none", label: "미분류", color: null as string | null },
+  ];
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href);
@@ -64,29 +78,67 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
           const active = isActive(item.href);
           const Icon = item.icon;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={false}
-              onClick={onMobileClose}
-              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                active
-                  ? "bg-brand-50 text-brand-600 shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              } ${collapsed ? "justify-center" : ""}`}
-              title={collapsed ? item.label : undefined}
-            >
-              <Icon size={20} weight={active ? "fill" : "regular"} className="shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-              {!collapsed && item.href === "/dashboard/chat" && chatUnreadCount > 0 && (
-                <span className="ml-auto w-5 h-5 bg-blue-600 text-white text-[10px] flex items-center justify-center rounded-full font-bold">
-                  {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
-                </span>
+            <div key={item.href}>
+              <Link
+                href={item.href}
+                prefetch={false}
+                onClick={onMobileClose}
+                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  active
+                    ? "bg-brand-50 text-brand-600 shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                } ${collapsed ? "justify-center" : ""}`}
+                title={collapsed ? item.label : undefined}
+              >
+                <Icon size={20} weight={active ? "fill" : "regular"} className="shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && item.href === "/dashboard/chat" && chatUnreadCount > 0 && (
+                  <span className="ml-auto w-5 h-5 bg-blue-600 text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                    {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                  </span>
+                )}
+                {collapsed && item.href === "/dashboard/chat" && chatUnreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-full" />
+                )}
+              </Link>
+              {!collapsed && item.href === "/dashboard/work-timeline" && onTimeline && (
+                <div className="mt-1 space-y-0.5 pl-9 pr-1">
+                  {timelineSubItems.map((sub) => {
+                    const subActive = currentProject === sub.value;
+                    return (
+                      <Link
+                        key={sub.value || "all"}
+                        href={
+                          sub.value === ""
+                            ? "/dashboard/work-timeline"
+                            : sub.value === "none"
+                              ? "/dashboard/work-timeline?project=none"
+                              : `/dashboard/work-timeline?project=${sub.value}`
+                        }
+                        prefetch={false}
+                        onClick={onMobileClose}
+                        className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                          subActive
+                            ? "bg-brand-50 text-brand-600"
+                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                        }`}
+                      >
+                        {sub.color ? (
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full"
+                            style={{ backgroundColor: sub.color }}
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+                        )}
+                        <span className="truncate">{sub.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-              {collapsed && item.href === "/dashboard/chat" && chatUnreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-full" />
-              )}
-            </Link>
+            </div>
           );
         })}
       </nav>
