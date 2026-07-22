@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, CalendarBlank, CaretLeft, CaretRight, DownloadSimple, ImageSquare, LinkSimple, PencilSimple, TrashSimple, X } from "phosphor-react";
+import { ArrowLeft, CalendarBlank, CaretLeft, CaretRight, DownloadSimple, FileArrowUp, LinkSimple, PencilSimple, TrashSimple, X } from "phosphor-react";
 import { toast } from "sonner";
 import UserAvatar from "@/components/shared/UserAvatar";
 import {
@@ -13,17 +13,17 @@ import {
   getWorkTimelineSignedUrls,
   updateWorkTimelineEntry,
 } from "@/lib/work-timeline/actions";
-import { uploadWorkTimelineImagesDirect } from "@/lib/work-timeline/clientUploads";
+import { uploadWorkTimelineFilesDirect } from "@/lib/work-timeline/clientUploads";
 import {
-  WORK_TIMELINE_IMAGE_MIME_TYPES,
+  WORK_TIMELINE_MAX_ATTACHMENTS,
   WORK_TIMELINE_MAX_DESCRIPTION_LENGTH,
-  WORK_TIMELINE_MAX_IMAGES,
   WORK_TIMELINE_MAX_TITLE_LENGTH,
 } from "@/lib/work-timeline/constants";
 import type { WorkTimelineEntryWithProfile } from "@/lib/work-timeline/types";
-import { validateWorkTimelineImage } from "@/lib/work-timeline/utils";
+import { isWorkTimelineImage, validateWorkTimelineFile } from "@/lib/work-timeline/utils";
 import { createImageThumbnail, resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
+import AttachmentFileCard from "./AttachmentFileCard";
 
 interface WorkTimelineDetailClientProps {
   initialEntry: WorkTimelineEntryWithProfile;
@@ -88,9 +88,14 @@ export default function WorkTimelineDetailClient({
 
   const isOwner = entry.user_id === currentUserId;
   const canDelete = isOwner || currentUserRole === "admin";
-  const viewableAttachments = entry.attachments.filter(
-    (attachment) => attachment.original_url || attachment.thumbnail_url,
+  const imageAttachments = entry.attachments.filter(
+    (attachment) => isWorkTimelineImage(attachment.mime_type)
+      && (attachment.original_url || attachment.thumbnail_url),
   );
+  const fileAttachments = entry.attachments.filter(
+    (attachment) => !isWorkTimelineImage(attachment.mime_type),
+  );
+  const viewableAttachments = imageAttachments; // 라이트박스는 이미지에만
   const activeViewerAttachment = viewerIndex === null ? null : viewableAttachments[viewerIndex] ?? null;
   const activeViewerUrl = activeViewerAttachment?.original_url ?? activeViewerAttachment?.thumbnail_url ?? null;
 
@@ -168,9 +173,9 @@ export default function WorkTimelineDetailClient({
     try {
       const result = await deleteWorkTimelineEntry(entry.id);
       if (result.storageCleanupFailed) {
-        toast.warning("업무 기록은 삭제했지만 일부 저장소 이미지 정리가 필요합니다.");
+        toast.warning("업무 기록은 삭제했지만 일부 저장소 파일 정리가 필요합니다.");
       } else {
-        toast.success("업무 기록과 첨부 이미지 삭제를 완료했습니다.");
+        toast.success("업무 기록과 첨부 파일 삭제를 완료했습니다.");
       }
       router.replace("/dashboard/work-timeline");
       router.refresh();
@@ -191,41 +196,42 @@ export default function WorkTimelineDetailClient({
       if (result.storageCleanupFailed) {
         toast.warning("첨부 기록은 삭제했지만 저장소 이미지 정리가 필요합니다.");
       } else {
-        toast.success("첨부 이미지를 삭제했습니다.");
+        toast.success("첨부 파일을 삭제했습니다.");
       }
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "첨부 이미지를 삭제하지 못했습니다.");
+      toast.error(error instanceof Error ? error.message : "첨부 파일을 삭제하지 못했습니다.");
     } finally {
       setDeletingAttachmentId(null);
     }
   };
 
-  const handleAddImages = async (files: FileList | null) => {
+  const handleAddFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const availableSlots = WORK_TIMELINE_MAX_IMAGES - entry.attachments.length;
+    const availableSlots = WORK_TIMELINE_MAX_ATTACHMENTS - entry.attachments.length;
     const selected = Array.from(files).slice(0, availableSlots);
     if (files.length > availableSlots) {
-      toast.error(`이미지는 최대 ${WORK_TIMELINE_MAX_IMAGES}개까지 첨부할 수 있습니다.`);
+      toast.error(`파일은 최대 ${WORK_TIMELINE_MAX_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
     }
     if (selected.length === 0) return;
 
     setUploadingImages(true);
     try {
       const processed = await Promise.all(selected.map(async (file) => {
-        validateWorkTimelineImage(file);
+        validateWorkTimelineFile(file);
+        if (!isWorkTimelineImage(file.type)) return { file, thumbnail: null };
         const resized = await resizeImageIfNeeded(file, { maxDim: 2560, quality: 0.92 });
         const thumbnail = await createImageThumbnail(resized);
         return { file: resized, thumbnail };
       }));
       const occupied = new Set(entry.attachments.map((attachment) => attachment.position));
-      const positions = Array.from({ length: WORK_TIMELINE_MAX_IMAGES }, (_, index) => index)
+      const positions = Array.from({ length: WORK_TIMELINE_MAX_ATTACHMENTS }, (_, index) => index)
         .filter((position) => !occupied.has(position))
         .slice(0, processed.length);
-      const attachments = await uploadWorkTimelineImagesDirect({
+      const attachments = await uploadWorkTimelineFilesDirect({
         entryId: entry.id,
         userId: currentUserId,
-        images: processed,
+        files: processed,
         positions,
       });
       let signedUrls: Record<string, string>;
@@ -234,8 +240,8 @@ export default function WorkTimelineDetailClient({
           attachments.flatMap((attachment) => [attachment.file_path, attachment.thumbnail_path ?? ""]),
         );
       } catch (error) {
-        console.warn("추가된 첨부 이미지의 서명 URL을 즉시 발급하지 못했습니다.", error);
-        toast.success("첨부 이미지를 추가했습니다. 화면을 새로 불러옵니다.");
+        console.warn("추가된 첨부 파일의 서명 URL을 즉시 발급하지 못했습니다.", error);
+        toast.success("첨부 파일을 추가했습니다. 화면을 새로 불러옵니다.");
         router.refresh();
         return;
       }
@@ -251,10 +257,10 @@ export default function WorkTimelineDetailClient({
         attachments: [...current.attachments, ...signedAttachments]
           .sort((a, b) => a.position - b.position),
       }));
-      toast.success("첨부 이미지를 추가했습니다.");
+      toast.success("첨부 파일을 추가했습니다.");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "이미지를 추가하지 못했습니다.");
+      toast.error(error instanceof Error ? error.message : "파일을 추가하지 못했습니다.");
     } finally {
       setUploadingImages(false);
       if (imageInputRef.current) imageInputRef.current.value = "";
@@ -331,22 +337,21 @@ export default function WorkTimelineDetailClient({
                 <input
                   ref={imageInputRef}
                   type="file"
-                  accept={WORK_TIMELINE_IMAGE_MIME_TYPES.join(",")}
                   multiple
                   className="sr-only"
-                  onChange={(event) => void handleAddImages(event.target.files)}
+                  onChange={(event) => void handleAddFiles(event.target.files)}
                 />
                 <button
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
-                  disabled={uploadingImages || entry.attachments.length >= WORK_TIMELINE_MAX_IMAGES}
+                  disabled={uploadingImages || entry.attachments.length >= WORK_TIMELINE_MAX_ATTACHMENTS}
                   className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <ImageSquare size={17} aria-hidden="true" />
-                  {uploadingImages ? "이미지 추가 중..." : "이미지 추가"}
+                  <FileArrowUp size={17} aria-hidden="true" />
+                  {uploadingImages ? "파일 추가 중..." : "파일 추가"}
                 </button>
                 <span className="text-xs font-semibold text-slate-400">
-                  {entry.attachments.length}/{WORK_TIMELINE_MAX_IMAGES}
+                  {entry.attachments.length}/{WORK_TIMELINE_MAX_ATTACHMENTS}
                 </span>
               </div>
               <div className="flex justify-end gap-2">
@@ -414,7 +419,7 @@ export default function WorkTimelineDetailClient({
           <section className="border-t border-slate-100 px-5 py-6 sm:px-7" aria-labelledby="timeline-images-title">
             <div className="mb-4 flex items-center justify-between gap-2">
               <h2 id="timeline-images-title" className="text-sm font-bold text-slate-800">
-                첨부 이미지 {entry.attachments.length}
+                첨부 파일 {entry.attachments.length}
               </h2>
               {viewableAttachments.length >= 2 && (
                 <button
@@ -474,6 +479,21 @@ export default function WorkTimelineDetailClient({
                 );
               })}
             </div>
+            {fileAttachments.length > 0 && (
+              <ul className="mt-4 space-y-2" aria-label="첨부 문서">
+                {fileAttachments.map((attachment) => (
+                  <li key={attachment.id}>
+                    <AttachmentFileCard
+                      fileName={attachment.file_name}
+                      fileSize={attachment.file_size}
+                      downloadUrl={attachment.original_url}
+                      onDelete={isOwner && editing ? () => handleDeleteAttachment(attachment.id) : undefined}
+                      deleting={deletingAttachmentId === attachment.id}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         )}
       </article>
@@ -482,7 +502,7 @@ export default function WorkTimelineDetailClient({
         <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4">
           <p className="text-sm font-bold text-red-800">이 업무 기록을 삭제하시겠습니까?</p>
           <p className="mt-1 text-xs leading-5 text-red-600">
-            기록과 첨부 이미지가 함께 삭제되며 복구할 수 없습니다.
+            기록과 첨부 파일이 함께 삭제되며 복구할 수 없습니다.
           </p>
           <div className="mt-3 flex justify-end gap-2">
             <button
