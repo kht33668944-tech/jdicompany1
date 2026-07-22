@@ -158,8 +158,14 @@ export async function setExpenseReceipt(id: string, path: string | null) {
 
 function validateRecurringInput(input: RecurringInput) {
   if (!input.name.trim()) throw new Error("이름을 입력해주세요.");
-  if (!Number.isFinite(input.amount_krw) || input.amount_krw <= 0 || !Number.isInteger(input.amount_krw))
-    throw new Error("금액(원)을 올바르게 입력해주세요.");
+  if (!input.is_variable) {
+    if (!Number.isFinite(input.amount_krw) || input.amount_krw <= 0 || !Number.isInteger(input.amount_krw))
+      throw new Error("금액(원)을 올바르게 입력해주세요.");
+  } else {
+    // 변동성: 예상 금액은 선택(0 또는 양의 정수 허용)
+    if (!Number.isFinite(input.amount_krw) || input.amount_krw < 0 || !Number.isInteger(input.amount_krw))
+      throw new Error("예상 금액을 올바르게 입력해주세요.");
+  }
   if (input.billing_day < 1 || input.billing_day > 31)
     throw new Error("결제일은 1~31 사이여야 합니다.");
   if (!input.payment_method.trim()) throw new Error("결제수단을 입력해주세요.");
@@ -202,4 +208,22 @@ export async function deleteRecurringExpense(id: string) {
   const { supabase } = await getSessionUserId();
   const { error } = await supabase.from("recurring_expenses").delete().eq("id", id);
   if (error) throw new Error(`고정 지출 삭제에 실패했습니다: ${error.message}`);
+}
+
+/** 변동성 자동 기록(미확정) 지출의 이번 달 실제 금액을 확정한다. 승인 직원 누구나 가능(RLS로 보호). */
+export async function confirmExpenseAmount(id: string, amountKrw: number, amountForeign: number | null) {
+  const { supabase, userId } = await getSessionUserId();
+  if (!Number.isFinite(amountKrw) || amountKrw <= 0 || !Number.isInteger(amountKrw))
+    throw new Error("금액(원)을 올바르게 입력해주세요.");
+  const { error } = await supabase
+    .from("expenses")
+    .update({
+      amount_krw: amountKrw,
+      amount_foreign: amountForeign,
+      amount_pending: false,
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) throw new Error(`금액 확정에 실패했습니다: ${error.message}`);
 }

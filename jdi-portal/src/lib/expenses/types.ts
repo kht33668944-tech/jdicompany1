@@ -28,6 +28,7 @@ export interface Expense {
   receipt_path: string | null;
   source: ExpenseSource;
   recurring_id: string | null;
+  amount_pending: boolean;
   created_by: string;
   updated_by: string | null;
   created_at: string;
@@ -62,6 +63,7 @@ export interface RecurringExpense {
   category_id: string;
   owner_id: string;
   is_active: boolean;
+  is_variable: boolean;
   note: string | null;
   created_by: string;
   created_at: string;
@@ -92,5 +94,6 @@ export interface RecurringInput {
   payment_method: string;
   category_id: string;
   owner_id: string;
+  is_variable: boolean;
   note: string | null;
 }
