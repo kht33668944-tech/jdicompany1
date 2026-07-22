@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FileArrowUp, Plus, SpinnerGap, X } from "phosphor-react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
+import Select from "@/components/shared/Select";
+import { createProject } from "@/lib/projects/actions";
+import { PROJECT_COLORS } from "@/lib/projects/constants";
+import { notifyProjectsChanged, useProjects } from "@/lib/projects/useProjects";
 import {
   createWorkTimelineEntry,
   deleteWorkTimelineEntry,
@@ -85,6 +89,12 @@ export default function WorkTimelineCreateModal({
   const [draftStatus, setDraftStatus] = useState<"loading" | "restored" | "ready">("loading");
   const [restoredDraftUpdatedAt, setRestoredDraftUpdatedAt] = useState<number | null>(null);
   const [autosaveArmed, setAutosaveArmed] = useState(false);
+  const [projectId, setProjectId] = useState("");
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectColor, setNewProjectColor] = useState<string>(PROJECT_COLORS[0]);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const { activeProjects } = useProjects();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlsRef = useRef(new Set<string>());
   const autosaveTimerRef = useRef<number | null>(null);
@@ -107,7 +117,8 @@ export default function WorkTimelineCreateModal({
       title.trim()
       || description.trim()
       || images.length > 0
-      || completedAt !== initialCompletedAtValue,
+      || completedAt !== initialCompletedAtValue
+      || projectId !== "",
     );
     if (!hasContent) {
       await clearWorkTimelineDraft(currentUserId, draftScope);
@@ -126,6 +137,7 @@ export default function WorkTimelineCreateModal({
         lastModified: file.lastModified,
         blob: file,
       })),
+      projectId: projectId || null,
     });
     if (result === "text-only" && !imageDraftFallbackNotifiedRef.current) {
       imageDraftFallbackNotifiedRef.current = true;
@@ -134,7 +146,7 @@ export default function WorkTimelineCreateModal({
       draftUnavailableNotifiedRef.current = true;
       toast.warning("브라우저 저장소를 사용할 수 없어 초안을 자동 저장하지 못했습니다.");
     }
-  }), [completedAt, currentUserId, description, draftScope, enqueueDraftOperation, images, initialCompletedAtValue, taskId, title]);
+  }), [completedAt, currentUserId, description, draftScope, enqueueDraftOperation, images, initialCompletedAtValue, projectId, taskId, title]);
 
   const applyDraft = useCallback((draft: WorkTimelineDraftRecord) => {
     const restoredImages: SelectedAttachment[] = [];
@@ -167,6 +179,7 @@ export default function WorkTimelineCreateModal({
     setTitle(draft.title.slice(0, WORK_TIMELINE_MAX_TITLE_LENGTH));
     setDescription(draft.description.slice(0, WORK_TIMELINE_MAX_DESCRIPTION_LENGTH));
     setCompletedAt(draft.completedAt || initialCompletedAtValue);
+    setProjectId(draft.projectId ?? "");
     setAutosaveArmed(false);
     setRestoredDraftUpdatedAt(draft.updatedAt);
     setDraftStatus("restored");
@@ -291,9 +304,29 @@ export default function WorkTimelineCreateModal({
     setTitle(initialTitle);
     setDescription(initialDescription);
     setCompletedAt(initialCompletedAtValue);
+    setProjectId("");
     setAutosaveArmed(false);
     setRestoredDraftUpdatedAt(null);
     setDraftStatus("ready");
+  }
+
+  async function handleCreateProject() {
+    if (!newProjectName.trim() || creatingProject) return;
+    setCreatingProject(true);
+    try {
+      const project = await createProject(newProjectName, newProjectColor);
+      notifyProjectsChanged();
+      setProjectId(project.id);
+      setNewProjectOpen(false);
+      setNewProjectName("");
+      setNewProjectColor(PROJECT_COLORS[0]);
+      setAutosaveArmed(true);
+      toast.success(`'${project.name}' 프로젝트를 만들었습니다.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "프로젝트를 만들지 못했습니다.");
+    } finally {
+      setCreatingProject(false);
+    }
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -341,6 +374,7 @@ export default function WorkTimelineCreateModal({
         description: description.trim() || null,
         completedAt: new Date(`${completedAt}:00+09:00`).toISOString(),
         taskId,
+        projectId: projectId || null,
       });
       if (!result.duplicate) {
         createdEntryId = result.entry.id;
@@ -493,6 +527,69 @@ export default function WorkTimelineCreateModal({
               required
               className="w-full rounded-lg border border-slate-200 px-3.5 py-3 text-sm text-slate-700 outline-none transition-colors focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 sm:max-w-xs"
             />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              프로젝트 <span className="font-normal text-slate-400">(선택)</span>
+            </label>
+            <Select
+              value={projectId}
+              onChange={(v) => {
+                setProjectId(v);
+                setAutosaveArmed(true);
+              }}
+              ariaLabel="프로젝트 선택"
+              className="w-full rounded-lg border border-slate-200 px-3.5 py-3 text-sm text-slate-700 sm:max-w-xs"
+              options={[
+                { value: "", label: "미분류" },
+                ...activeProjects.map((project) => ({ value: project.id, label: project.name })),
+              ]}
+              footerAction={{ label: "새 프로젝트 만들기", onClick: () => setNewProjectOpen(true) }}
+            />
+            {newProjectOpen && (
+              <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <input
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                  maxLength={50}
+                  placeholder="새 프로젝트 이름 (예: 코스피랩)"
+                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="프로젝트 색상">
+                  {PROJECT_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setNewProjectColor(color)}
+                      aria-label={`색상 ${color}`}
+                      aria-pressed={newProjectColor === color}
+                      className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                        newProjectColor === color ? "scale-110 border-slate-700" : "border-transparent"
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewProjectOpen(false)}
+                    className="rounded-md px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateProject()}
+                    disabled={creatingProject || !newProjectName.trim()}
+                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:bg-slate-300"
+                  >
+                    {creatingProject ? "만드는 중..." : "만들기"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
