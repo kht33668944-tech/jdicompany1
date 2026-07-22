@@ -30,3 +30,16 @@ test("101 마이그레이션: projects 테이블 + RLS + FK 컬럼", () => {
   // KST 규칙 위반 금지: 날짜 컬럼 없음 → CURRENT_DATE 미사용
   assert.doesNotMatch(sql, /CURRENT_DATE/);
 });
+
+test("lib/projects: 모듈 구성과 서버 검증", () => {
+  const actions = read("src/lib/projects/actions.ts");
+  assert.match(actions, /^"use server";/);
+  // 삭제는 서버에서도 admin 재검증 (RLS만 믿지 않음)
+  assert.match(actions, /role[\s\S]*?admin/);
+  // Supabase error 무시 금지
+  assert.doesNotMatch(actions, /\.insert\([\s\S]*?\)\s*;\s*return/);
+  const queries = read("src/lib/projects/queries.ts");
+  assert.match(queries, /order\("name"/);
+  const hook = read("src/lib/projects/useProjects.ts");
+  assert.match(hook, /jdi:projects-changed/);
+});
