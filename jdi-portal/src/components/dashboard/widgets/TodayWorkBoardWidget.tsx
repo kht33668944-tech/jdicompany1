@@ -646,7 +646,7 @@ export default function TodayWorkBoardWidget({
               value={assigneeFilter}
               onChange={(event) => setAssigneeFilter(event.target.value)}
               aria-label="직원별 오늘 할 일 필터"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors"
             >
               <option value="all">전체 직원</option>
               {approvedProfiles.map((profile) => (

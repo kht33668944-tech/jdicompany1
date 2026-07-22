@@ -6,6 +6,7 @@ import { PaperPlaneTilt } from "phosphor-react";
 import { submitVacationRequest } from "@/lib/attendance/actions";
 import { getVacationDaysCount } from "@/lib/utils/vacation";
 import { getErrorMessage } from "@/lib/utils/errors";
+import Select from "@/components/shared/Select";
 import type { VacationBalance, VacationType } from "@/lib/attendance/types";
 
 interface VacationRequestFormProps {
@@ -93,17 +94,16 @@ export default function VacationRequestForm({ balance }: VacationRequestFormProp
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1">휴가 유형</label>
-          <select
+          <Select
+            options={vacationTypes.map((vacationType) => ({
+              value: vacationType.value,
+              label: vacationType.label,
+            }))}
             value={type}
-            onChange={(event) => handleTypeChange(event.target.value as VacationType)}
-            className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-          >
-            {vacationTypes.map((vacationType) => (
-              <option key={vacationType.value} value={vacationType.value}>
-                {vacationType.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => handleTypeChange(v as VacationType)}
+            className="glass-input w-full px-4 py-2.5 rounded-xl text-sm"
+            ariaLabel="휴가 유형"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">

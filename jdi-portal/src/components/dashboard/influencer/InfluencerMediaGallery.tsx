@@ -8,6 +8,7 @@ import type {
 import NextImage from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { calcPostER, isBestPost, isReel } from "@/lib/influencer/post-utils";
+import Select, { type SelectOption } from "@/components/shared/Select";
 
 import FilmStrip from "phosphor-react/dist/icons/FilmStrip.esm.js";
 import Play from "phosphor-react/dist/icons/Play.esm.js";
@@ -21,6 +22,13 @@ import ImageIcon from "phosphor-react/dist/icons/Image.esm.js";
 
 type MediaFilter = "all" | "photo" | "reel";
 type Sort = "recent" | "er" | "likes" | "views";
+
+const SORT_OPTIONS: SelectOption[] = [
+  { value: "recent", label: "최신순" },
+  { value: "er", label: "참여율 높은순" },
+  { value: "likes", label: "좋아요 많은순" },
+  { value: "views", label: "조회수 많은순" },
+];
 
 interface Filters {
   hideSponsored: boolean;
@@ -129,17 +137,14 @@ export default function InfluencerMediaGallery({
       {/* 정렬 / 필터 바 */}
       <div className="px-6 py-3 flex items-center gap-2 flex-wrap shrink-0 border-b border-white/10">
         <label className="text-[11px] text-slate-300 mr-1">정렬</label>
-        <select
+        <Select
+          options={SORT_OPTIONS}
           value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-          className="text-xs px-2 py-1 rounded-lg bg-white/10 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 [&>option]:bg-slate-900 [&>option]:text-white"
-          aria-label="정렬"
-        >
-          <option value="recent">최신순</option>
-          <option value="er">참여율 높은순</option>
-          <option value="likes">좋아요 많은순</option>
-          <option value="views">조회수 많은순</option>
-        </select>
+          onChange={(v) => setSort(v as Sort)}
+          variant="dark"
+          className="text-xs px-2 py-1 rounded-lg bg-white/10 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          ariaLabel="정렬"
+        />
 
         <span className="w-px h-4 bg-white/10 mx-1" />
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { X, Plus } from "phosphor-react";
 import { addDepartment, deleteDepartment, updateUserRole, approveUser, rejectUser, setSensitiveExpenseAccess } from "@/lib/settings/actions";
+import Select from "@/components/shared/Select";
 import type { Profile } from "@/lib/attendance/types";
 import type { Department } from "@/lib/settings/types";
 
@@ -265,16 +266,18 @@ export default function AdminSection({ profiles, departments }: AdminSectionProp
                 <td className="py-4 px-2 text-sm text-slate-500">{p.email}</td>
                 <td className="py-4 px-2 text-sm text-slate-500">{p.department}</td>
                 <td className="py-4 px-2">
-                  <select
+                  <Select
+                    options={[
+                      { value: "admin", label: "관리자" },
+                      { value: "developer", label: "개발자" },
+                      { value: "employee", label: "사용자" },
+                    ]}
                     value={p.role}
-                    onChange={(e) => handleRoleChange(p.id, e.target.value as "employee" | "admin" | "developer")}
+                    onChange={(v) => handleRoleChange(p.id, v as "employee" | "admin" | "developer")}
                     disabled={loading}
-                    className="text-xs bg-slate-50 border-none rounded-lg px-2 py-1 focus:ring-0 cursor-pointer font-medium"
-                  >
-                    <option value="admin">관리자</option>
-                    <option value="developer">개발자</option>
-                    <option value="employee">사용자</option>
-                  </select>
+                    ariaLabel="권한 변경"
+                    className="text-xs bg-slate-50 border-none rounded-lg px-2 py-1 font-medium"
+                  />
                 </td>
                 <td className="py-4 px-2">
                   <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 cursor-pointer">

@@ -10,6 +10,7 @@ import { updateReportStatus } from "@/lib/reports/actions";
 import ReportCard from "./ReportCard";
 import ReportCreateModal from "./ReportCreateModal";
 import ReportDetailModal from "./ReportDetailModal";
+import Select from "@/components/shared/Select";
 
 interface ReportsPageClientProps {
   initialReports: ReportWithProfile[];
@@ -143,28 +144,19 @@ export default function ReportsPageClient({
           </div>
 
           {/* Status select */}
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as "all" | ReportStatus)}
-              className="appearance-none bg-white/60 border border-white/50 rounded-2xl px-5 py-2.5 pr-10 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
-            >
-              <option value="all">상태: 전체</option>
-              {REPORT_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {REPORT_STATUS_CONFIG[status].label}
-                </option>
-              ))}
-            </select>
-            <svg
-              className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+          <Select
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(v as "all" | ReportStatus)}
+            options={[
+              { value: "all", label: "상태: 전체" },
+              ...REPORT_STATUSES.map((status) => ({
+                value: status,
+                label: REPORT_STATUS_CONFIG[status].label,
+              })),
+            ]}
+            ariaLabel="상태 필터"
+            className="bg-white/60 border border-white/50 rounded-2xl px-5 py-2.5 text-sm font-medium shadow-sm"
+          />
         </div>
       </div>
 

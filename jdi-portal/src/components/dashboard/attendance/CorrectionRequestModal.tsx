@@ -8,6 +8,7 @@ import { formatDate, formatTime } from "@/lib/utils/date";
 import { getErrorMessage } from "@/lib/utils/errors";
 import type { AttendanceRecord, CorrectionRequest } from "@/lib/attendance/types";
 import ModalContainer from "@/components/shared/ModalContainer";
+import Select from "@/components/shared/Select";
 
 interface CorrectionRequestModalProps {
   record?: AttendanceRecord | null;
@@ -114,15 +115,17 @@ export default function CorrectionRequestModal({ record, targetDate: initialDate
           ) : (
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">요청 유형</label>
-              <select
+              <Select
+                options={[
+                  { value: "출근시간수정", label: "출근시간 수정" },
+                  { value: "퇴근시간수정", label: "퇴근시간 수정" },
+                  { value: "기록누락", label: "기록 누락" },
+                ]}
                 value={requestType}
-                onChange={(event) => setRequestType(event.target.value as RequestType)}
-                className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-              >
-                <option value="출근시간수정">출근시간 수정</option>
-                <option value="퇴근시간수정">퇴근시간 수정</option>
-                <option value="기록누락">기록 누락</option>
-              </select>
+                onChange={(v) => setRequestType(v as RequestType)}
+                className="glass-input w-full px-4 py-2.5 rounded-xl text-sm"
+                ariaLabel="요청 유형"
+              />
             </div>
           )}
 

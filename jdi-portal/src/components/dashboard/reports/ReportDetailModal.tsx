@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { X, PencilSimple, TrashSimple, CaretDown, Browser, Calendar, CloudArrowUp, Bug, SmileySad, Lightbulb } from "phosphor-react";
+import { X, PencilSimple, TrashSimple, Browser, Calendar, CloudArrowUp, Bug, SmileySad, Lightbulb } from "phosphor-react";
 import UserAvatar from "@/components/shared/UserAvatar";
+import Select from "@/components/shared/Select";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -258,18 +259,13 @@ export default function ReportDetailModal({
               {/* Edit: Page */}
               <div className="space-y-3">
                 <label className="text-sm font-bold text-slate-700 ml-1 block">발생 페이지</label>
-                <div className="relative">
-                  <select
-                    value={editPage}
-                    onChange={(e) => setEditPage(e.target.value as ReportPage)}
-                    className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all text-sm"
-                  >
-                    {REPORT_PAGES.map((p) => (
-                      <option key={p} value={p}>{REPORT_PAGE_CONFIG[p].label}</option>
-                    ))}
-                  </select>
-                  <CaretDown size={14} className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
-                </div>
+                <Select
+                  value={editPage}
+                  onChange={(v) => setEditPage(v as ReportPage)}
+                  options={REPORT_PAGES.map((p) => ({ value: p, label: REPORT_PAGE_CONFIG[p].label }))}
+                  ariaLabel="발생 페이지"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3.5 transition-all text-sm"
+                />
               </div>
 
               {/* Edit: Title */}
@@ -388,18 +384,15 @@ export default function ReportDetailModal({
           {!editing && canManageStatus && (
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-slate-700">처리 상태 변경</h4>
-              <div className="relative w-48">
-                <select
+              <div className="w-48">
+                <Select
                   value={report.status}
-                  onChange={(e) => handleStatusChange(e.target.value as ReportStatus)}
+                  onChange={(v) => handleStatusChange(v as ReportStatus)}
                   disabled={statusUpdating}
-                  className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all text-sm disabled:opacity-50"
-                >
-                  {REPORT_STATUSES.map((s) => (
-                    <option key={s} value={s}>{REPORT_STATUS_CONFIG[s].label}</option>
-                  ))}
-                </select>
-                <CaretDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+                  options={REPORT_STATUSES.map((s) => ({ value: s, label: REPORT_STATUS_CONFIG[s].label }))}
+                  ariaLabel="처리 상태 변경"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3 transition-all text-sm"
+                />
               </div>
             </div>
           )}

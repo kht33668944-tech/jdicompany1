@@ -6,17 +6,25 @@ import { updateExpense, deleteExpense, setExpenseReceipt } from "@/lib/expenses/
 import { uploadExpenseReceipt, getExpenseReceiptUrl } from "@/lib/expenses/receipts";
 import type { ExpenseCategory, ExpenseCurrency, ExpenseWithMeta, PaymentMethod } from "@/lib/expenses/types";
 import PaymentMethodField from "./PaymentMethodField";
+import CategoryField from "./CategoryField";
+import Select from "@/components/shared/Select";
+
+const CURRENCY_OPTIONS = [
+  { value: "KRW", label: "원화" },
+  { value: "USD", label: "달러" },
+];
 
 interface ExpenseEditModalProps {
   expense: ExpenseWithMeta;
   categories: ExpenseCategory[];
   paymentMethods: PaymentMethod[];
   onMethodsChanged: () => void;
+  onCategoriesChanged: () => void;
   onClose: () => void;
   onChanged: () => void;
 }
 
-export default function ExpenseEditModal({ expense, categories, paymentMethods, onMethodsChanged, onClose, onChanged }: ExpenseEditModalProps) {
+export default function ExpenseEditModal({ expense, categories, paymentMethods, onMethodsChanged, onCategoriesChanged, onClose, onChanged }: ExpenseEditModalProps) {
   const [date, setDate] = useState(expense.expense_date);
   const [vendor, setVendor] = useState(expense.vendor ?? "");
   const [description, setDescription] = useState(expense.description);
@@ -122,10 +130,13 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
 
         <div className="space-y-1.5">
           <label className={labelCls}>통화</label>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value as ExpenseCurrency)} className={inputCls}>
-            <option value="KRW">원화</option>
-            <option value="USD">달러</option>
-          </select>
+          <Select
+            options={CURRENCY_OPTIONS}
+            value={currency}
+            onChange={(v) => setCurrency(v as ExpenseCurrency)}
+            ariaLabel="통화"
+            className={inputCls}
+          />
         </div>
 
         {currency === "USD" && (
@@ -168,12 +179,14 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
 
         <div className="space-y-1.5">
           <label className={labelCls}>분류</label>
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls} required>
-            <option value="">분류 선택</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <CategoryField
+            categories={categories}
+            value={categoryId}
+            onChange={setCategoryId}
+            onCategoriesChanged={onCategoriesChanged}
+            className={inputCls}
+            required
+          />
         </div>
 
         <div className="space-y-1.5">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CalendarBlank, MagnifyingGlass, Funnel } from "phosphor-react";
 import { getMonthRange } from "@/lib/utils/date";
+import Select from "@/components/shared/Select";
 
 interface RecordsFilterProps {
   startDate: string;
@@ -94,17 +95,17 @@ export default function RecordsFilter({
           <div className="w-full lg:w-40">
             <label className="block text-xs font-medium text-slate-500 mb-1.5">부서</label>
             <div className="relative">
-              <Funnel size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <select
+              <Funnel size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10 pointer-events-none" />
+              <Select
+                options={[
+                  { value: "", label: "전체 부서" },
+                  ...departments.map((dept) => ({ value: dept, label: dept })),
+                ]}
                 value={selectedDepartment}
-                onChange={(e) => onDepartmentChange(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 appearance-none"
-              >
-                <option value="">전체 부서</option>
-                {departments.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
+                onChange={(v) => onDepartmentChange(v)}
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800"
+                ariaLabel="부서 필터"
+              />
             </div>
           </div>
         )}

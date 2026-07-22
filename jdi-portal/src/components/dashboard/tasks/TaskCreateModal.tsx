@@ -9,6 +9,7 @@ import type { DashboardTaskPerson } from "@/lib/dashboard/dashboard-task-summary
 import { getErrorMessage } from "@/lib/utils/errors";
 import ModalContainer from "@/components/shared/ModalContainer";
 import UserAvatar from "@/components/shared/UserAvatar";
+import Select from "@/components/shared/Select";
 
 interface TaskCreateModalProps {
   userId: string;
@@ -201,23 +202,18 @@ export default function TaskCreateModal({
               );
             })}
           </div>
-          <select
+          <Select
             value=""
-            onChange={(e) => {
-              addAssignee(e.target.value);
-              e.target.value = "";
+            resetOnSelect
+            onChange={(v) => {
+              if (v) addAssignee(v);
             }}
+            placeholder="+ 담당자 추가"
             className="glass-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
-          >
-            <option value="">+ 담당자 추가</option>
-            {profiles
+            options={profiles
               .filter((profile) => !assigneeIds.includes(profile.id))
-              .map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.full_name}
-                </option>
-              ))}
-          </select>
+              .map((profile) => ({ value: profile.id, label: profile.full_name }))}
+          />
         </div>}
 
         <button

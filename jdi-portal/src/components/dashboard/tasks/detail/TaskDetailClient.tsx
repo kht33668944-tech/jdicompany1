@@ -24,6 +24,7 @@ import type {
 } from "@/lib/tasks/types";
 import {
   CATEGORIES,
+  PRIORITY_CONFIG,
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_STATUS_CONFIG,
@@ -34,6 +35,7 @@ import TaskAttachments from "./TaskAttachments";
 import TaskActivityTimeline from "./TaskActivityTimeline";
 import TaskCommentInput from "./TaskCommentInput";
 import UserAvatar from "@/components/shared/UserAvatar";
+import Select from "@/components/shared/Select";
 import WorkTimelineCreateModal from "@/components/dashboard/work-timeline/WorkTimelineCreateModal";
 import { getTaskTimelineShare } from "@/lib/work-timeline/actions";
 import type { WorkTimelineTaskShareState } from "@/lib/work-timeline/types";
@@ -455,31 +457,33 @@ export default function TaskDetailClient({
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-bold text-slate-400">상태</label>
-              <select
-                aria-label="업무 상태"
+              <Select
+                ariaLabel="업무 상태"
                 value={status}
-                onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                onChange={(v) => setStatus(v as TaskStatus)}
                 disabled={!canEdit}
                 className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none disabled:bg-slate-50"
-              >
-                {TASK_STATUSES.map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
+                options={TASK_STATUSES.map((item) => ({
+                  value: item,
+                  label: item,
+                  dotClass: TASK_STATUS_CONFIG[item].dot,
+                }))}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold text-slate-400">우선순위</label>
-              <select
-                aria-label="업무 우선순위"
+              <Select
+                ariaLabel="업무 우선순위"
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                onChange={(v) => setPriority(v as TaskPriority)}
                 disabled={!canEdit}
                 className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none disabled:bg-slate-50"
-              >
-                {TASK_PRIORITIES.map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
+                options={TASK_PRIORITIES.map((item) => ({
+                  value: item,
+                  label: item,
+                  dotClass: PRIORITY_CONFIG[item].dot,
+                }))}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold text-slate-400">시작일</label>
@@ -544,21 +548,19 @@ export default function TaskDetailClient({
                 ))}
               </div>
               {canManageAssignees && (
-                <select
-                  aria-label="담당자 추가"
+                <Select
+                  ariaLabel="담당자 추가"
                   value=""
-                  onChange={(e) => {
-                    if (e.target.value) handleAddAssignee(e.target.value);
+                  resetOnSelect
+                  onChange={(v) => {
+                    if (v) handleAddAssignee(v);
                   }}
+                  placeholder="+ 담당자 추가"
                   className="glass-input mt-2 w-full rounded-lg px-3 py-2 text-sm text-slate-500 outline-none"
-                >
-                  <option value="">+ 담당자 추가</option>
-                  {profiles
+                  options={profiles
                     .filter((profile) => !task.assignees.some((assignee) => assignee.user_id === profile.id))
-                    .map((profile) => (
-                      <option key={profile.id} value={profile.id}>{profile.full_name}</option>
-                    ))}
-                </select>
+                    .map((profile) => ({ value: profile.id, label: profile.full_name }))}
+                />
               )}
             </div>
           </div>
@@ -710,16 +712,17 @@ export default function TaskDetailClient({
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">상태</label>
               {canEdit ? (
-                <select
-                  aria-label="업무 상태"
+                <Select
+                  ariaLabel="업무 상태"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                  onChange={(v) => setStatus(v as TaskStatus)}
                   className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
-                >
-                  {TASK_STATUSES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                  options={TASK_STATUSES.map((s) => ({
+                    value: s,
+                    label: s,
+                    dotClass: TASK_STATUS_CONFIG[s].dot,
+                  }))}
+                />
               ) : (
                 <span className={`text-sm font-medium ${TASK_STATUS_CONFIG[status].text}`}>
                   {status}
@@ -764,21 +767,19 @@ export default function TaskDetailClient({
                   </div>
                 ))}
                 {canManageAssignees && (
-                  <select
-                    aria-label="담당자 추가"
+                  <Select
+                    ariaLabel="담당자 추가"
                     value=""
-                    onChange={(e) => {
-                      if (e.target.value) handleAddAssignee(e.target.value);
+                    resetOnSelect
+                    onChange={(v) => {
+                      if (v) handleAddAssignee(v);
                     }}
+                    placeholder="+ 담당자 추가"
                     className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none text-slate-400"
-                  >
-                    <option value="">+ 담당자 추가</option>
-                    {profiles
+                    options={profiles
                       .filter((p) => !task.assignees.some((a) => a.user_id === p.id))
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>{p.full_name}</option>
-                      ))}
-                  </select>
+                      .map((p) => ({ value: p.id, label: p.full_name }))}
+                  />
                 )}
               </div>
             </div>

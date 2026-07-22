@@ -27,6 +27,7 @@ import { createClient } from "@/lib/supabase/client";
 import TaskCreateModal from "./TaskCreateModal";
 import TaskDetailPanel from "./TaskDetailPanel";
 import UserAvatar from "@/components/shared/UserAvatar";
+import Select from "@/components/shared/Select";
 
 interface Props {
   profiles: Profile[];
@@ -364,29 +365,31 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
           </label>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px]">
-            <select
+            <Select
               value={employeeId}
-              onChange={(event) => setEmployeeId(event.target.value)}
-              aria-label="담당 직원 필터"
+              onChange={(v) => setEmployeeId(v)}
+              ariaLabel="담당 직원 필터"
               className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value={userId}>내 업무</option>
-              <option value="all">전체 직원</option>
-              {profiles.filter((profile) => profile.id !== userId).map((profile) => (
-                <option key={profile.id} value={profile.id}>{profile.full_name}</option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: userId, label: "내 업무" },
+                { value: "all", label: "전체 직원" },
+                ...profiles
+                  .filter((profile) => profile.id !== userId)
+                  .map((profile) => ({ value: profile.id, label: profile.full_name })),
+              ]}
+            />
+            <Select
               value={historyStatus}
-              onChange={(event) => setHistoryStatus(event.target.value as HistoryStatusFilter)}
-              aria-label="업무 상태 필터"
+              onChange={(v) => setHistoryStatus(v as HistoryStatusFilter)}
+              ariaLabel="업무 상태 필터"
               className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="all">전체 상태</option>
-              <option value="대기">대기</option>
-              <option value="진행중">진행중</option>
-              <option value="완료">완료</option>
-            </select>
+              options={[
+                { value: "all", label: "전체 상태" },
+                { value: "대기", label: "대기", dotClass: TASK_STATUS_CONFIG["대기"].dot },
+                { value: "진행중", label: "진행중", dotClass: TASK_STATUS_CONFIG["진행중"].dot },
+                { value: "완료", label: "완료", dotClass: TASK_STATUS_CONFIG["완료"].dot },
+              ]}
+            />
           </div>
 
           <div className="mt-2 flex min-w-0 flex-wrap gap-1.5" role="group" aria-label="업무 날짜 필터">

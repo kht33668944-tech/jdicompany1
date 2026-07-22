@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
-import { getExpensesByRange, getPaymentMethods, getRangeKrwTotal } from "@/lib/expenses/queries";
+import { getExpenseCategories, getExpensesByRange, getPaymentMethods, getRangeKrwTotal } from "@/lib/expenses/queries";
 import { getMonthRange } from "@/lib/utils/date";
 import type {
   ExpenseCategory,
@@ -57,16 +57,25 @@ export default function ExpensesPageClient({
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<ExpenseWithMeta | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(initialPaymentMethods);
+  const [allCategories, setAllCategories] = useState<ExpenseCategory[]>(categories);
   const didMount = useRef(false);
 
   const inputCategories = useMemo(
-    () => (canViewSensitive ? categories : categories.filter((c) => !c.is_sensitive)),
-    [canViewSensitive, categories]
+    () => (canViewSensitive ? allCategories : allCategories.filter((c) => !c.is_sensitive)),
+    [canViewSensitive, allCategories]
   );
 
   const refreshPaymentMethods = useCallback(async () => {
     try {
       setPaymentMethods(await getPaymentMethods(createClient()));
+    } catch {
+      // 목록 갱신 실패는 조용히 무시 (다음 새로고침에서 반영)
+    }
+  }, []);
+
+  const refreshCategories = useCallback(async () => {
+    try {
+      setAllCategories(await getExpenseCategories(createClient()));
     } catch {
       // 목록 갱신 실패는 조용히 무시 (다음 새로고침에서 반영)
     }
@@ -146,8 +155,8 @@ export default function ExpensesPageClient({
       {tab === "list" ? (
         <>
           <ExpenseSummary expenses={expenses} prevMonthTotal={prevTotal} />
-          <ExpenseQuickInput categories={inputCategories} paymentMethods={paymentMethods} onMethodsChanged={refreshPaymentMethods} onCreated={refresh} />
-          <ExpenseList expenses={expenses} categories={categories} onChanged={refresh} loading={loading} onSelect={setSelected} />
+          <ExpenseQuickInput categories={inputCategories} paymentMethods={paymentMethods} onMethodsChanged={refreshPaymentMethods} onCategoriesChanged={refreshCategories} onCreated={refresh} />
+          <ExpenseList expenses={expenses} categories={allCategories} onChanged={refresh} loading={loading} onSelect={setSelected} />
         </>
       ) : (
         <RecurringTab
@@ -158,6 +167,7 @@ export default function ExpensesPageClient({
           userRole={userRole}
           paymentMethods={paymentMethods}
           onMethodsChanged={refreshPaymentMethods}
+          onCategoriesChanged={refreshCategories}
         />
       )}
 
@@ -167,6 +177,7 @@ export default function ExpensesPageClient({
           categories={inputCategories}
           paymentMethods={paymentMethods}
           onMethodsChanged={refreshPaymentMethods}
+          onCategoriesChanged={refreshCategories}
           onClose={() => setSelected(null)}
           onChanged={refresh}
         />

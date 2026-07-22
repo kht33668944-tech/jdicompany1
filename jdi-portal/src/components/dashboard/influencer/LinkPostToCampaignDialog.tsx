@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
+import Select, { type SelectOption } from "@/components/shared/Select";
 import { linkPostToCampaign } from "@/lib/influencer/actions";
 import type { InfluencerCampaign, InfluencerPost } from "@/lib/influencer/types";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
@@ -60,23 +61,23 @@ export default function LinkPostToCampaignDialog({
           <label className="block text-xs font-semibold text-slate-500 mb-1.5">
             연결할 캠페인
           </label>
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className="w-full text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-            aria-label="캠페인 선택"
-          >
-            {campaigns.map((c) => {
+          <Select
+            options={campaigns.map((c): SelectOption => {
               const statusLabel =
                 CAMPAIGN_STATUS_OPTIONS.find((o) => o.value === c.status)?.label ?? c.status;
               const product = c.product_name ? ` · ${c.product_name}` : "";
-              return (
-                <option key={c.id} value={c.id}>
-                  [{statusLabel}] {c.campaign_name}{product}
-                </option>
-              );
+              return {
+                value: c.id,
+                label: c.campaign_name,
+                hint: `[${statusLabel}]${product}`,
+              };
             })}
-          </select>
+            value={selectedId}
+            onChange={(v) => setSelectedId(v)}
+            placeholder="캠페인 선택"
+            className="w-full text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white"
+            ariaLabel="캠페인 선택"
+          />
 
           <div className="mt-4 bg-slate-50 rounded-xl p-3 space-y-1 text-xs text-slate-500">
             <div>

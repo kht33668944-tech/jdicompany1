@@ -2,48 +2,50 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { createPaymentMethod, deletePaymentMethod } from "@/lib/expenses/actions";
-import type { PaymentMethod } from "@/lib/expenses/types";
+import { createExpenseCategory, deleteExpenseCategory } from "@/lib/expenses/actions";
+import { CATEGORY_STYLE } from "@/lib/expenses/constants";
+import type { ExpenseCategory } from "@/lib/expenses/types";
 import Select, { type SelectOption } from "@/components/shared/Select";
 import X from "phosphor-react/dist/icons/X.esm.js";
 
-interface PaymentMethodFieldProps {
-  methods: PaymentMethod[];
-  value: string;
-  onChange: (value: string) => void;
-  onMethodsChanged: () => void;
+interface CategoryFieldProps {
+  categories: ExpenseCategory[];
+  value: string; // category_id
+  onChange: (categoryId: string) => void;
+  onCategoriesChanged: () => void;
   className?: string;
   required?: boolean;
+  placeholder?: string;
 }
 
-export default function PaymentMethodField({
-  methods,
+export default function CategoryField({
+  categories,
   value,
   onChange,
-  onMethodsChanged,
+  onCategoriesChanged,
   className,
   required,
-}: PaymentMethodFieldProps) {
+  placeholder = "분류 선택",
+}: CategoryFieldProps) {
   const [managing, setManaging] = useState(false);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const options: SelectOption[] = methods.map((m) => ({ value: m.name, label: m.name }));
-  // 목록에 없는 기존 값(자유 입력/이관 데이터)도 유실 없이 표시
-  if (value && !methods.some((m) => m.name === value)) {
-    options.push({ value, label: value });
-  }
+  const options: SelectOption[] = categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+    dotClass: CATEGORY_STYLE[c.name]?.dot,
+  }));
 
   const handleAdd = async () => {
     const name = newName.trim();
     if (!name || busy) return;
     setBusy(true);
     try {
-      await createPaymentMethod(name);
-      toast.success("결제수단이 추가되었습니다.");
+      await createExpenseCategory(name);
+      toast.success("분류가 추가되었습니다.");
       setNewName("");
-      onMethodsChanged();
-      onChange(name);
+      onCategoriesChanged();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "추가에 실패했습니다.");
     } finally {
@@ -51,14 +53,15 @@ export default function PaymentMethodField({
     }
   };
 
-  const handleDelete = async (method: PaymentMethod) => {
+  const handleDelete = async (cat: ExpenseCategory) => {
     if (busy) return;
-    if (!window.confirm(`'${method.name}' 결제수단을 목록에서 삭제할까요?`)) return;
+    if (!window.confirm(`'${cat.name}' 분류를 목록에서 숨길까요?\n(기존 지출 기록은 그대로 유지됩니다.)`)) return;
     setBusy(true);
     try {
-      await deletePaymentMethod(method.id);
+      await deleteExpenseCategory(cat.id);
       toast.success("삭제되었습니다.");
-      onMethodsChanged();
+      if (value === cat.id) onChange("");
+      onCategoriesChanged();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "삭제에 실패했습니다.");
     } finally {
@@ -72,11 +75,11 @@ export default function PaymentMethodField({
         options={options}
         value={value}
         onChange={onChange}
-        placeholder="결제수단 선택"
+        placeholder={placeholder}
         className={className}
         required={required}
-        ariaLabel="결제수단 선택"
-        footerAction={{ label: "결제수단 추가/관리", onClick: () => setManaging(true) }}
+        ariaLabel="분류 선택"
+        footerAction={{ label: "분류 추가/관리", onClick: () => setManaging(true) }}
       />
 
       {managing && (
@@ -87,7 +90,10 @@ export default function PaymentMethodField({
           }}
         >
           <div className="w-full max-w-sm rounded-[28px] shadow-2xl bg-white/80 backdrop-blur-[40px] border border-white/50 p-5 space-y-4">
-            <p className="text-base font-bold text-slate-800">결제수단 관리</p>
+            <div>
+              <p className="text-base font-bold text-slate-800">분류 관리</p>
+              <p className="text-xs text-slate-400 mt-0.5">자주 쓰는 지출 분류를 추가하거나 정리하세요.</p>
+            </div>
             <div className="flex gap-2">
               <input
                 value={newName}
@@ -98,7 +104,7 @@ export default function PaymentMethodField({
                     handleAdd();
                   }
                 }}
-                placeholder="새 결제수단 이름"
+                placeholder="새 분류 이름"
                 className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <button
@@ -111,25 +117,28 @@ export default function PaymentMethodField({
               </button>
             </div>
             <ul className="space-y-1 max-h-60 overflow-y-auto">
-              {methods.map((m) => (
+              {categories.map((c) => (
                 <li
-                  key={m.id}
+                  key={c.id}
                   className="flex items-center justify-between rounded-xl px-3 py-2 hover:bg-slate-100/70"
                 >
-                  <span className="text-sm text-slate-700">{m.name}</span>
+                  <span className="flex items-center gap-2 text-sm text-slate-700">
+                    <span className={`inline-block w-2 h-2 rounded-full ${CATEGORY_STYLE[c.name]?.dot ?? "bg-slate-300"}`} />
+                    {c.name}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => handleDelete(m)}
+                    onClick={() => handleDelete(c)}
                     disabled={busy}
                     className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                    aria-label={`${m.name} 삭제`}
+                    aria-label={`${c.name} 삭제`}
                   >
                     <X size={16} />
                   </button>
                 </li>
               ))}
-              {methods.length === 0 && (
-                <li className="text-sm text-slate-400 px-3 py-2">등록된 결제수단이 없습니다.</li>
+              {categories.length === 0 && (
+                <li className="text-sm text-slate-400 px-3 py-2">등록된 분류가 없습니다.</li>
               )}
             </ul>
             <div className="flex justify-end">

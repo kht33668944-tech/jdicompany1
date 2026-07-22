@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, PencilSimple, Trash, MapPin, Monitor, Clock, CalendarBlank, User, Lock, Buildings, Users, XCircle } from "phosphor-react";
 import ModalContainer from "@/components/shared/ModalContainer";
+import Select from "@/components/shared/Select";
 import { updateScheduleWithParticipants, deleteSchedule } from "@/lib/schedule/actions";
 import { SCHEDULE_CATEGORIES, SCHEDULE_CATEGORY_CONFIG, getCategoryStyle } from "@/lib/schedule/constants";
 import { formatTime } from "@/lib/utils/date";
@@ -320,21 +321,23 @@ export default function ScheduleDetailModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">카테고리</label>
-                <select
+                <Select
+                  options={[
+                    ...SCHEDULE_CATEGORIES.map((cat) => ({
+                      value: cat,
+                      label: SCHEDULE_CATEGORY_CONFIG[cat].labelKo,
+                      dotClass: SCHEDULE_CATEGORY_CONFIG[cat].dot,
+                    })),
+                    { value: "__CUSTOM__", label: "기타 (직접 입력)" },
+                  ]}
                   value={isCustomCategory ? "__CUSTOM__" : category}
-                  onChange={(e) => {
-                    setCategory(e.target.value);
-                    if (e.target.value !== "__CUSTOM__") setCustomCategory("");
+                  onChange={(v) => {
+                    setCategory(v);
+                    if (v !== "__CUSTOM__") setCustomCategory("");
                   }}
                   className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-                >
-                  {SCHEDULE_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {SCHEDULE_CATEGORY_CONFIG[cat].labelKo}
-                    </option>
-                  ))}
-                  <option value="__CUSTOM__">기타 (직접 입력)</option>
-                </select>
+                  ariaLabel="카테고리"
+                />
                 {isCustomCategory && (
                   <input
                     type="text"
@@ -430,25 +433,24 @@ export default function ScheduleDetailModal({
               <label className="block text-sm font-semibold text-slate-700 mb-1">
                 참여자 <span className="text-slate-400 font-normal">(선택)</span>
               </label>
-              <select
-                onChange={(e) => {
-                  const id = e.target.value;
-                  if (id && !participantIds.includes(id)) {
-                    setParticipantIds([...participantIds, id]);
-                  }
-                  e.target.value = "";
-                }}
-                className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-              >
-                <option value="">직원 선택...</option>
-                {profiles
+              <Select
+                options={profiles
                   .filter((p) => p.id !== userId && !participantIds.includes(p.id))
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name} ({p.department})
-                    </option>
-                  ))}
-              </select>
+                  .map((p) => ({
+                    value: p.id,
+                    label: `${p.full_name} (${p.department})`,
+                  }))}
+                value=""
+                onChange={(v) => {
+                  if (v && !participantIds.includes(v)) {
+                    setParticipantIds([...participantIds, v]);
+                  }
+                }}
+                resetOnSelect
+                placeholder="직원 선택..."
+                className="glass-input w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                ariaLabel="참여자 추가"
+              />
               {participantIds.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {participantIds.map((id) => {

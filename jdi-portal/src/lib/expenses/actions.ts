@@ -31,6 +31,58 @@ export async function deletePaymentMethod(id: string) {
   if (error) throw new Error(`결제수단 삭제에 실패했습니다: ${error.message}`);
 }
 
+/**
+ * 지출 분류 추가 (승인 직원 누구나, 비민감 분류만).
+ * 같은 이름이 소프트 삭제(is_active=false)된 상태로 남아 있으면 재활성화한다.
+ */
+export async function createExpenseCategory(name: string) {
+  const { supabase, userId } = await getSessionUserId();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("분류 이름을 입력해주세요.");
+
+  // 동명 분류가 이미 있는지 확인 (UNIQUE(name) 이므로 소프트 삭제분도 걸린다)
+  const { data: existing, error: readError } = await supabase
+    .from("expense_categories")
+    .select("id, is_active, is_sensitive")
+    .eq("name", trimmed)
+    .maybeSingle();
+  if (readError) throw new Error(`분류 확인에 실패했습니다: ${readError.message}`);
+
+  if (existing) {
+    if (existing.is_sensitive || existing.is_active) {
+      throw new Error("이미 등록된 분류입니다.");
+    }
+    // 숨겨졌던 비민감 분류 → 다시 활성화
+    const { error } = await supabase
+      .from("expense_categories")
+      .update({ is_active: true })
+      .eq("id", existing.id);
+    if (error) throw new Error(`분류 추가에 실패했습니다: ${error.message}`);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("expense_categories")
+    .insert({ name: trimmed, is_sensitive: false, sort_order: 50, created_by: userId });
+  if (error) {
+    if (error.code === "23505") throw new Error("이미 등록된 분류입니다.");
+    throw new Error(`분류 추가에 실패했습니다: ${error.message}`);
+  }
+}
+
+/**
+ * 지출 분류 삭제 = 소프트 삭제(is_active=false).
+ * 기존 지출/고정지출이 category_id 로 참조하므로 하드 삭제하지 않고 목록에서만 숨긴다.
+ */
+export async function deleteExpenseCategory(id: string) {
+  const { supabase } = await getSessionUserId();
+  const { error } = await supabase
+    .from("expense_categories")
+    .update({ is_active: false })
+    .eq("id", id);
+  if (error) throw new Error(`분류 삭제에 실패했습니다: ${error.message}`);
+}
+
 function validateExpenseInput(input: ExpenseInput) {
   if (!input.expense_date) throw new Error("날짜를 입력해주세요.");
   if (!input.description.trim()) throw new Error("내용을 입력해주세요.");

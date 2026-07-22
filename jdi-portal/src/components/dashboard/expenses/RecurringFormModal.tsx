@@ -9,6 +9,13 @@ import { formatKrw, formatForeign } from "@/lib/expenses/format";
 import { formatDate } from "@/lib/utils/date";
 import type { ExpenseCategory, ExpenseCurrency, PaymentMethod, RecurringExpenseWithMeta, RecurringHistoryItem, RecurringInput } from "@/lib/expenses/types";
 import PaymentMethodField from "./PaymentMethodField";
+import CategoryField from "./CategoryField";
+import Select from "@/components/shared/Select";
+
+const CURRENCY_OPTIONS = [
+  { value: "KRW", label: "원화" },
+  { value: "USD", label: "달러" },
+];
 
 interface RecurringFormModalProps {
   initial: RecurringExpenseWithMeta | null;
@@ -16,6 +23,7 @@ interface RecurringFormModalProps {
   profiles: { id: string; full_name: string }[];
   paymentMethods: PaymentMethod[];
   onMethodsChanged: () => void;
+  onCategoriesChanged: () => void;
   defaultOwnerId: string;
   onClose: () => void;
   onChanged: () => void;
@@ -27,6 +35,7 @@ export default function RecurringFormModal({
   profiles,
   paymentMethods,
   onMethodsChanged,
+  onCategoriesChanged,
   defaultOwnerId,
   onClose,
   onChanged,
@@ -128,10 +137,13 @@ export default function RecurringFormModal({
 
         <div className="space-y-1.5">
           <label className={labelCls}>통화</label>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value as ExpenseCurrency)} className={inputCls}>
-            <option value="KRW">원화</option>
-            <option value="USD">달러</option>
-          </select>
+          <Select
+            options={CURRENCY_OPTIONS}
+            value={currency}
+            onChange={(v) => setCurrency(v as ExpenseCurrency)}
+            ariaLabel="통화"
+            className={inputCls}
+          />
         </div>
 
         {currency === "USD" && (
@@ -188,22 +200,27 @@ export default function RecurringFormModal({
 
         <div className="space-y-1.5">
           <label className={labelCls}>분류</label>
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls} required>
-            <option value="">분류 선택</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <CategoryField
+            categories={categories}
+            value={categoryId}
+            onChange={setCategoryId}
+            onCategoriesChanged={onCategoriesChanged}
+            className={inputCls}
+            required
+          />
         </div>
 
         <div className="space-y-1.5">
           <label className={labelCls}>담당자</label>
-          <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className={inputCls} required>
-            <option value="">담당자 선택</option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>{p.full_name}</option>
-            ))}
-          </select>
+          <Select
+            options={profiles.map((p) => ({ value: p.id, label: p.full_name }))}
+            value={ownerId}
+            onChange={setOwnerId}
+            placeholder="담당자 선택"
+            ariaLabel="담당자"
+            className={inputCls}
+            required
+          />
         </div>
 
         <div className="space-y-1.5">

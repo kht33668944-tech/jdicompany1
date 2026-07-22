@@ -65,7 +65,7 @@ export default function CampaignStatusDropdown({ status, onChange }: Props) {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             style={{ position: "fixed", top: pos.top, left: pos.left, width: MENU_WIDTH }}
-            className="z-50 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden"
+            className="z-50 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl shadow-slate-900/10 border border-slate-100 p-1.5 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {CAMPAIGN_STATUS_OPTIONS.map((opt) => {
@@ -75,8 +75,8 @@ export default function CampaignStatusDropdown({ status, onChange }: Props) {
                   key={opt.value}
                   type="button"
                   onClick={() => select(opt.value)}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors ${
-                    isActive ? "bg-slate-50" : "hover:bg-slate-50"
+                  className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition-colors ${
+                    isActive ? "bg-blue-50" : "hover:bg-slate-100"
                   }`}
                 >
                   <StatusBadge status={opt.value} type="campaign" />

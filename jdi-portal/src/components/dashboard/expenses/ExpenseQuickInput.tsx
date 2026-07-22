@@ -6,16 +6,24 @@ import { createExpense } from "@/lib/expenses/actions";
 import { toDateString } from "@/lib/utils/date";
 import type { ExpenseCategory, ExpenseCurrency, PaymentMethod } from "@/lib/expenses/types";
 import PaymentMethodField from "./PaymentMethodField";
+import CategoryField from "./CategoryField";
+import Select from "@/components/shared/Select";
 import Plus from "phosphor-react/dist/icons/Plus.esm.js";
+
+const CURRENCY_OPTIONS = [
+  { value: "KRW", label: "원화" },
+  { value: "USD", label: "달러" },
+];
 
 interface ExpenseQuickInputProps {
   categories: ExpenseCategory[];
   paymentMethods: PaymentMethod[];
   onMethodsChanged: () => void;
+  onCategoriesChanged: () => void;
   onCreated: () => void;
 }
 
-export default function ExpenseQuickInput({ categories, paymentMethods, onMethodsChanged, onCreated }: ExpenseQuickInputProps) {
+export default function ExpenseQuickInput({ categories, paymentMethods, onMethodsChanged, onCategoriesChanged, onCreated }: ExpenseQuickInputProps) {
   const [date, setDate] = useState(toDateString());
   const [vendor, setVendor] = useState("");
   const [description, setDescription] = useState("");
@@ -88,10 +96,13 @@ export default function ExpenseQuickInput({ categories, paymentMethods, onMethod
         )}
         {wrap(
           "통화",
-          <select value={currency} onChange={(e) => setCurrency(e.target.value as ExpenseCurrency)} className={`${inputCls} ${w("")}`}>
-            <option value="KRW">원화</option>
-            <option value="USD">달러</option>
-          </select>
+          <Select
+            options={CURRENCY_OPTIONS}
+            value={currency}
+            onChange={(v) => setCurrency(v as ExpenseCurrency)}
+            ariaLabel="통화"
+            className={`${inputCls} ${w("w-24")}`}
+          />
         )}
         {currency === "USD" &&
           wrap(
@@ -115,12 +126,14 @@ export default function ExpenseQuickInput({ categories, paymentMethods, onMethod
         )}
         {wrap(
           "분류",
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={`${inputCls} ${w("")}`} required>
-            <option value="">분류 선택</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <CategoryField
+            categories={categories}
+            value={categoryId}
+            onChange={setCategoryId}
+            onCategoriesChanged={onCategoriesChanged}
+            className={`${inputCls} ${w("w-40")}`}
+            required
+          />
         )}
       </>
     );

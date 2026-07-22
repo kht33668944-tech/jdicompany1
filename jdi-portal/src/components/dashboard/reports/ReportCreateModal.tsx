@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Bug, SmileySad, Lightbulb, CloudArrowUp, X, CaretDown } from "phosphor-react";
+import { Bug, SmileySad, Lightbulb, CloudArrowUp, X } from "phosphor-react";
 import { toast } from "sonner";
 import { createReport, deleteReport, uploadReportAttachment } from "@/lib/reports/actions";
 import type { ReportType, ReportPage } from "@/lib/reports/types";
 import { REPORT_PAGES, REPORT_PAGE_CONFIG } from "@/lib/reports/constants";
+import Select from "@/components/shared/Select";
 import { validateFile } from "@/lib/utils/upload";
 import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
 
@@ -163,19 +164,15 @@ export default function ReportCreateModal({ open, onClose, onCreated, userId }: 
           {/* Page */}
           <div className="space-y-3">
             <label className="text-sm font-bold text-slate-700 ml-1 block">발생 페이지</label>
-            <div className="relative">
-              <select
-                value={page}
-                onChange={(e) => setPage(e.target.value as ReportPage | "")}
-                className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
-              >
-                <option value="">페이지를 선택해주세요</option>
-                {REPORT_PAGES.map((p) => (
-                  <option key={p} value={p}>{REPORT_PAGE_CONFIG[p].label}</option>
-                ))}
-              </select>
-              <CaretDown size={14} className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
-            </div>
+            <Select
+              value={page}
+              onChange={(v) => setPage(v as ReportPage | "")}
+              options={REPORT_PAGES.map((p) => ({ value: p, label: REPORT_PAGE_CONFIG[p].label }))}
+              placeholder="페이지를 선택해주세요"
+              required
+              ariaLabel="발생 페이지"
+              className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3.5 transition-all text-sm"
+            />
           </div>
 
           {/* Title */}

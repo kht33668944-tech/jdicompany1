@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, MagnifyingGlass, Plus, X } from "phosphor-react";
 import UserAvatar from "@/components/shared/UserAvatar";
+import Select from "@/components/shared/Select";
 import { createClient } from "@/lib/supabase/client";
 import { addDays, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { WORK_TIMELINE_PAGE_SIZE } from "@/lib/work-timeline/constants";
@@ -381,19 +382,18 @@ export default function WorkTimelineSection({
       )}
 
       {!compact && <div className="grid gap-2 border-b border-slate-100 px-5 py-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <label className="min-w-0">
-          <span className="sr-only">직원 선택</span>
-          <select
+        <div className="min-w-0">
+          <Select
+            options={[
+              { value: "", label: "전체 직원" },
+              ...profiles.map((profile) => ({ value: profile.id, label: profile.full_name })),
+            ]}
             value={employeeId}
-            onChange={(event) => setEmployeeId(event.target.value)}
-            className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-          >
-            <option value="">전체 직원</option>
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>{profile.full_name}</option>
-            ))}
-          </select>
-        </label>
+            onChange={(v) => setEmployeeId(v)}
+            ariaLabel="직원 선택"
+            className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors"
+          />
+        </div>
         <div className="flex min-w-0 flex-wrap gap-1.5" role="group" aria-label="완료 날짜 필터">
           {[
             { label: "전체", value: "" },

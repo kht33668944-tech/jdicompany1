@@ -9,6 +9,7 @@ import type { ReportType, ReportPage } from "@/lib/reports/types";
 import { REPORT_PAGES, REPORT_PAGE_CONFIG } from "@/lib/reports/constants";
 import { validateFile } from "@/lib/utils/upload";
 import { resizeImageIfNeeded } from "@/lib/utils/imageResize";
+import Select from "@/components/shared/Select";
 
 interface ReportQuickDrawerProps {
   open: boolean;
@@ -184,16 +185,15 @@ export default function ReportQuickDrawer({ open, onClose, userId }: ReportQuick
             {/* Page */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700 block">발생 페이지</label>
-              <select
+              <Select
                 value={page}
-                onChange={(e) => setPage(e.target.value as ReportPage | "")}
-                className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              >
-                <option value="">페이지를 선택해주세요</option>
-                {REPORT_PAGES.map((p) => (
-                  <option key={p} value={p}>{REPORT_PAGE_CONFIG[p].label}</option>
-                ))}
-              </select>
+                onChange={(v) => setPage(v as ReportPage | "")}
+                options={REPORT_PAGES.map((p) => ({ value: p, label: REPORT_PAGE_CONFIG[p].label }))}
+                placeholder="페이지를 선택해주세요"
+                required
+                ariaLabel="발생 페이지"
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm"
+              />
             </div>
 
             {/* Title */}

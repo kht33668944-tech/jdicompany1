@@ -22,12 +22,27 @@ import PostLightbox from "./PostLightbox";
 import Image from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
+import Select, { type SelectOption } from "@/components/shared/Select";
 import {
   getTier,
   calcEstimatedReach,
   calcLikeCommentRatio,
   calcErVsTierAverage,
 } from "@/lib/influencer/metrics";
+
+// 캠페인 상태별 색 점 (StatusBadge 색상과 맞춤) — 공용 Select 옵션에 사용
+const CAMPAIGN_STATUS_DOT: Record<CampaignStatus, string> = {
+  planned: "bg-slate-400",
+  dm_sent: "bg-blue-500",
+  replied: "bg-purple-500",
+  shipped: "bg-cyan-500",
+  posted: "bg-emerald-500",
+  done: "bg-slate-300",
+};
+
+const CAMPAIGN_STATUS_SELECT_OPTIONS: SelectOption[] = CAMPAIGN_STATUS_OPTIONS.map(
+  (o) => ({ value: o.value, label: o.label, dotClass: CAMPAIGN_STATUS_DOT[o.value] }),
+);
 
 import X from "phosphor-react/dist/icons/X.esm.js";
 import Robot from "phosphor-react/dist/icons/Robot.esm.js";
@@ -296,16 +311,13 @@ function EditCampaignForm({ campaign, onSaved, onCancel }: EditCampaignFormProps
           className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
         />
       </div>
-      <select
+      <Select
+        options={CAMPAIGN_STATUS_SELECT_OPTIONS}
         value={status}
-        onChange={(e) => setStatus(e.target.value as CampaignStatus)}
-        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-        aria-label="캠페인 상태"
-      >
-        {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
+        onChange={(v) => setStatus(v as CampaignStatus)}
+        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+        ariaLabel="캠페인 상태"
+      />
       <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="block text-[10px] text-slate-500 mb-0.5">연락일 (DM)</label>
@@ -971,16 +983,13 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <select
+                          <Select
+                            options={CAMPAIGN_STATUS_SELECT_OPTIONS}
                             value={c.status}
-                            onChange={(e) => handleStatusChange(c.id, e.target.value as CampaignStatus)}
-                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                            aria-label="캠페인 상태"
-                          >
-                            {CAMPAIGN_STATUS_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
+                            onChange={(v) => handleStatusChange(c.id, v as CampaignStatus)}
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white"
+                            ariaLabel="캠페인 상태"
+                          />
                           <StatusBadge status={c.status} type="campaign" />
                         </div>
                         <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">

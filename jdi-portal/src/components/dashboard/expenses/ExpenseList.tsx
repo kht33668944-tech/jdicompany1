@@ -5,8 +5,11 @@ import { formatDate } from "@/lib/utils/date";
 import { formatKrw, formatForeign } from "@/lib/expenses/format";
 import { EXPENSE_SOURCE_LABEL, CATEGORY_STYLE, CATEGORY_STYLE_FALLBACK } from "@/lib/expenses/constants";
 import type { ExpenseCategory, ExpenseWithMeta } from "@/lib/expenses/types";
+import Select, { type SelectOption } from "@/components/shared/Select";
 import Paperclip from "phosphor-react/dist/icons/Paperclip.esm.js";
 import ArrowsClockwise from "phosphor-react/dist/icons/ArrowsClockwise.esm.js";
+
+const FILTER_CLS = "w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm";
 
 interface ExpenseListProps {
   expenses: ExpenseWithMeta[];
@@ -24,6 +27,18 @@ export default function ExpenseList({ expenses, categories, loading, onSelect }:
   const methods = useMemo(
     () => [...new Set(expenses.map((e) => e.payment_method))].sort(),
     [expenses]
+  );
+
+  const categoryOptions: SelectOption[] = useMemo(
+    () => [
+      { value: "", label: "전체 분류" },
+      ...categories.map((c) => ({ value: c.id, label: c.name, dotClass: CATEGORY_STYLE[c.name]?.dot })),
+    ],
+    [categories]
+  );
+  const methodOptions: SelectOption[] = useMemo(
+    () => [{ value: "", label: "전체 결제수단" }, ...methods.map((m) => ({ value: m, label: m }))],
+    [methods]
   );
 
   const filtered = useMemo(() => {
@@ -62,26 +77,20 @@ export default function ExpenseList({ expenses, categories, loading, onSelect }:
           className="w-full md:flex-1 md:min-w-[160px] bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         <div className="grid grid-cols-2 gap-2 md:contents">
-          <select
+          <Select
+            options={categoryOptions}
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-          >
-            <option value="">전체 분류</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <select
+            onChange={setCategoryFilter}
+            ariaLabel="분류 필터"
+            className={FILTER_CLS}
+          />
+          <Select
+            options={methodOptions}
             value={methodFilter}
-            onChange={(e) => setMethodFilter(e.target.value)}
-            className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-          >
-            <option value="">전체 결제수단</option>
-            {methods.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+            onChange={setMethodFilter}
+            ariaLabel="결제수단 필터"
+            className={FILTER_CLS}
+          />
         </div>
       </div>
 
