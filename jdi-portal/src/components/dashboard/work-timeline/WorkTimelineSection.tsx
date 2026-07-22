@@ -93,8 +93,7 @@ function formatCompletedTime(timestamp: string): string {
 function AttachmentPreview({ entry }: { entry: WorkTimelineEntryWithProfile }) {
   const images = entry.attachments
     .filter((attachment) => isWorkTimelineImage(attachment.mime_type)
-      && (attachment.thumbnail_url || attachment.original_url))
-    .slice(0, 5);
+      && (attachment.thumbnail_url || attachment.original_url));
   const fileCount = entry.attachments.filter(
     (attachment) => !isWorkTimelineImage(attachment.mime_type),
   ).length;

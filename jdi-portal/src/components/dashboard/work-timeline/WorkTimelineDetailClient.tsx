@@ -100,7 +100,7 @@ export default function WorkTimelineDetailClient({
   const activeViewerUrl = activeViewerAttachment?.original_url ?? activeViewerAttachment?.thumbnail_url ?? null;
 
   const handleDownloadAllAttachments = () => {
-    const ready = viewableAttachments.flatMap((attachment) => {
+    const ready = [...imageAttachments, ...fileAttachments].flatMap((attachment) => {
       const url = attachment.original_url ?? attachment.thumbnail_url;
       return url ? [{ url, fileName: attachment.file_name }] : [];
     });
@@ -421,7 +421,7 @@ export default function WorkTimelineDetailClient({
               <h2 id="timeline-images-title" className="text-sm font-bold text-slate-800">
                 첨부 파일 {entry.attachments.length}
               </h2>
-              {viewableAttachments.length >= 2 && (
+              {(imageAttachments.length + fileAttachments.length) >= 2 && (
                 <button
                   type="button"
                   onClick={handleDownloadAllAttachments}
