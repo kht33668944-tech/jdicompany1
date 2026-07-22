@@ -131,120 +131,62 @@ export default function RecurringFormModal({
         overlayMouseDown.current = false;
       }}
     >
-      <div className="w-full max-w-lg rounded-[32px] shadow-2xl bg-white/70 backdrop-blur-[40px] border border-white/50 p-6 space-y-3">
+      <div className="w-full max-w-md rounded-[32px] shadow-2xl bg-white/70 backdrop-blur-[40px] border border-white/50 p-6 space-y-4">
         <h2 className="text-lg font-extrabold text-slate-900 ml-1">{initial ? "고정 지출 수정" : "고정 지출 등록"}</h2>
 
-        <div className="space-y-1.5">
-          <label className={labelCls}>이름</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="이름" className={inputCls} required />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>거래처(선택)</label>
-          <input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="거래처(선택)" className={inputCls} />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>통화</label>
-          <Select
-            options={CURRENCY_OPTIONS}
-            value={currency}
-            onChange={(v) => setCurrency(v as ExpenseCurrency)}
-            ariaLabel="통화"
-            className={inputCls}
-          />
-        </div>
-
-        {currency === "USD" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className={labelCls}>달러 금액</label>
-            <input
-              value={foreignAmount}
-              onChange={(e) => setForeignAmount(e.target.value)}
-              placeholder="달러 금액"
-              inputMode="decimal"
-              className={inputCls}
-              required
-            />
+            <label className={labelCls}>이름</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="이름" className={inputCls} required />
           </div>
-        )}
+          <div className="space-y-1.5">
+            <label className={labelCls}>거래처(선택)</label>
+            <input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="거래처(선택)" className={inputCls} />
+          </div>
 
-        <div className="space-y-1.5">
-          <label className={labelCls}>{isVariable ? "예상 금액(선택)" : currency === "USD" ? "원화 환산액" : "금액(원)"}</label>
-          <input
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder={isVariable ? "예상 금액(선택)" : currency === "USD" ? "원화 환산액" : "금액(원)"}
-            inputMode="numeric"
-            className={inputCls}
-            required={!isVariable}
-          />
-        </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>통화</label>
+            <Select options={CURRENCY_OPTIONS} value={currency} onChange={(v) => setCurrency(v as ExpenseCurrency)} ariaLabel="통화" className={inputCls} />
+          </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>{isVariable ? "예상 금액(선택)" : currency === "USD" ? "원화 환산액" : "금액(원)"}</label>
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={isVariable ? "예상 금액(선택)" : currency === "USD" ? "원화 환산액" : "금액(원)"} inputMode="numeric" className={inputCls} required={!isVariable} />
+          </div>
 
-        <label className="flex items-center gap-2 ml-1 text-sm font-medium text-slate-600 select-none cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isVariable}
-            onChange={(e) => setIsVariable(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-          />
-          매달 금액이 달라져요 (변동성)
-        </label>
+          {currency === "USD" && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className={labelCls}>달러 금액</label>
+              <input value={foreignAmount} onChange={(e) => setForeignAmount(e.target.value)} placeholder="달러 금액" inputMode="decimal" className={inputCls} required />
+            </div>
+          )}
 
-        <div className="space-y-1.5">
-          <label className={labelCls}>매달 결제일</label>
-          <input
-            type="number"
-            min={1}
-            max={31}
-            value={billingDay}
-            onChange={(e) => setBillingDay(e.target.value)}
-            placeholder="매달 결제일"
-            className={inputCls}
-            required
-          />
-        </div>
+          <label className="sm:col-span-2 flex items-center gap-2 ml-1 text-sm font-medium text-slate-600 select-none cursor-pointer">
+            <input type="checkbox" checked={isVariable} onChange={(e) => setIsVariable(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            매달 금액이 달라져요 (변동성)
+          </label>
 
-        <div className="space-y-1.5">
-          <label className={labelCls}>결제수단</label>
-          <PaymentMethodField
-            methods={paymentMethods}
-            value={method}
-            onChange={setMethod}
-            onMethodsChanged={onMethodsChanged}
-            className={inputCls}
-            required
-          />
-        </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>매달 결제일</label>
+            <input type="number" min={1} max={31} value={billingDay} onChange={(e) => setBillingDay(e.target.value)} placeholder="매달 결제일" className={inputCls} required />
+          </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>결제수단</label>
+            <PaymentMethodField methods={paymentMethods} value={method} onChange={setMethod} onMethodsChanged={onMethodsChanged} className={inputCls} required />
+          </div>
 
-        <div className="space-y-1.5">
-          <label className={labelCls}>분류</label>
-          <CategoryField
-            categories={categories}
-            value={categoryId}
-            onChange={setCategoryId}
-            onCategoriesChanged={onCategoriesChanged}
-            className={inputCls}
-            required
-          />
-        </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>분류</label>
+            <CategoryField categories={categories} value={categoryId} onChange={setCategoryId} onCategoriesChanged={onCategoriesChanged} className={inputCls} required />
+          </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>담당자</label>
+            <Select options={profiles.map((p) => ({ value: p.id, label: p.full_name }))} value={ownerId} onChange={setOwnerId} placeholder="담당자 선택" ariaLabel="담당자" className={inputCls} required />
+          </div>
 
-        <div className="space-y-1.5">
-          <label className={labelCls}>담당자</label>
-          <Select
-            options={profiles.map((p) => ({ value: p.id, label: p.full_name }))}
-            value={ownerId}
-            onChange={setOwnerId}
-            placeholder="담당자 선택"
-            ariaLabel="담당자"
-            className={inputCls}
-            required
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>메모(선택)</label>
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="메모(선택)" className={inputCls} />
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className={labelCls}>메모(선택)</label>
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="메모(선택)" className={inputCls} />
+          </div>
         </div>
 
         {initial && (

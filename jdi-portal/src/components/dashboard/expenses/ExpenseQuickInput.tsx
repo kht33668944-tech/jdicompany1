@@ -183,9 +183,9 @@ export default function ExpenseQuickInput({ categories, paymentMethods, onMethod
           <div className="w-full max-h-[88vh] overflow-y-auto rounded-t-[32px] shadow-2xl bg-white/85 backdrop-blur-[40px] border-t border-white/60 p-5 pb-8 animate-sheet-up">
             <div className="h-1.5 w-10 rounded-full bg-slate-300 mx-auto mb-4" />
             <h2 className="text-lg font-extrabold text-slate-900 ml-1 mb-3">지출 추가</h2>
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {renderFields(true)}
-              <div className="flex items-center gap-2 pt-2">
+              <div className="sm:col-span-2 flex items-center gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setSheetOpen(false)}

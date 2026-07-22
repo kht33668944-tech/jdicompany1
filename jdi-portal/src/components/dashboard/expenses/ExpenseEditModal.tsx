@@ -117,99 +117,64 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
         overlayMouseDown.current = false;
       }}
     >
-      <div className="w-full max-w-lg rounded-[32px] shadow-2xl bg-white/70 backdrop-blur-[40px] border border-white/50 p-6 space-y-3">
+      <div className="w-full max-w-md rounded-[32px] shadow-2xl bg-white/70 backdrop-blur-[40px] border border-white/50 p-6 space-y-4">
         <h2 className="text-lg font-extrabold text-slate-900 ml-1">지출 수정</h2>
 
-        <div className="space-y-1.5">
-          <label className={labelCls}>날짜</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} required />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>거래처(선택)</label>
-          <input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="거래처(선택)" className={inputCls} />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>내용</label>
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="내용" className={inputCls} required />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>통화</label>
-          <Select
-            options={CURRENCY_OPTIONS}
-            value={currency}
-            onChange={(v) => setCurrency(v as ExpenseCurrency)}
-            ariaLabel="통화"
-            className={inputCls}
-          />
-        </div>
-
-        {currency === "USD" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className={labelCls}>달러 금액</label>
+            <label className={labelCls}>날짜</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} required />
+          </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>거래처(선택)</label>
+            <input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="거래처(선택)" className={inputCls} />
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className={labelCls}>내용</label>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="내용" className={inputCls} required />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className={labelCls}>통화</label>
+            <Select options={CURRENCY_OPTIONS} value={currency} onChange={(v) => setCurrency(v as ExpenseCurrency)} ariaLabel="통화" className={inputCls} />
+          </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>{currency === "USD" ? "원화 환산액" : "금액(원)"}</label>
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={currency === "USD" ? "원화 환산액" : "금액(원)"} inputMode="numeric" className={inputCls} required />
+          </div>
+
+          {currency === "USD" && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className={labelCls}>달러 금액</label>
+              <input value={foreignAmount} onChange={(e) => setForeignAmount(e.target.value)} placeholder="달러 금액" inputMode="decimal" className={inputCls} required />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className={labelCls}>결제수단</label>
+            <PaymentMethodField methods={paymentMethods} value={method} onChange={setMethod} onMethodsChanged={onMethodsChanged} className={inputCls} required />
+          </div>
+          <div className="space-y-1.5">
+            <label className={labelCls}>분류</label>
+            <CategoryField categories={categories} value={categoryId} onChange={setCategoryId} onCategoriesChanged={onCategoriesChanged} className={inputCls} required />
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className={labelCls}>영수증</label>
+            {receiptUrl && (
+              <a href={receiptUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 font-bold underline ml-1">
+                영수증 보기
+              </a>
+            )}
             <input
-              value={foreignAmount}
-              onChange={(e) => setForeignAmount(e.target.value)}
-              placeholder="달러 금액"
-              inputMode="decimal"
-              className={inputCls}
-              required
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => e.target.files?.[0] && handleReceiptUpload(e.target.files[0])}
+              disabled={busy}
+              className="w-full text-sm text-slate-500 ml-1"
             />
           </div>
-        )}
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>{currency === "USD" ? "원화 환산액" : "금액(원)"}</label>
-          <input
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder={currency === "USD" ? "원화 환산액" : "금액(원)"}
-            inputMode="numeric"
-            className={inputCls}
-            required
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>결제수단</label>
-          <PaymentMethodField
-            methods={paymentMethods}
-            value={method}
-            onChange={setMethod}
-            onMethodsChanged={onMethodsChanged}
-            className={inputCls}
-            required
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>분류</label>
-          <CategoryField
-            categories={categories}
-            value={categoryId}
-            onChange={setCategoryId}
-            onCategoriesChanged={onCategoriesChanged}
-            className={inputCls}
-            required
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className={labelCls}>영수증</label>
-          {receiptUrl && (
-            <a href={receiptUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 font-bold underline ml-1">
-              영수증 보기
-            </a>
-          )}
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            onChange={(e) => e.target.files?.[0] && handleReceiptUpload(e.target.files[0])}
-            disabled={busy}
-            className="w-full text-sm text-slate-500 ml-1"
-          />
         </div>
 
         <div className="flex items-center justify-between pt-2">
