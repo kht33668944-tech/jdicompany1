@@ -1,21 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImageSquare, Plus, SpinnerGap, X } from "phosphor-react";
+import { FileArrowUp, Plus, SpinnerGap, X } from "phosphor-react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
 import {
   createWorkTimelineEntry,
   deleteWorkTimelineEntry,
 } from "@/lib/work-timeline/actions";
-import { uploadWorkTimelineImagesDirect } from "@/lib/work-timeline/clientUploads";
+import { uploadWorkTimelineFilesDirect } from "@/lib/work-timeline/clientUploads";
 import {
-  WORK_TIMELINE_IMAGE_MIME_TYPES,
+  WORK_TIMELINE_MAX_ATTACHMENTS,
   WORK_TIMELINE_MAX_DESCRIPTION_LENGTH,
-  WORK_TIMELINE_MAX_IMAGES,
   WORK_TIMELINE_MAX_TITLE_LENGTH,
 } from "@/lib/work-timeline/constants";
-import { validateWorkTimelineImage } from "@/lib/work-timeline/utils";
+import { isWorkTimelineImage, validateWorkTimelineFile } from "@/lib/work-timeline/utils";
 import {
   clearWorkTimelineDraft,
   getWorkTimelineDraft,
@@ -23,6 +22,7 @@ import {
   type WorkTimelineDraftRecord,
 } from "@/lib/work-timeline/draftStore";
 import { createImageThumbnail, resizeImageIfNeeded } from "@/lib/utils/imageResize";
+import AttachmentFileCard from "./AttachmentFileCard";
 
 interface WorkTimelineCreateModalProps {
   open: boolean;
@@ -35,10 +35,11 @@ interface WorkTimelineCreateModalProps {
   taskId?: string | null;
 }
 
-interface SelectedImage {
+interface SelectedAttachment {
   id: string;
   file: File;
-  previewUrl: string;
+  isImage: boolean;
+  previewUrl: string | null; // 이미지에만 존재
 }
 
 function toKstDateTimeLocal(value: string | Date = new Date()): string {
@@ -77,7 +78,7 @@ export default function WorkTimelineCreateModal({
     toKstDateTimeLocal(initialCompletedAt ?? new Date()),
   );
   const [completedAt, setCompletedAt] = useState(initialCompletedAtValue);
-  const [images, setImages] = useState<SelectedImage[]>([]);
+  const [images, setImages] = useState<SelectedAttachment[]>([]);
   const [dragging, setDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -136,27 +137,30 @@ export default function WorkTimelineCreateModal({
   }), [completedAt, currentUserId, description, draftScope, enqueueDraftOperation, images, initialCompletedAtValue, taskId, title]);
 
   const applyDraft = useCallback((draft: WorkTimelineDraftRecord) => {
-    const restoredImages: SelectedImage[] = [];
+    const restoredImages: SelectedAttachment[] = [];
     const storedImages = Array.isArray(draft.images) ? draft.images : [];
-    for (const storedImage of storedImages.slice(0, WORK_TIMELINE_MAX_IMAGES)) {
+    for (const storedImage of storedImages.slice(0, WORK_TIMELINE_MAX_ATTACHMENTS)) {
       const file = new File([storedImage.blob], storedImage.name, {
         type: storedImage.type,
         lastModified: storedImage.lastModified,
       });
       try {
-        validateWorkTimelineImage(file);
+        validateWorkTimelineFile(file);
       } catch {
         continue;
       }
-      const previewUrl = URL.createObjectURL(file);
-      previewUrlsRef.current.add(previewUrl);
-      restoredImages.push({ id: storedImage.id || crypto.randomUUID(), file, previewUrl });
+      const isImage = isWorkTimelineImage(file.type);
+      const previewUrl = isImage ? URL.createObjectURL(file) : null;
+      if (previewUrl) previewUrlsRef.current.add(previewUrl);
+      restoredImages.push({ id: storedImage.id || crypto.randomUUID(), file, isImage, previewUrl });
     }
 
     setImages((current) => {
       for (const image of current) {
-        URL.revokeObjectURL(image.previewUrl);
-        previewUrlsRef.current.delete(image.previewUrl);
+        if (image.previewUrl) {
+          URL.revokeObjectURL(image.previewUrl);
+          previewUrlsRef.current.delete(image.previewUrl);
+        }
       }
       return restoredImages;
     });
@@ -226,11 +230,11 @@ export default function WorkTimelineCreateModal({
     if (files.length === 0) return;
 
     const existingKeys = new Set(images.map(({ file }) => getFileKey(file)));
-    const accepted: SelectedImage[] = [];
+    const accepted: SelectedAttachment[] = [];
 
     for (const file of files) {
-      if (images.length + accepted.length >= WORK_TIMELINE_MAX_IMAGES) {
-        toast.error(`이미지는 최대 ${WORK_TIMELINE_MAX_IMAGES}개까지 첨부할 수 있습니다.`);
+      if (images.length + accepted.length >= WORK_TIMELINE_MAX_ATTACHMENTS) {
+        toast.error(`파일은 최대 ${WORK_TIMELINE_MAX_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
         break;
       }
       if (existingKeys.has(getFileKey(file))) {
@@ -238,16 +242,16 @@ export default function WorkTimelineCreateModal({
         continue;
       }
       try {
-        validateWorkTimelineImage(file);
+        validateWorkTimelineFile(file);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : `${file.name} 파일을 확인해주세요.`);
         continue;
       }
-
-      const previewUrl = URL.createObjectURL(file);
-      previewUrlsRef.current.add(previewUrl);
+      const isImage = isWorkTimelineImage(file.type);
+      const previewUrl = isImage ? URL.createObjectURL(file) : null;
+      if (previewUrl) previewUrlsRef.current.add(previewUrl);
       existingKeys.add(getFileKey(file));
-      accepted.push({ id: crypto.randomUUID(), file, previewUrl });
+      accepted.push({ id: crypto.randomUUID(), file, isImage, previewUrl });
     }
 
     if (accepted.length > 0) {
@@ -260,7 +264,7 @@ export default function WorkTimelineCreateModal({
   function removeImage(id: string) {
     setImages((current) => {
       const target = current.find((image) => image.id === id);
-      if (target) {
+      if (target?.previewUrl) {
         URL.revokeObjectURL(target.previewUrl);
         previewUrlsRef.current.delete(target.previewUrl);
       }
@@ -277,8 +281,10 @@ export default function WorkTimelineCreateModal({
     await enqueueDraftOperation(() => clearWorkTimelineDraft(currentUserId, draftScope));
     setImages((current) => {
       for (const image of current) {
-        URL.revokeObjectURL(image.previewUrl);
-        previewUrlsRef.current.delete(image.previewUrl);
+        if (image.previewUrl) {
+          URL.revokeObjectURL(image.previewUrl);
+          previewUrlsRef.current.delete(image.previewUrl);
+        }
       }
       return [];
     });
@@ -322,8 +328,9 @@ export default function WorkTimelineCreateModal({
     setErrorMessage(null);
     let createdEntryId: string | null = null;
     try {
-      const processedImages = await Promise.all(
-        images.map(async ({ file }) => {
+      const processedFiles = await Promise.all(
+        images.map(async ({ file, isImage }) => {
+          if (!isImage) return { file, thumbnail: null };
           const resized = await resizeImageIfNeeded(file, { maxDim: 2560, quality: 0.92 });
           const thumbnail = await createImageThumbnail(resized);
           return { file: resized, thumbnail };
@@ -337,11 +344,11 @@ export default function WorkTimelineCreateModal({
       });
       if (!result.duplicate) {
         createdEntryId = result.entry.id;
-        await uploadWorkTimelineImagesDirect({
+        await uploadWorkTimelineFilesDirect({
           entryId: result.entry.id,
           userId: currentUserId,
-          images: processedImages,
-          positions: processedImages.map((_, index) => index),
+          files: processedFiles,
+          positions: processedFiles.map((_, index) => index),
         });
       }
       if (autosaveTimerRef.current !== null) {
@@ -491,16 +498,16 @@ export default function WorkTimelineCreateModal({
           <div>
             <div className="mb-2 flex items-center justify-between gap-3">
               <label className="text-sm font-bold text-slate-700">
-                이미지 <span className="font-normal text-slate-400">(선택)</span>
+                파일 첨부 <span className="font-normal text-slate-400">(선택)</span>
               </label>
               <span className="text-[11px] font-semibold tabular-nums text-slate-400">
-                {images.length}/{WORK_TIMELINE_MAX_IMAGES}
+                {images.length}/{WORK_TIMELINE_MAX_ATTACHMENTS}
               </span>
             </div>
             <div
               role="button"
               tabIndex={0}
-              aria-label="이미지 선택"
+              aria-label="파일 선택"
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
@@ -520,13 +527,12 @@ export default function WorkTimelineCreateModal({
                   : "border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-indigo-50/50"
               }`}
             >
-              <ImageSquare size={25} className="text-indigo-500" aria-hidden="true" />
+              <FileArrowUp size={25} className="text-indigo-500" aria-hidden="true" />
               <p className="mt-2 text-xs font-bold text-slate-600">클릭, 드래그 또는 붙여넣기로 추가</p>
-              <p className="mt-1 text-[11px] text-slate-400">JPG, PNG, WebP, GIF · 파일당 최대 10MB</p>
+              <p className="mt-1 text-[11px] text-slate-400">엑셀·PDF·한글·이미지 등 · 파일당 최대 50MB</p>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={WORK_TIMELINE_IMAGE_MIME_TYPES.join(",")}
                 multiple
                 onChange={handleFileChange}
                 className="sr-only"
@@ -535,24 +541,39 @@ export default function WorkTimelineCreateModal({
             </div>
 
             {images.length > 0 && (
-              <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="선택한 이미지">
-                {images.map((image) => (
-                  <li key={image.id} className="group relative aspect-square overflow-hidden rounded-lg bg-slate-100">
-                    <div
-                      role="img"
-                      aria-label={image.file.name}
-                      className="absolute inset-0 bg-cover bg-center"
-                      style={{ backgroundImage: `url(${JSON.stringify(image.previewUrl)})` }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(image.id)}
-                      disabled={submitting}
-                      aria-label={`${image.file.name} 제거`}
-                      className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900/75 text-white transition-colors hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-40"
-                    >
-                      <X size={14} aria-hidden="true" />
-                    </button>
+              <ul className="mt-3 space-y-2" aria-label="선택한 첨부">
+                {images.map((item) => (
+                  <li key={item.id}>
+                    {item.isImage && item.previewUrl ? (
+                      <div className="group relative flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 p-2">
+                        <div
+                          role="img"
+                          aria-label={item.file.name}
+                          className="h-12 w-12 shrink-0 rounded-md bg-cover bg-center"
+                          style={{ backgroundImage: `url(${JSON.stringify(item.previewUrl)})` }}
+                        />
+                        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700" title={item.file.name}>
+                          {item.file.name}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(item.id)}
+                          disabled={submitting}
+                          aria-label={`${item.file.name} 제거`}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-red-600 disabled:opacity-40"
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                    ) : (
+                      <AttachmentFileCard
+                        fileName={item.file.name}
+                        fileSize={item.file.size}
+                        downloadUrl={null}
+                        onDelete={() => removeImage(item.id)}
+                        deleting={submitting}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
