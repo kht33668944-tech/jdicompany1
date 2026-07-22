@@ -102,7 +102,8 @@ test("role defaults make only admins start at all scope while developer and empl
 test("employee and status selectors are local, reset stale named selections, and keep canonical counts", () => {
   const widgetSource = readFileSync(widgetPath, "utf8");
 
-  assert.match(widgetSource, /onChange=\{\(event\) => setAssigneeFilter\(event\.target\.value\)\}/);
+  // 공용 커스텀 Select 로 렌더되어도 필터는 로컬 상태만 갱신(서버 왕복/ router.refresh 금지)해야 함.
+  assert.match(widgetSource, /onChange=\{\(value\) => setAssigneeFilter\(value\)\}/);
   assert.match(widgetSource, /onClick=\{\(\) => setStatusFilter\(filter\.value\)\}/);
   assert.doesNotMatch(widgetSource, /onChange=\{[^}]*router\.refresh/);
   assert.doesNotMatch(widgetSource, /onClick=\{[^}]*setStatusFilter[^}]*router\.refresh/);

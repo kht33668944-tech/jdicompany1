@@ -30,6 +30,7 @@ import { formatDueDate } from "@/lib/tasks/utils";
 import { deleteTask, updateTask } from "@/lib/tasks/actions";
 import { formatTime } from "@/lib/utils/date";
 import UserAvatar from "@/components/shared/UserAvatar";
+import Select from "@/components/shared/Select";
 import TaskCreateModal from "@/components/dashboard/tasks/TaskCreateModal";
 import TaskDetailPanel from "@/components/dashboard/tasks/TaskDetailPanel";
 import WorkTimelineCreateModal from "@/components/dashboard/work-timeline/WorkTimelineCreateModal";
@@ -642,19 +643,19 @@ export default function TodayWorkBoardWidget({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <Select
+              options={[
+                { value: "all", label: "전체 직원" },
+                ...approvedProfiles.map((profile) => ({
+                  value: profile.id,
+                  label: profile.id === userId ? `${profile.full_name} (나)` : profile.full_name,
+                })),
+              ]}
               value={assigneeFilter}
-              onChange={(event) => setAssigneeFilter(event.target.value)}
-              aria-label="직원별 오늘 할 일 필터"
+              onChange={(value) => setAssigneeFilter(value)}
+              ariaLabel="직원별 오늘 할 일 필터"
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors"
-            >
-              <option value="all">전체 직원</option>
-              {approvedProfiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.id === userId ? `${profile.full_name} (나)` : profile.full_name}
-                </option>
-              ))}
-            </select>
+            />
             <button
               type="button"
               onClick={() => setShowCreate(true)}

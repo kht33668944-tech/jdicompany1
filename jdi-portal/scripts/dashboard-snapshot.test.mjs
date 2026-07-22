@@ -186,7 +186,8 @@ test("separates role default task scope from schedule visibility and preserves b
   assert.match(clientSource, /defaultAssigneeFilter=\{defaultTaskAssigneeFilter\}/);
   assert.match(clientSource, /taskSummary=\{data\.taskSummary\}/);
   assert.match(widgetSource, /useState\(defaultAssigneeFilter\)/);
-  assert.match(widgetSource, /<option value="all">전체 직원<\/option>/);
+  // 직원 필터는 공용 커스텀 Select 로 렌더되지만, 여전히 로컬 상태 기반이어야 함(전체 직원 옵션 존재).
+  assert.match(widgetSource, /\{ value: "all", label: "전체 직원" \}/);
   assert.match(widgetSource, /taskBelongsToProfile\(task, assigneeFilter\)/);
   assert.match(widgetSource, /max-h-\[36rem\].*overflow-y-auto/);
   assert.match(widgetSource, /initialTask=\{null\}/);
