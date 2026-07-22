@@ -10,6 +10,7 @@ import { getErrorMessage } from "@/lib/utils/errors";
 import ModalContainer from "@/components/shared/ModalContainer";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
+import { useProjects } from "@/lib/projects/useProjects";
 
 interface TaskCreateModalProps {
   userId: string;
@@ -42,6 +43,8 @@ export default function TaskCreateModal({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState(initialDueDate);
+  const [projectId, setProjectId] = useState("");
+  const { activeProjects } = useProjects();
   const [assigneeIds, setAssigneeIds] = useState<string[]>([userId]);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -107,6 +110,7 @@ export default function TaskCreateModal({
         title: title.trim(),
         description: description.trim() || undefined,
         dueDate: dueDate || undefined,
+        projectId: projectId || null,
         assigneeIds: selfOnly ? [userId] : assigneeIds.length > 0 ? assigneeIds : undefined,
       });
       if (draftKey) {
@@ -176,6 +180,20 @@ export default function TaskCreateModal({
             min={toDateString()}
             onChange={(e) => setDueDate(e.target.value)}
             className="glass-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-slate-700">프로젝트</label>
+          <Select
+            value={projectId}
+            onChange={(v) => setProjectId(v)}
+            ariaLabel="프로젝트 선택"
+            className="glass-input w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+            options={[
+              { value: "", label: "미분류" },
+              ...activeProjects.map((project) => ({ value: project.id, label: project.name })),
+            ]}
           />
         </div>
 

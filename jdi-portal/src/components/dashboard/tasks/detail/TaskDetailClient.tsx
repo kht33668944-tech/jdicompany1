@@ -30,6 +30,7 @@ import {
   TASK_STATUS_CONFIG,
 } from "@/lib/tasks/constants";
 import { updateTask, deleteTask, addAssignee, removeAssignee } from "@/lib/tasks/actions";
+import { useProjects } from "@/lib/projects/useProjects";
 import TaskChecklist from "./TaskChecklist";
 import TaskAttachments from "./TaskAttachments";
 import TaskActivityTimeline from "./TaskActivityTimeline";
@@ -264,6 +265,8 @@ export default function TaskDetailClient({
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [category, setCategory] = useState(task.category ?? "");
+  const [projectId, setProjectId] = useState(task.project_id ?? "");
+  const { projects } = useProjects();
   const [startDate, setStartDate] = useState(task.start_date ?? "");
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [saving, setSaving] = useState(false);
@@ -278,6 +281,7 @@ export default function TaskDetailClient({
     setStatus(task.status);
     setPriority(task.priority);
     setCategory(task.category ?? "");
+    setProjectId(task.project_id ?? "");
     setStartDate(task.start_date ?? "");
     setDueDate(task.due_date ?? "");
   }, [
@@ -286,6 +290,7 @@ export default function TaskDetailClient({
     task.due_date,
     task.id,
     task.priority,
+    task.project_id,
     task.start_date,
     task.status,
     task.title,
@@ -299,6 +304,13 @@ export default function TaskDetailClient({
   const canDelete = isCreator || isAdmin;
   const canManageAssignees = isCreator || isAdmin;
 
+  const projectOptions = [
+    { value: "", label: "미분류" },
+    ...projects
+      .filter((project) => !project.is_archived || project.id === projectId)
+      .map((project) => ({ value: project.id, label: project.name })),
+  ];
+
   const handleSave = async () => {
     setSaving(true);
     setFeedback(null);
@@ -309,6 +321,7 @@ export default function TaskDetailClient({
         status,
         priority,
         category: category.trim() || null,
+        projectId: projectId || null,
         startDate: startDate || null,
         dueDate: dueDate || null,
       });
@@ -506,6 +519,17 @@ export default function TaskDetailClient({
                 onChange={(e) => setDueDate(e.target.value)}
                 readOnly={!canEdit}
                 className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none read-only:bg-slate-50"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-bold text-slate-400">프로젝트</label>
+              <Select
+                ariaLabel="프로젝트"
+                value={projectId}
+                onChange={(v) => setProjectId(v)}
+                disabled={!canEdit}
+                className="glass-input w-full rounded-lg px-3 py-2 text-sm outline-none disabled:bg-slate-50"
+                options={projectOptions}
               />
             </div>
             <div className="sm:col-span-2">
@@ -743,6 +767,22 @@ export default function TaskDetailClient({
                 />
               ) : (
                 <span className="text-sm text-slate-600">{dueDate || "-"}</span>
+              )}
+            </div>
+
+            {/* 프로젝트 */}
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">프로젝트</label>
+              {canEdit ? (
+                <Select
+                  ariaLabel="프로젝트"
+                  value={projectId}
+                  onChange={(v) => setProjectId(v)}
+                  className="glass-input w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  options={projectOptions}
+                />
+              ) : (
+                <span className="text-sm text-slate-600">{task.project?.name ?? "미분류"}</span>
               )}
             </div>
 

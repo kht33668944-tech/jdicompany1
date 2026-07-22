@@ -60,6 +60,7 @@ export async function createTask(params: {
   status?: TaskStatus;
   priority?: TaskPriority;
   category?: string;
+  projectId?: string | null;
   dueDate?: string;
   startDate?: string;
   assigneeIds?: string[];
@@ -78,6 +79,7 @@ export async function createTask(params: {
       status: targetStatus,
       priority: params.priority ?? TASK_PRIORITIES[2],
       category: params.category || null,
+      project_id: params.projectId || null,
       due_date: params.dueDate || null,
       start_date: params.startDate || null,
       position: nextPosition,
@@ -202,6 +204,7 @@ export async function updateTask(
     status?: TaskStatus;
     priority?: TaskPriority;
     category?: string | null;
+    projectId?: string | null;
     dueDate?: string | null;
     startDate?: string | null;
   }
@@ -257,6 +260,7 @@ export async function updateTask(
   if (params.description !== undefined) updateData.description = params.description;
   if (params.priority !== undefined && params.priority !== currentTask.priority) updateData.priority = params.priority;
   if (params.category !== undefined) updateData.category = params.category;
+  if (params.projectId !== undefined) updateData.project_id = params.projectId;
   if (params.dueDate !== undefined) updateData.due_date = params.dueDate;
   if (params.startDate !== undefined) updateData.start_date = params.startDate;
   if (statusChanged) updateData.updated_at = new Date().toISOString();

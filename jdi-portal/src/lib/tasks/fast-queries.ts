@@ -96,6 +96,12 @@ const INITIAL_TASKS_PAGE_QUERY = `
           'status', t.status,
           'priority', t.priority,
           'category', t.category,
+          'project_id', t.project_id,
+          'project', (
+            select jsonb_build_object('id', pj.id, 'name', pj.name, 'color', pj.color)
+            from public.projects pj
+            where pj.id = t.project_id
+          ),
           'due_date', t.due_date,
           'start_date', t.start_date,
           'position', t.position,

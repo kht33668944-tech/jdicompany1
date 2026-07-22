@@ -1,3 +1,5 @@
+import type { ProjectRef } from "@/lib/projects/types";
+
 export type TaskStatus = "대기" | "진행중" | "완료";
 export type TaskPriority = "긴급" | "높음" | "보통" | "낮음";
 export type TaskViewId = "list" | "calendar" | "timeline";
@@ -19,6 +21,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   category: string | null;
+  project_id: string | null;
   due_date: string | null;
   start_date: string | null;
   position: number;
@@ -37,6 +40,7 @@ export interface TaskAssignee {
 
 export interface TaskWithDetails extends Task {
   creator_profile: { full_name: string; avatar_url: string | null };
+  project?: ProjectRef | null;
   assignees: TaskAssignee[];
   checklist_total: number;
   checklist_completed: number;

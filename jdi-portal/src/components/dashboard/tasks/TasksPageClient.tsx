@@ -28,6 +28,7 @@ import TaskCreateModal from "./TaskCreateModal";
 import TaskDetailPanel from "./TaskDetailPanel";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
+import { useProjects } from "@/lib/projects/useProjects";
 
 interface Props {
   profiles: Profile[];
@@ -67,6 +68,8 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
   // 할 일 기록 기본값을 '오늘'로 둔다(전체 날짜는 불러올 범위가 넓어 느림).
   const [historyDate, setHistoryDate] = useState(() => toDateString());
   const [historyStatus, setHistoryStatus] = useState<HistoryStatusFilter>("all");
+  const [historyProject, setHistoryProject] = useState("");
+  const { activeProjects } = useProjects();
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
   const historyGenerationRef = useRef(0);
   const dashboardTaskProfiles = useMemo(
@@ -79,7 +82,8 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
     assigneeId: employeeId === "all" ? undefined : employeeId,
     status: historyStatus === "all" ? undefined : historyStatus,
     date: historyDate || undefined,
-  }), [employeeId, historyDate, historyStatus, searchQuery]);
+    projectId: historyProject || undefined,
+  }), [employeeId, historyDate, historyProject, historyStatus, searchQuery]);
   const historyFiltersRef = useRef(historyFilters);
   historyFiltersRef.current = historyFilters;
 
@@ -289,7 +293,15 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusConfig.dot}`} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-800">{task.title}</p>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        {task.project && (
+                          <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
+                            <span className="truncate">{task.project.name}</span>
+                          </span>
+                        )}
+                        <p className="min-w-0 truncate text-sm font-bold text-slate-800">{task.title}</p>
+                      </div>
                       {task.description && (
                         <p className="mt-1 hidden truncate text-xs text-slate-400 lg:block">{task.description}</p>
                       )}
@@ -364,7 +376,7 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
             )}
           </label>
 
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px]">
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_170px_170px]">
             <Select
               value={employeeId}
               onChange={(v) => setEmployeeId(v)}
@@ -388,6 +400,17 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
                 { value: "대기", label: "대기", dotClass: TASK_STATUS_CONFIG["대기"].dot },
                 { value: "진행중", label: "진행중", dotClass: TASK_STATUS_CONFIG["진행중"].dot },
                 { value: "완료", label: "완료", dotClass: TASK_STATUS_CONFIG["완료"].dot },
+              ]}
+            />
+            <Select
+              value={historyProject}
+              onChange={(v) => setHistoryProject(v)}
+              ariaLabel="프로젝트 필터"
+              className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              options={[
+                { value: "", label: "전체 프로젝트" },
+                ...activeProjects.map((project) => ({ value: project.id, label: project.name })),
+                { value: "none", label: "미분류" },
               ]}
             />
           </div>
@@ -452,7 +475,15 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
                         className="grid w-full gap-3 px-5 py-3 text-left transition-colors hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-center"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-slate-800">{task.title}</p>
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {task.project && (
+                              <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
+                                <span className="truncate">{task.project.name}</span>
+                              </span>
+                            )}
+                            <p className="min-w-0 truncate text-sm font-bold text-slate-800">{task.title}</p>
+                          </div>
                           {task.description && (
                             <p className="mt-1 truncate text-xs text-slate-400">{task.description}</p>
                           )}

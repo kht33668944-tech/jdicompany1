@@ -18,10 +18,11 @@ interface TaskStatsRow {
 }
 
 const TASK_BASE_SELECT = `
-  id, title, description, status, priority, category,
+  id, title, description, status, priority, category, project_id,
   due_date, start_date, position, parent_id, created_by,
   created_at, updated_at, completed_at,
-  creator_profile:profiles!tasks_created_by_fkey(full_name, avatar_url)
+  creator_profile:profiles!tasks_created_by_fkey(full_name, avatar_url),
+  project:projects(id, name, color)
 `;
 
 export function getCompletedCutoff(): string {
@@ -130,6 +131,7 @@ export interface TaskHistoryFilters {
   assigneeId?: string;
   status?: TaskStatus;
   date?: string;
+  projectId?: string; // "none" = 미분류
 }
 
 export interface TaskHistoryPage {
@@ -217,6 +219,8 @@ export async function getTaskHistoryWithDetails(
   }
   if (filters.assigneeId) query = query.eq("history_assignee.user_id", filters.assigneeId);
   if (filters.status) query = query.eq("status", filters.status);
+  if (filters.projectId === "none") query = query.is("project_id", null);
+  else if (filters.projectId) query = query.eq("project_id", filters.projectId);
   if (filters.date) {
     const { start, end } = getSeoulDayBounds(filters.date);
     query = query.or(

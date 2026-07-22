@@ -71,3 +71,14 @@ test("타임라인 화면: project 파라미터·필터·배지", () => {
   assert.match(section, /entry\.project/);
   assert.match(section, /useProjects/);
 });
+
+test("할일: project 를 빠른 경로와 REST 폴백 양쪽에 싣는다 (성능 불변조건 3)", () => {
+  const fast = read("src/lib/tasks/fast-queries.ts");
+  assert.match(fast, /'project_id', t\.project_id/);
+  assert.match(fast, /'project',[\s\S]*?public\.projects pj/);
+  const queries = read("src/lib/tasks/queries.ts");
+  assert.match(queries, /project:projects\(id, name, color\)/);
+  assert.match(queries, /is\("project_id", null\)/);
+  const actions = read("src/lib/tasks/actions.ts");
+  assert.match(actions, /project_id/);
+});
