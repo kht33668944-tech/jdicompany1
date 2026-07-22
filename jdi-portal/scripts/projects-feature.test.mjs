@@ -43,3 +43,13 @@ test("lib/projects: 모듈 구성과 서버 검증", () => {
   const hook = read("src/lib/projects/useProjects.ts");
   assert.match(hook, /jdi:projects-changed/);
 });
+
+test("work-timeline: project 조인·필터·캐시 버전", () => {
+  const queries = read("src/lib/work-timeline/queries.ts");
+  assert.match(queries, /project:projects\(id, name, color\)/);
+  assert.match(queries, /is\("project_id", null\)/);
+  const actions = read("src/lib/work-timeline/actions.ts");
+  assert.match(actions, /project_id/);
+  const cache = read("src/lib/work-timeline/timelineCache.ts");
+  assert.match(cache, /CACHE_SCHEMA_VERSION = 3/);
+});

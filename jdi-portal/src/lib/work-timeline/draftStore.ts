@@ -19,6 +19,7 @@ export interface WorkTimelineDraftPayload {
   completedAt: string;
   taskId: string | null;
   images: WorkTimelineDraftImage[];
+  projectId?: string | null;
 }
 
 export interface WorkTimelineDraftRecord extends WorkTimelineDraftPayload {

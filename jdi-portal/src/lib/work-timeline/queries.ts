@@ -9,8 +9,9 @@ import type {
 import { assertUuid, escapePostgrestIlike, getKstDayRange, isWorkTimelineImage } from "./utils";
 
 const ENTRY_SELECT = `
-  id, user_id, task_id, title, description, completed_at, created_at, updated_at,
-  author_profile:profiles!work_timeline_entries_user_id_fkey(id, full_name, avatar_url)
+  id, user_id, task_id, project_id, title, description, completed_at, created_at, updated_at,
+  author_profile:profiles!work_timeline_entries_user_id_fkey(id, full_name, avatar_url),
+  project:projects(id, name, color)
 `;
 
 type RawAttachment = Omit<WorkTimelineAttachment, "original_url" | "thumbnail_url">;
@@ -106,6 +107,11 @@ export async function getWorkTimelineEntries(
   let request = supabase.from("work_timeline_entries").select(ENTRY_SELECT);
 
   if (filters.employeeId) request = request.eq("user_id", filters.employeeId);
+  if (filters.projectId === "none") request = request.is("project_id", null);
+  else if (filters.projectId) {
+    assertUuid(filters.projectId, "프로젝트");
+    request = request.eq("project_id", filters.projectId);
+  }
   if (filters.cursor) {
     assertUuid(filters.cursor.id, "페이지 커서");
     const cursorDate = new Date(filters.cursor.completedAt);

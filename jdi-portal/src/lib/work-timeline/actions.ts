@@ -47,7 +47,7 @@ async function findDuplicateTaskEntry(
 ): Promise<WorkTimelineEntry | null> {
   const { data, error } = await supabase
     .from("work_timeline_entries")
-    .select("id, user_id, task_id, title, description, completed_at, created_at, updated_at")
+    .select("id, user_id, task_id, project_id, title, description, completed_at, created_at, updated_at")
     .eq("user_id", userId)
     .eq("task_id", taskId)
     .maybeSingle();
@@ -61,6 +61,7 @@ async function insertEntry(
   input: CreateWorkTimelineEntryInput,
 ): Promise<CreateWorkTimelineEntryResult> {
   const values = validateWorkTimelineInput(input);
+  if (input.projectId) assertUuid(input.projectId, "프로젝트");
   if (input.taskId) {
     assertUuid(input.taskId, "연결 업무");
     const existing = await findDuplicateTaskEntry(supabase, userId, input.taskId);
@@ -91,11 +92,12 @@ async function insertEntry(
     .insert({
       user_id: userId,
       task_id: input.taskId || null,
+      project_id: input.projectId || null,
       title: values.title,
       description: values.description,
       completed_at: values.completedAt,
     })
-    .select("id, user_id, task_id, title, description, completed_at, created_at, updated_at")
+    .select("id, user_id, task_id, project_id, title, description, completed_at, created_at, updated_at")
     .single();
 
   if (error && input.taskId && isUniqueViolation(error)) {
@@ -132,16 +134,21 @@ export async function updateWorkTimelineEntry(
     description: input.description !== undefined ? input.description : currentResult.data.description,
     completedAt: input.completedAt ?? currentResult.data.completed_at,
   });
+  const updatePayload: Record<string, unknown> = {
+    title: values.title,
+    description: values.description,
+    completed_at: values.completedAt,
+    updated_at: new Date().toISOString(),
+  };
+  if (input.projectId !== undefined) {
+    if (input.projectId) assertUuid(input.projectId, "프로젝트");
+    updatePayload.project_id = input.projectId;
+  }
   const { data, error } = await supabase
     .from("work_timeline_entries")
-    .update({
-      title: values.title,
-      description: values.description,
-      completed_at: values.completedAt,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", entryId)
-    .select("id, user_id, task_id, title, description, completed_at, created_at, updated_at")
+    .select("id, user_id, task_id, project_id, title, description, completed_at, created_at, updated_at")
     .single();
   if (error) throw error;
   revalidateTimeline(entryId, data.task_id);

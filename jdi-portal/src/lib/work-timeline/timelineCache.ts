@@ -14,7 +14,7 @@ import type { WorkTimelineEntryWithProfile, WorkTimelineProfile } from "./types"
 const DB_NAME = "jdi-work-timeline-cache";
 const DB_VERSION = 1;
 const TIMELINE_STORE = "recent_work_timeline";
-const CACHE_SCHEMA_VERSION = 2;
+const CACHE_SCHEMA_VERSION = 3;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_ENTRIES = 50;
 

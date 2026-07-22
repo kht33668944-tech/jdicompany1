@@ -1,3 +1,5 @@
+import type { ProjectRef } from "@/lib/projects/types";
+
 export interface WorkTimelineProfile {
   id: string;
   full_name: string;
@@ -22,6 +24,7 @@ export interface WorkTimelineEntry {
   id: string;
   user_id: string;
   task_id: string | null;
+  project_id: string | null;
   title: string;
   description: string | null;
   completed_at: string;
@@ -32,6 +35,7 @@ export interface WorkTimelineEntry {
 export interface WorkTimelineEntryWithProfile extends WorkTimelineEntry {
   author_profile: WorkTimelineProfile;
   attachments: WorkTimelineAttachment[];
+  project: ProjectRef | null;
 }
 
 export interface WorkTimelineFilters {
@@ -42,6 +46,7 @@ export interface WorkTimelineFilters {
   date?: string | null;
   query?: string | null;
   includeAttachments?: boolean;
+  projectId?: string | null; // "none" = 미분류
 }
 
 export interface CreateWorkTimelineEntryInput {
@@ -49,12 +54,14 @@ export interface CreateWorkTimelineEntryInput {
   description?: string | null;
   completedAt?: string | null;
   taskId?: string | null;
+  projectId?: string | null;
 }
 
 export interface UpdateWorkTimelineEntryInput {
   title?: string;
   description?: string | null;
   completedAt?: string;
+  projectId?: string | null;
 }
 
 export interface WorkTimelineFileUpload {
