@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createRecurringExpense, updateRecurringExpense, deleteRecurringExpense } from "@/lib/expenses/actions";
 import { getRecurringHistory } from "@/lib/expenses/queries";
 import { createClient } from "@/lib/supabase/client";
-import { formatKrw, formatForeign } from "@/lib/expenses/format";
+import { formatKrw, formatForeign, parseKrwInput, parseForeignInput } from "@/lib/expenses/format";
 import { formatDate } from "@/lib/utils/date";
 import type { ExpenseCategory, ExpenseCurrency, PaymentMethod, RecurringExpenseWithMeta, RecurringHistoryItem, RecurringInput } from "@/lib/expenses/types";
 import PaymentMethodField from "./PaymentMethodField";
@@ -53,6 +53,9 @@ export default function RecurringFormModal({
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<RecurringHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  // 오버레이(배경)에서 마우스를 눌러 시작한 경우에만 닫는다.
+  // (입력칸에서 텍스트를 드래그하다 배경에서 떼면 실수로 닫히던 문제 방지)
+  const overlayMouseDown = useRef(false);
 
   useEffect(() => {
     if (!initial) return;
@@ -70,10 +73,10 @@ export default function RecurringFormModal({
       const input: RecurringInput = {
         name: name.trim(),
         vendor: vendor.trim() || null,
-        amount_krw: Math.round(Number(amount.replaceAll(",", ""))),
+        amount_krw: parseKrwInput(amount),
         currency,
-        amount_foreign: currency === "USD" ? Number(foreignAmount) : null,
-        billing_day: Number(billingDay),
+        amount_foreign: currency === "USD" ? parseForeignInput(foreignAmount) : null,
+        billing_day: parseKrwInput(billingDay),
         payment_method: method.trim(),
         category_id: categoryId,
         owner_id: ownerId,
@@ -118,8 +121,12 @@ export default function RecurringFormModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/20 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        overlayMouseDown.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && overlayMouseDown.current) onClose();
+        overlayMouseDown.current = false;
       }}
     >
       <div className="w-full max-w-lg rounded-[32px] shadow-2xl bg-white/70 backdrop-blur-[40px] border border-white/50 p-6 space-y-3">

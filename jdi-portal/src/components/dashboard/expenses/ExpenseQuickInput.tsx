@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { createExpense } from "@/lib/expenses/actions";
+import { parseKrwInput, parseForeignInput } from "@/lib/expenses/format";
 import { toDateString } from "@/lib/utils/date";
 import type { ExpenseCategory, ExpenseCurrency, PaymentMethod } from "@/lib/expenses/types";
 import PaymentMethodField from "./PaymentMethodField";
@@ -34,6 +35,8 @@ export default function ExpenseQuickInput({ categories, paymentMethods, onMethod
   const [categoryId, setCategoryId] = useState("");
   const [saving, setSaving] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // 배경에서 눌러 시작한 클릭만 시트를 닫는다 (입력칸 드래그 중 닫힘 방지)
+  const overlayMouseDown = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,9 +47,9 @@ export default function ExpenseQuickInput({ categories, paymentMethods, onMethod
         expense_date: date,
         vendor: vendor.trim() || null,
         description: description.trim(),
-        amount_krw: Math.round(Number(amount.replaceAll(",", ""))),
+        amount_krw: parseKrwInput(amount),
         currency,
-        amount_foreign: currency === "USD" ? Number(foreignAmount) : null,
+        amount_foreign: currency === "USD" ? parseForeignInput(foreignAmount) : null,
         payment_method: method.trim(),
         category_id: categoryId,
       });
@@ -169,8 +172,12 @@ export default function ExpenseQuickInput({ categories, paymentMethods, onMethod
       {sheetOpen && (
         <div
           className="md:hidden fixed inset-0 z-50 flex items-end bg-slate-900/20 backdrop-blur-sm"
+          onMouseDown={(e) => {
+            overlayMouseDown.current = e.target === e.currentTarget;
+          }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setSheetOpen(false);
+            if (e.target === e.currentTarget && overlayMouseDown.current) setSheetOpen(false);
+            overlayMouseDown.current = false;
           }}
         >
           <div className="w-full max-h-[88vh] overflow-y-auto rounded-t-[32px] shadow-2xl bg-white/85 backdrop-blur-[40px] border-t border-white/60 p-5 pb-8 animate-sheet-up">

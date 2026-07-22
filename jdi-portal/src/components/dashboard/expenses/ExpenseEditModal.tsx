@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { updateExpense, deleteExpense, setExpenseReceipt } from "@/lib/expenses/actions";
 import { uploadExpenseReceipt, getExpenseReceiptUrl } from "@/lib/expenses/receipts";
+import { parseKrwInput, parseForeignInput } from "@/lib/expenses/format";
 import type { ExpenseCategory, ExpenseCurrency, ExpenseWithMeta, PaymentMethod } from "@/lib/expenses/types";
 import PaymentMethodField from "./PaymentMethodField";
 import CategoryField from "./CategoryField";
@@ -35,6 +36,8 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
   const [categoryId, setCategoryId] = useState(expense.category_id);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // 배경에서 눌러 시작한 클릭만 닫기로 처리 (입력칸 드래그 중 배경에서 떼도 안 닫히게)
+  const overlayMouseDown = useRef(false);
 
   useEffect(() => {
     if (expense.receipt_path) {
@@ -50,9 +53,9 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
         expense_date: date,
         vendor: vendor.trim() || null,
         description: description.trim(),
-        amount_krw: Math.round(Number(amount.replaceAll(",", ""))),
+        amount_krw: parseKrwInput(amount),
         currency,
-        amount_foreign: currency === "USD" ? Number(foreignAmount) : null,
+        amount_foreign: currency === "USD" ? parseForeignInput(foreignAmount) : null,
         payment_method: method.trim(),
         category_id: categoryId,
       });
@@ -106,8 +109,12 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/20 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        overlayMouseDown.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && overlayMouseDown.current) onClose();
+        overlayMouseDown.current = false;
       }}
     >
       <div className="w-full max-w-lg rounded-[32px] shadow-2xl bg-white/70 backdrop-blur-[40px] border border-white/50 p-6 space-y-3">
