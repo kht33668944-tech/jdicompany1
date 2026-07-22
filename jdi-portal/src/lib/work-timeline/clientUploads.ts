@@ -9,16 +9,18 @@ import { WORK_TIMELINE_BUCKET } from "./constants";
 import type {
   WorkTimelineAttachment,
   WorkTimelineAttachmentInput,
-  WorkTimelineImageUpload,
+  WorkTimelineFileUpload,
 } from "./types";
-import { getFileExtension, validateWorkTimelineImage } from "./utils";
+import { getFileExtension, validateWorkTimelineFile } from "./utils";
 
 interface DirectUploadOptions {
   entryId: string;
   userId: string;
-  images: WorkTimelineImageUpload[];
+  files: WorkTimelineFileUpload[];
   positions: number[];
 }
+
+const FALLBACK_MIME = "application/octet-stream";
 
 async function cleanupUploadedPaths(paths: string[]): Promise<void> {
   if (paths.length === 0) return;
@@ -29,23 +31,22 @@ async function cleanupUploadedPaths(paths: string[]): Promise<void> {
   }
 }
 
-export async function uploadWorkTimelineImagesDirect({
+export async function uploadWorkTimelineFilesDirect({
   entryId,
   userId,
-  images,
+  files,
   positions,
 }: DirectUploadOptions): Promise<WorkTimelineAttachment[]> {
-  if (images.length !== positions.length) throw new Error("첨부 이미지 순서가 올바르지 않습니다.");
+  if (files.length !== positions.length) throw new Error("첨부 파일 순서가 올바르지 않습니다.");
   const supabase = createClient();
   const uploadedPaths: string[] = [];
   const metadata: WorkTimelineAttachmentInput[] = [];
 
   try {
-    for (let index = 0; index < images.length; index += 1) {
-      const { file, thumbnail = null } = images[index];
+    for (let index = 0; index < files.length; index += 1) {
+      const { file, thumbnail = null } = files[index];
       const position = positions[index];
-      validateWorkTimelineImage(file);
-      if (thumbnail) validateWorkTimelineImage(thumbnail);
+      validateWorkTimelineFile(file);
 
       const uniqueId = crypto.randomUUID();
       const basePath = `${userId}/${entryId}/${uniqueId}`;
@@ -53,17 +54,18 @@ export async function uploadWorkTimelineImagesDirect({
       const thumbnailPath = thumbnail
         ? `${basePath}_thumb.${getFileExtension(thumbnail)}`
         : null;
+      const contentType = file.type || FALLBACK_MIME;
 
       const { error: fileError } = await supabase.storage
         .from(WORK_TIMELINE_BUCKET)
-        .upload(filePath, file, { contentType: file.type, upsert: false });
+        .upload(filePath, file, { contentType, upsert: false });
       if (fileError) throw fileError;
       uploadedPaths.push(filePath);
 
       if (thumbnail && thumbnailPath) {
         const { error: thumbnailError } = await supabase.storage
           .from(WORK_TIMELINE_BUCKET)
-          .upload(thumbnailPath, thumbnail, { contentType: thumbnail.type, upsert: false });
+          .upload(thumbnailPath, thumbnail, { contentType: thumbnail.type || FALLBACK_MIME, upsert: false });
         if (thumbnailError) throw thumbnailError;
         uploadedPaths.push(thumbnailPath);
       }
@@ -72,7 +74,7 @@ export async function uploadWorkTimelineImagesDirect({
         fileName: file.name,
         filePath,
         thumbnailPath,
-        mimeType: file.type,
+        mimeType: contentType,
         fileSize: file.size,
         position,
       });

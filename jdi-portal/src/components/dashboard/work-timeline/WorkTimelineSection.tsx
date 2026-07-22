@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, MagnifyingGlass, Plus, X } from "phosphor-react";
+import { ArrowRight, FileArrowDown, MagnifyingGlass, Plus, X } from "phosphor-react";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
 import { createClient } from "@/lib/supabase/client";
@@ -11,7 +11,7 @@ import { addDays, toDateString, toDateStringFromTimestamp } from "@/lib/utils/da
 import { WORK_TIMELINE_PAGE_SIZE } from "@/lib/work-timeline/constants";
 import { retryPendingWorkTimelineStorageCleanup } from "@/lib/work-timeline/actions";
 import { getWorkTimelineEntries } from "@/lib/work-timeline/queries";
-import { getKstDayRange } from "@/lib/work-timeline/utils";
+import { getKstDayRange, isWorkTimelineImage } from "@/lib/work-timeline/utils";
 import type {
   WorkTimelineEntryWithProfile,
   WorkTimelineProfile,
@@ -92,28 +92,42 @@ function formatCompletedTime(timestamp: string): string {
 
 function AttachmentPreview({ entry }: { entry: WorkTimelineEntryWithProfile }) {
   const images = entry.attachments
-    .filter((attachment) => attachment.thumbnail_url || attachment.original_url)
-    .slice(0, 5);
-  if (images.length === 0) return null;
+    .filter((attachment) => isWorkTimelineImage(attachment.mime_type)
+      && (attachment.thumbnail_url || attachment.original_url));
+  const fileCount = entry.attachments.filter(
+    (attachment) => !isWorkTimelineImage(attachment.mime_type),
+  ).length;
 
-  const image = images[0];
-  const url = image.thumbnail_url ?? image.original_url;
+  if (images.length > 0) {
+    const image = images[0];
+    const url = image.thumbnail_url ?? image.original_url;
+    return (
+      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-100 sm:w-24">
+        <div
+          role="img"
+          aria-label={`${entry.title} 첨부 이미지 미리보기`}
+          className="h-full w-full bg-slate-200 bg-cover bg-center"
+          style={url ? { backgroundImage: `url(${JSON.stringify(url)})` } : undefined}
+        />
+        {(images.length + fileCount) > 1 && (
+          <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold text-white">
+            +{images.length + fileCount - 1}
+          </span>
+        )}
+      </div>
+    );
+  }
 
-  return (
-    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-slate-100 sm:w-24">
-      <div
-        role="img"
-        aria-label={`${entry.title} 첨부 이미지 미리보기`}
-        className="h-full w-full bg-slate-200 bg-cover bg-center"
-        style={url ? { backgroundImage: `url(${JSON.stringify(url)})` } : undefined}
-      />
-      {images.length > 1 && (
-        <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold text-white">
-          +{images.length - 1}
-        </span>
-      )}
-    </div>
-  );
+  if (fileCount > 0) {
+    return (
+      <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md bg-slate-100 text-slate-500 sm:w-24">
+        <FileArrowDown size={24} weight="fill" aria-hidden="true" />
+        <span className="text-[11px] font-bold">파일 {fileCount}</span>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export default function WorkTimelineSection({

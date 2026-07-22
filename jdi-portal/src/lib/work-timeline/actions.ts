@@ -4,9 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   WORK_TIMELINE_BUCKET,
-  WORK_TIMELINE_IMAGE_MIME_TYPES,
-  WORK_TIMELINE_MAX_IMAGE_SIZE,
-  WORK_TIMELINE_MAX_IMAGES,
+  WORK_TIMELINE_MAX_ATTACHMENTS,
+  WORK_TIMELINE_MAX_FILE_SIZE,
   WORK_TIMELINE_SIGNED_URL_TTL_SECONDS,
 } from "./constants";
 import type {
@@ -20,6 +19,7 @@ import type {
 } from "./types";
 import {
   assertUuid,
+  getBlockedExtension,
   isUniqueViolation,
   validateWorkTimelineInput,
 } from "./utils";
@@ -244,25 +244,33 @@ function validateAttachmentInput(
   userId: string,
   entryId: string,
 ): void {
-  if (!input.fileName.trim() || input.fileName.length > 255) throw new Error("첨부 이미지 이름이 올바르지 않습니다.");
-  if (!(WORK_TIMELINE_IMAGE_MIME_TYPES as readonly string[]).includes(input.mimeType)) {
-    throw new Error("지원하지 않는 이미지 형식입니다.");
+  if (!input.fileName.trim() || input.fileName.length > 255) throw new Error("첨부 파일 이름이 올바르지 않습니다.");
+  const blocked = getBlockedExtension(input.fileName);
+  if (blocked === "") throw new Error("확장자가 없는 파일은 첨부할 수 없습니다.");
+  if (blocked) throw new Error(`보안상 '.${blocked}' 형식의 파일은 첨부할 수 없습니다.`);
+  if (input.mimeType.length > 255) throw new Error("첨부 파일 형식이 올바르지 않습니다.");
+  if (!Number.isInteger(input.fileSize) || input.fileSize < 1 || input.fileSize > WORK_TIMELINE_MAX_FILE_SIZE) {
+    throw new Error("첨부 파일 크기가 올바르지 않습니다.");
   }
-  if (!Number.isInteger(input.fileSize) || input.fileSize < 1 || input.fileSize > WORK_TIMELINE_MAX_IMAGE_SIZE) {
-    throw new Error("첨부 이미지 크기가 올바르지 않습니다.");
-  }
-  if (!Number.isInteger(input.position) || input.position < 0 || input.position >= WORK_TIMELINE_MAX_IMAGES) {
-    throw new Error("첨부 이미지 순서가 올바르지 않습니다.");
+  if (!Number.isInteger(input.position) || input.position < 0 || input.position >= WORK_TIMELINE_MAX_ATTACHMENTS) {
+    throw new Error("첨부 파일 순서가 올바르지 않습니다.");
   }
   const expectedPrefix = `${userId}/${entryId}/`;
   if (!input.filePath.startsWith(expectedPrefix) || getStoragePathOwner(input.filePath) !== userId) {
-    throw new Error("첨부 이미지 경로가 올바르지 않습니다.");
+    throw new Error("첨부 파일 경로가 올바르지 않습니다.");
   }
-  if (input.thumbnailPath && (
-    !input.thumbnailPath.startsWith(expectedPrefix)
-    || getStoragePathOwner(input.thumbnailPath) !== userId
-  )) {
-    throw new Error("첨부 이미지 썸네일 경로가 올바르지 않습니다.");
+  if (input.thumbnailPath) {
+    if (
+      !input.thumbnailPath.startsWith(expectedPrefix)
+      || getStoragePathOwner(input.thumbnailPath) !== userId
+    ) {
+      throw new Error("첨부 파일 썸네일 경로가 올바르지 않습니다.");
+    }
+    // 썸네일도 신뢰 경계 방어: 위험 확장자 차단 (직접 호출 대비)
+    const thumbnailName = input.thumbnailPath.split("/").pop() ?? "";
+    if (getBlockedExtension(thumbnailName)) {
+      throw new Error("첨부 파일 썸네일 형식이 올바르지 않습니다.");
+    }
   }
 }
 
@@ -272,8 +280,8 @@ export async function finalizeWorkTimelineAttachments(
 ): Promise<WorkTimelineAttachment[]> {
   assertUuid(entryId, "업무 타임라인");
   if (inputs.length === 0) return [];
-  if (inputs.length > WORK_TIMELINE_MAX_IMAGES) {
-    throw new Error(`이미지는 최대 ${WORK_TIMELINE_MAX_IMAGES}개까지 첨부할 수 있습니다.`);
+  if (inputs.length > WORK_TIMELINE_MAX_ATTACHMENTS) {
+    throw new Error(`파일은 최대 ${WORK_TIMELINE_MAX_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
   }
   const { supabase, userId } = await getAuthenticatedContext();
   const [{ data: entry, error: entryError }, { data: existing, error: existingError }] = await Promise.all([
@@ -281,10 +289,10 @@ export async function finalizeWorkTimelineAttachments(
     supabase.from("work_timeline_attachments").select("position").eq("entry_id", entryId),
   ]);
   if (entryError) throw entryError;
-  if (entry.user_id !== userId) throw new Error("본인의 업무 타임라인에만 이미지를 추가할 수 있습니다.");
+  if (entry.user_id !== userId) throw new Error("본인의 업무 타임라인에만 파일을 추가할 수 있습니다.");
   if (existingError) throw existingError;
-  if ((existing?.length ?? 0) + inputs.length > WORK_TIMELINE_MAX_IMAGES) {
-    throw new Error(`이미지는 최대 ${WORK_TIMELINE_MAX_IMAGES}개까지 첨부할 수 있습니다.`);
+  if ((existing?.length ?? 0) + inputs.length > WORK_TIMELINE_MAX_ATTACHMENTS) {
+    throw new Error(`파일은 최대 ${WORK_TIMELINE_MAX_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
   }
 
   const occupied = new Set((existing ?? []).map((row) => row.position));
@@ -292,7 +300,7 @@ export async function finalizeWorkTimelineAttachments(
   for (const input of inputs) {
     validateAttachmentInput(input, userId, entryId);
     if (occupied.has(input.position) || incomingPositions.has(input.position)) {
-      throw new Error("이미 사용 중인 첨부 이미지 순서입니다.");
+      throw new Error("이미 사용 중인 첨부 순서입니다.");
     }
     incomingPositions.add(input.position);
   }
@@ -304,7 +312,7 @@ export async function finalizeWorkTimelineAttachments(
       file_name: input.fileName,
       file_path: input.filePath,
       thumbnail_path: input.thumbnailPath,
-      mime_type: input.mimeType,
+      mime_type: input.mimeType.trim() || "application/octet-stream",
       file_size: input.fileSize,
       position: input.position,
     })))

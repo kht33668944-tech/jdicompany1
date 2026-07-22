@@ -1,8 +1,9 @@
 import { addDays } from "@/lib/utils/date";
 import {
+  WORK_TIMELINE_BLOCKED_EXTENSIONS,
   WORK_TIMELINE_IMAGE_MIME_TYPES,
   WORK_TIMELINE_MAX_DESCRIPTION_LENGTH,
-  WORK_TIMELINE_MAX_IMAGE_SIZE,
+  WORK_TIMELINE_MAX_FILE_SIZE,
   WORK_TIMELINE_MAX_TITLE_LENGTH,
 } from "./constants";
 
@@ -30,14 +31,27 @@ export function validateWorkTimelineInput(input: {
   return { title, description, completedAt: new Date(completedAt).toISOString() };
 }
 
-export function validateWorkTimelineImage(file: File): void {
-  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("JPG, PNG, WebP, GIF 이미지만 첨부할 수 있습니다.");
+export function isWorkTimelineImage(mimeType: string): boolean {
+  return ALLOWED_IMAGE_TYPES.has(mimeType);
+}
+
+/** 차단 확장자면 그 확장자를, 아니면 null. 확장자 없으면 빈 문자열("")을 반환해 거부 유도. */
+export function getBlockedExtension(fileName: string): string | null {
+  const parts = fileName.split(".");
+  if (parts.length < 2) return ""; // 확장자 없음 → 거부
+  const ext = parts.pop()!.toLowerCase();
+  if (!ext) return "";
+  return WORK_TIMELINE_BLOCKED_EXTENSIONS.has(ext) ? ext : null;
+}
+
+export function validateWorkTimelineFile(file: File): void {
+  if (file.size <= 0) throw new Error("내용이 없는 파일은 첨부할 수 없습니다.");
+  if (file.size > WORK_TIMELINE_MAX_FILE_SIZE) {
+    throw new Error("파일은 개당 50MB 이하만 첨부할 수 있습니다.");
   }
-  if (file.size > WORK_TIMELINE_MAX_IMAGE_SIZE) {
-    throw new Error("이미지는 파일당 10MB 이하만 첨부할 수 있습니다.");
-  }
-  if (file.size <= 0) throw new Error("내용이 없는 이미지는 첨부할 수 없습니다.");
+  const blocked = getBlockedExtension(file.name);
+  if (blocked === "") throw new Error("확장자가 없는 파일은 첨부할 수 없습니다.");
+  if (blocked) throw new Error(`보안상 '.${blocked}' 형식의 파일은 첨부할 수 없습니다.`);
 }
 
 export function assertUuid(value: string, label: string): void {

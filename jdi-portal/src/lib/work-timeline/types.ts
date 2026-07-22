@@ -57,7 +57,7 @@ export interface UpdateWorkTimelineEntryInput {
   completedAt?: string;
 }
 
-export interface WorkTimelineImageUpload {
+export interface WorkTimelineFileUpload {
   file: File;
   thumbnail?: File | null;
 }

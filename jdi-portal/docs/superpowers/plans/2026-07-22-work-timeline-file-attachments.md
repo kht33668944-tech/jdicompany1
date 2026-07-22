@@ -158,11 +158,11 @@ import {
 } from "./constants";
 ```
 
-기존 `validateWorkTimelineImage`(이미지 MIME/10MB 검사) 바로 아래에 신규 함수 추가:
+기존 `validateWorkTimelineImage`(이미지 MIME/10MB 검사)는 이 리팩터링 이후 사용처가 사라지므로(Task 3/6/7에서 `validateWorkTimelineFile`로 교체) **삭제**한다. 그 자리에 신규 함수 추가. `isWorkTimelineImage`는 기존 `ALLOWED_IMAGE_TYPES` Set을 재사용한다:
 
 ```ts
 export function isWorkTimelineImage(mimeType: string): boolean {
-  return (WORK_TIMELINE_IMAGE_MIME_TYPES as readonly string[]).includes(mimeType);
+  return ALLOWED_IMAGE_TYPES.has(mimeType);
 }
 
 /** 차단 확장자면 그 확장자를, 아니면 null. 확장자 없으면 빈 문자열("")을 반환해 거부 유도. */
@@ -185,7 +185,7 @@ export function validateWorkTimelineFile(file: File): void {
 }
 ```
 
-> `validateWorkTimelineImage`와 `getFileExtension`은 그대로 둔다. `getFileExtension`은 이미지가 아니면 파일명 확장자 fallback이라 xlsx/hwp 등에서 정상 동작한다.
+> `getFileExtension`은 그대로 둔다. 이미지가 아니면 파일명 확장자 fallback이라 xlsx/hwp 등에서 정상 동작한다. `WORK_TIMELINE_MAX_IMAGE_SIZE` 참조가 있던 `validateWorkTimelineImage`는 삭제되므로 dangling 참조가 남지 않는다.
 
 - [ ] **Step 3: lint 통과 확인**
 
