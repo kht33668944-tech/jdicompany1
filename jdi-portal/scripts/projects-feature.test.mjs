@@ -62,3 +62,12 @@ test("사이드바: 타임라인 하위 메뉴", () => {
   // 하위 링크 포함 모든 Link 는 prefetch 금지 유지
   assert.doesNotMatch(sidebar, /prefetch=\{true\}/);
 });
+
+test("타임라인 화면: project 파라미터·필터·배지", () => {
+  const page = read("src/app/dashboard/work-timeline/page.tsx");
+  assert.match(page, /initialProjectId/);
+  const section = read("src/components/dashboard/work-timeline/WorkTimelineSection.tsx");
+  assert.match(section, /updateParam\("project"/);
+  assert.match(section, /entry\.project/);
+  assert.match(section, /useProjects/);
+});

@@ -13,6 +13,7 @@ interface WorkTimelinePageProps {
     q?: string | string[];
     employee?: string | string[];
     date?: string | string[];
+    project?: string | string[];
   }>;
 }
 
@@ -45,6 +46,9 @@ export default async function WorkTimelinePage({ searchParams }: WorkTimelinePag
   const dateParam = firstValue(params.date);
   const initialDate = dateParam ? validDate(dateParam) : toDateString();
   const employeeId = UUID_PATTERN.test(initialEmployeeId) ? initialEmployeeId : "";
+  const projectParam = firstValue(params.project);
+  const initialProjectId =
+    projectParam === "none" || UUID_PATTERN.test(projectParam) ? projectParam : "";
   const entriesPromise = initialQuery.length === 1
     ? Promise.resolve([])
     : getWorkTimelineEntries(auth.supabase, {
@@ -52,6 +56,7 @@ export default async function WorkTimelinePage({ searchParams }: WorkTimelinePag
         query: initialQuery.length >= 2 ? initialQuery : null,
         employeeId: employeeId || null,
         date: initialDate || null,
+        projectId: initialProjectId || null,
       });
   const [entries, profiles] = await Promise.all([
     entriesPromise,
@@ -68,6 +73,7 @@ export default async function WorkTimelinePage({ searchParams }: WorkTimelinePag
         initialQuery={initialQuery}
         initialEmployeeId={employeeId}
         initialDate={initialDate}
+        initialProjectId={initialProjectId}
       />
     </div>
   );

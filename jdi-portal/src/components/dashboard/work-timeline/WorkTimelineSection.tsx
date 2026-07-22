@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, FileArrowDown, MagnifyingGlass, Plus, X } from "phosphor-react";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
+import { useProjects } from "@/lib/projects/useProjects";
 import { createClient } from "@/lib/supabase/client";
 import { addDays, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { WORK_TIMELINE_PAGE_SIZE } from "@/lib/work-timeline/constants";
@@ -27,6 +28,7 @@ interface WorkTimelineSectionProps {
   initialQuery?: string;
   initialEmployeeId?: string;
   initialDate?: string;
+  initialProjectId?: string;
 }
 
 interface DateGroup {
@@ -139,12 +141,16 @@ export default function WorkTimelineSection({
   initialQuery = "",
   initialEmployeeId = "",
   initialDate = "",
+  initialProjectId = "",
 }: WorkTimelineSectionProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { activeProjects } = useProjects();
   const [entries, setEntries] = useState(initialEntries);
   const [createOpen, setCreateOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState(initialEmployeeId);
   const [date, setDate] = useState(initialDate);
+  const [projectId, setProjectId] = useState(initialProjectId);
   const [searchInput, setSearchInput] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery.trim());
   const [hasMore, setHasMore] = useState(
@@ -190,6 +196,7 @@ export default function WorkTimelineSection({
     employeeFilter = employeeId,
     dateFilter = date,
     queryFilter = query,
+    projectFilter = projectId,
   ) => {
     if (!reset && loadingRef.current) return;
     const requestVersion = reset
@@ -211,6 +218,7 @@ export default function WorkTimelineSection({
         employeeId: employeeFilter || null,
         date: dateFilter || null,
         query: queryFilter.length >= 2 ? queryFilter : null,
+        projectId: projectFilter || null,
         cursor: lastEntry
           ? { completedAt: lastEntry.completed_at, id: lastEntry.id }
           : null,
@@ -230,7 +238,7 @@ export default function WorkTimelineSection({
         setIsLoading(false);
       }
     }
-  }, [date, employeeId, entries, query]);
+  }, [date, employeeId, entries, projectId, query]);
 
   useEffect(() => {
     if (compact || trimmedSearchInput === query) return;
@@ -259,8 +267,8 @@ export default function WorkTimelineSection({
       setErrorMessage(null);
       return;
     }
-    void loadEntries(true, employeeId, date, query);
-  }, [date, employeeId, query]); // eslint-disable-line react-hooks/exhaustive-deps
+    void loadEntries(true, employeeId, date, query, projectId);
+  }, [date, employeeId, query, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (compact) return;
@@ -272,6 +280,7 @@ export default function WorkTimelineSection({
     updateParam("q", query);
     updateParam("employee", employeeId);
     updateParam("date", date);
+    updateParam("project", projectId);
     const nextUrl = `${url.pathname}${url.search}${url.hash}`;
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     const isInitialSync = !urlSyncMountedRef.current;
@@ -279,7 +288,7 @@ export default function WorkTimelineSection({
     if (nextUrl === currentUrl) return;
     if (isInitialSync) window.history.replaceState(window.history.state, "", nextUrl);
     else window.history.pushState(window.history.state, "", nextUrl);
-  }, [compact, date, employeeId, query]);
+  }, [compact, date, employeeId, projectId, query]);
 
   useEffect(() => {
     if (compact) return;
@@ -291,10 +300,20 @@ export default function WorkTimelineSection({
       setQuery(nextQuery);
       setEmployeeId(UUID_PATTERN.test(nextEmployee) ? nextEmployee : "");
       setDate(normalizeDateFilter(params.get("date")));
+      const nextProject = params.get("project") ?? "";
+      setProjectId(nextProject === "none" || UUID_PATTERN.test(nextProject) ? nextProject : "");
     };
     window.addEventListener("popstate", restoreFilters);
     return () => window.removeEventListener("popstate", restoreFilters);
   }, [compact]);
+
+  // 사이드바 하위 메뉴(라우터 내비게이션)로 project 파라미터가 바뀌면 필터에 반영한다.
+  useEffect(() => {
+    if (compact) return;
+    const next = searchParams.get("project") ?? "";
+    const valid = next === "none" || UUID_PATTERN.test(next) ? next : "";
+    setProjectId((current) => (current === valid ? current : valid));
+  }, [compact, searchParams]);
 
   useEffect(() => {
     if (compact) return;
@@ -305,18 +324,18 @@ export default function WorkTimelineSection({
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !loadingRef.current) {
-          void loadEntries(false, employeeId, date, query);
+          void loadEntries(false, employeeId, date, query, projectId);
         }
       },
       { root, rootMargin: "120px 0px", threshold: 0.01 },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [compact, date, employeeId, hasMore, loadEntries, query, searchPending, searchTooShort]);
+  }, [compact, date, employeeId, hasMore, loadEntries, projectId, query, searchPending, searchTooShort]);
 
   const handleCreated = () => {
     setCreateOpen(false);
-    void loadEntries(true, employeeId, date, query);
+    void loadEntries(true, employeeId, date, query, projectId);
     router.refresh();
   };
 
@@ -395,7 +414,7 @@ export default function WorkTimelineSection({
         </div>
       )}
 
-      {!compact && <div className="grid gap-2 border-b border-slate-100 px-5 py-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      {!compact && <div className="grid gap-2 border-b border-slate-100 px-5 py-3 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,1.2fr)]">
         <div className="min-w-0">
           <Select
             options={[
@@ -405,6 +424,19 @@ export default function WorkTimelineSection({
             value={employeeId}
             onChange={(v) => setEmployeeId(v)}
             ariaLabel="직원 선택"
+            className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors"
+          />
+        </div>
+        <div className="min-w-0">
+          <Select
+            options={[
+              { value: "", label: "전체 프로젝트" },
+              ...activeProjects.map((project) => ({ value: project.id, label: project.name })),
+              { value: "none", label: "미분류" },
+            ]}
+            value={projectId}
+            onChange={(v) => setProjectId(v)}
+            ariaLabel="프로젝트 선택"
             className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors"
           />
         </div>
@@ -476,14 +508,14 @@ export default function WorkTimelineSection({
             <p className="text-sm font-semibold text-slate-600">
               {compact
                 ? "오늘 공유된 완료 업무가 없습니다"
-                : query.length >= 2 || employeeId || date
+                : query.length >= 2 || employeeId || date || projectId
                   ? "조건에 맞는 업무가 없습니다"
                   : "아직 공유된 완료 업무가 없습니다"}
             </p>
             <p className="mt-1 text-xs text-slate-400">
               {compact
                 ? "오늘 완료한 업무가 여기에 표시됩니다."
-                : query.length >= 2 || employeeId || date
+                : query.length >= 2 || employeeId || date || projectId
                   ? "검색어나 필터 조건을 조정해 보세요."
                   : "첫 완료 업무를 등록해 팀에 공유해보세요."}
             </p>
@@ -539,9 +571,21 @@ export default function WorkTimelineSection({
                                 {isMine && <span className="ml-1 text-indigo-600">나</span>}
                               </p>
                             </div>
-                            <h4 className="mt-1.5 truncate text-sm font-bold leading-5 text-slate-800">
-                              {entry.title}
-                            </h4>
+                            <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
+                              {entry.project && (
+                                <span className="inline-flex max-w-28 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                                  <span
+                                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: entry.project.color }}
+                                    aria-hidden="true"
+                                  />
+                                  <span className="truncate">{entry.project.name}</span>
+                                </span>
+                              )}
+                              <h4 className="min-w-0 truncate text-sm font-bold leading-5 text-slate-800">
+                                {entry.title}
+                              </h4>
+                            </div>
                             {entry.description && (
                               <p className="mt-0.5 truncate text-xs leading-4 text-slate-500">
                                 {entry.description}
