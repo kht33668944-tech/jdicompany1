@@ -7,6 +7,7 @@ export interface ExpenseCategory {
   is_sensitive: boolean;
   sort_order: number;
   is_active: boolean;
+  color_key: string | null;
 }
 
 export interface PaymentMethod {

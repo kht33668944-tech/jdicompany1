@@ -2,13 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExpenseCategory, ExpenseWithMeta, PaymentMethod, RecurringExpenseWithMeta, RecurringHistoryItem } from "./types";
 
 const EXPENSE_SELECT = `*,
-  category:expense_categories(id, name, is_sensitive, sort_order, is_active),
+  category:expense_categories(id, name, is_sensitive, sort_order, is_active, color_key),
   author_profile:profiles!expenses_created_by_fkey(full_name)`;
 
 export async function getExpenseCategories(supabase: SupabaseClient): Promise<ExpenseCategory[]> {
   const { data, error } = await supabase
     .from("expense_categories")
-    .select("id, name, is_sensitive, sort_order, is_active")
+    .select("id, name, is_sensitive, sort_order, is_active, color_key")
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
   if (error) throw error;
@@ -62,7 +62,7 @@ export async function getRecurringExpenses(
   const { data, error } = await supabase
     .from("recurring_expenses")
     .select(`*,
-      category:expense_categories(id, name, is_sensitive, sort_order, is_active),
+      category:expense_categories(id, name, is_sensitive, sort_order, is_active, color_key),
       owner_profile:profiles!recurring_expenses_owner_id_fkey(full_name)`)
     .order("is_active", { ascending: false })
     .order("billing_day", { ascending: true });
