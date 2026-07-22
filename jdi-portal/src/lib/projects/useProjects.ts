@@ -36,16 +36,19 @@ export function notifyProjectsChanged(): void {
  * 프로젝트 목록 클라이언트 훅.
  * - 모듈 레벨 캐시로 대시보드 내 중복 조회를 막는다 (표시용, 권한은 RLS가 담당)
  * - `projects` = 보관 포함 전체, `activeProjects` = 보관 제외
+ * - `enabled: false` 는 조회를 건너뜀 (compact 미리보기용).
  */
-export function useProjects(): {
+export function useProjects(options: { enabled?: boolean } = {}): {
   projects: Project[];
   activeProjects: Project[];
   loaded: boolean;
 } {
+  const enabled = options.enabled !== false;
   const [projects, setProjects] = useState<Project[]>(cachedProjects ?? []);
   const [loaded, setLoaded] = useState(cachedProjects !== null);
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     const load = () => {
       void fetchProjects()
@@ -65,7 +68,7 @@ export function useProjects(): {
       active = false;
       window.removeEventListener(PROJECTS_CHANGED_EVENT, load);
     };
-  }, []);
+  }, [enabled]);
 
   return {
     projects,

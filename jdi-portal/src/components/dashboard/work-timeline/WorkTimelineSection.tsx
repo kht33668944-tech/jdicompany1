@@ -145,7 +145,7 @@ export default function WorkTimelineSection({
 }: WorkTimelineSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { activeProjects } = useProjects();
+  const { activeProjects } = useProjects({ enabled: !compact });
   const [entries, setEntries] = useState(initialEntries);
   const [createOpen, setCreateOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState(initialEmployeeId);
