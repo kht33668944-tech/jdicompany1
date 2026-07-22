@@ -194,7 +194,7 @@ export default function WorkTimelineDetailClient({
         attachments: current.attachments.filter((attachment) => attachment.id !== attachmentId),
       }));
       if (result.storageCleanupFailed) {
-        toast.warning("첨부 기록은 삭제했지만 저장소 이미지 정리가 필요합니다.");
+        toast.warning("첨부 기록은 삭제했지만 저장소 파일 정리가 필요합니다.");
       } else {
         toast.success("첨부 파일을 삭제했습니다.");
       }
