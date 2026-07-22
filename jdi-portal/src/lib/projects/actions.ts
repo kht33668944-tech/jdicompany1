@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { PROJECT_COLORS, PROJECT_NAME_MAX_LENGTH } from "./constants";
 import type { Project } from "./types";
+import { isUniqueViolation } from "./utils";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -40,13 +41,6 @@ function validateColor(color: string): string {
 
 function assertProjectId(id: string): void {
   if (!UUID_PATTERN.test(id)) throw new Error("프로젝트 값이 올바르지 않습니다.");
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return Boolean(
-    error && typeof error === "object" && "code" in error
-      && (error as { code?: string }).code === "23505",
-  );
 }
 
 export async function createProject(name: string, color?: string): Promise<Project> {

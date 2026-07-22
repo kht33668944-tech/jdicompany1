@@ -29,6 +29,7 @@ import TaskDetailPanel from "./TaskDetailPanel";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
 import { useProjects } from "@/lib/projects/useProjects";
+import { toProjectFilterOptions } from "@/lib/projects/utils";
 
 interface Props {
   profiles: Profile[];
@@ -69,12 +70,16 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
   const [historyDate, setHistoryDate] = useState(() => toDateString());
   const [historyStatus, setHistoryStatus] = useState<HistoryStatusFilter>("all");
   const [historyProject, setHistoryProject] = useState("");
-  const { activeProjects } = useProjects();
+  const { projects } = useProjects();
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
   const historyGenerationRef = useRef(0);
   const dashboardTaskProfiles = useMemo(
     () => profiles.map(toDashboardTaskPerson),
     [profiles]
+  );
+  const historyProjectOptions = useMemo(
+    () => toProjectFilterOptions(projects, historyProject),
+    [projects, historyProject],
   );
 
   const historyFilters = useMemo<TaskHistoryFilters>(() => ({
@@ -407,11 +412,7 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
               onChange={(v) => setHistoryProject(v)}
               ariaLabel="프로젝트 필터"
               className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              options={[
-                { value: "", label: "전체 프로젝트" },
-                ...activeProjects.map((project) => ({ value: project.id, label: project.name })),
-                { value: "none", label: "미분류" },
-              ]}
+              options={historyProjectOptions}
             />
           </div>
 

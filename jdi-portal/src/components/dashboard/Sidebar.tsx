@@ -45,7 +45,7 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
   const { activeProjects } = useProjects();
   const onTimeline = pathname.startsWith("/dashboard/work-timeline");
   const currentProject = searchParams.get("project") ?? "";
-  const timelineSubItems = [
+  const timelineSubItems = onTimeline ? [
     { value: "", label: "전체", color: null as string | null },
     ...activeProjects.map((project) => ({
       value: project.id,
@@ -53,7 +53,7 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
       color: project.color as string | null,
     })),
     { value: "none", label: "미분류", color: null as string | null },
-  ];
+  ] : [];
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href);

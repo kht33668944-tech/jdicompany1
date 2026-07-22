@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import Select from "@/components/shared/Select";
 import UserAvatar from "@/components/shared/UserAvatar";
 import { useProjects } from "@/lib/projects/useProjects";
+import { toProjectEditOptions } from "@/lib/projects/utils";
 import {
   deleteWorkTimelineAttachment,
   deleteWorkTimelineEntry,
@@ -163,17 +164,14 @@ export default function WorkTimelineDetailClient({
         completedAt: fromKstDateTimeLocal(completedAt),
         projectId: projectId || null,
       });
-      const found = projectId
-        ? projects.find((project) => project.id === projectId)
-        : null;
-      // 프로젝트 목록이 아직 로딩 전이면, 변경하지 않은 프로젝트는 기존 배지를 유지한다.
-      const nextProject = projectId
-        ? found
-          ? { id: found.id, name: found.name, color: found.color }
-          : projectId === entry.project_id
-            ? entry.project
-            : null
-        : null;
+      const resolveNextProject = () => {
+        if (!projectId) return null;
+        const found = projects.find((project) => project.id === projectId);
+        if (found) return { id: found.id, name: found.name, color: found.color };
+        // 프로젝트 목록이 아직 로딩 전이면, 변경하지 않은 프로젝트는 기존 배지를 유지한다.
+        return projectId === entry.project_id ? entry.project : null;
+      };
+      const nextProject = resolveNextProject();
       setEntry((current) => ({
         ...current,
         ...updated,
@@ -361,12 +359,7 @@ export default function WorkTimelineDetailClient({
                   onChange={(v) => setProjectId(v)}
                   ariaLabel="프로젝트 선택"
                   className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"
-                  options={[
-                    { value: "", label: "미분류" },
-                    ...projects
-                      .filter((project) => !project.is_archived || project.id === projectId)
-                      .map((project) => ({ value: project.id, label: project.name })),
-                  ]}
+                  options={toProjectEditOptions(projects, projectId)}
                 />
               </label>
               <div className="flex flex-wrap items-center gap-2">

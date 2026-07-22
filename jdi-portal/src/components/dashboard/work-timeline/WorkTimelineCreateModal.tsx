@@ -8,6 +8,7 @@ import Select from "@/components/shared/Select";
 import { createProject } from "@/lib/projects/actions";
 import { PROJECT_COLORS, PROJECT_NAME_MAX_LENGTH } from "@/lib/projects/constants";
 import { notifyProjectsChanged, useProjects } from "@/lib/projects/useProjects";
+import { toProjectEditOptions } from "@/lib/projects/utils";
 import {
   createWorkTimelineEntry,
   deleteWorkTimelineEntry,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/work-timeline/draftStore";
 import { createImageThumbnail, resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import AttachmentFileCard from "./AttachmentFileCard";
+import ProjectColorPicker from "./ProjectColorPicker";
 
 interface WorkTimelineCreateModalProps {
   open: boolean;
@@ -94,7 +96,7 @@ export default function WorkTimelineCreateModal({
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectColor, setNewProjectColor] = useState<string>(PROJECT_COLORS[0]);
   const [creatingProject, setCreatingProject] = useState(false);
-  const { activeProjects } = useProjects();
+  const { projects } = useProjects();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlsRef = useRef(new Set<string>());
   const autosaveTimerRef = useRef<number | null>(null);
@@ -541,10 +543,7 @@ export default function WorkTimelineCreateModal({
               }}
               ariaLabel="프로젝트 선택"
               className="w-full rounded-lg border border-slate-200 px-3.5 py-3 text-sm text-slate-700 sm:max-w-xs"
-              options={[
-                { value: "", label: "미분류" },
-                ...activeProjects.map((project) => ({ value: project.id, label: project.name })),
-              ]}
+              options={toProjectEditOptions(projects, projectId)}
               footerAction={{ label: "새 프로젝트 만들기", onClick: () => setNewProjectOpen(true) }}
             />
             {newProjectOpen && (
@@ -556,21 +555,13 @@ export default function WorkTimelineCreateModal({
                   placeholder="새 프로젝트 이름 (예: 코스피랩)"
                   className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 />
-                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="프로젝트 색상">
-                  {PROJECT_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setNewProjectColor(color)}
-                      aria-label={`색상 ${color}`}
-                      aria-pressed={newProjectColor === color}
-                      className={`h-6 w-6 rounded-full border-2 transition-transform ${
-                        newProjectColor === color ? "scale-110 border-slate-700" : "border-transparent"
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
+                <ProjectColorPicker
+                  value={newProjectColor}
+                  onChange={setNewProjectColor}
+                  ariaLabel="프로젝트 색상"
+                  swatchSizeClass="h-6 w-6"
+                  className="items-center"
+                />
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"

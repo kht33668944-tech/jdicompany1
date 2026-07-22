@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, FileArrowDown, MagnifyingGlass, Plus, X } from "phosphor-react";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
 import { useProjects } from "@/lib/projects/useProjects";
+import { normalizeProjectParam, toProjectFilterOptions } from "@/lib/projects/utils";
 import { createClient } from "@/lib/supabase/client";
 import { addDays, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { WORK_TIMELINE_PAGE_SIZE } from "@/lib/work-timeline/constants";
@@ -166,6 +167,10 @@ export default function WorkTimelineSection({
   const requestVersionRef = useRef(0);
   const didMountRef = useRef(false);
   const urlSyncMountedRef = useRef(false);
+  const projectFilterOptions = useMemo(
+    () => toProjectFilterOptions(projects, projectId),
+    [projects, projectId],
+  );
   const groups = groupEntriesByKstDate(entries);
   const today = toDateString();
   const yesterday = addDays(today, -1);
@@ -302,8 +307,7 @@ export default function WorkTimelineSection({
       setQuery(nextQuery);
       setEmployeeId(UUID_PATTERN.test(nextEmployee) ? nextEmployee : "");
       setDate(normalizeDateFilter(params.get("date")));
-      const nextProject = params.get("project") ?? "";
-      setProjectId(nextProject === "none" || UUID_PATTERN.test(nextProject) ? nextProject : "");
+      setProjectId(normalizeProjectParam(params.get("project")));
     };
     window.addEventListener("popstate", restoreFilters);
     return () => window.removeEventListener("popstate", restoreFilters);
@@ -312,8 +316,7 @@ export default function WorkTimelineSection({
   // 사이드바 하위 메뉴(라우터 내비게이션)로 project 파라미터가 바뀌면 필터에 반영한다.
   useEffect(() => {
     if (compact) return;
-    const next = searchParams.get("project") ?? "";
-    const valid = next === "none" || UUID_PATTERN.test(next) ? next : "";
+    const valid = normalizeProjectParam(searchParams.get("project"));
     setProjectId((current) => (current === valid ? current : valid));
   }, [compact, searchParams]);
 
@@ -440,13 +443,7 @@ export default function WorkTimelineSection({
         </div>
         <div className="min-w-0">
           <Select
-            options={[
-              { value: "", label: "전체 프로젝트" },
-              ...projects
-                .filter((project) => !project.is_archived || project.id === projectId)
-                .map((project) => ({ value: project.id, label: project.name })),
-              { value: "none", label: "미분류" },
-            ]}
+            options={projectFilterOptions}
             value={projectId}
             onChange={(v) => setProjectId(v)}
             ariaLabel="프로젝트 선택"

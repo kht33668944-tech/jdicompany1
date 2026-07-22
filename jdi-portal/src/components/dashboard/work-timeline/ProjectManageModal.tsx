@@ -8,6 +8,7 @@ import { createProject, deleteProject, updateProject } from "@/lib/projects/acti
 import { PROJECT_COLORS, PROJECT_NAME_MAX_LENGTH } from "@/lib/projects/constants";
 import { notifyProjectsChanged, useProjects } from "@/lib/projects/useProjects";
 import type { Project } from "@/lib/projects/types";
+import ProjectColorPicker from "./ProjectColorPicker";
 
 interface ProjectManageModalProps {
   currentUserRole: string;
@@ -61,22 +62,12 @@ function ProjectRow({ project, isAdmin }: { project: Project; isAdmin: boolean }
         )}
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label={`${project.name} 색상`}>
-          {PROJECT_COLORS.map((color) => (
-            <button
-              key={color}
-              type="button"
-              disabled={busy}
-              onClick={() => void run(() => updateProject(project.id, { color }), "색상을 변경했습니다.")}
-              aria-label={`색상 ${color}`}
-              aria-pressed={project.color === color}
-              className={`h-5 w-5 rounded-full border-2 transition-transform ${
-                project.color === color ? "scale-110 border-slate-700" : "border-transparent"
-              }`}
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
+        <ProjectColorPicker
+          value={project.color}
+          disabled={busy}
+          ariaLabel={`${project.name} 색상`}
+          onChange={(color) => void run(() => updateProject(project.id, { color }), "색상을 변경했습니다.")}
+        />
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -191,21 +182,12 @@ export default function ProjectManageModal({ currentUserRole, onClose }: Project
               {creating ? "만드는 중..." : "만들기"}
             </button>
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="새 프로젝트 색상">
-            {PROJECT_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setNewColor(color)}
-                aria-label={`색상 ${color}`}
-                aria-pressed={newColor === color}
-                className={`h-5 w-5 rounded-full border-2 transition-transform ${
-                  newColor === color ? "scale-110 border-slate-700" : "border-transparent"
-                }`}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
+          <ProjectColorPicker
+            value={newColor}
+            onChange={setNewColor}
+            ariaLabel="새 프로젝트 색상"
+            className="mt-2"
+          />
         </div>
 
         {!loaded ? (

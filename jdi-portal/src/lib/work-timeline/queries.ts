@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PROJECT_UNCLASSIFIED } from "@/lib/projects/constants";
 import { WORK_TIMELINE_BUCKET, WORK_TIMELINE_PAGE_SIZE, WORK_TIMELINE_SIGNED_URL_TTL_SECONDS } from "./constants";
 import type {
   WorkTimelineAttachment,
@@ -107,7 +108,7 @@ export async function getWorkTimelineEntries(
   let request = supabase.from("work_timeline_entries").select(ENTRY_SELECT);
 
   if (filters.employeeId) request = request.eq("user_id", filters.employeeId);
-  if (filters.projectId === "none") request = request.is("project_id", null);
+  if (filters.projectId === PROJECT_UNCLASSIFIED) request = request.is("project_id", null);
   else if (filters.projectId) {
     assertUuid(filters.projectId, "프로젝트");
     request = request.eq("project_id", filters.projectId);

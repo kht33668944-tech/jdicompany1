@@ -6,6 +6,7 @@ import {
   getWorkTimelineProfiles,
 } from "@/lib/work-timeline/queries";
 import { getKstDayRange } from "@/lib/work-timeline/utils";
+import { normalizeProjectParam } from "@/lib/projects/utils";
 import { toDateString } from "@/lib/utils/date";
 
 interface WorkTimelinePageProps {
@@ -47,8 +48,7 @@ export default async function WorkTimelinePage({ searchParams }: WorkTimelinePag
   const initialDate = dateParam ? validDate(dateParam) : toDateString();
   const employeeId = UUID_PATTERN.test(initialEmployeeId) ? initialEmployeeId : "";
   const projectParam = firstValue(params.project);
-  const initialProjectId =
-    projectParam === "none" || UUID_PATTERN.test(projectParam) ? projectParam : "";
+  const initialProjectId = normalizeProjectParam(projectParam);
   const entriesPromise = initialQuery.length === 1
     ? Promise.resolve([])
     : getWorkTimelineEntries(auth.supabase, {

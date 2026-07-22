@@ -6,6 +6,7 @@ import { TASK_PRIORITIES, TASK_STATUSES } from "./constants";
 import { validateFile } from "@/lib/utils/upload";
 import type { TaskPriority, TaskStatus, TaskChecklistItem, TaskAttachment, TaskActivity } from "./types";
 import { createNotification, createNotificationForMany } from "@/lib/notifications/actions";
+import { isProjectFkViolation } from "@/lib/projects/utils";
 
 async function getSessionUserId() {
   const supabase = await createClient();
@@ -31,13 +32,6 @@ function revalidateTaskViews(taskId?: string) {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/tasks");
   if (taskId) revalidatePath(`/dashboard/tasks/${taskId}`);
-}
-
-/** 프로젝트 FK(23503) 위반: 선택한 프로젝트가 이미 삭제된 경우 */
-function isProjectFkViolation(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const { code, message, details } = error as { code?: string; message?: string; details?: string };
-  return code === "23503" && `${message ?? ""} ${details ?? ""}`.includes("project");
 }
 
 async function logActivity(

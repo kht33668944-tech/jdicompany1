@@ -23,15 +23,9 @@ import {
   isUniqueViolation,
   validateWorkTimelineInput,
 } from "./utils";
+import { isProjectFkViolation } from "@/lib/projects/utils";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
-
-/** 프로젝트 FK(23503) 위반: 선택한 프로젝트가 이미 삭제된 경우 */
-function isProjectFkViolation(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const { code, message, details } = error as { code?: string; message?: string; details?: string };
-  return code === "23503" && `${message ?? ""} ${details ?? ""}`.includes("project");
-}
 
 async function getAuthenticatedContext(): Promise<{ supabase: ServerClient; userId: string }> {
   const supabase = await createClient();

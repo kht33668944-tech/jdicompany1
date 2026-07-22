@@ -31,6 +31,7 @@ import {
 } from "@/lib/tasks/constants";
 import { updateTask, deleteTask, addAssignee, removeAssignee } from "@/lib/tasks/actions";
 import { useProjects } from "@/lib/projects/useProjects";
+import { toProjectEditOptions } from "@/lib/projects/utils";
 import TaskChecklist from "./TaskChecklist";
 import TaskAttachments from "./TaskAttachments";
 import TaskActivityTimeline from "./TaskActivityTimeline";
@@ -304,12 +305,7 @@ export default function TaskDetailClient({
   const canDelete = isCreator || isAdmin;
   const canManageAssignees = isCreator || isAdmin;
 
-  const projectOptions = [
-    { value: "", label: "미분류" },
-    ...projects
-      .filter((project) => !project.is_archived || project.id === projectId)
-      .map((project) => ({ value: project.id, label: project.name })),
-  ];
+  const projectOptions = toProjectEditOptions(projects, projectId);
 
   const handleSave = async () => {
     setSaving(true);

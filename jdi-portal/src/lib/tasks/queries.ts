@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PROJECT_UNCLASSIFIED } from "@/lib/projects/constants";
 import type {
   TaskWithDetails,
   TaskChecklistItem,
@@ -219,7 +220,7 @@ export async function getTaskHistoryWithDetails(
   }
   if (filters.assigneeId) query = query.eq("history_assignee.user_id", filters.assigneeId);
   if (filters.status) query = query.eq("status", filters.status);
-  if (filters.projectId === "none") query = query.is("project_id", null);
+  if (filters.projectId === PROJECT_UNCLASSIFIED) query = query.is("project_id", null);
   else if (filters.projectId) query = query.eq("project_id", filters.projectId);
   if (filters.date) {
     const { start, end } = getSeoulDayBounds(filters.date);

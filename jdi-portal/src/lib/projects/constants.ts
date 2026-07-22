@@ -1,5 +1,8 @@
 export const PROJECT_NAME_MAX_LENGTH = 50;
 
+/** URL·필터에서 "미분류"를 뜻하는 sentinel 값 (project_id IS NULL) */
+export const PROJECT_UNCLASSIFIED = "none";
+
 /** 프로젝트 색상 팔레트 (고정 선택지) */
 export const PROJECT_COLORS = [
   "#6366f1", // 인디고
