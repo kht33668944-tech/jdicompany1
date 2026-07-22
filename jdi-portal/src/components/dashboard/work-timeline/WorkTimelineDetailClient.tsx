@@ -163,15 +163,21 @@ export default function WorkTimelineDetailClient({
         completedAt: fromKstDateTimeLocal(completedAt),
         projectId: projectId || null,
       });
+      const found = projectId
+        ? projects.find((project) => project.id === projectId)
+        : null;
+      // 프로젝트 목록이 아직 로딩 전이면, 변경하지 않은 프로젝트는 기존 배지를 유지한다.
       const nextProject = projectId
-        ? (projects.find((project) => project.id === projectId) ?? null)
+        ? found
+          ? { id: found.id, name: found.name, color: found.color }
+          : projectId === entry.project_id
+            ? entry.project
+            : null
         : null;
       setEntry((current) => ({
         ...current,
         ...updated,
-        project: nextProject
-          ? { id: nextProject.id, name: nextProject.name, color: nextProject.color }
-          : null,
+        project: nextProject,
       }));
       setEditing(false);
       toast.success("업무 기록을 수정했습니다.");
