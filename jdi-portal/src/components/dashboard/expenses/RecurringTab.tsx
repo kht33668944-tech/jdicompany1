@@ -8,7 +8,7 @@ import { setRecurringActive } from "@/lib/expenses/actions";
 import { recurringStatus, type RecurringStatus } from "@/lib/expenses/recurring";
 import { getMonthRange, kstNow } from "@/lib/utils/date";
 import { formatKrw, formatForeign } from "@/lib/expenses/format";
-import { CATEGORY_STYLE } from "@/lib/expenses/constants";
+import { categoryStyle } from "@/lib/expenses/constants";
 import type {
   ExpenseCategory,
   PaymentMethod,
@@ -114,7 +114,7 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
   const categoryOptions: SelectOption[] = useMemo(
     () => [
       { value: "", label: "전체 분류" },
-      ...categories.map((c) => ({ value: c.id, label: c.name, dotClass: CATEGORY_STYLE[c.name]?.dot })),
+      ...categories.map((c) => ({ value: c.id, label: c.name, dotClass: categoryStyle(c.color_key).dot })),
     ],
     [categories]
   );

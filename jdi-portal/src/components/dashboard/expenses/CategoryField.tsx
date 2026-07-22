@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { createExpenseCategory, deleteExpenseCategory } from "@/lib/expenses/actions";
-import { CATEGORY_STYLE } from "@/lib/expenses/constants";
+import { categoryStyle } from "@/lib/expenses/constants";
 import type { ExpenseCategory } from "@/lib/expenses/types";
 import Select, { type SelectOption } from "@/components/shared/Select";
 import X from "phosphor-react/dist/icons/X.esm.js";
@@ -34,7 +34,7 @@ export default function CategoryField({
   const options: SelectOption[] = categories.map((c) => ({
     value: c.id,
     label: c.name,
-    dotClass: CATEGORY_STYLE[c.name]?.dot,
+    dotClass: categoryStyle(c.color_key).dot,
   }));
 
   const handleAdd = async () => {
@@ -123,7 +123,7 @@ export default function CategoryField({
                   className="flex items-center justify-between rounded-xl px-3 py-2 hover:bg-slate-100/70"
                 >
                   <span className="flex items-center gap-2 text-sm text-slate-700">
-                    <span className={`inline-block w-2 h-2 rounded-full ${CATEGORY_STYLE[c.name]?.dot ?? "bg-slate-300"}`} />
+                    <span className={`inline-block w-2 h-2 rounded-full ${categoryStyle(c.color_key).dot}`} />
                     {c.name}
                   </span>
                   <button

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/utils/date";
 import { formatKrw, formatForeign } from "@/lib/expenses/format";
-import { EXPENSE_SOURCE_LABEL, CATEGORY_STYLE, CATEGORY_STYLE_FALLBACK } from "@/lib/expenses/constants";
+import { EXPENSE_SOURCE_LABEL, categoryStyle } from "@/lib/expenses/constants";
 import type { ExpenseCategory, ExpenseWithMeta } from "@/lib/expenses/types";
 import Select, { type SelectOption } from "@/components/shared/Select";
 import Paperclip from "phosphor-react/dist/icons/Paperclip.esm.js";
@@ -32,7 +32,7 @@ export default function ExpenseList({ expenses, categories, loading, onSelect }:
   const categoryOptions: SelectOption[] = useMemo(
     () => [
       { value: "", label: "전체 분류" },
-      ...categories.map((c) => ({ value: c.id, label: c.name, dotClass: CATEGORY_STYLE[c.name]?.dot })),
+      ...categories.map((c) => ({ value: c.id, label: c.name, dotClass: categoryStyle(c.color_key).dot })),
     ],
     [categories]
   );
@@ -106,7 +106,7 @@ export default function ExpenseList({ expenses, categories, loading, onSelect }:
           <p className="text-xs font-bold text-slate-500 mb-2 ml-1">{formatDate(date)}</p>
           <div className="space-y-2">
             {rows.map((e) => {
-              const style = CATEGORY_STYLE[e.category?.name ?? ""] ?? CATEGORY_STYLE_FALLBACK;
+              const style = categoryStyle(e.category?.color_key);
               const isRecurring = e.source === "recurring";
               return (
               <button

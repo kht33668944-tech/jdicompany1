@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { pickNextColorKey } from "./colors";
 import type { ExpenseInput, RecurringInput } from "./types";
 
 async function getSessionUserId() {
@@ -40,22 +41,24 @@ export async function createExpenseCategory(name: string) {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("분류 이름을 입력해주세요.");
 
-  // 동명 분류가 이미 있는지 확인 (UNIQUE(name) 이므로 소프트 삭제분도 걸린다)
-  const { data: existing, error: readError } = await supabase
+  // 현재 쓰이는 색키 조회 → 안 쓰인 색 자동 배정 (UNIQUE(name) 이므로 소프트 삭제분도 함께 조회)
+  const { data: all, error: listError } = await supabase
     .from("expense_categories")
-    .select("id, is_active, is_sensitive")
-    .eq("name", trimmed)
-    .maybeSingle();
-  if (readError) throw new Error(`분류 확인에 실패했습니다: ${readError.message}`);
+    .select("id, name, is_active, is_sensitive, color_key");
+  if (listError) throw new Error(`분류 확인에 실패했습니다: ${listError.message}`);
 
+  const usedKeys = (all ?? []).map((c) => c.color_key).filter((k): k is string => !!k);
+  const nextKey = pickNextColorKey(usedKeys);
+
+  const existing = (all ?? []).find((c) => c.name === trimmed);
   if (existing) {
     if (existing.is_sensitive || existing.is_active) {
       throw new Error("이미 등록된 분류입니다.");
     }
-    // 숨겨졌던 비민감 분류 → 다시 활성화
+    // 숨겨졌던 비민감 분류 → 다시 활성화 (색이 없으면 이때 배정)
     const { error } = await supabase
       .from("expense_categories")
-      .update({ is_active: true })
+      .update({ is_active: true, color_key: existing.color_key ?? nextKey })
       .eq("id", existing.id);
     if (error) throw new Error(`분류 추가에 실패했습니다: ${error.message}`);
     return;
@@ -63,7 +66,7 @@ export async function createExpenseCategory(name: string) {
 
   const { error } = await supabase
     .from("expense_categories")
-    .insert({ name: trimmed, is_sensitive: false, sort_order: 50, created_by: userId });
+    .insert({ name: trimmed, is_sensitive: false, sort_order: 50, color_key: nextKey, created_by: userId });
   if (error) {
     if (error.code === "23505") throw new Error("이미 등록된 분류입니다.");
     throw new Error(`분류 추가에 실패했습니다: ${error.message}`);
