@@ -6,7 +6,7 @@ import type {
   WorkTimelineFilters,
   WorkTimelineProfile,
 } from "./types";
-import { assertUuid, escapePostgrestIlike, getKstDayRange } from "./utils";
+import { assertUuid, escapePostgrestIlike, getKstDayRange, isWorkTimelineImage } from "./utils";
 
 const ENTRY_SELECT = `
   id, user_id, task_id, title, description, completed_at, created_at, updated_at,
@@ -49,21 +49,29 @@ export async function getWorkTimelineAttachments(
   if (error) throw error;
 
   const rows = (data ?? []) as RawAttachment[];
-  const urls = await createSignedUrlMap(
-    supabase,
-    options.thumbnailOnly
-      ? rows.map((row) => row.thumbnail_path ?? row.file_path)
-      : rows.flatMap((row) => [row.file_path, row.thumbnail_path ?? ""]),
-  );
-  return rows.map((row) => ({
-    ...row,
-    original_url: options.thumbnailOnly && row.thumbnail_path
-      ? null
-      : urls[row.file_path] ?? null,
-    thumbnail_url: row.thumbnail_path
-      ? urls[row.thumbnail_path] ?? urls[row.file_path] ?? null
-      : urls[row.file_path] ?? null,
-  }));
+  const signPaths = options.thumbnailOnly
+    ? rows
+        .filter((row) => isWorkTimelineImage(row.mime_type) && row.thumbnail_path)
+        .map((row) => row.thumbnail_path as string)
+    : rows.flatMap((row) => [row.file_path, row.thumbnail_path ?? ""]);
+  const urls = await createSignedUrlMap(supabase, signPaths);
+  return rows.map((row) => {
+    const isImage = isWorkTimelineImage(row.mime_type);
+    if (options.thumbnailOnly) {
+      return {
+        ...row,
+        original_url: null,
+        thumbnail_url: isImage && row.thumbnail_path ? urls[row.thumbnail_path] ?? null : null,
+      };
+    }
+    return {
+      ...row,
+      original_url: urls[row.file_path] ?? null,
+      thumbnail_url: row.thumbnail_path
+        ? urls[row.thumbnail_path] ?? urls[row.file_path] ?? null
+        : urls[row.file_path] ?? null,
+    };
+  });
 }
 
 export function groupAttachmentsByEntry(
