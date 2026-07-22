@@ -26,6 +26,13 @@ import {
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
+/** 프로젝트 FK(23503) 위반: 선택한 프로젝트가 이미 삭제된 경우 */
+function isProjectFkViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { code, message, details } = error as { code?: string; message?: string; details?: string };
+  return code === "23503" && `${message ?? ""} ${details ?? ""}`.includes("project");
+}
+
 async function getAuthenticatedContext(): Promise<{ supabase: ServerClient; userId: string }> {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
@@ -104,7 +111,12 @@ async function insertEntry(
     const existing = await findDuplicateTaskEntry(supabase, userId, input.taskId);
     if (existing) return { entry: existing, duplicate: true };
   }
-  if (error) throw error;
+  if (error) {
+    if (isProjectFkViolation(error)) {
+      throw new Error("선택한 프로젝트가 삭제되었습니다. 프로젝트를 다시 선택해 주세요.");
+    }
+    throw error;
+  }
   return { entry: data as WorkTimelineEntry, duplicate: false };
 }
 
@@ -150,7 +162,12 @@ export async function updateWorkTimelineEntry(
     .eq("id", entryId)
     .select("id, user_id, task_id, project_id, title, description, completed_at, created_at, updated_at")
     .single();
-  if (error) throw error;
+  if (error) {
+    if (isProjectFkViolation(error)) {
+      throw new Error("선택한 프로젝트가 삭제되었습니다. 프로젝트를 다시 선택해 주세요.");
+    }
+    throw error;
+  }
   revalidateTimeline(entryId, data.task_id);
   return data as WorkTimelineEntry;
 }

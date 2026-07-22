@@ -117,6 +117,7 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
                         }
                         prefetch={false}
                         onClick={onMobileClose}
+                        aria-current={subActive ? "page" : undefined}
                         className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                           subActive
                             ? "bg-brand-50 text-brand-600"

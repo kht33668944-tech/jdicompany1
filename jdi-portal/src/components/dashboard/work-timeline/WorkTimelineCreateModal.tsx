@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
 import Select from "@/components/shared/Select";
 import { createProject } from "@/lib/projects/actions";
-import { PROJECT_COLORS } from "@/lib/projects/constants";
+import { PROJECT_COLORS, PROJECT_NAME_MAX_LENGTH } from "@/lib/projects/constants";
 import { notifyProjectsChanged, useProjects } from "@/lib/projects/useProjects";
 import {
   createWorkTimelineEntry,
@@ -552,7 +552,7 @@ export default function WorkTimelineCreateModal({
                 <input
                   value={newProjectName}
                   onChange={(event) => setNewProjectName(event.target.value)}
-                  maxLength={50}
+                  maxLength={PROJECT_NAME_MAX_LENGTH}
                   placeholder="새 프로젝트 이름 (예: 코스피랩)"
                   className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 />

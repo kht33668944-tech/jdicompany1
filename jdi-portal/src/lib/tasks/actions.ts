@@ -33,6 +33,13 @@ function revalidateTaskViews(taskId?: string) {
   if (taskId) revalidatePath(`/dashboard/tasks/${taskId}`);
 }
 
+/** 프로젝트 FK(23503) 위반: 선택한 프로젝트가 이미 삭제된 경우 */
+function isProjectFkViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { code, message, details } = error as { code?: string; message?: string; details?: string };
+  return code === "23503" && `${message ?? ""} ${details ?? ""}`.includes("project");
+}
+
 async function logActivity(
   taskId: string,
   userId: string,
@@ -89,7 +96,12 @@ export async function createTask(params: {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (isProjectFkViolation(error)) {
+      throw new Error("선택한 프로젝트가 삭제되었습니다. 프로젝트를 다시 선택해 주세요.");
+    }
+    throw error;
+  }
 
   // 담당자 배정
   const assigneeIds = params.assigneeIds?.length ? params.assigneeIds : [userId];
@@ -280,7 +292,12 @@ export async function updateTask(
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    if (isProjectFkViolation(error)) {
+      throw new Error("선택한 프로젝트가 삭제되었습니다. 프로젝트를 다시 선택해 주세요.");
+    }
+    throw error;
+  }
   revalidateTaskViews(taskId);
   return data ?? currentTask;
 }

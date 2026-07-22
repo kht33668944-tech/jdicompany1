@@ -146,7 +146,7 @@ export default function WorkTimelineSection({
 }: WorkTimelineSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { activeProjects } = useProjects({ enabled: !compact });
+  const { projects } = useProjects({ enabled: !compact });
   const [entries, setEntries] = useState(initialEntries);
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -442,7 +442,9 @@ export default function WorkTimelineSection({
           <Select
             options={[
               { value: "", label: "전체 프로젝트" },
-              ...activeProjects.map((project) => ({ value: project.id, label: project.name })),
+              ...projects
+                .filter((project) => !project.is_archived || project.id === projectId)
+                .map((project) => ({ value: project.id, label: project.name })),
               { value: "none", label: "미분류" },
             ]}
             value={projectId}
