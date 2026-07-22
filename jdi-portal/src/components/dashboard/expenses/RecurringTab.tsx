@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { getRecurringExpenses, getRecurringRecordedIds } from "@/lib/expenses/queries";
@@ -17,7 +17,6 @@ import type {
 import RecurringFormModal from "./RecurringFormModal";
 import RecurringCalendar from "./RecurringCalendar";
 import Select, { type SelectOption } from "@/components/shared/Select";
-import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 
 const FILTER_CLS = "w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm";
 
@@ -30,6 +29,7 @@ interface RecurringTabProps {
   paymentMethods: PaymentMethod[];
   onMethodsChanged: () => void;
   onCategoriesChanged: () => void;
+  openCreateSignal: number;
 }
 
 const BADGE_STYLE: Record<RecurringStatus, { cls: string; label: string }> = {
@@ -39,9 +39,8 @@ const BADGE_STYLE: Record<RecurringStatus, { cls: string; label: string }> = {
 };
 const SEG_ACTIVE = "bg-white shadow text-blue-600";
 const SEG_INACTIVE = "text-slate-500";
-const REGISTER_BTN = "flex items-center justify-center gap-1.5 rounded-xl bg-[#2563eb] text-white text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all";
 
-export default function RecurringTab({ recurring: initial, categories, profiles, userId, paymentMethods, onMethodsChanged, onCategoriesChanged }: RecurringTabProps) {
+export default function RecurringTab({ recurring: initial, categories, profiles, userId, paymentMethods, onMethodsChanged, onCategoriesChanged, openCreateSignal }: RecurringTabProps) {
   const [rows, setRows] = useState(initial);
   const [recordedIds, setRecordedIds] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<RecurringExpenseWithMeta | null>(null);
@@ -78,6 +77,13 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
     loadRecorded();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 부모(헤더 버튼)에서 등록 신호가 오면 등록 모달을 연다 (초기 마운트 제외)
+  const createSignalMounted = useRef(false);
+  useEffect(() => {
+    if (!createSignalMounted.current) { createSignalMounted.current = true; return; }
+    setCreating(true);
+  }, [openCreateSignal]);
 
   const refresh = async () => {
     try {
@@ -162,13 +168,6 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
 
   return (
     <div className="space-y-4">
-      {/* PC: 등록 버튼 (카드 밖 오른쪽 상단) */}
-      <div className="hidden md:flex justify-end">
-        <button onClick={() => setCreating(true)} className={`${REGISTER_BTN} px-5 py-2.5`}>
-          <Plus size={16} weight="bold" /> 고정 지출 등록
-        </button>
-      </div>
-
       {/* 통합 카드: 요약 + 뷰 전환 + 내용 */}
       <div className="rounded-2xl bg-white/65 backdrop-blur-sm border border-white/80 shadow-sm p-4 sm:p-5 space-y-4">
         {/* 요약 헤더 + 뷰 토글(우측) */}
@@ -293,10 +292,6 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
           </div>
         )}
 
-        {/* 모바일: 등록 버튼 (카드 하단) */}
-        <button onClick={() => setCreating(true)} className={`md:hidden w-full ${REGISTER_BTN} px-5 py-3`}>
-          <Plus size={16} weight="bold" /> 고정 지출 등록
-        </button>
       </div>
 
       {/* 분류별 고정비 (아래로 이동) */}

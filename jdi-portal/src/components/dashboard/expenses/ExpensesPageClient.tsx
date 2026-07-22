@@ -17,6 +17,7 @@ import ExpenseQuickInput from "./ExpenseQuickInput";
 import ExcelDownloadButton from "./ExcelDownloadButton";
 import CaretLeft from "phosphor-react/dist/icons/CaretLeft.esm.js";
 import CaretRight from "phosphor-react/dist/icons/CaretRight.esm.js";
+import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 
 const RecurringTab = dynamic(() => import("./RecurringTab"), {
   ssr: false,
@@ -58,6 +59,7 @@ export default function ExpensesPageClient({
   const [selected, setSelected] = useState<ExpenseWithMeta | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(initialPaymentMethods);
   const [allCategories, setAllCategories] = useState<ExpenseCategory[]>(categories);
+  const [recurringCreateSignal, setRecurringCreateSignal] = useState(0);
   const didMount = useRef(false);
 
   const inputCategories = useMemo(
@@ -150,6 +152,14 @@ export default function ExpensesPageClient({
             </div>
           </div>
         )}
+        {tab === "recurring" && (
+          <button
+            onClick={() => setRecurringCreateSignal((n) => n + 1)}
+            className="flex items-center gap-1.5 rounded-xl bg-[#2563eb] text-white text-sm font-bold px-4 py-2 hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            <Plus size={16} weight="bold" /> 고정 지출 등록
+          </button>
+        )}
       </div>
 
       {tab === "list" ? (
@@ -168,6 +178,7 @@ export default function ExpensesPageClient({
           paymentMethods={paymentMethods}
           onMethodsChanged={refreshPaymentMethods}
           onCategoriesChanged={refreshCategories}
+          openCreateSignal={recurringCreateSignal}
         />
       )}
 
