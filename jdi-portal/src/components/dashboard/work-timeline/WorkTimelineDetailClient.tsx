@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CalendarBlank, CaretLeft, CaretRight, DownloadSimple, FileArrowUp, LinkSimple, PencilSimple, TrashSimple, X } from "phosphor-react";
 import { toast } from "sonner";
+import Select from "@/components/shared/Select";
 import UserAvatar from "@/components/shared/UserAvatar";
+import { useProjects } from "@/lib/projects/useProjects";
 import {
   deleteWorkTimelineAttachment,
   deleteWorkTimelineEntry,
@@ -78,6 +80,8 @@ export default function WorkTimelineDetailClient({
   const [title, setTitle] = useState(initialEntry.title);
   const [description, setDescription] = useState(initialEntry.description ?? "");
   const [completedAt, setCompletedAt] = useState(() => toKstDateTimeLocal(initialEntry.completed_at));
+  const [projectId, setProjectId] = useState(initialEntry.project_id ?? "");
+  const { projects } = useProjects();
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -142,6 +146,7 @@ export default function WorkTimelineDetailClient({
     setTitle(entry.title);
     setDescription(entry.description ?? "");
     setCompletedAt(toKstDateTimeLocal(entry.completed_at));
+    setProjectId(entry.project_id ?? "");
     setEditing(false);
   };
 
@@ -156,8 +161,18 @@ export default function WorkTimelineDetailClient({
         title,
         description,
         completedAt: fromKstDateTimeLocal(completedAt),
+        projectId: projectId || null,
       });
-      setEntry((current) => ({ ...current, ...updated }));
+      const nextProject = projectId
+        ? (projects.find((project) => project.id === projectId) ?? null)
+        : null;
+      setEntry((current) => ({
+        ...current,
+        ...updated,
+        project: nextProject
+          ? { id: nextProject.id, name: nextProject.name, color: nextProject.color }
+          : null,
+      }));
       setEditing(false);
       toast.success("업무 기록을 수정했습니다.");
       router.refresh();
@@ -333,6 +348,21 @@ export default function WorkTimelineDetailClient({
                   className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 />
               </label>
+              <label className="block max-w-xs">
+                <span className="mb-1.5 block text-xs font-bold text-slate-500">프로젝트</span>
+                <Select
+                  value={projectId}
+                  onChange={(v) => setProjectId(v)}
+                  ariaLabel="프로젝트 선택"
+                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"
+                  options={[
+                    { value: "", label: "미분류" },
+                    ...projects
+                      .filter((project) => !project.is_archived || project.id === projectId)
+                      .map((project) => ({ value: project.id, label: project.name })),
+                  ]}
+                />
+              </label>
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   ref={imageInputRef}
@@ -389,6 +419,16 @@ export default function WorkTimelineDetailClient({
                   <CalendarBlank size={16} aria-hidden="true" />
                   {formatCompletedAt(entry.completed_at)}
                 </span>
+                {entry.project && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: entry.project.color }}
+                      aria-hidden="true"
+                    />
+                    {entry.project.name}
+                  </span>
+                )}
                 {entry.task_id && (
                   <Link
                     href={`/dashboard/tasks/${entry.task_id}`}
