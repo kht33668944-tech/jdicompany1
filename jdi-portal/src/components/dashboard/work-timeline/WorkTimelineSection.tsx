@@ -18,6 +18,7 @@ import type {
   WorkTimelineProfile,
 } from "@/lib/work-timeline/types";
 import WorkTimelineCreateModal from "./WorkTimelineCreateModal";
+import ProjectManageModal from "./ProjectManageModal";
 
 interface WorkTimelineSectionProps {
   initialEntries: WorkTimelineEntryWithProfile[];
@@ -148,6 +149,7 @@ export default function WorkTimelineSection({
   const { activeProjects } = useProjects({ enabled: !compact });
   const [entries, setEntries] = useState(initialEntries);
   const [createOpen, setCreateOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState(initialEmployeeId);
   const [date, setDate] = useState(initialDate);
   const [projectId, setProjectId] = useState(initialProjectId);
@@ -361,6 +363,15 @@ export default function WorkTimelineSection({
                 전체 보기
                 <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" weight="bold" aria-hidden="true" />
               </Link>
+            )}
+            {!compact && (
+              <button
+                type="button"
+                onClick={() => setManageOpen(true)}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition-colors hover:bg-slate-50 sm:gap-1.5 sm:px-3 sm:py-2 sm:text-xs"
+              >
+                프로젝트 관리
+              </button>
             )}
             <button
               type="button"
@@ -620,6 +631,12 @@ export default function WorkTimelineSection({
           currentUserId={currentUserId}
           onClose={() => setCreateOpen(false)}
           onCreated={handleCreated}
+        />
+      )}
+      {manageOpen && (
+        <ProjectManageModal
+          currentUserRole={currentUserRole}
+          onClose={() => setManageOpen(false)}
         />
       )}
     </section>
