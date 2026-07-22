@@ -28,11 +28,11 @@ const PALETTE: Record<string, CategoryStyle> = {
 
 const FALLBACK: CategoryStyle = { card: "bg-slate-50/80 border-slate-200", dot: "bg-slate-300" };
 
-/** 자동 배정 순서 (자주 쓰는 색을 앞쪽에) */
-export const COLOR_KEYS: readonly string[] = [
-  "violet", "blue", "indigo", "sky", "teal", "emerald",
-  "amber", "orange", "rose", "pink", "cyan", "lime", "fuchsia",
-];
+/**
+ * 자동 배정 순서 = PALETTE 선언 순서 (자주 쓰는 색을 앞쪽에 선언).
+ * ⚠️ 099 마이그레이션의 SQL backfill 배열은 별도 순서(emerald 시작)이므로 여기와 일치하지 않아도 된다.
+ */
+export const COLOR_KEYS = Object.keys(PALETTE) as readonly string[];
 
 export function categoryStyle(colorKey: string | null | undefined): CategoryStyle {
   if (!colorKey) return FALLBACK;

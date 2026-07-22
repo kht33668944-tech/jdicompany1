@@ -25,31 +25,7 @@ export default function ExpenseList({ expenses, categories, onChanged, loading, 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [methodFilter, setMethodFilter] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [amtInput, setAmtInput] = useState("");
-  const [savingAmt, setSavingAmt] = useState(false);
-
   const pendingCount = useMemo(() => expenses.filter((e) => e.amount_pending).length, [expenses]);
-
-  const submitAmount = async (id: string) => {
-    const val = parseKrwInput(amtInput);
-    if (!Number.isFinite(val) || val <= 0) {
-      toast.error("금액을 숫자로 입력해주세요.");
-      return;
-    }
-    setSavingAmt(true);
-    try {
-      await confirmExpenseAmount(id, val, null);
-      toast.success("금액이 확정되었습니다.");
-      setEditingId(null);
-      setAmtInput("");
-      onChanged();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
-    } finally {
-      setSavingAmt(false);
-    }
-  };
 
   const methods = useMemo(
     () => [...new Set(expenses.map((e) => e.payment_method))].sort(),
@@ -142,49 +118,9 @@ export default function ExpenseList({ expenses, categories, onChanged, loading, 
               const style = categoryStyle(e.category?.color_key);
               const isRecurring = e.source === "recurring";
 
-              // 변동성 자동기록(미확정): 빨강 강조 + 인라인 금액 입력
+              // 변동성 자동기록(미확정): 빨강 강조 + 인라인 금액 입력 (입력 상태는 행 컴포넌트가 자체 보유)
               if (e.amount_pending) {
-                const editing = editingId === e.id;
-                return (
-                  <div
-                    key={e.id}
-                    className="w-full rounded-2xl border border-red-200 bg-red-50/70 px-5 py-3.5 flex items-center gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate">
-                          {e.vendor ? `${e.vendor} · ` : ""}{e.description}
-                        </p>
-                        <span className="inline-flex items-center rounded-full bg-red-100 text-red-600 text-[11px] font-bold px-2 py-0.5 shrink-0">입력 필요</span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5 truncate flex items-center gap-1">
-                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
-                        {e.category?.name ?? "미분류"} · {e.payment_method}
-                      </p>
-                    </div>
-                    {editing ? (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <input
-                          autoFocus
-                          value={amtInput}
-                          onChange={(ev) => setAmtInput(ev.target.value)}
-                          onKeyDown={(ev) => { if (ev.key === "Enter") submitAmount(e.id); }}
-                          inputMode="numeric"
-                          placeholder="금액"
-                          className="w-28 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button onClick={() => submitAmount(e.id)} disabled={savingAmt} className="px-3 py-1.5 rounded-lg bg-[#2563eb] text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50">저장</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => { setEditingId(e.id); setAmtInput(""); }}
-                        className="shrink-0 px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold hover:bg-red-600"
-                      >
-                        금액 입력
-                      </button>
-                    )}
-                  </div>
-                );
+                return <PendingExpenseRow key={e.id} expense={e} dotClass={style.dot} onConfirmed={onChanged} />;
               }
 
               return (
@@ -225,6 +161,80 @@ export default function ExpenseList({ expenses, categories, onChanged, loading, 
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * 변동성 자동기록(미확정) 행 — 인라인 금액 입력.
+ * 입력 상태를 자체 보유해, 키 입력마다 리스트 전체가 재렌더되지 않게 한다.
+ */
+function PendingExpenseRow({
+  expense: e,
+  dotClass,
+  onConfirmed,
+}: {
+  expense: ExpenseWithMeta;
+  dotClass: string;
+  onConfirmed: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [amtInput, setAmtInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    const val = parseKrwInput(amtInput);
+    if (!Number.isFinite(val) || val <= 0) {
+      toast.error("금액을 숫자로 입력해주세요.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await confirmExpenseAmount(e.id, val);
+      toast.success("금액이 확정되었습니다.");
+      onConfirmed();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="w-full rounded-2xl border border-red-200 bg-red-50/70 px-5 py-3.5 flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm font-bold text-slate-800 truncate">
+            {e.vendor ? `${e.vendor} · ` : ""}{e.description}
+          </p>
+          <span className="inline-flex items-center rounded-full bg-red-100 text-red-600 text-[11px] font-bold px-2 py-0.5 shrink-0">입력 필요</span>
+        </div>
+        <p className="text-xs text-slate-500 mt-0.5 truncate flex items-center gap-1">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} />
+          {e.category?.name ?? "미분류"} · {e.payment_method}
+        </p>
+      </div>
+      {editing ? (
+        <div className="flex items-center gap-1.5 shrink-0">
+          <input
+            autoFocus
+            value={amtInput}
+            onChange={(ev) => setAmtInput(ev.target.value)}
+            onKeyDown={(ev) => { if (ev.key === "Enter") submit(); }}
+            inputMode="numeric"
+            placeholder="금액"
+            className="w-28 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button onClick={submit} disabled={saving} className="px-3 py-1.5 rounded-lg bg-[#2563eb] text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50">저장</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setEditing(true)}
+          className="shrink-0 px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold hover:bg-red-600"
+        >
+          금액 입력
+        </button>
+      )}
     </div>
   );
 }

@@ -59,7 +59,7 @@ export default function ExpensesPageClient({
   const [selected, setSelected] = useState<ExpenseWithMeta | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(initialPaymentMethods);
   const [allCategories, setAllCategories] = useState<ExpenseCategory[]>(categories);
-  const [recurringCreateSignal, setRecurringCreateSignal] = useState(0);
+  const [recurringCreateOpen, setRecurringCreateOpen] = useState(false);
   const didMount = useRef(false);
 
   const inputCategories = useMemo(
@@ -154,7 +154,7 @@ export default function ExpensesPageClient({
         )}
         {tab === "recurring" && (
           <button
-            onClick={() => setRecurringCreateSignal((n) => n + 1)}
+            onClick={() => setRecurringCreateOpen(true)}
             className="flex items-center gap-1.5 rounded-xl bg-[#2563eb] text-white text-sm font-bold px-4 py-2 hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
           >
             <Plus size={16} weight="bold" /> 고정 지출 등록
@@ -178,7 +178,8 @@ export default function ExpensesPageClient({
           paymentMethods={paymentMethods}
           onMethodsChanged={refreshPaymentMethods}
           onCategoriesChanged={refreshCategories}
-          openCreateSignal={recurringCreateSignal}
+          createOpen={recurringCreateOpen}
+          onCreateClose={() => setRecurringCreateOpen(false)}
         />
       )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { getRecurringExpenses, getRecurringRecordedIds } from "@/lib/expenses/queries";
@@ -29,7 +29,9 @@ interface RecurringTabProps {
   paymentMethods: PaymentMethod[];
   onMethodsChanged: () => void;
   onCategoriesChanged: () => void;
-  openCreateSignal: number;
+  /** 부모(헤더 버튼)가 여는 등록 모달 상태 */
+  createOpen: boolean;
+  onCreateClose: () => void;
 }
 
 const BADGE_STYLE: Record<RecurringStatus, { cls: string; label: string }> = {
@@ -40,11 +42,10 @@ const BADGE_STYLE: Record<RecurringStatus, { cls: string; label: string }> = {
 const SEG_ACTIVE = "bg-white shadow text-blue-600";
 const SEG_INACTIVE = "text-slate-500";
 
-export default function RecurringTab({ recurring: initial, categories, profiles, userId, paymentMethods, onMethodsChanged, onCategoriesChanged, openCreateSignal }: RecurringTabProps) {
+export default function RecurringTab({ recurring: initial, categories, profiles, userId, paymentMethods, onMethodsChanged, onCategoriesChanged, createOpen, onCreateClose }: RecurringTabProps) {
   const [rows, setRows] = useState(initial);
   const [recordedIds, setRecordedIds] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<RecurringExpenseWithMeta | null>(null);
-  const [creating, setCreating] = useState(false);
   const [view, setView] = useState<"calendar" | "list">("calendar");
 
   // 필터(목록 뷰)
@@ -77,13 +78,6 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
     loadRecorded();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // 부모(헤더 버튼)에서 등록 신호가 오면 등록 모달을 연다 (초기 마운트 제외)
-  const createSignalMounted = useRef(false);
-  useEffect(() => {
-    if (!createSignalMounted.current) { createSignalMounted.current = true; return; }
-    setCreating(true);
-  }, [openCreateSignal]);
 
   const refresh = async () => {
     try {
@@ -317,7 +311,7 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
         </div>
       )}
 
-      {(creating || editing) && (
+      {(createOpen || editing) && (
         <RecurringFormModal
           initial={editing}
           categories={categories}
@@ -327,7 +321,7 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
           onCategoriesChanged={onCategoriesChanged}
           defaultOwnerId={userId}
           onClose={() => {
-            setCreating(false);
+            onCreateClose();
             setEditing(null);
           }}
           onChanged={refresh}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { updateExpense, deleteExpense, setExpenseReceipt } from "@/lib/expenses/actions";
 import { uploadExpenseReceipt, getExpenseReceiptUrl } from "@/lib/expenses/receipts";
@@ -9,6 +9,7 @@ import type { ExpenseCategory, ExpenseCurrency, ExpenseWithMeta, PaymentMethod }
 import PaymentMethodField from "./PaymentMethodField";
 import CategoryField from "./CategoryField";
 import Select from "@/components/shared/Select";
+import { useOverlayDismiss } from "@/components/shared/useOverlayDismiss";
 
 const CURRENCY_OPTIONS = [
   { value: "KRW", label: "원화" },
@@ -36,8 +37,7 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
   const [categoryId, setCategoryId] = useState(expense.category_id);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // 배경에서 눌러 시작한 클릭만 닫기로 처리 (입력칸 드래그 중 배경에서 떼도 안 닫히게)
-  const overlayMouseDown = useRef(false);
+  const overlayHandlers = useOverlayDismiss(onClose);
 
   useEffect(() => {
     if (expense.receipt_path) {
@@ -109,13 +109,7 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/20 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        overlayMouseDown.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && overlayMouseDown.current) onClose();
-        overlayMouseDown.current = false;
-      }}
+      {...overlayHandlers}
     >
       <div className="w-full max-w-md rounded-[32px] shadow-2xl bg-white/70 backdrop-blur-[40px] border border-white/50 p-6 space-y-4">
         <h2 className="text-lg font-extrabold text-slate-900 ml-1">지출 수정</h2>

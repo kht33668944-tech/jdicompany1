@@ -18,7 +18,7 @@ test("pickNextColorKey 는 안 쓰인 첫 색을 고른다", () => {
   assert.equal(next, COLOR_KEYS[2]);
 });
 
-test("pickNextColorKey 는 모두 쓰이면 순환한다", () => {
+test("pickNextColorKey 는 모두 쓰이면 처음부터 순환한다", () => {
   const next = pickNextColorKey([...COLOR_KEYS]);
-  assert.equal(next, COLOR_KEYS[COLOR_KEYS.length % COLOR_KEYS.length]);
+  assert.equal(next, COLOR_KEYS[0]);
 });

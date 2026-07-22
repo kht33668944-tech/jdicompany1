@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createRecurringExpense, updateRecurringExpense, deleteRecurringExpense } from "@/lib/expenses/actions";
 import { getRecurringHistory } from "@/lib/expenses/queries";
@@ -11,6 +11,7 @@ import type { ExpenseCategory, ExpenseCurrency, PaymentMethod, RecurringExpenseW
 import PaymentMethodField from "./PaymentMethodField";
 import CategoryField from "./CategoryField";
 import Select from "@/components/shared/Select";
+import { useOverlayDismiss } from "@/components/shared/useOverlayDismiss";
 
 const CURRENCY_OPTIONS = [
   { value: "KRW", label: "원화" },
@@ -54,9 +55,7 @@ export default function RecurringFormModal({
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<RecurringHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  // 오버레이(배경)에서 마우스를 눌러 시작한 경우에만 닫는다.
-  // (입력칸에서 텍스트를 드래그하다 배경에서 떼면 실수로 닫히던 문제 방지)
-  const overlayMouseDown = useRef(false);
+  const overlayHandlers = useOverlayDismiss(onClose);
 
   useEffect(() => {
     if (!initial) return;
@@ -71,13 +70,14 @@ export default function RecurringFormModal({
     if (busy) return;
     setBusy(true);
     try {
+      const krw = parseKrwInput(amount);
       const input: RecurringInput = {
         name: name.trim(),
         vendor: vendor.trim() || null,
-        amount_krw: isVariable ? (parseKrwInput(amount) || 0) : parseKrwInput(amount),
+        amount_krw: isVariable ? (krw || 0) : krw,
         currency,
         amount_foreign: currency === "USD" ? parseForeignInput(foreignAmount) : null,
-        billing_day: parseKrwInput(billingDay),
+        billing_day: Number(billingDay),
         payment_method: method.trim(),
         category_id: categoryId,
         owner_id: ownerId,
@@ -123,13 +123,7 @@ export default function RecurringFormModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/20 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        overlayMouseDown.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && overlayMouseDown.current) onClose();
-        overlayMouseDown.current = false;
-      }}
+      {...overlayHandlers}
     >
       <div className="w-full max-w-md rounded-[32px] shadow-2xl bg-white/70 backdrop-blur-[40px] border border-white/50 p-6 space-y-4">
         <h2 className="text-lg font-extrabold text-slate-900 ml-1">{initial ? "고정 지출 수정" : "고정 지출 등록"}</h2>

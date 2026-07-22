@@ -211,7 +211,7 @@ export async function deleteRecurringExpense(id: string) {
 }
 
 /** 변동성 자동 기록(미확정) 지출의 이번 달 실제 금액을 확정한다. 승인 직원 누구나 가능(RLS로 보호). */
-export async function confirmExpenseAmount(id: string, amountKrw: number, amountForeign: number | null) {
+export async function confirmExpenseAmount(id: string, amountKrw: number) {
   const { supabase, userId } = await getSessionUserId();
   if (!Number.isFinite(amountKrw) || amountKrw <= 0 || !Number.isInteger(amountKrw))
     throw new Error("금액(원)을 올바르게 입력해주세요.");
@@ -219,7 +219,7 @@ export async function confirmExpenseAmount(id: string, amountKrw: number, amount
     .from("expenses")
     .update({
       amount_krw: amountKrw,
-      amount_foreign: amountForeign,
+      amount_foreign: null,
       amount_pending: false,
       updated_by: userId,
       updated_at: new Date().toISOString(),
