@@ -50,6 +50,7 @@ export default function RecurringFormModal({
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? "");
   const [ownerId, setOwnerId] = useState(initial?.owner_id ?? defaultOwnerId);
   const [note, setNote] = useState(initial?.note ?? "");
+  const [isVariable, setIsVariable] = useState(initial?.is_variable ?? false);
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<RecurringHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -73,13 +74,14 @@ export default function RecurringFormModal({
       const input: RecurringInput = {
         name: name.trim(),
         vendor: vendor.trim() || null,
-        amount_krw: parseKrwInput(amount),
+        amount_krw: isVariable ? (parseKrwInput(amount) || 0) : parseKrwInput(amount),
         currency,
         amount_foreign: currency === "USD" ? parseForeignInput(foreignAmount) : null,
         billing_day: parseKrwInput(billingDay),
         payment_method: method.trim(),
         category_id: categoryId,
         owner_id: ownerId,
+        is_variable: isVariable,
         note: note.trim() || null,
       };
       if (initial) {
@@ -168,16 +170,26 @@ export default function RecurringFormModal({
         )}
 
         <div className="space-y-1.5">
-          <label className={labelCls}>{currency === "USD" ? "원화 환산액" : "금액(원)"}</label>
+          <label className={labelCls}>{isVariable ? "예상 금액(선택)" : currency === "USD" ? "원화 환산액" : "금액(원)"}</label>
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder={currency === "USD" ? "원화 환산액" : "금액(원)"}
+            placeholder={isVariable ? "예상 금액(선택)" : currency === "USD" ? "원화 환산액" : "금액(원)"}
             inputMode="numeric"
             className={inputCls}
-            required
+            required={!isVariable}
           />
         </div>
+
+        <label className="flex items-center gap-2 ml-1 text-sm font-medium text-slate-600 select-none cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isVariable}
+            onChange={(e) => setIsVariable(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          />
+          매달 금액이 달라져요 (변동성)
+        </label>
 
         <div className="space-y-1.5">
           <label className={labelCls}>매달 결제일</label>
