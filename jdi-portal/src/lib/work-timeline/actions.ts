@@ -248,7 +248,7 @@ function validateAttachmentInput(
   const blocked = getBlockedExtension(input.fileName);
   if (blocked === "") throw new Error("확장자가 없는 파일은 첨부할 수 없습니다.");
   if (blocked) throw new Error(`보안상 '.${blocked}' 형식의 파일은 첨부할 수 없습니다.`);
-  if (!input.mimeType.trim()) throw new Error("첨부 파일 형식이 올바르지 않습니다.");
+  if (input.mimeType.length > 255) throw new Error("첨부 파일 형식이 올바르지 않습니다.");
   if (!Number.isInteger(input.fileSize) || input.fileSize < 1 || input.fileSize > WORK_TIMELINE_MAX_FILE_SIZE) {
     throw new Error("첨부 파일 크기가 올바르지 않습니다.");
   }
@@ -259,11 +259,18 @@ function validateAttachmentInput(
   if (!input.filePath.startsWith(expectedPrefix) || getStoragePathOwner(input.filePath) !== userId) {
     throw new Error("첨부 파일 경로가 올바르지 않습니다.");
   }
-  if (input.thumbnailPath && (
-    !input.thumbnailPath.startsWith(expectedPrefix)
-    || getStoragePathOwner(input.thumbnailPath) !== userId
-  )) {
-    throw new Error("첨부 파일 썸네일 경로가 올바르지 않습니다.");
+  if (input.thumbnailPath) {
+    if (
+      !input.thumbnailPath.startsWith(expectedPrefix)
+      || getStoragePathOwner(input.thumbnailPath) !== userId
+    ) {
+      throw new Error("첨부 파일 썸네일 경로가 올바르지 않습니다.");
+    }
+    // 썸네일도 신뢰 경계 방어: 위험 확장자 차단 (직접 호출 대비)
+    const thumbnailName = input.thumbnailPath.split("/").pop() ?? "";
+    if (getBlockedExtension(thumbnailName)) {
+      throw new Error("첨부 파일 썸네일 형식이 올바르지 않습니다.");
+    }
   }
 }
 
@@ -305,7 +312,7 @@ export async function finalizeWorkTimelineAttachments(
       file_name: input.fileName,
       file_path: input.filePath,
       thumbnail_path: input.thumbnailPath,
-      mime_type: input.mimeType,
+      mime_type: input.mimeType.trim() || "application/octet-stream",
       file_size: input.fileSize,
       position: input.position,
     })))
