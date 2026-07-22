@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatKrw } from "@/lib/expenses/format";
+import { categoryStyle } from "@/lib/expenses/constants";
 import { effectiveBillingDay } from "@/lib/expenses/recurring";
 import { getDaysInMonth, getFirstDayOfMonth, kstNow } from "@/lib/utils/date";
 import type { RecurringExpenseWithMeta } from "@/lib/expenses/types";
@@ -95,7 +96,7 @@ export default function RecurringCalendar({
       {/* 날짜 그리드 */}
       <div className="grid grid-cols-7 gap-1">
         {cells.map((day, idx) => {
-          if (day == null) return <div key={`e${idx}`} className="aspect-square md:aspect-auto md:min-h-[104px]" />;
+          if (day == null) return <div key={`e${idx}`} className="aspect-square md:aspect-auto md:min-h-[132px]" />;
           const items = byDay.get(day) ?? [];
           const has = items.length > 0;
           const isToday = isCurrentMonth && day === todayDay;
@@ -108,7 +109,7 @@ export default function RecurringCalendar({
           return (
             <div
               key={day}
-              className={`aspect-square md:aspect-auto md:min-h-[104px] rounded-xl border overflow-hidden transition-all ${
+              className={`aspect-square md:aspect-auto md:min-h-[132px] rounded-xl border overflow-hidden transition-all ${
                 has
                   ? "bg-blue-50 border-blue-200 md:bg-white md:border-slate-100"
                   : "border-transparent md:border-slate-100"
@@ -133,25 +134,29 @@ export default function RecurringCalendar({
               {/* 데스크톱: 칸 안에 내용+가격 칩 표시 */}
               <div className="hidden md:flex md:flex-col md:h-full p-1.5 gap-1">
                 <span className={`text-sm font-bold leading-none mb-0.5 ${dayNumCls}`}>{day}</span>
-                {items.slice(0, 2).map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => onSelectRow(r)}
-                    className="w-full flex items-center justify-between gap-1.5 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-[13px] leading-tight transition-colors"
-                    title={`${r.name} · ${formatKrw(Number(r.amount_krw))}`}
-                  >
-                    <span className="font-bold text-blue-700 truncate">{r.name}</span>
-                    <span className="text-blue-500 shrink-0 font-medium">{Number(r.amount_krw).toLocaleString("ko-KR")}</span>
-                  </button>
-                ))}
-                {items.length > 2 && (
+                {items.slice(0, 3).map((r) => {
+                  const cs = categoryStyle(r.category?.color_key);
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => onSelectRow(r)}
+                      className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-md border text-[13px] leading-tight transition-colors hover:brightness-95 ${cs.card}`}
+                      title={`${r.name} · ${formatKrw(Number(r.amount_krw))}`}
+                    >
+                      <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${cs.dot}`} />
+                      <span className="font-bold text-slate-700 truncate flex-1 text-left">{r.name}</span>
+                      <span className="text-slate-500 shrink-0 font-medium">{Number(r.amount_krw).toLocaleString("ko-KR")}</span>
+                    </button>
+                  );
+                })}
+                {items.length > 3 && (
                   <button
                     type="button"
                     onClick={() => setSelectedDay(isSelected ? null : day)}
                     className="text-[11px] text-slate-400 hover:text-blue-500 text-left px-1"
                   >
-                    +{items.length - 2}건 더
+                    +{items.length - 3}건 더
                   </button>
                 )}
               </div>
