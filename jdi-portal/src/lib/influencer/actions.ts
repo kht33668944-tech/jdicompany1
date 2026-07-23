@@ -79,7 +79,7 @@ export async function addInfluencer(
     throw new Error("URL에서 사용자명을 추출할 수 없습니다.");
   }
 
-  const userId = await getSessionUserId();
+  await getSessionUserId();
   const supabase = await createClient();
 
   // 이미 등록되어 있으면 Apify 호출 없이 기존 ID 반환 (비용·시간 절감)
@@ -96,7 +96,7 @@ export async function addInfluencer(
 
   const { data: extractData, error: extractError } = await supabase.functions.invoke(
     "influencer-extract",
-    { body: { profile_url: profileUrl, created_by: userId } }
+    { body: { profile_url: profileUrl } }
   );
 
   if (extractError) throw new Error(`인플루언서 정보 수집 실패: ${extractError.message}`);
@@ -121,7 +121,7 @@ export async function resyncAllInfluencers(): Promise<{
   success: number;
   failed: number;
 }> {
-  const userId = await getSessionUserId();
+  await getSessionUserId();
   const supabase = await createClient();
 
   const { data: list, error } = await supabase
@@ -140,7 +140,7 @@ export async function resyncAllInfluencers(): Promise<{
     try {
       const { data: extractData, error: extractError } = await supabase.functions.invoke(
         "influencer-extract",
-        { body: { profile_url: inf.profile_url, created_by: userId } },
+        { body: { profile_url: inf.profile_url } },
       );
       if (extractError) {
         failed++;
@@ -165,7 +165,7 @@ export async function resyncAllInfluencers(): Promise<{
 }
 
 export async function resyncInfluencer(id: string): Promise<void> {
-  const userId = await getSessionUserId();
+  await getSessionUserId();
   const supabase = await createClient();
 
   const { data, error: fetchError } = await supabase
@@ -178,7 +178,7 @@ export async function resyncInfluencer(id: string): Promise<void> {
 
   const { data: extractData, error: extractError } = await supabase.functions.invoke(
     "influencer-extract",
-    { body: { profile_url: data.profile_url, created_by: userId } }
+    { body: { profile_url: data.profile_url } }
   );
 
   if (extractError) throw new Error(`재동기화 실패: ${extractError.message}`);

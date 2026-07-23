@@ -144,10 +144,34 @@ Deno.serve(async (req) => {
     return new Response("method not allowed", { status: 405 });
   }
 
-  // Authorization 헤더 검증 (호출자 JWT)
+  // 호출자 인증: Supabase JWT를 실제로 검증하고 승인된 사용자만 통과.
+  //   - Bearer 문자열만 확인하던 이전 방식(가짜 인증)을 대체.
+  //   - 함수는 --no-verify-jwt로 배포되므로 게이트웨이가 아니라 여기서 직접 검증해야 함.
   const authHeader = req.headers.get("authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
-    return new Response("unauthorized", { status: 401 });
+    return new Response(
+      JSON.stringify({ error: "unauthorized" }),
+      { status: 401, headers: { "content-type": "application/json" } },
+    );
+  }
+  const jwt = authHeader.slice(7);
+  const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
+  if (authError || !user) {
+    return new Response(
+      JSON.stringify({ error: "unauthorized" }),
+      { status: 401, headers: { "content-type": "application/json" } },
+    );
+  }
+  const { data: approvedRow } = await supabase
+    .from("profiles")
+    .select("is_approved")
+    .eq("id", user.id)
+    .single();
+  if (!approvedRow?.is_approved) {
+    return new Response(
+      JSON.stringify({ error: "forbidden: not an approved user" }),
+      { status: 403, headers: { "content-type": "application/json" } },
+    );
   }
 
   // GEMINI_API_KEY 누락 시 명확한 에러

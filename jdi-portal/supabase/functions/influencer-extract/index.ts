@@ -77,7 +77,8 @@ interface ApifyProfileResult {
 
 interface ExtractRequest {
   profile_url: string;
-  created_by?: string;
+  // created_by는 더 이상 요청 본문에서 받지 않는다(위조 방지).
+  // 등록자는 검증된 로그인 사용자(user.id)로 서버가 결정한다.
 }
 
 interface ExtractResponse {
@@ -397,24 +398,31 @@ Deno.serve(async (req) => {
   }
   const userJwt = authHeader.slice(7);
 
-  // 호출자 JWT로 클라이언트 생성 → created_by = auth.uid() RLS 자동 충족
-  const supabaseUser = createClient(SUPABASE_URL, SERVICE_ROLE, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${userJwt}` } },
-  });
-
   // service_role 클라이언트 (posts/logs 같이 RLS 우회 필요한 작업용)
   const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // 호출자 uid 확인
+  // 호출자 uid 확인: JWT를 실제 검증 (getUser가 auth 서버에 토큰 유효성 확인)
   const {
     data: { user },
     error: authError,
-  } = await supabaseUser.auth.getUser();
+  } = await supabaseAdmin.auth.getUser(userJwt);
   if (authError || !user) {
     return new Response("unauthorized", { status: 401 });
+  }
+
+  // 승인된 사용자만 허용 (Apify 유료 호출 남용 방지)
+  const { data: approvedRow } = await supabaseAdmin
+    .from("profiles")
+    .select("is_approved")
+    .eq("id", user.id)
+    .single();
+  if (!approvedRow?.is_approved) {
+    return new Response(
+      JSON.stringify({ error: "forbidden: not an approved user" }),
+      { status: 403, headers: { "content-type": "application/json" } },
+    );
   }
 
   let body: ExtractRequest;
@@ -460,7 +468,9 @@ Deno.serve(async (req) => {
     // 4. 등급
     const grade = calcGrade(engagementRate, followerCount);
 
-    const createdBy = body.created_by ?? user.id;
+    // 등록자는 요청 본문의 입력값을 신뢰하지 않고,
+    // 검증된 로그인 사용자 id로 서버가 결정한다.
+    const createdBy = user.id;
 
     // 5. influencers upsert
     const { data: influencerRow, error: upsertError } = await supabaseAdmin
