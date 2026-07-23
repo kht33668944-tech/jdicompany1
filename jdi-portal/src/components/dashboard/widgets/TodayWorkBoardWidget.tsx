@@ -756,9 +756,17 @@ export default function TodayWorkBoardWidget({
                             aria-label={`${task.title} 상세 보기`}
                           >
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <p className={`truncate text-sm font-bold ${isDone ? "text-slate-400 line-through" : "text-slate-800"}`}>
-                                {task.title}
-                              </p>
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                {task.project && (
+                                  <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
+                                    <span className="truncate">{task.project.name}</span>
+                                  </span>
+                                )}
+                                <p className={`min-w-0 truncate text-sm font-bold ${isDone ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                                  {task.title}
+                                </p>
+                              </div>
                               <div className="flex shrink-0 items-center gap-4">
                                 <span className={`rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
                                   {task.status}

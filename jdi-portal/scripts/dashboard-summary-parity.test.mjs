@@ -10,7 +10,7 @@ const appRoot = path.resolve(import.meta.dirname, "..");
 const summarySourcePath = path.join(appRoot, "src", "lib", "dashboard", "dashboard-task-summary.ts");
 const fastQueriesSourcePath = path.join(appRoot, "src", "lib", "dashboard", "fast-queries.ts");
 const dashboardQueriesSourcePath = path.join(appRoot, "src", "lib", "dashboard", "queries.ts");
-const rpcMigrationSourcePath = path.join(appRoot, "supabase", "migrations", "089_dashboard_task_summary_future_due.sql");
+const rpcMigrationSourcePath = path.join(appRoot, "supabase", "migrations", "102_dashboard_task_summary_project.sql");
 const tasksPageSourcePath = path.join(appRoot, "src", "components", "dashboard", "tasks", "TasksPageClient.tsx");
 const taskPageDetailSourcePath = path.join(appRoot, "src", "app", "dashboard", "tasks", "[id]", "page.tsx");
 
@@ -95,9 +95,11 @@ function assertClassifierAndProjectionSource(source, variableName, nextDayDateEx
   assert.match(sql, /ORDER BY t\.class_rank ASC, CASE WHEN t\.class_rank = 5 THEN t\.relevant_at END DESC NULLS LAST, CASE WHEN t\.class_rank <> 5 THEN t\.relevant_at END ASC NULLS LAST, t\.status_rank ASC, t\.position ASC NULLS LAST, t\.created_at ASC, t\.id ASC/i);
   assert.match(sql, /JOIN public\.profiles assignee ON assignee\.id = ta\.user_id AND assignee\.is_approved = true/i);
   assert.match(sql, /ORDER BY ta\.user_id ASC/i);
-  for (const field of ["id", "title", "status", "priority", "due_date", "start_date", "position", "parent_id", "created_by", "created_at", "updated_at", "completed_at"]) {
+  for (const field of ["id", "title", "status", "priority", "due_date", "start_date", "position", "parent_id", "project_id", "created_by", "created_at", "updated_at", "completed_at"]) {
     assert.match(sql, new RegExp(`t\\.${field}`));
   }
+  // 프로젝트 배지: 빠른 경로와 RPC 양쪽 모두 project(id, name, color)를 싣는다.
+  assert.match(sql, /'project', \( select jsonb_build_object\('id', pj\.id, 'name', pj\.name, 'color', pj\.color\) from public\.projects pj where pj\.id = t\.project_id \)/i);
 }
 
 test("fast SQL and the atomic fallback RPC mirror the pinned classifier, comparator, approved assignees, projection, and 101 cap", () => {

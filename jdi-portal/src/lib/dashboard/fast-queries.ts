@@ -56,6 +56,7 @@ const DASHBOARD_SNAPSHOT_QUERY = `
       t.start_date,
       t.position,
       t.parent_id,
+      t.project_id,
       t.created_by,
       t.created_at,
       t.updated_at,
@@ -133,6 +134,12 @@ const DASHBOARD_SNAPSHOT_QUERY = `
           'start_date', t.start_date,
           'position', t.position,
           'parent_id', t.parent_id,
+          'project_id', t.project_id,
+          'project', (
+            select jsonb_build_object('id', pj.id, 'name', pj.name, 'color', pj.color)
+            from public.projects pj
+            where pj.id = t.project_id
+          ),
           'created_by', t.created_by,
           'created_at', t.created_at,
           'updated_at', t.updated_at,

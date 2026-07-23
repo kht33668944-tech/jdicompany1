@@ -72,6 +72,21 @@ test("타임라인 화면: project 파라미터·필터·배지", () => {
   assert.match(section, /useProjects/);
 });
 
+test("대시보드 오늘 할 일: project 를 빠른 경로와 RPC 폴백 양쪽에 싣고 배지로 표시한다", () => {
+  const fast = read("src/lib/dashboard/fast-queries.ts");
+  assert.match(fast, /'project_id', t\.project_id/);
+  assert.match(fast, /'project',[\s\S]*?public\.projects pj/);
+  const rpc = read("supabase/migrations/102_dashboard_task_summary_project.sql");
+  assert.match(rpc, /'project_id', t\.project_id/);
+  assert.match(rpc, /'project',[\s\S]*?public\.projects pj/);
+  const summary = read("src/lib/dashboard/dashboard-task-summary.ts");
+  assert.match(summary, /project: ProjectRef \| null/);
+  const widget = read("src/components/dashboard/widgets/TodayWorkBoardWidget.tsx");
+  assert.match(widget, /task\.project && \(/);
+  assert.match(widget, /task\.project\.color/);
+  assert.match(widget, /task\.project\.name/);
+});
+
 test("할일: project 를 빠른 경로와 REST 폴백 양쪽에 싣는다 (성능 불변조건 3)", () => {
   const fast = read("src/lib/tasks/fast-queries.ts");
   assert.match(fast, /'project_id', t\.project_id/);

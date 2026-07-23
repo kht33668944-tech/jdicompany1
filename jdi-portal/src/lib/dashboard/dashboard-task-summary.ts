@@ -1,4 +1,5 @@
 import type { Profile } from "../attendance/types";
+import type { ProjectRef } from "../projects/types";
 import type { TaskPriority, TaskStatus } from "../tasks/types";
 import { addDays, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 
@@ -27,6 +28,8 @@ export interface DashboardTaskSummary {
   start_date: string | null;
   position: number | null;
   parent_id: string | null;
+  project_id: string | null;
+  project: ProjectRef | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -244,6 +247,18 @@ function parseAssignees(value: unknown, field: string): DashboardTaskAssigneeSum
   });
 }
 
+function parseNullableProjectRef(value: unknown, field: string): ProjectRef | null {
+  // 102 이전 RPC 는 project 필드를 싣지 않으므로 undefined 도 null 로 허용한다
+  // (배포/마이그레이션 순서가 어긋나도 대시보드가 깨지지 않게 하는 안전장치).
+  if (value === null || value === undefined) return null;
+  if (!isRecord(value)) contractFailure(`${field} must be an object or null`);
+  return {
+    id: readString(value.id, `${field}.id`),
+    name: readString(value.name, `${field}.name`),
+    color: readString(value.color, `${field}.color`),
+  };
+}
+
 function parseDashboardTaskSummary(value: unknown, index: number): DashboardTaskSummary {
   const field = `tasks[${index}]`;
   if (!isRecord(value)) contractFailure(`${field} must be an object`);
@@ -275,6 +290,10 @@ function parseDashboardTaskSummary(value: unknown, index: number): DashboardTask
     start_date: readNullableDate(value.start_date, `${field}.start_date`),
     position,
     parent_id: readNullableString(value.parent_id, `${field}.parent_id`),
+    project_id: value.project_id === undefined
+      ? null
+      : readNullableString(value.project_id, `${field}.project_id`),
+    project: parseNullableProjectRef(value.project, `${field}.project`),
     created_by: readString(value.created_by, `${field}.created_by`),
     created_at: readTimestamp(value.created_at, `${field}.created_at`),
     updated_at: readTimestamp(value.updated_at, `${field}.updated_at`),
