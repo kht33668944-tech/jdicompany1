@@ -17,6 +17,7 @@ import {
 import {
   buildDashboardDataFromSnapshot,
   type DashboardSnapshot,
+  type PendingReviews,
 } from "./dashboard-snapshot";
 import { getDashboardData, type DashboardData } from "./queries";
 
@@ -278,6 +279,54 @@ const DASHBOARD_SNAPSHOT_QUERY = `
       where r.state = '미확인'
       group by r.user_id
     ) c
+  ),
+  -- 검토 인박스: 내가 보완해야 할(open, author=나) 검토와 내가 확인해야 할(submitted, reviewer=나) 검토.
+  -- 부분 인덱스 work_timeline_reviews_author_open / _reviewer_submitted 를 탄다 (마이그레이션 107).
+  pending_reviews_to_fix as (
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'review_id', r.id,
+          'entry_id', r.entry_id,
+          'entry_title', e.title,
+          'comment', r.comment,
+          'counterpart_name', rp.full_name,
+          'created_at', r.created_at,
+          'task_id', r.task_id
+        )
+        order by r.created_at desc
+      ),
+      '[]'::jsonb
+    ) as value
+    from public.work_timeline_reviews r
+    join public.work_timeline_entries e on e.id = r.entry_id
+    left join public.profiles rp on rp.id = r.reviewer_id
+    cross join parameters prm
+    cross join approved_requester
+    where r.author_id = prm.user_id and r.state = 'open'
+  ),
+  pending_reviews_to_confirm as (
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'review_id', r.id,
+          'entry_id', r.entry_id,
+          'entry_title', e.title,
+          'comment', r.comment,
+          'counterpart_name', ap.full_name,
+          'created_at', r.created_at,
+          'task_id', r.task_id
+        )
+        order by r.created_at desc
+      ),
+      '[]'::jsonb
+    ) as value
+    from public.work_timeline_reviews r
+    join public.work_timeline_entries e on e.id = r.entry_id
+    left join public.profiles ap on ap.id = r.author_id
+    cross join parameters prm
+    cross join approved_requester
+    where r.reviewer_id = prm.user_id and r.state = 'submitted'
   )
   select jsonb_build_object(
     'todayRecord', coalesce((select value from today_record), 'null'::jsonb),
@@ -304,7 +353,11 @@ const DASHBOARD_SNAPSHOT_QUERY = `
     ), '[]'::jsonb),
     'schedules', (select value from schedules),
     'pendingDirectives', (select value from pending_directives),
-    'directivePendingCounts', (select value from directive_pending_counts)
+    'directivePendingCounts', (select value from directive_pending_counts),
+    'pendingReviews', jsonb_build_object(
+      'toFix', (select value from pending_reviews_to_fix),
+      'toConfirm', (select value from pending_reviews_to_confirm)
+    )
   ) as snapshot
   from approved_requester
 `;
@@ -314,8 +367,25 @@ interface DashboardTaskSummaryWire {
   profiles: unknown;
 }
 
-interface DashboardSnapshotWire extends Omit<DashboardSnapshot, "taskSummary"> {
+interface PendingReviewItemWire {
+  review_id: string;
+  entry_id: string;
+  entry_title: string;
+  comment: string;
+  counterpart_name: string | null;
+  created_at: string;
+  task_id: string | null;
+}
+
+interface PendingReviewsWire {
+  toFix: PendingReviewItemWire[];
+  toConfirm: PendingReviewItemWire[];
+}
+
+interface DashboardSnapshotWire
+  extends Omit<DashboardSnapshot, "taskSummary" | "pendingReviews"> {
   taskSummary: DashboardTaskSummaryWire;
+  pendingReviews: PendingReviewsWire;
 }
 
 interface DashboardSnapshotRow {
@@ -396,6 +466,25 @@ export function mapFastDashboardTaskSummaryRows(
   return normalizeDashboardTaskSummaryResult(rows, profiles, window);
 }
 
+function mapPendingReviewItemWire(row: PendingReviewItemWire) {
+  return {
+    reviewId: row.review_id,
+    entryId: row.entry_id,
+    entryTitle: row.entry_title,
+    comment: row.comment,
+    counterpartName: row.counterpart_name,
+    createdAt: row.created_at,
+    taskId: row.task_id,
+  };
+}
+
+export function mapFastPendingReviews(wire: PendingReviewsWire | undefined | null): PendingReviews {
+  return {
+    toFix: (wire?.toFix ?? []).map(mapPendingReviewItemWire),
+    toConfirm: (wire?.toConfirm ?? []).map(mapPendingReviewItemWire),
+  };
+}
+
 async function getDashboardDataViaPostgres(
   userId: string,
   userName: string,
@@ -432,9 +521,11 @@ async function getDashboardDataViaPostgres(
     snapshot.taskSummary.profiles,
     taskSummaryWindow
   );
+  const pendingReviews = mapFastPendingReviews(snapshot.pendingReviews);
   const snapshotDataWithSummary = buildDashboardDataFromSnapshot({
     ...snapshot,
     taskSummary,
+    pendingReviews,
   }, {
     userName,
     canViewCompanyWork,

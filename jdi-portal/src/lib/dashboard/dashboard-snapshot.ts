@@ -1,7 +1,13 @@
 import type { AttendanceRecord, TodayAttendanceStatus } from "../attendance/types";
 import type { DirectivePendingCount, PendingDirective } from "../directives/types";
 import type { ScheduleWithProfile } from "../schedule/types";
+import type { PendingReviewItem } from "../work-timeline/types";
 import type { DashboardTaskSummaryResult } from "./dashboard-task-summary";
+
+export interface PendingReviews {
+  toFix: PendingReviewItem[];
+  toConfirm: PendingReviewItem[];
+}
 
 export interface DashboardSnapshot {
   todayRecord: AttendanceRecord | null;
@@ -11,6 +17,7 @@ export interface DashboardSnapshot {
   schedules: ScheduleWithProfile[];
   pendingDirectives: PendingDirective[];
   directivePendingCounts: DirectivePendingCount[];
+  pendingReviews: PendingReviews;
 }
 
 export interface DashboardSnapshotContext {
@@ -33,6 +40,7 @@ export interface DashboardSnapshotData {
   canViewCompanyWork: boolean;
   pendingDirectives: PendingDirective[];
   directivePendingCounts: DirectivePendingCount[];
+  pendingReviews: PendingReviews;
 }
 
 function addDays(dateString: string, days: number): string {
@@ -76,5 +84,7 @@ export function buildDashboardDataFromSnapshot(
     // 업무지시 기능(103) 이전에 만들어진 스냅샷이 들어와도 화면이 깨지지 않도록 기본값을 둔다.
     pendingDirectives: snapshot.pendingDirectives ?? [],
     directivePendingCounts: snapshot.directivePendingCounts ?? [],
+    // 업무보고 검토 기능(107) 이전에 만들어진 스냅샷이 들어와도 화면이 깨지지 않도록 기본값을 둔다.
+    pendingReviews: snapshot.pendingReviews ?? { toFix: [], toConfirm: [] },
   };
 }

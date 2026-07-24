@@ -111,6 +111,8 @@ test("maps a single-query dashboard snapshot to the bounded task-summary Dashboa
     // 업무지시 필드가 없는 예전 스냅샷도 빈 배열로 안전하게 채워진다
     pendingDirectives: [],
     directivePendingCounts: [],
+    // 검토 필드가 없는 예전 스냅샷도 빈 배열로 안전하게 채워진다
+    pendingReviews: { toFix: [], toConfirm: [] },
   });
 });
 
@@ -151,6 +153,7 @@ test("preserves empty employee dashboard data without inventing company task rec
     canViewCompanyWork: false,
     pendingDirectives: [],
     directivePendingCounts: [],
+    pendingReviews: { toFix: [], toConfirm: [] },
   });
 });
 

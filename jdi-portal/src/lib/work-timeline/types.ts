@@ -128,3 +128,14 @@ export interface WorkTimelineReviewEvent {
 export interface WorkTimelineReviewWithEvents extends WorkTimelineReview {
   events: WorkTimelineReviewEvent[];
 }
+
+/** 대시보드 검토 인박스 한 건 (보완할 것 / 확인할 것 공용) */
+export interface PendingReviewItem {
+  reviewId: string;
+  entryId: string;
+  entryTitle: string;
+  comment: string;
+  counterpartName: string | null;
+  createdAt: string;
+  taskId: string | null;
+}

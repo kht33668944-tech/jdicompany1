@@ -7,6 +7,7 @@ import {
 } from "@/lib/attendance/queries";
 import { getTodaySchedules } from "@/lib/schedule/queries";
 import type { DirectivePendingCount, PendingDirective } from "@/lib/directives/types";
+import type { PendingReviewItem } from "@/lib/work-timeline/types";
 import {
   getDashboardTaskSummaryWindow,
   normalizeDashboardTaskSummarySnapshot,
@@ -16,6 +17,7 @@ import {
 import {
   buildDashboardDataFromSnapshot,
   type DashboardSnapshotData,
+  type PendingReviews,
 } from "./dashboard-snapshot";
 
 export interface RecentActivity {
@@ -132,6 +134,71 @@ async function getDirectivePendingCounts(
   );
 }
 
+interface PendingReviewRow {
+  id: string;
+  entry_id: string;
+  comment: string;
+  created_at: string;
+  task_id: string | null;
+  work_timeline_entries: { title: string } | null;
+  counterpart: { full_name: string | null } | null;
+}
+
+function mapPendingReviewRows(rows: PendingReviewRow[]): PendingReviewItem[] {
+  return rows
+    .filter((row) => row.work_timeline_entries !== null)
+    .map((row) => ({
+      reviewId: row.id,
+      entryId: row.entry_id,
+      entryTitle: row.work_timeline_entries!.title,
+      comment: row.comment,
+      counterpartName: row.counterpart?.full_name ?? null,
+      createdAt: row.created_at,
+      taskId: row.task_id,
+    }));
+}
+
+/**
+ * 폴백 경로의 검토 인박스 조회.
+ * 빠른 경로(fast-queries.ts 의 pending_reviews_to_fix/_to_confirm CTE)와 반드시 같은 결과를 내야 한다.
+ * 한쪽만 고치면 운영에서만 안 보이는 사고가 난다 (성능 불변조건 3).
+ */
+async function getPendingReviews(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<PendingReviews> {
+  const [toFixResult, toConfirmResult] = await Promise.all([
+    supabase
+      .from("work_timeline_reviews")
+      .select(
+        "id, entry_id, comment, created_at, task_id, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_reviewer_id_fkey(full_name)"
+      )
+      .eq("author_id", userId)
+      .eq("state", "open")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("work_timeline_reviews")
+      .select(
+        "id, entry_id, comment, created_at, task_id, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_author_id_fkey(full_name)"
+      )
+      .eq("reviewer_id", userId)
+      .eq("state", "submitted")
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (toFixResult.error) throw toFixResult.error;
+  if (toConfirmResult.error) throw toConfirmResult.error;
+
+  return {
+    toFix: mapPendingReviewRows(
+      (toFixResult.data ?? []) as unknown as PendingReviewRow[]
+    ),
+    toConfirm: mapPendingReviewRows(
+      (toConfirmResult.data ?? []) as unknown as PendingReviewRow[]
+    ),
+  };
+}
+
 export async function getDashboardData(
   supabase: SupabaseClient,
   userId: string,
@@ -151,6 +218,7 @@ export async function getDashboardData(
     todayAttendanceStatuses,
     pendingDirectives,
     directivePendingCounts,
+    pendingReviews,
   ] = await Promise.all([
     getTodayRecord(supabase, userId),
     getWeekRecords(supabase, userId, weekStart, weekEnd),
@@ -159,6 +227,7 @@ export async function getDashboardData(
     getTodayAttendanceStatuses(supabase),
     getPendingDirectives(supabase, userId),
     getDirectivePendingCounts(supabase),
+    getPendingReviews(supabase, userId),
   ]);
 
   const snapshotData = buildDashboardDataFromSnapshot({
@@ -169,6 +238,7 @@ export async function getDashboardData(
     schedules: todaySchedules,
     pendingDirectives,
     directivePendingCounts,
+    pendingReviews,
   }, {
     userName,
     canViewCompanyWork,
