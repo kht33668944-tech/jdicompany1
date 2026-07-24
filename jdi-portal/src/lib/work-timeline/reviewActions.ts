@@ -36,9 +36,13 @@ export async function requestReview(entryId: string, comment: string): Promise<v
 
 export async function approveReview(reviewId: string, note?: string): Promise<void> {
   assertUuid(reviewId, "검토");
+  const trimmedNote = note?.trim() || null;
+  if (trimmedNote && trimmedNote.length > REVIEW_COMMENT_MAX_LENGTH) {
+    throw new Error(`승인 메모는 ${REVIEW_COMMENT_MAX_LENGTH}자 이하로 입력해 주세요.`);
+  }
   const { supabase } = await getAuth();
   const { error } = await supabase.rpc("approve_timeline_review", {
-    p_review_id: reviewId, p_note: note?.trim() || null,
+    p_review_id: reviewId, p_note: trimmedNote,
   });
   if (error) throw error;
   revalidatePath("/dashboard");
@@ -49,6 +53,9 @@ export async function rejectReview(reviewId: string, note: string): Promise<void
   assertUuid(reviewId, "검토");
   const trimmed = note.trim();
   if (!trimmed) throw new Error("반려 사유를 입력해 주세요.");
+  if (trimmed.length > REVIEW_COMMENT_MAX_LENGTH) {
+    throw new Error(`반려 사유는 ${REVIEW_COMMENT_MAX_LENGTH}자 이하로 입력해 주세요.`);
+  }
   const { supabase } = await getAuth();
   const { error } = await supabase.rpc("reject_timeline_review", {
     p_review_id: reviewId, p_note: trimmed,
@@ -65,5 +72,6 @@ export async function cancelReview(reviewId: string): Promise<void> {
   const { error } = await supabase.rpc("cancel_timeline_review", { p_review_id: reviewId });
   if (error) throw error;
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/work-timeline", "layout");
 }

@@ -13,7 +13,7 @@ export async function getEntryReview(
        created_at, resolved_at, updated_at,
        reviewer:profiles!work_timeline_reviews_reviewer_id_fkey(full_name),
        author:profiles!work_timeline_reviews_author_id_fkey(full_name),
-       task:tasks(status),
+       task:tasks!work_timeline_reviews_task_id_fkey(status),
        events:work_timeline_review_events(
          id, review_id, actor_id, kind, note, created_at,
          actor:profiles!work_timeline_review_events_actor_id_fkey(full_name)
