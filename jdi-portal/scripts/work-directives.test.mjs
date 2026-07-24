@@ -172,6 +172,12 @@ test("보내는 쪽 팝업: 오늘 업무 3줄 + 지시 작성 + 표 배지", ()
   // 보낸 지시 목록은 팝업을 열 때만 조회 (대시보드 초기 예산 보호)
   assert.match(panel, /getSentDirectivesFor/);
   assert.match(panel, /useEffect/);
+  // Select 는 테두리를 스스로 갖지 않는다 — 칸 스타일을 넘기지 않으면 글씨만 떠 보인다
+  assert.match(panel, /SELECT_BOX_CLASS/);
+  assert.ok(
+    (panel.match(/className=\{SELECT_BOX_CLASS\}/g) ?? []).length >= 2,
+    "중요도·프로젝트 Select 모두 칸 스타일을 받아야 합니다",
+  );
 
   const widget = read("src/components/dashboard/widgets/TodayWorkBoardWidget.tsx");
   // 이름이 버튼이 된다 — 모바일/데스크톱 두 곳 모두

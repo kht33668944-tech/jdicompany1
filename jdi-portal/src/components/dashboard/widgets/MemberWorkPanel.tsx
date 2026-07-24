@@ -34,6 +34,10 @@ const PRIORITY_OPTIONS = [
   { value: "낮음", label: "낮음" },
 ];
 
+// Select 컴포넌트는 테두리를 스스로 갖지 않는다. 옆의 마감일 입력칸과 같은 모양으로 맞춘다.
+const SELECT_BOX_CLASS =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-left";
+
 const STATE_BADGE: Record<string, string> = {
   미확인: "bg-amber-50 text-amber-700",
   거절: "bg-slate-100 text-slate-500",
@@ -241,6 +245,7 @@ export default function MemberWorkPanel({
                 onChange={setPriority}
                 options={PRIORITY_OPTIONS}
                 ariaLabel="중요도"
+                className={SELECT_BOX_CLASS}
               />
             </div>
             <div className="flex flex-1 flex-col gap-1">
@@ -250,6 +255,7 @@ export default function MemberWorkPanel({
                 onChange={setProjectId}
                 options={toProjectEditOptions(projects, projectId)}
                 ariaLabel="프로젝트"
+                className={SELECT_BOX_CLASS}
               />
             </div>
           </div>
