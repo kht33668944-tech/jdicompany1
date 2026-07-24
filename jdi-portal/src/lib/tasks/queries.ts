@@ -21,9 +21,10 @@ interface TaskStatsRow {
 const TASK_BASE_SELECT = `
   id, title, description, status, priority, category, project_id,
   due_date, start_date, position, parent_id, created_by,
-  created_at, updated_at, completed_at,
+  created_at, updated_at, completed_at, review_id,
   creator_profile:profiles!tasks_created_by_fkey(full_name, avatar_url),
-  project:projects(id, name, color)
+  project:projects(id, name, color),
+  review:work_timeline_reviews!tasks_review_id_fkey(entry_id)
 `;
 
 export function getCompletedCutoff(): string {
