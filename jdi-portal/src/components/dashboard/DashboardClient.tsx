@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardData } from "@/lib/dashboard/queries";
 import DirectiveInboxWidget from "./widgets/DirectiveInboxWidget";
+import ReviewInboxWidget from "./widgets/ReviewInboxWidget";
 import TodayWorkBoardWidget from "./widgets/TodayWorkBoardWidget";
 
 interface Props {
@@ -93,6 +94,13 @@ export default function DashboardClient({
         userId={userId}
         directives={data.pendingDirectives}
         attendanceStatuses={data.todayAttendanceStatuses}
+      />
+
+      <ReviewInboxWidget
+        toFix={data.pendingReviews.toFix}
+        toConfirm={data.pendingReviews.toConfirm}
+        attendanceStatuses={data.todayAttendanceStatuses}
+        currentUserId={userId}
       />
 
       <TodayWorkBoardWidget
