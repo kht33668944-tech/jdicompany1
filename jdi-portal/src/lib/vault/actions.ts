@@ -5,11 +5,11 @@ import { revalidatePath } from "next/cache";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { encryptSecret, decryptSecret, signUnlock, verifyUnlockToken } from "./crypto";
 import { VAULT_BUCKET, VAULT_UNLOCK_COOKIE, VAULT_UNLOCK_TTL_SEC } from "./constants";
-import { getDocumentVersions } from "./queries";
-import type { UploadedFileMeta } from "./storage";
+import { getDocumentVersions, getProfileNameMap } from "./queries";
 import type {
   AccountInput,
   DocumentMetaInput,
+  UploadedFileMeta,
   VaultAccount,
   VaultDocumentVersion,
   AccountSecretHistoryItem,
@@ -353,19 +353,15 @@ export async function getAccountHistory(accountId: string): Promise<AccountSecre
   const { supabase, user } = await requireAuth();
   await requireUnlock(user.id);
 
-  const [histRes, namesRes] = await Promise.all([
+  const [histRes, nameMap] = await Promise.all([
     supabase
       .from("vault_account_secret_history")
       .select("id, field, old_value_enc, changed_by, changed_at")
       .eq("account_id", accountId)
       .order("changed_at", { ascending: false }),
-    supabase.from("profiles").select("id, full_name"),
+    getProfileNameMap(supabase),
   ]);
   if (histRes.error) throw new Error(`이력을 불러오지 못했습니다: ${histRes.error.message}`);
-  if (namesRes.error) throw new Error(`이력을 불러오지 못했습니다: ${namesRes.error.message}`);
-
-  const nameMap = new Map<string, string>();
-  for (const p of namesRes.data ?? []) nameMap.set(p.id as string, p.full_name as string);
 
   return (histRes.data ?? []).map((h): AccountSecretHistoryItem => ({
     id: h.id,

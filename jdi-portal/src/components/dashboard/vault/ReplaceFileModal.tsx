@@ -4,10 +4,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { VaultDocument } from "@/lib/vault/types";
 import { replaceDocument } from "@/lib/vault/actions";
-import { uploadVaultFile } from "@/lib/vault/storage";
+import { uploadVaultFile, removeVaultFile } from "@/lib/vault/storage";
+import { FILE_ACCEPT_ATTR } from "@/lib/utils/upload";
 import { useOverlayDismiss } from "@/components/shared/useOverlayDismiss";
-
-const ACCEPT = ".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt";
 
 interface Props {
   doc: VaultDocument;
@@ -29,7 +28,12 @@ export default function ReplaceFileModal({ doc, onClose, onSaved }: Props) {
     setBusy(true);
     try {
       const meta = await uploadVaultFile(doc.corporation_id, file);
-      await replaceDocument(doc.id, meta);
+      try {
+        await replaceDocument(doc.id, meta);
+      } catch (e) {
+        await removeVaultFile(meta.storagePath); // 최신화 기록 실패 시 방금 올린 파일 정리(고아 방지)
+        throw e;
+      }
       toast.success("최신 파일로 교체했습니다. 이전 파일은 ‘지난 버전’에 보관됩니다.");
       onSaved();
     } catch (err) {
@@ -48,7 +52,7 @@ export default function ReplaceFileModal({ doc, onClose, onSaved }: Props) {
           이전 파일(현재 v{doc.current_version_no ?? 1})은 <b>지난 버전</b>으로 보관되어 되돌릴 수 있어요.
         </p>
         <div>
-          <input type="file" accept={ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={busy} className="w-full text-sm text-slate-500 ml-1" />
+          <input type="file" accept={FILE_ACCEPT_ATTR} onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={busy} className="w-full text-sm text-slate-500 ml-1" />
           <p className="text-xs text-slate-400 ml-1 mt-1">최대 10MB · PDF·이미지·오피스 문서·ZIP</p>
         </div>
         <div className="flex items-center justify-end gap-2 pt-1">

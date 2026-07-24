@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Corporation, VaultDocument } from "@/lib/vault/types";
-import { DOCUMENT_CATEGORY_SUGGESTIONS } from "@/lib/vault/constants";
+import { DOCUMENT_CATEGORY_SUGGESTIONS, MODAL_INPUT_CLS, MODAL_LABEL_CLS } from "@/lib/vault/constants";
 import { createDocument, updateDocumentMeta } from "@/lib/vault/actions";
-import { uploadVaultFile } from "@/lib/vault/storage";
+import { uploadVaultFile, removeVaultFile } from "@/lib/vault/storage";
+import { FILE_ACCEPT_ATTR } from "@/lib/utils/upload";
 import { useOverlayDismiss } from "@/components/shared/useOverlayDismiss";
-
-const ACCEPT = ".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt";
 
 interface Props {
   corporations: Corporation[];
@@ -51,7 +50,12 @@ export default function DocumentFormModal({ corporations, defaultCorpId, editDoc
         toast.success("서류 정보가 수정되었습니다.");
       } else {
         const meta = await uploadVaultFile(corpId, file!);
-        await createDocument({ corporationId: corpId, title, category: category || null, note: note || null }, meta);
+        try {
+          await createDocument({ corporationId: corpId, title, category: category || null, note: note || null }, meta);
+        } catch (e) {
+          await removeVaultFile(meta.storagePath); // 서버 기록 실패 시 방금 올린 파일 정리(고아 방지)
+          throw e;
+        }
         toast.success("서류가 등록되었습니다.");
       }
       onSaved();
@@ -62,9 +66,6 @@ export default function DocumentFormModal({ corporations, defaultCorpId, editDoc
     }
   };
 
-  const inputCls = "w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
-  const labelCls = "text-sm font-bold text-slate-700 ml-1 block mb-1.5";
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/20 backdrop-blur-sm" {...overlay}>
       <div className="w-full max-w-md rounded-[28px] shadow-2xl bg-white p-6 space-y-4">
@@ -72,8 +73,8 @@ export default function DocumentFormModal({ corporations, defaultCorpId, editDoc
 
         {!isEdit && (
           <div>
-            <label className={labelCls}>법인</label>
-            <select value={corpId} onChange={(e) => setCorpId(e.target.value)} className={inputCls}>
+            <label className={MODAL_LABEL_CLS}>법인</label>
+            <select value={corpId} onChange={(e) => setCorpId(e.target.value)} className={MODAL_INPUT_CLS}>
               {corporations.length === 0 && <option value="">먼저 법인을 추가하세요</option>}
               {corporations.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -83,13 +84,13 @@ export default function DocumentFormModal({ corporations, defaultCorpId, editDoc
         )}
 
         <div>
-          <label className={labelCls}>제목</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 사업자등록증" className={inputCls} />
+          <label className={MODAL_LABEL_CLS}>제목</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 사업자등록증" className={MODAL_INPUT_CLS} />
         </div>
 
         <div>
-          <label className={labelCls}>종류(선택)</label>
-          <input list="vault-category-suggestions" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="예: 사업자등록증" className={inputCls} />
+          <label className={MODAL_LABEL_CLS}>종류(선택)</label>
+          <input list="vault-category-suggestions" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="예: 사업자등록증" className={MODAL_INPUT_CLS} />
           <datalist id="vault-category-suggestions">
             {DOCUMENT_CATEGORY_SUGGESTIONS.map((s) => (
               <option key={s} value={s} />
@@ -98,14 +99,14 @@ export default function DocumentFormModal({ corporations, defaultCorpId, editDoc
         </div>
 
         <div>
-          <label className={labelCls}>메모(선택)</label>
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="메모" className={inputCls} />
+          <label className={MODAL_LABEL_CLS}>메모(선택)</label>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="메모" className={MODAL_INPUT_CLS} />
         </div>
 
         {!isEdit && (
           <div>
-            <label className={labelCls}>파일</label>
-            <input type="file" accept={ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={busy} className="w-full text-sm text-slate-500 ml-1" />
+            <label className={MODAL_LABEL_CLS}>파일</label>
+            <input type="file" accept={FILE_ACCEPT_ATTR} onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={busy} className="w-full text-sm text-slate-500 ml-1" />
             <p className="text-xs text-slate-400 ml-1 mt-1">최대 10MB · PDF·이미지·오피스 문서·ZIP</p>
           </div>
         )}

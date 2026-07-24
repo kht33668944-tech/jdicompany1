@@ -47,6 +47,14 @@ export interface DocumentMetaInput {
   note: string | null;
 }
 
+/** 스토리지 업로드 후 서버 액션에 넘기는 파일 메타 */
+export interface UploadedFileMeta {
+  storagePath: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+}
+
 /** 잠금 해제 후 클라이언트로 내려가는 계정(비번은 평문으로 복호화됨) */
 export interface VaultAccount {
   id: string;

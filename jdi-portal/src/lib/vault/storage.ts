@@ -1,13 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { validateFile } from "@/lib/utils/upload";
 import { VAULT_BUCKET } from "./constants";
-
-export interface UploadedFileMeta {
-  storagePath: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-}
+import type { UploadedFileMeta } from "./types";
 
 /** 서류 파일 업로드(브라우저). 성공 시 저장 메타 반환, 실패 시 한국어 Error throw. */
 export async function uploadVaultFile(corporationId: string, file: File): Promise<UploadedFileMeta> {
@@ -26,6 +20,12 @@ export async function uploadVaultFile(corporationId: string, file: File): Promis
     fileSize: file.size,
     mimeType: file.type || "application/octet-stream",
   };
+}
+
+/** 업로드된 파일 정리(서버 액션 실패 시 고아 파일 방지용 보상 삭제). 실패해도 조용히 무시. */
+export async function removeVaultFile(path: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.storage.from(VAULT_BUCKET).remove([path]).catch(() => {});
 }
 
 /** 단일 파일 서명 URL(1시간). */

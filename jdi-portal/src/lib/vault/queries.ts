@@ -12,8 +12,8 @@ export async function getCorporations(supabase: SupabaseClient): Promise<Corpora
   return (data ?? []) as Corporation[];
 }
 
-/** id → full_name 매핑 */
-async function getProfileNameMap(supabase: SupabaseClient): Promise<Map<string, string>> {
+/** id → full_name 매핑 (actions.ts 등에서 재사용) */
+export async function getProfileNameMap(supabase: SupabaseClient): Promise<Map<string, string>> {
   const { data, error } = await supabase.from("profiles").select("id, full_name");
   if (error) throw error;
   const map = new Map<string, string>();
@@ -59,8 +59,9 @@ export async function getDocuments(supabase: SupabaseClient): Promise<VaultDocum
     const versions = versionsByDoc.get(d.id as string) ?? [];
     const current =
       versions.find((v) => v.is_current) ??
-      versions.slice().sort((a, b) => b.version_no - a.version_no)[0] ??
-      null;
+      (versions.length > 0
+        ? versions.reduce((max, v) => (v.version_no > max.version_no ? v : max))
+        : null);
     return {
       id: d.id,
       corporation_id: d.corporation_id,

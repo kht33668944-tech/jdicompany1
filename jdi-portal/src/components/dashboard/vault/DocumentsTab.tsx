@@ -13,15 +13,9 @@ import {
 } from "@/lib/vault/actions";
 import { getVaultSignedUrl, getVaultSignedUrls } from "@/lib/vault/storage";
 import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
+import { formatFileSize } from "@/lib/chat/utils";
 import DocumentFormModal from "./DocumentFormModal";
 import ReplaceFileModal from "./ReplaceFileModal";
-
-function formatSize(bytes: number | null): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function formatDate(iso: string): string {
   try {
@@ -290,7 +284,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
                   </div>
                   <div className="mt-1 text-xs text-slate-400 flex gap-3 flex-wrap">
                     {d.file_name && <span className="truncate max-w-[220px]">{d.file_name}</span>}
-                    {d.file_size ? <span>{formatSize(d.file_size)}</span> : null}
+                    {d.file_size ? <span>{formatFileSize(d.file_size)}</span> : null}
                     <span>최신화 {formatDate(d.updated_at)}</span>
                     {d.updated_by_name && <span>올린이 {d.updated_by_name}</span>}
                   </div>
