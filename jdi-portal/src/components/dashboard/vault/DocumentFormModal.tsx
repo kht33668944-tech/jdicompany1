@@ -6,8 +6,9 @@ import type { Corporation, VaultDocument } from "@/lib/vault/types";
 import { DOCUMENT_CATEGORY_SUGGESTIONS, MODAL_INPUT_CLS, MODAL_LABEL_CLS } from "@/lib/vault/constants";
 import { createDocument, updateDocumentMeta } from "@/lib/vault/actions";
 import { uploadVaultFile, removeVaultFile } from "@/lib/vault/storage";
-import { FILE_ACCEPT_ATTR } from "@/lib/utils/upload";
 import { useOverlayDismiss } from "@/components/shared/useOverlayDismiss";
+import Select from "@/components/shared/Select";
+import FileDropZone from "./FileDropZone";
 
 interface Props {
   corporations: Corporation[];
@@ -74,12 +75,14 @@ export default function DocumentFormModal({ corporations, defaultCorpId, editDoc
         {!isEdit && (
           <div>
             <label className={MODAL_LABEL_CLS}>법인</label>
-            <select value={corpId} onChange={(e) => setCorpId(e.target.value)} className={MODAL_INPUT_CLS}>
-              {corporations.length === 0 && <option value="">먼저 법인을 추가하세요</option>}
-              {corporations.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <Select
+              options={corporations.map((c) => ({ value: c.id, label: c.name }))}
+              value={corpId}
+              onChange={setCorpId}
+              placeholder={corporations.length === 0 ? "먼저 법인을 추가하세요" : "법인 선택"}
+              ariaLabel="법인"
+              className={MODAL_INPUT_CLS}
+            />
           </div>
         )}
 
@@ -106,8 +109,7 @@ export default function DocumentFormModal({ corporations, defaultCorpId, editDoc
         {!isEdit && (
           <div>
             <label className={MODAL_LABEL_CLS}>파일</label>
-            <input type="file" accept={FILE_ACCEPT_ATTR} onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={busy} className="w-full text-sm text-slate-500 ml-1" />
-            <p className="text-xs text-slate-400 ml-1 mt-1">최대 10MB · PDF·이미지·오피스 문서·ZIP</p>
+            <FileDropZone file={file} onFile={setFile} disabled={busy} />
           </div>
         )}
         {isEdit && (

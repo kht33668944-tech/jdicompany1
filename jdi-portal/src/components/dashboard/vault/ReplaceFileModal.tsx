@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import type { VaultDocument } from "@/lib/vault/types";
 import { replaceDocument } from "@/lib/vault/actions";
 import { uploadVaultFile, removeVaultFile } from "@/lib/vault/storage";
-import { FILE_ACCEPT_ATTR } from "@/lib/utils/upload";
 import { useOverlayDismiss } from "@/components/shared/useOverlayDismiss";
+import FileDropZone from "./FileDropZone";
 
 interface Props {
   doc: VaultDocument;
@@ -51,10 +51,7 @@ export default function ReplaceFileModal({ doc, onClose, onSaved }: Props) {
           <b className="text-slate-700">{doc.title}</b> 을(를) 새 파일로 교체합니다.<br />
           이전 파일(현재 v{doc.current_version_no ?? 1})은 <b>지난 버전</b>으로 보관되어 되돌릴 수 있어요.
         </p>
-        <div>
-          <input type="file" accept={FILE_ACCEPT_ATTR} onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={busy} className="w-full text-sm text-slate-500 ml-1" />
-          <p className="text-xs text-slate-400 ml-1 mt-1">최대 10MB · PDF·이미지·오피스 문서·ZIP</p>
-        </div>
+        <FileDropZone file={file} onFile={setFile} disabled={busy} />
         <div className="flex items-center justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} disabled={busy} className="px-6 py-2.5 rounded-xl text-slate-600 font-bold hover:bg-slate-100 disabled:opacity-50">취소</button>
           <button type="button" onClick={handleSave} disabled={busy} className="px-6 py-2.5 rounded-xl bg-[#2563eb] text-white font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50">
