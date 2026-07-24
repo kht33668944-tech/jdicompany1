@@ -84,3 +84,23 @@ test("lib/directives: 모듈 구성과 서버 검증", () => {
   assert.match(constants, /대표님 지시/);
   assert.match(constants, /업무 요청/);
 });
+
+test("대시보드: 미확인 지시를 빠른 경로와 폴백 양쪽에 싣는다 (성능 불변조건 3)", () => {
+  const fast = read("src/lib/dashboard/fast-queries.ts");
+  // 같은 스냅샷 쿼리 안에서 처리 — DB 왕복을 늘리지 않는다
+  assert.match(fast, /pending_directives/);
+  assert.match(fast, /directive_pending_counts/);
+  assert.match(fast, /'pendingDirectives'/);
+  assert.match(fast, /'directivePendingCounts'/);
+  // 미확인 부분 인덱스를 타야 한다
+  assert.match(fast, /r\.state = '미확인'/);
+
+  const fallback = read("src/lib/dashboard/queries.ts");
+  assert.match(fallback, /pendingDirectives/);
+  assert.match(fallback, /directivePendingCounts/);
+  assert.match(fallback, /work_directive_recipients/);
+
+  const snapshot = read("src/lib/dashboard/dashboard-snapshot.ts");
+  assert.match(snapshot, /pendingDirectives: PendingDirective\[\]/);
+  assert.match(snapshot, /directivePendingCounts: DirectivePendingCount\[\]/);
+});
