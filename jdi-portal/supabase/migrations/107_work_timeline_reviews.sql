@@ -383,6 +383,7 @@ AS $$
 DECLARE
   v_uid UUID := auth.uid();
   v_rev public.work_timeline_reviews%ROWTYPE;
+  v_canceller_name TEXT;
 BEGIN
   SELECT * INTO v_rev FROM public.work_timeline_reviews WHERE id = p_review_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION '검토를 찾을 수 없습니다.'; END IF;
@@ -404,6 +405,16 @@ BEGIN
 
   INSERT INTO public.work_timeline_review_events (review_id, actor_id, kind)
   VALUES (p_review_id, v_uid, 'cancelled');
+
+  IF v_rev.author_id <> v_uid THEN
+    SELECT full_name INTO v_canceller_name FROM public.profiles WHERE id = v_uid;
+    INSERT INTO public.notifications (user_id, type, title, body, link)
+    VALUES (
+      v_rev.author_id, 'timeline_review_resolved', '검토 요청이 취소되었어요',
+      COALESCE(v_canceller_name, '검토자') || '님이 검토 요청을 취소했습니다.',
+      '/dashboard/work-timeline/' || v_rev.entry_id
+    );
+  END IF;
 END;
 $$;
 
