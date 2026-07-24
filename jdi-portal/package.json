@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:search-privacy": "node scripts/check-search-privacy.mjs",
-    "test:security": "node --test scripts/influencer-edge-auth.test.mjs",
+    "test:security": "node --test scripts/influencer-edge-auth.test.mjs scripts/work-timeline-reviews.test.mjs",
     "test:expenses": "node --experimental-strip-types --test scripts/expense-amount-parse.test.mjs scripts/expense-variable.test.mjs scripts/expense-category-color.test.mjs",
     "perf:audit": "node scripts/performance-audit.mjs",
     "test:performance": "node --test scripts/performance-audit.test.mjs scripts/performance-architecture.test.mjs scripts/login-performance-and-fonts.test.mjs scripts/dashboard-snapshot.test.mjs scripts/dashboard-summary-parity.test.mjs scripts/dashboard-summary-selector.test.mjs scripts/influencer-list-loading.test.mjs scripts/performance-timing.test.mjs scripts/task-bounded-loading.test.mjs scripts/work-directives.test.mjs scripts/work-timeline-reviews.test.mjs"

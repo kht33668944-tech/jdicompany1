@@ -37,3 +37,82 @@ test("대시보드: 검토 인박스를 빠른 경로와 폴백 양쪽에 싣는
   assert.match(fallback, /if \(toFixResult\.error\) throw toFixResult\.error;/);
   assert.match(fallback, /if \(toConfirmResult\.error\) throw toConfirmResult\.error;/);
 });
+
+// 아래 두 테스트는 work-directives.test.mjs 의
+// "103 마이그레이션: 테이블 2개 + 연결 컬럼 + RLS" /
+// "103 마이그레이션: 수락/거절 RPC 의 권한 재검증" 과 대칭인 보안 회귀 검사다.
+test("107 마이그레이션: RLS 활성 + SELECT 정책은 당사자·관리자로 제한, 쓰기 정책 없음", () => {
+  const path = "supabase/migrations/107_work_timeline_reviews.sql";
+  const sql = read(path);
+
+  // RLS 활성 — 두 테이블 모두
+  assert.match(sql, /ALTER TABLE public\.work_timeline_reviews ENABLE ROW LEVEL SECURITY/);
+  assert.match(sql, /ALTER TABLE public\.work_timeline_review_events ENABLE ROW LEVEL SECURITY/);
+
+  const rlsBlock = sql.slice(
+    sql.indexOf("-- ---------- RLS ----------"),
+    sql.indexOf("-- ---------- 보완 할일 완료 감지 ----------"),
+  );
+  assert.ok(rlsBlock.length > 0, "RLS 섹션을 찾지 못했습니다");
+
+  // 승인 사용자 확인
+  assert.match(rlsBlock, /is_approved_user\(\)/);
+
+  // work_timeline_reviews SELECT 정책: 검토자·작성자·관리자만
+  assert.match(rlsBlock, /ON public\.work_timeline_reviews FOR SELECT TO authenticated/);
+  assert.match(rlsBlock, /reviewer_id = auth\.uid\(\)/);
+  assert.match(rlsBlock, /author_id = auth\.uid\(\)/);
+  assert.match(rlsBlock, /p\.role = 'admin'/);
+
+  // work_timeline_review_events SELECT 정책: 연결된 검토를 볼 수 있으면 조회
+  assert.match(rlsBlock, /ON public\.work_timeline_review_events FOR SELECT TO authenticated/);
+  assert.match(
+    rlsBlock,
+    /FROM public\.work_timeline_reviews r\s*\n\s*WHERE r\.id = work_timeline_review_events\.review_id/,
+  );
+
+  // INSERT/UPDATE/DELETE 정책은 없다 — 쓰기는 RPC(SECURITY DEFINER) 전용
+  assert.doesNotMatch(
+    rlsBlock,
+    /FOR (INSERT|UPDATE|DELETE) TO authenticated/,
+    "work_timeline_reviews/_events 에는 쓰기 정책이 있으면 안 됩니다 (RPC 전용)",
+  );
+});
+
+test("107 마이그레이션: 검토 RPC 4개는 SECURITY DEFINER + search_path 고정 + auth.uid() 검증 + 최소 권한 부여", () => {
+  const path = "supabase/migrations/107_work_timeline_reviews.sql";
+  const sql = read(path);
+
+  const rpcs = [
+    { name: "request_timeline_review", signature: "request_timeline_review(UUID, TEXT)" },
+    { name: "approve_timeline_review", signature: "approve_timeline_review(UUID, TEXT)" },
+    { name: "reject_timeline_review", signature: "reject_timeline_review(UUID, TEXT)" },
+    { name: "cancel_timeline_review", signature: "cancel_timeline_review(UUID)" },
+  ];
+
+  for (const { name, signature } of rpcs) {
+    const startMarker = `FUNCTION public.${name}(`;
+    const revokeMarker = `REVOKE ALL ON FUNCTION public.${signature} FROM PUBLIC;`;
+    const grantMarker = `GRANT EXECUTE ON FUNCTION public.${signature} TO authenticated;`;
+
+    const start = sql.indexOf(startMarker);
+    assert.ok(start >= 0, `${name} 함수 정의를 찾지 못했습니다`);
+    const revokeIdx = sql.indexOf(revokeMarker);
+    assert.ok(revokeIdx >= 0, `${name}: REVOKE ALL ... FROM PUBLIC 이 없습니다`);
+    assert.ok(sql.includes(grantMarker), `${name}: GRANT EXECUTE ... TO authenticated 가 없습니다`);
+
+    const body = sql.slice(start, revokeIdx);
+    assert.match(body, /SECURITY DEFINER/, `${name}: SECURITY DEFINER 가 없습니다`);
+    assert.match(body, /SET search_path = public/, `${name}: search_path 고정이 없습니다`);
+    // 세션 사용자를 신뢰하지 않고 auth.uid() 로 직접 재검증한다
+    // (approve/reject/cancel 은 공통 헬퍼 assert_can_resolve_review 를 통해 검증)
+    assert.match(body, /auth\.uid\(\)/, `${name}: auth.uid() 검증이 없습니다`);
+  }
+
+  // 승인/반려/취소는 공통 권한 헬퍼로 검토자·관리자만 처리하도록 강제한다
+  const helperCalls = (sql.match(/PERFORM public\.assert_can_resolve_review\(v_rev\);/g) ?? []).length;
+  assert.ok(
+    helperCalls >= 3,
+    `approve/reject/cancel 각각 assert_can_resolve_review 로 권한을 재검증해야 합니다 (현재 ${helperCalls})`,
+  );
+});

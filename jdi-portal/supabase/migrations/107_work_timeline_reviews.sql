@@ -274,6 +274,8 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.assert_can_resolve_review(public.work_timeline_reviews) FROM PUBLIC;
+
 -- ---------- 승인 ----------
 CREATE OR REPLACE FUNCTION public.approve_timeline_review(p_review_id UUID, p_note TEXT DEFAULT NULL)
 RETURNS VOID
