@@ -257,8 +257,12 @@ SELECT cron.schedule(
 |---|---|
 | `types.ts` | `WorkDirective`, `DirectiveRecipient`, `PendingDirective`(받는 쪽 카드용), `SentDirective`(보낸 쪽 목록용) |
 | `constants.ts` | `DIRECTIVE_KIND`, `DIRECTIVE_STATE`, 배지 라벨/색상 |
-| `queries.ts` | `getPendingDirectives(userId)`, `getSentDirectivesFor(targetUserId)`, `getPendingCountsByUser()` |
-| `actions.ts` | `createDirective()`, `acceptDirective()`(RPC 호출), `declineDirective()`(RPC 호출) |
+| `actions.ts` | `createDirective()`, `acceptDirective()`(RPC 호출), `declineDirective()`(RPC 호출), `getSentDirectivesFor(targetUserId)` |
+
+읽기 함수의 위치는 부르는 쪽에 맞춘다.
+
+- `getSentDirectivesFor`는 팝업(클라이언트 컴포넌트)이 부르므로 `"use server"` 파일인 `actions.ts`에 둔다.
+- 미확인 지시 목록과 사용자별 건수는 대시보드 스냅샷의 일부이므로 `src/lib/dashboard/queries.ts`(폴백 경로)에 둔다. 별도 모듈에 두면 빠른 경로와 두 벌이 되어 성능 불변조건 3을 어기기 쉽다.
 
 - `createDirective()`는 지시 INSERT → 수신자 INSERT → 수신자별 알림 INSERT 순으로 진행한다.
   **알림 INSERT 실패가 지시 등록을 되돌리지 않는다** (기존 업무 도메인 규칙).
