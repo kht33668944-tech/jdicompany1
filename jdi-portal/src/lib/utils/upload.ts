@@ -1,8 +1,11 @@
-const ALLOWED_EXTENSIONS = new Set([
+export const ALLOWED_EXTENSIONS = new Set([
   "jpg", "jpeg", "png", "gif", "webp",
   "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
   "zip", "txt",
 ]);
+
+/** `<input type="file" accept>` 용 문자열 (허용 확장자 단일 출처에서 파생) */
+export const FILE_ACCEPT_ATTR = Array.from(ALLOWED_EXTENSIONS).map((e) => `.${e}`).join(",");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 

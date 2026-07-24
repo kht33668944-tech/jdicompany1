@@ -40,7 +40,15 @@ export async function subscribeToPush(userId: string): Promise<PushSubscription>
 
   const permission = await requestPushPermission();
   if (permission !== "granted") {
-    throw new Error("알림 권한이 거부되었습니다.");
+    if (permission === "denied") {
+      // 이미 브라우저/기기 설정에서 이 사이트 알림이 차단된 상태 → 요청창이 뜨지 않으므로
+      // 사용자가 직접 풀어야 한다. 어디를 눌러야 하는지까지 안내한다.
+      throw new Error(
+        "이 브라우저에서 알림이 차단되어 있어요. 주소창 왼쪽 자물쇠(🔒) 아이콘 → ‘알림’ → ‘허용’으로 바꾼 뒤 다시 눌러주세요. (아이폰은 홈 화면에 앱을 설치한 뒤 사용할 수 있어요.)"
+      );
+    }
+    // permission === "default": 허용 창을 그냥 닫았거나 아직 선택하지 않은 경우
+    throw new Error("알림 허용 창에서 ‘허용’을 눌러야 알림이 켜집니다. 다시 한 번 눌러주세요.");
   }
 
   // SW 등록 (이미 등록되어 있으면 그대로 사용)

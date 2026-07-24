@@ -17,6 +17,7 @@ import WarningCircle from "phosphor-react/dist/icons/WarningCircle.esm.js";
 import GearSix from "phosphor-react/dist/icons/GearSix.esm.js";
 import SignOut from "phosphor-react/dist/icons/SignOut.esm.js";
 import Receipt from "phosphor-react/dist/icons/Receipt.esm.js";
+import Archive from "phosphor-react/dist/icons/Archive.esm.js";
 
 interface SidebarProps {
   user: { email: string; name: string; avatarUrl?: string | null };
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/dashboard/schedule", label: "스케줄", icon: CalendarBlank },
   { href: "/dashboard/influencer", label: "인플루언서", icon: UsersThree },
   { href: "/dashboard/expenses", label: "지출관리", icon: Receipt },
+  { href: "/dashboard/vault", label: "보관함", icon: Archive },
   { href: "/dashboard/chat", label: "채팅", icon: ChatCircle },
   { href: "/dashboard/reports", label: "오류 접수", icon: WarningCircle },
   { href: "/dashboard/settings", label: "설정", icon: GearSix },
