@@ -2,7 +2,8 @@
 
 - 날짜: 2026-07-24
 - 도메인: `directives`(신규), `dashboard`(표시), `tasks`(연동), `notifications`/`push`(알림)
-- 상태: 사용자 승인 대기
+- 상태: 승인됨 · 구현 완료 (계획: `docs/superpowers/plans/2026-07-24-work-directives.md`)
+- 실제 마이그레이션 번호: `103`(테이블·RLS·RPC), `104`(RLS 상호 재귀 해소 — 구현 중 발견), `105`(미확인 재촉). 설계 당시 예상했던 `104 = 재촉`은 한 칸 밀렸다.
 
 ## 배경 / 목적
 

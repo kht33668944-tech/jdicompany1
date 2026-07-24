@@ -108,6 +108,9 @@ test("maps a single-query dashboard snapshot to the bounded task-summary Dashboa
     nextScheduleMinutes: 30,
     userName: "Member",
     canViewCompanyWork: true,
+    // 업무지시 필드가 없는 예전 스냅샷도 빈 배열로 안전하게 채워진다
+    pendingDirectives: [],
+    directivePendingCounts: [],
   });
 });
 
@@ -146,6 +149,8 @@ test("preserves empty employee dashboard data without inventing company task rec
     nextScheduleMinutes: null,
     userName: "Member",
     canViewCompanyWork: false,
+    pendingDirectives: [],
+    directivePendingCounts: [],
   });
 });
 

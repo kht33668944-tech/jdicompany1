@@ -228,6 +228,56 @@ const DASHBOARD_SNAPSHOT_QUERY = `
       '[]'::jsonb
     ) as value
     from schedule_rows s
+  ),
+  -- 미확인 업무지시: 같은 스냅샷 쿼리 안에서 처리해 DB 왕복을 늘리지 않는다.
+  -- work_directive_recipients_pending 부분 인덱스를 탄다 (마이그레이션 103).
+  pending_directives as (
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'recipient_id', r.id,
+          'directive_id', d.id,
+          'kind', d.kind,
+          'title', d.title,
+          'body', d.body,
+          'priority', d.priority,
+          'due_date', d.due_date,
+          'project', (
+            select jsonb_build_object('id', pj.id, 'name', pj.name, 'color', pj.color)
+            from public.projects pj
+            where pj.id = d.project_id
+          ),
+          'sender_name', coalesce(sender.full_name, ''),
+          'created_at', r.created_at
+        )
+        -- 대표님 지시(=admin 발신)를 항상 위로, 그다음 오래된 순
+        order by case when d.kind = '지시' then 0 else 1 end asc, r.created_at asc
+      ),
+      '[]'::jsonb
+    ) as value
+    from public.work_directive_recipients r
+    join public.work_directives d on d.id = r.directive_id
+    left join public.profiles sender on sender.id = d.created_by
+    cross join parameters prm
+    cross join approved_requester
+    where r.state = '미확인'
+      and r.user_id = prm.user_id
+  ),
+  directive_pending_counts as (
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object('user_id', c.user_id, 'count', c.pending_count)
+        order by c.user_id asc
+      ),
+      '[]'::jsonb
+    ) as value
+    from (
+      select r.user_id, count(*)::int as pending_count
+      from public.work_directive_recipients r
+      cross join approved_requester
+      where r.state = '미확인'
+      group by r.user_id
+    ) c
   )
   select jsonb_build_object(
     'todayRecord', coalesce((select value from today_record), 'null'::jsonb),
@@ -252,7 +302,9 @@ const DASHBOARD_SNAPSHOT_QUERY = `
       cross join parameters prm
       where ar.work_date = prm.today
     ), '[]'::jsonb),
-    'schedules', (select value from schedules)
+    'schedules', (select value from schedules),
+    'pendingDirectives', (select value from pending_directives),
+    'directivePendingCounts', (select value from directive_pending_counts)
   ) as snapshot
   from approved_requester
 `;

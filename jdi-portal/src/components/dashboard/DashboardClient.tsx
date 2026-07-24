@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardData } from "@/lib/dashboard/queries";
+import DirectiveInboxWidget from "./widgets/DirectiveInboxWidget";
 import TodayWorkBoardWidget from "./widgets/TodayWorkBoardWidget";
 
 interface Props {
@@ -88,6 +89,12 @@ export default function DashboardClient({
 
       {children}
 
+      <DirectiveInboxWidget
+        userId={userId}
+        directives={data.pendingDirectives}
+        attendanceStatuses={data.todayAttendanceStatuses}
+      />
+
       <TodayWorkBoardWidget
         userId={userId}
         profiles={data.taskSummary.profiles}
@@ -95,6 +102,7 @@ export default function DashboardClient({
         attendanceStatuses={data.todayAttendanceStatuses}
         schedules={data.todaySchedules}
         defaultAssigneeFilter={defaultTaskAssigneeFilter}
+        directivePendingCounts={data.directivePendingCounts}
       />
     </div>
   );

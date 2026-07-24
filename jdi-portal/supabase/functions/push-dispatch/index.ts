@@ -127,7 +127,31 @@ const SETTING_KEY_BY_TYPE: Record<string, string> = {
   report_submitted: "system_announce",
   report_status_changed: "system_announce",
   expense_due: "expense_notify",
+  work_directive: "system_announce",
+  work_directive_answer: "system_announce",
+  work_directive_reminder: "system_announce",
+  work_directive_pending: "system_announce",
 };
+
+// ============================================================
+// 조용한 시간 (업무지시 등록 알림 전용)
+//   대표님이 밤늦게 지시를 써도 직원 폰이 울리지 않게 한다.
+//   인앱 알림은 이미 저장돼 있으므로 아침에 포털을 열면 그대로 보인다.
+// ============================================================
+const QUIET_HOURS_TYPES = new Set(["work_directive"]);
+const QUIET_HOURS_START = 22; // 22:00 KST 부터
+const QUIET_HOURS_END = 7; // 07:00 KST 까지
+
+function isWithinQuietHours(): boolean {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Seoul",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date()),
+  );
+  return hour >= QUIET_HOURS_START || hour < QUIET_HOURS_END;
+}
 
 // ============================================================
 // 수신자 결정
@@ -142,8 +166,10 @@ async function resolveRecipientsForNotifications(
   const rawLink = (record.link as string) || "/dashboard";
   const link = isInternalLink(rawLink) ? rawLink : "/dashboard";
   const settingKey = SETTING_KEY_BY_TYPE[type] ?? null;
+  // 조용한 시간대의 업무지시 등록 알림은 푸시 수신자를 비운다 (인앱 알림은 그대로 남는다).
+  const userIds = QUIET_HOURS_TYPES.has(type) && isWithinQuietHours() ? [] : [userId];
   return {
-    userIds: [userId],
+    userIds,
     payload: { title, body, link, tag: `notif:${record.id}` },
     settingKey,
   };

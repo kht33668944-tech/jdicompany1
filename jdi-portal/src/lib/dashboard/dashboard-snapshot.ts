@@ -1,4 +1,5 @@
 import type { AttendanceRecord, TodayAttendanceStatus } from "../attendance/types";
+import type { DirectivePendingCount, PendingDirective } from "../directives/types";
 import type { ScheduleWithProfile } from "../schedule/types";
 import type { DashboardTaskSummaryResult } from "./dashboard-task-summary";
 
@@ -8,6 +9,8 @@ export interface DashboardSnapshot {
   taskSummary: DashboardTaskSummaryResult;
   todayAttendanceStatuses: TodayAttendanceStatus[];
   schedules: ScheduleWithProfile[];
+  pendingDirectives: PendingDirective[];
+  directivePendingCounts: DirectivePendingCount[];
 }
 
 export interface DashboardSnapshotContext {
@@ -28,6 +31,8 @@ export interface DashboardSnapshotData {
   nextScheduleMinutes: number | null;
   userName: string;
   canViewCompanyWork: boolean;
+  pendingDirectives: PendingDirective[];
+  directivePendingCounts: DirectivePendingCount[];
 }
 
 function addDays(dateString: string, days: number): string {
@@ -68,5 +73,8 @@ export function buildDashboardDataFromSnapshot(
     nextScheduleMinutes,
     userName: context.userName,
     canViewCompanyWork: context.canViewCompanyWork,
+    // 업무지시 기능(103) 이전에 만들어진 스냅샷이 들어와도 화면이 깨지지 않도록 기본값을 둔다.
+    pendingDirectives: snapshot.pendingDirectives ?? [],
+    directivePendingCounts: snapshot.directivePendingCounts ?? [],
   };
 }
