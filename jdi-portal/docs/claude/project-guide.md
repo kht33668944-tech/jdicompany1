@@ -4,11 +4,11 @@
 
 ## 개요
 
-JDICOMPANY 사내 업무 포털입니다. 승인된 사용자만 접근하며, 근태/업무/채팅/일정/리포트/인플루언서 운영을 통합합니다. 한국어 UI와 Asia/Seoul 기준 날짜 처리가 기본입니다.
+JDICOMPANY 사내 업무 포털입니다. 승인된 사용자만 접근하며, 근태/업무/채팅/일정/리포트/인플루언서/업무 타임라인/지출관리/프로젝트/업무지시 운영을 통합합니다. 한국어 UI와 Asia/Seoul 기준 날짜 처리가 기본입니다.
 
 ## 스택
 
-- Frontend: Next.js 16.2.10 App Router, React 19.2.4, TypeScript strict
+- Frontend: Next.js 16.2.11 App Router, React 19.2.4, TypeScript strict
 - Styling: Tailwind CSS 4
 - Backend: Supabase Auth, Postgres, RLS, Realtime, Storage, Edge Functions
 - Runtime/Deploy: Node 22 이상, Railway

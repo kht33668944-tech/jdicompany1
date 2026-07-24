@@ -27,7 +27,7 @@
 ## 빠른 프로젝트 정보
 
 - 앱 위치: `jdi-portal/`
-- 프레임워크: Next.js 16.2.10 App Router, React 19.2.4
+- 프레임워크: Next.js 16.2.11 App Router, React 19.2.4
 - 언어: TypeScript strict
 - 스타일: Tailwind CSS 4
 - 백엔드: Supabase Auth, Postgres, RLS, Storage, Realtime, Edge Functions

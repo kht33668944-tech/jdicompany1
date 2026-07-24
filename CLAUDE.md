@@ -22,6 +22,8 @@ npm run lint     # ESLint (eslint-config-next + typescript)
 
 # 테스트 (jdi-portal 안에서만, node:test 기반 — jest/vitest 아님)
 npm run test:search-privacy   # 검색 프라이버시 회귀 검사 (scripts/check-search-privacy.mjs)
+npm run test:security         # 보안 회귀 검사 (RLS/권한/경계)
+npm run test:expenses         # 지출관리 도메인 정적 검사
 npm run perf:audit            # 성능 감사 (scripts/performance-audit.mjs)
 npm run test:performance      # 성능/아키텍처/로그인 성능 테스트 스위트
 #   단일 테스트 파일: node --test scripts/<파일>.test.mjs
@@ -40,7 +42,9 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 - `src/lib/<domain>/{queries,actions,types,constants}.ts` — `queries.ts`(읽기), `actions.ts`(쓰기), `types.ts`(도메인 타입). 일부 도메인엔 `*Cache.ts`(예: `tasks/tasksCache.ts`).
 - `src/components/dashboard/<domain>/` — 도메인 UI. 여기 하위 `CLAUDE.md`가 있으면 우선.
 
-도메인 목록: `dashboard`(대시보드 홈), `attendance`(근태), `tasks`(업무), `chat`(채팅), `schedule`(일정), `reports`(리포트), `influencer`(인플루언서), `work-timeline`(업무 타임라인), `settings`(설정), `directives`(업무지시), `notifications`(알림), `push`(웹 푸시). (`src/lib/cache`, `src/lib/performance`는 도메인이 아니라 공용 인프라 모듈입니다.)
+도메인 목록: `dashboard`(대시보드 홈), `attendance`(근태), `tasks`(업무), `chat`(채팅), `schedule`(일정), `reports`(리포트), `influencer`(인플루언서), `work-timeline`(업무 타임라인), `expenses`(지출관리), `projects`(프로젝트 분류), `directives`(업무지시), `notifications`(알림), `push`(웹 푸시), `settings`(설정). (`src/lib/cache`, `src/lib/performance`, `src/lib/db`, `src/lib/supabase`, `src/lib/hooks`, `src/lib/utils`는 도메인이 아니라 공용 인프라 모듈입니다.)
+
+일부 도메인은 표준 4파일 형태와 조금 다릅니다: `directives`는 읽기를 대시보드 빠른 경로에 통합해 `queries.ts` 없이 `actions/constants/types.ts`만 둡니다. `projects`는 `useProjects.ts` 훅과 `utils.ts`(접두어 자동 분류), `expenses`는 `colors.ts`·`format.ts`·`receipts.ts`·`recurring.ts` 등 보조 모듈을 함께 둡니다.
 
 **이중 데이터 접근 — 이 앱의 핵심 특징.** 두 경로가 공존하며, 보안의 최종 방어선은 항상 RLS입니다.
 - **Supabase (기본)**: `src/lib/supabase/`의 SSR 클라이언트. `server.ts`(서버 컴포넌트/Route Handler, 쿠키 기반), `client.ts`(브라우저, 캐시된 싱글턴), `middleware.ts`(세션 갱신), `auth.ts`(`getAuthUser()` 등). RLS + `public.is_approved_user()`로 접근 제어.
