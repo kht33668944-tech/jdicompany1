@@ -110,6 +110,7 @@ const INITIAL_TASKS_PAGE_QUERY = `
           'created_at', t.created_at,
           'updated_at', t.updated_at,
           'completed_at', t.completed_at,
+          'review_id', t.review_id,
           'creator_profile', (
             select jsonb_build_object(
               'full_name', cp.full_name,
