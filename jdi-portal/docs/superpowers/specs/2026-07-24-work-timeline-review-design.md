@@ -50,7 +50,7 @@
 | 보완 제출 방식 | 작성자가 검토 칸에서 **보완 내용(글) + 파일 첨부**를 올리고 **"보완 완료"** 버튼 → 검토대기 |
 | 인박스 "보완 열기" | 할일이 아니라 **해당 업무보고(`/dashboard/work-timeline/{entryId}`)로 이동** |
 | 상태 전환 | 트리거 대신 **서버 액션(`submit_timeline_review_remediation`)이 open→submitted** 담당 |
-| 보완 첨부 저장 | 신규 `work_timeline_review_attachments`(이벤트 연결) + `work-timeline` 스토리지 버킷의 `reviews/{reviewId}/` 경로 재사용 |
+| 보완 첨부 저장 | 신규 `work_timeline_review_attachments`(이벤트 연결) + `work-timeline` 스토리지 버킷의 기존 `{userId}/{entryId}/` 경로 재사용 (083 스토리지 RLS를 그대로 통과 — 보완 제출자는 항상 업무보고 작성자라 본인 폴더). RLS 완화 없음 |
 | 반려/취소 | 할일을 건드리지 않음 — 상태만 전이(반려: submitted→open, 취소: →cancelled) |
 
 **DB 반영**: 108은 이미 원격 적용됨(수정 불가). 위 변경은 **신규 마이그레이션 `109_work_timeline_review_v2.sql`**로:
