@@ -3,7 +3,7 @@
 - 날짜: 2026-07-24
 - 도메인: `work-timeline`(상세 화면·검토 UI), `tasks`(보완 할일 연동), `dashboard`(검토 인박스 표시), `notifications`/`push`(알림)
 - 상태: 설계 확정 (사용자 승인) · 구현 예정
-- 예상 마이그레이션 번호: `106_work_timeline_reviews.sql` (테이블·인덱스·RLS·RPC·트리거), 재촉은 같은 파일 또는 `107`로 분리 가능
+- 예상 마이그레이션 번호: `107_work_timeline_reviews.sql` (테이블·인덱스·RLS·RPC·트리거), 재촉은 같은 파일 또는 `108`로 분리 가능
 - 참고 선례: 업무지시(directives) 기능 — `docs/superpowers/specs/2026-07-24-work-directives-design.md`, 마이그레이션 `103`/`105`. 이 검토 기능은 그 패턴을 거의 대칭 복제한다.
 
 ## 배경 / 목적
@@ -62,7 +62,7 @@
 - **취소(`cancelled`)**: 검토자가 승인 전 철회. 할일도 함께 닫힘.
 - **반려**: `submitted` → `open`으로 되돌리는 액션. 사유를 이력에 남기고 할일을 `대기`로 재오픈, 작성자에게 알림. (별도 종료 상태가 아니라 루프)
 
-## 1) DB — 마이그레이션 `106_work_timeline_reviews.sql`
+## 1) DB — 마이그레이션 `107_work_timeline_reviews.sql`
 
 ### work_timeline_reviews (검토 본문·상태)
 
