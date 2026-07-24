@@ -186,3 +186,40 @@ test("보내는 쪽 팝업: 오늘 업무 3줄 + 지시 작성 + 표 배지", ()
   assert.match(widget, /directivePendingCounts/);
   assert.match(widget, /미확인/);
 });
+
+test("105 마이그레이션: 미확인 재촉은 KST 기준 평일 1회", () => {
+  const path = "supabase/migrations/105_work_directive_reminder.sql";
+  assert.ok(exists(path), `${path} 이 없습니다`);
+  const sql = read(path);
+
+  assert.match(sql, /FUNCTION public\.remind_pending_work_directives\(\)/);
+  assert.match(sql, /SECURITY DEFINER/);
+  assert.match(sql, /SET search_path = public/);
+  // KST 고정
+  assert.match(sql, /NOW\(\) AT TIME ZONE 'Asia\/Seoul'/);
+  assert.doesNotMatch(sql, /CURRENT_DATE/);
+  // 출근한 사람에게만
+  assert.match(sql, /attendance_records/);
+  // 하루 1회 (중복 방지)
+  assert.match(sql, /reminded_on/);
+  // 평일 11:00 KST = 02:00 UTC
+  assert.match(sql, /cron\.schedule\(\s*'work_directive_reminder',\s*'0 2 \* \* 1-5'/);
+  // 받는 사람 + 보낸 사람 양쪽 알림
+  assert.match(sql, /work_directive_reminder'/);
+  assert.match(sql, /work_directive_pending'/);
+});
+
+test("push-dispatch: 알림 타입 등록 + 밤 시간 푸시 차단", () => {
+  const fn = read("supabase/functions/push-dispatch/index.ts");
+  for (const type of [
+    "work_directive",
+    "work_directive_answer",
+    "work_directive_reminder",
+    "work_directive_pending",
+  ]) {
+    assert.ok(fn.includes(`${type}:`), `SETTING_KEY_BY_TYPE 에 ${type} 이 없습니다`);
+  }
+  // 조용한 시간
+  assert.match(fn, /QUIET_HOURS/);
+  assert.match(fn, /Asia\/Seoul/);
+});
