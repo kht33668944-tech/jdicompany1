@@ -116,3 +116,73 @@ test("108 마이그레이션: 검토 RPC 4개는 SECURITY DEFINER + search_path 
     `approve/reject/cancel 각각 assert_can_resolve_review 로 권한을 재검증해야 합니다 (현재 ${helperCalls})`,
   );
 });
+
+// ---- v2 (마이그레이션 109): 할일 연동 제거 + 보완 제출 RPC + 첨부 테이블 ----
+// 현재 유효 동작은 109 기준이다. 108 은 원격에 이미 적용됐고 수정하지 않지만,
+// 109 가 그 위에 얹혀 할일 연동을 제거하고 보완 제출 흐름을 신설한다.
+
+test("109 마이그레이션: 할일 연동(tasks.review_id 등) 제거", () => {
+  const sql = read("supabase/migrations/109_work_timeline_review_v2.sql");
+
+  // tasks.review_id 컬럼과 유니크 인덱스, 완료 감지 트리거·함수를 되돌린다
+  assert.match(sql, /ALTER TABLE public\.tasks DROP COLUMN IF EXISTS review_id/);
+  assert.match(sql, /DROP INDEX IF EXISTS public\.tasks_review_unique/);
+  assert.match(sql, /DROP TRIGGER IF EXISTS tasks_sync_review_on_status ON public\.tasks/);
+  assert.match(sql, /DROP FUNCTION IF EXISTS public\.sync_review_on_task_status\(\)/);
+  assert.match(sql, /ALTER TABLE public\.work_timeline_reviews DROP COLUMN IF EXISTS task_id/);
+
+  // v2 의 상태 전이 RPC 들은 더 이상 tasks 를 INSERT/UPDATE 하지 않는다 (보완은 업무보고 검토 칸에서만)
+  assert.doesNotMatch(sql, /INSERT INTO public\.tasks\b/, "109 RPC 는 tasks 를 생성하면 안 됩니다");
+  assert.doesNotMatch(sql, /UPDATE public\.tasks\b/, "109 RPC 는 tasks 를 수정하면 안 됩니다");
+});
+
+test("109 마이그레이션: 보완 제출 RPC 는 SECURITY DEFINER + search_path + 작성자 검증 + 최소 권한", () => {
+  const sql = read("supabase/migrations/109_work_timeline_review_v2.sql");
+
+  const start = sql.indexOf("FUNCTION public.submit_timeline_review_remediation(");
+  assert.ok(start >= 0, "submit_timeline_review_remediation 정의를 찾지 못했습니다");
+  const revokeMarker =
+    "REVOKE ALL ON FUNCTION public.submit_timeline_review_remediation(UUID, TEXT, JSONB) FROM PUBLIC;";
+  const grantMarker =
+    "GRANT EXECUTE ON FUNCTION public.submit_timeline_review_remediation(UUID, TEXT, JSONB) TO authenticated;";
+  const revokeIdx = sql.indexOf(revokeMarker);
+  assert.ok(revokeIdx >= 0, "submit_...: REVOKE ALL ... FROM PUBLIC 이 없습니다");
+  assert.ok(sql.includes(grantMarker), "submit_...: GRANT EXECUTE ... TO authenticated 가 없습니다");
+
+  const body = sql.slice(start, revokeIdx);
+  assert.match(body, /SECURITY DEFINER/, "submit_...: SECURITY DEFINER 가 없습니다");
+  assert.match(body, /SET search_path = public/, "submit_...: search_path 고정이 없습니다");
+  assert.match(body, /auth\.uid\(\)/, "submit_...: auth.uid() 검증이 없습니다");
+  // 보완은 작성자만 제출할 수 있어야 한다
+  assert.match(body, /v_rev\.author_id <> v_uid/, "submit_...: 작성자 검증이 없습니다");
+  // open -> submitted 전이
+  assert.match(body, /state = 'submitted'/, "submit_...: submitted 전이가 없습니다");
+});
+
+test("109 마이그레이션: 검토 첨부 테이블 RLS 활성 + SELECT 정책은 당사자·관리자, 쓰기 정책 없음", () => {
+  const sql = read("supabase/migrations/109_work_timeline_review_v2.sql");
+
+  // 테이블 + RLS 활성
+  assert.match(sql, /CREATE TABLE public\.work_timeline_review_attachments/);
+  assert.match(
+    sql,
+    /ALTER TABLE public\.work_timeline_review_attachments ENABLE ROW LEVEL SECURITY/,
+  );
+
+  // SELECT 정책: 연결 검토를 볼 수 있는 사람(검토자·작성자·관리자)만
+  assert.match(
+    sql,
+    /ON public\.work_timeline_review_attachments FOR SELECT TO authenticated/,
+  );
+  assert.match(sql, /is_approved_user\(\)/);
+  assert.match(sql, /r\.reviewer_id = auth\.uid\(\)/);
+  assert.match(sql, /r\.author_id = auth\.uid\(\)/);
+  assert.match(sql, /p\.role = 'admin'/);
+
+  // INSERT/UPDATE/DELETE 정책은 없다 — 첨부 쓰기는 RPC(SECURITY DEFINER) 전용
+  assert.doesNotMatch(
+    sql,
+    /ON public\.work_timeline_review_attachments FOR (INSERT|UPDATE|DELETE)/,
+    "검토 첨부 테이블에는 쓰기 정책이 있으면 안 됩니다 (RPC 전용)",
+  );
+});
