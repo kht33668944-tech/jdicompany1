@@ -1,5 +1,7 @@
 // 보관함 도메인 상수
 
+import { PROJECT_COLORS } from "@/lib/projects/constants";
+
 /** 서류 파일 저장 버킷(비공개) */
 export const VAULT_BUCKET = "vault-documents";
 
@@ -9,17 +11,8 @@ export const VAULT_UNLOCK_COOKIE = "vault_unlock";
 /** 잠금 유지 시간(초) — 20분 */
 export const VAULT_UNLOCK_TTL_SEC = 20 * 60;
 
-/** 법인 구분 색상 팔레트 (프로젝트 기능과 동일 톤). 법인 순서대로 배정. */
-export const CORP_COLORS = [
-  "#6366f1", // 인디고
-  "#0ea5e9", // 하늘
-  "#16a34a", // 초록
-  "#f59e0b", // 주황
-  "#ef4444", // 빨강
-  "#8b5cf6", // 보라
-  "#ec4899", // 분홍
-  "#64748b", // 회색
-] as const;
+/** 법인 구분 색상 팔레트 — 프로젝트 팔레트를 재사용(단일 출처). 법인 순서대로 배정. */
+export const CORP_COLORS = PROJECT_COLORS;
 
 /** 보관함 모달 공용 입력/라벨 클래스 (모달 4종에서 공유) */
 export const MODAL_INPUT_CLS =

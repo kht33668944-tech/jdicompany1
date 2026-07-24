@@ -309,8 +309,9 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       ) : (
         <div className="space-y-2">
           {filtered.map((d) => {
-            const color = corpMeta.get(d.corporation_id)?.color ?? "#94a3b8";
-            const corpName = corpMeta.get(d.corporation_id)?.name ?? "미분류";
+            const meta = corpMeta.get(d.corporation_id);
+            const color = meta?.color ?? "#94a3b8"; // 카드 style 에서 알파 붙여 사용(12≈7%, 33≈20%)
+            const corpName = meta?.name ?? "미분류";
             return (
               <div key={d.id} className="rounded-xl border" style={{ backgroundColor: `${color}12`, borderColor: `${color}33` }}>
                 <div className="flex items-center gap-3 px-4 py-3">

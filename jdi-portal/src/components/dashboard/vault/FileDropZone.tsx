@@ -17,7 +17,9 @@ export default function FileDropZone({ file, onFile, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
 
-  // 모달이 열려 있는 동안 어디서든 Ctrl+V 로 파일 붙여넣기 (스크린샷 이미지/복사한 파일)
+  // 모달이 열려 있는 동안 어디서든 Ctrl+V 로 파일 붙여넣기 (스크린샷/복사한 파일).
+  // 요소 onPaste 가 아닌 window 리스너인 이유: "박스에 포커스 없이도" 붙여넣게 하려는 의도.
+  // (보관함 모달은 한 번에 하나만 열리므로 드롭존도 항상 단일 인스턴스라는 가정에 기댄다.)
   useEffect(() => {
     if (disabled) return;
     const onPaste = (e: ClipboardEvent) => {
