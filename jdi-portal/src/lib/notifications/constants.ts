@@ -26,6 +26,9 @@ export const NOTIFICATION_TYPE_CONFIG: Record<
   report_submitted: { label: "새 오류접수", icon: "Bug", color: "text-rose-500" },
   report_status_changed: { label: "오류접수 처리 상태", icon: "ArrowsClockwise", color: "text-amber-500" },
   expense_due: { label: "지출 결제 예정", icon: "Receipt", color: "text-teal-500" },
+  timeline_review_requested: { label: "검토 요청", icon: "ClipboardText", color: "text-indigo-500" },
+  timeline_review_submitted: { label: "보완 완료", icon: "Checks", color: "text-indigo-600" },
+  timeline_review_resolved: { label: "검토 결과", icon: "CheckCircle", color: "text-indigo-700" },
 };
 
 /** notification_settings 컬럼 → NotificationType[] 매핑 */

@@ -20,6 +20,7 @@ import ChatCircle from "phosphor-react/dist/icons/ChatCircle.esm.js";
 import WifiHigh from "phosphor-react/dist/icons/WifiHigh.esm.js";
 import Bug from "phosphor-react/dist/icons/Bug.esm.js";
 import Receipt from "phosphor-react/dist/icons/Receipt.esm.js";
+import ClipboardText from "phosphor-react/dist/icons/ClipboardText.esm.js";
 import { createClient } from "@/lib/supabase/client";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import { markAsRead, markAllAsRead } from "@/lib/notifications/actions";
@@ -57,6 +58,9 @@ const TYPE_ICONS: Record<NotificationType, React.ElementType> = {
   report_submitted: Bug,
   report_status_changed: ArrowsClockwise,
   expense_due: Receipt,
+  timeline_review_requested: ClipboardText,
+  timeline_review_submitted: Checks,
+  timeline_review_resolved: CheckCircle,
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -82,6 +86,9 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   report_submitted: "text-rose-500 bg-rose-50",
   report_status_changed: "text-amber-500 bg-amber-50",
   expense_due: "text-teal-500 bg-teal-50",
+  timeline_review_requested: "text-indigo-500 bg-indigo-50",
+  timeline_review_submitted: "text-indigo-600 bg-indigo-50",
+  timeline_review_resolved: "text-indigo-700 bg-indigo-50",
 };
 
 const INITIAL_COUNT_DELAY_MS = 10000;

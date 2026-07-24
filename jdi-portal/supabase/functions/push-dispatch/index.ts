@@ -131,6 +131,9 @@ const SETTING_KEY_BY_TYPE: Record<string, string> = {
   work_directive_answer: "system_announce",
   work_directive_reminder: "system_announce",
   work_directive_pending: "system_announce",
+  timeline_review_requested: "system_announce",
+  timeline_review_submitted: "system_announce",
+  timeline_review_resolved: "system_announce",
 };
 
 // ============================================================
@@ -138,7 +141,11 @@ const SETTING_KEY_BY_TYPE: Record<string, string> = {
 //   대표님이 밤늦게 지시를 써도 직원 폰이 울리지 않게 한다.
 //   인앱 알림은 이미 저장돼 있으므로 아침에 포털을 열면 그대로 보인다.
 // ============================================================
-const QUIET_HOURS_TYPES = new Set(["work_directive"]);
+const QUIET_HOURS_TYPES = new Set([
+  "work_directive",
+  "timeline_review_requested",
+  "timeline_review_submitted",
+]);
 const QUIET_HOURS_START = 22; // 22:00 KST 부터
 const QUIET_HOURS_END = 7; // 07:00 KST 까지
 
