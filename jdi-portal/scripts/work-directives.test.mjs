@@ -180,13 +180,16 @@ test("보내는 쪽 팝업: 오늘 업무 3줄 + 지시 작성 + 표 배지", ()
   );
 
   const widget = read("src/components/dashboard/widgets/TodayWorkBoardWidget.tsx");
-  // 이름이 버튼이 된다 — 모바일/데스크톱 두 곳 모두
+  // 이름만이 아니라 직원 행 전체가 클릭 대상이다 (모바일·데스크톱 공통 컨테이너)
   assert.match(widget, /MemberWorkPanel/);
   assert.match(widget, /setPanelMember/);
+  assert.match(widget, /role="button"/);
+  assert.match(widget, /onKeyDown=\{\(event\)/, "행은 키보드(Enter·Space)로도 열려야 합니다");
+  // 행이 버튼 역할이므로 이름 자체는 버튼이면 안 된다 (버튼 중첩)
   assert.doesNotMatch(
     widget,
-    /\{profile\.full_name\}<\/p>/,
-    "직원 이름은 모바일·데스크톱 두 곳 모두 버튼이어야 합니다",
+    /renderMemberNameButton/,
+    "행 전체가 클릭 대상이므로 이름 버튼은 남아 있으면 안 됩니다",
   );
   // 미확인 배지
   assert.match(widget, /directivePendingCounts/);

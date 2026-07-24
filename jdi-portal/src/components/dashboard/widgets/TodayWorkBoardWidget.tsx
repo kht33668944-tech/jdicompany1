@@ -370,21 +370,18 @@ export default function TodayWorkBoardWidget({
   const directivePendingOf = (profileId: string): number =>
     directivePendingCounts.find((entry) => entry.user_id === profileId)?.count ?? 0;
 
-  const renderMemberNameButton = (profile: DashboardTaskPerson) => {
+  // 행 전체가 클릭 대상이므로 이름 자체는 버튼이 아니다 (버튼 중첩 방지).
+  const renderMemberName = (profile: DashboardTaskPerson) => {
     const count = directivePendingOf(profile.id);
     return (
-      <button
-        type="button"
-        onClick={() => setPanelMember(profile)}
-        className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-2 focus-visible:outline-indigo-500"
-      >
+      <span className="flex min-w-0 items-center gap-1.5">
         <span className="truncate text-sm font-bold text-slate-800">{profile.full_name}</span>
         {count > 0 && (
           <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">
             지시 {count} 미확인
           </span>
         )}
-      </button>
+      </span>
     );
   };
 
@@ -598,12 +595,24 @@ export default function TodayWorkBoardWidget({
               const doneCount = profileTasks.filter((task) => task.status === "완료").length;
 
               return (
-                <div key={profile.id} className="px-5 py-4">
+                <div
+                  key={profile.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${profile.full_name}님의 업무 보기 및 지시하기`}
+                  onClick={() => setPanelMember(profile)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    setPanelMember(profile);
+                  }}
+                  className="cursor-pointer px-5 py-4 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-indigo-500"
+                >
                   {/* 모바일: 이름 줄 + 통계 한 줄 (아바타 제거) */}
                   <div className="lg:hidden">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        {renderMemberNameButton(profile)}
+                        {renderMemberName(profile)}
                         <p className="mt-0.5 text-xs text-slate-400">
                           {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
                         </p>
@@ -625,7 +634,7 @@ export default function TodayWorkBoardWidget({
                     <div className="flex min-w-0 items-center gap-3">
                       <UserAvatar name={profile.full_name} avatarUrl={profile.avatar_url} size="md" />
                       <div className="min-w-0">
-                        {renderMemberNameButton(profile)}
+                        {renderMemberName(profile)}
                         <p className="mt-0.5 text-xs text-slate-400">
                           {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
                         </p>
