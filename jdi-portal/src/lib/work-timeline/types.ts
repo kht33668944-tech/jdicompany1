@@ -94,3 +94,37 @@ export interface WorkTimelineTaskShareState {
     completedAt: string;
   } | null;
 }
+
+export type ReviewState = "open" | "submitted" | "approved" | "cancelled";
+export type ReviewEventKind =
+  | "requested" | "submitted" | "approved" | "rejected" | "cancelled";
+
+export interface WorkTimelineReview {
+  id: string;
+  entry_id: string;
+  reviewer_id: string;
+  author_id: string;
+  task_id: string | null;
+  comment: string;
+  state: ReviewState;
+  created_at: string;
+  resolved_at: string | null;
+  updated_at: string;
+  reviewer_name: string | null;
+  author_name: string | null;
+  task_status: string | null; // 연결 할일의 status (표시용)
+}
+
+export interface WorkTimelineReviewEvent {
+  id: string;
+  review_id: string;
+  actor_id: string;
+  actor_name: string | null;
+  kind: ReviewEventKind;
+  note: string | null;
+  created_at: string;
+}
+
+export interface WorkTimelineReviewWithEvents extends WorkTimelineReview {
+  events: WorkTimelineReviewEvent[];
+}

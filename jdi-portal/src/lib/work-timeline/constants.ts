@@ -21,3 +21,16 @@ export const WORK_TIMELINE_IMAGE_MIME_TYPES = [
   "image/webp",
   "image/gif",
 ] as const;
+
+export const REVIEW_COMMENT_MAX_LENGTH = 2000;
+export const REVIEW_TASK_TITLE_PREFIX = "[검토 보완] ";
+
+export const REVIEW_STATE_LABELS: Record<
+  "open" | "submitted" | "approved" | "cancelled",
+  { label: string; tone: "amber" | "indigo" | "emerald" | "slate" }
+> = {
+  open: { label: "보완중", tone: "amber" },
+  submitted: { label: "검토대기", tone: "indigo" },
+  approved: { label: "검토 완료", tone: "emerald" },
+  cancelled: { label: "검토 취소", tone: "slate" },
+};
