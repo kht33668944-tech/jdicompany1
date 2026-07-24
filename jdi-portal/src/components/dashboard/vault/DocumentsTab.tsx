@@ -15,8 +15,12 @@ import { getVaultSignedUrl, getVaultSignedUrls } from "@/lib/vault/storage";
 import { CORP_COLORS } from "@/lib/vault/constants";
 import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
 import { formatFileSize } from "@/lib/chat/utils";
+import Select from "@/components/shared/Select";
 import DocumentFormModal from "./DocumentFormModal";
 import ReplaceFileModal from "./ReplaceFileModal";
+import FilePreviewModal from "./FilePreviewModal";
+
+type SortKey = "updated" | "title" | "category";
 
 function formatDate(iso: string): string {
   try {
@@ -43,6 +47,16 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
   const [replaceDoc, setReplaceDoc] = useState<VaultDocument | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [versions, setVersions] = useState<VaultDocumentVersion[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<VaultDocument | null>(null);
+  const [sortBy, setSortBy] = useState<SortKey>("updated");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  // 서류에 실제로 쓰인 종류 목록 (필터 선택지)
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of documents) if (d.category) set.add(d.category);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [documents]);
 
   const countByCorp = useMemo(() => {
     const m = new Map<string, number>();
@@ -59,8 +73,9 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return documents.filter((d) => {
+    const list = documents.filter((d) => {
       if (corpId !== "all" && d.corporation_id !== corpId) return false;
+      if (categoryFilter !== "all" && (d.category ?? "") !== categoryFilter) return false;
       if (!q) return true;
       return (
         d.title.toLowerCase().includes(q) ||
@@ -69,7 +84,12 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
         (d.note ?? "").toLowerCase().includes(q)
       );
     });
-  }, [documents, corpId, search]);
+    return list.sort((a, b) => {
+      if (sortBy === "title") return a.title.localeCompare(b.title, "ko");
+      if (sortBy === "category") return (a.category ?? "").localeCompare(b.category ?? "", "ko");
+      return b.updated_at.localeCompare(a.updated_at); // 최신화순(최신 먼저)
+    });
+  }, [documents, corpId, search, categoryFilter, sortBy]);
 
   const toggleSel = (id: string) => {
     setSelected((prev) => {
@@ -258,6 +278,29 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
         )}
       </div>
 
+      {/* 정렬 · 종류 필터 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-slate-400">정렬·필터</span>
+        <Select
+          options={[{ value: "all", label: "모든 종류" }, ...categories.map((c) => ({ value: c, label: c }))]}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          ariaLabel="종류 필터"
+          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm min-w-[140px]"
+        />
+        <Select
+          options={[
+            { value: "updated", label: "최신화순" },
+            { value: "title", label: "이름순" },
+            { value: "category", label: "종류순" },
+          ]}
+          value={sortBy}
+          onChange={(v) => setSortBy(v as SortKey)}
+          ariaLabel="정렬 기준"
+          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm min-w-[120px]"
+        />
+      </div>
+
       {/* 서류 리스트 */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         {filtered.length === 0 ? (
@@ -305,6 +348,9 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <button type="button" onClick={() => setPreviewDoc(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-brand-400 hover:text-brand-600">
+                    👁 미리보기
+                  </button>
                   <button type="button" onClick={() => handleDownload(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-brand-400 hover:text-brand-600">
                     ⤓ 다운로드
                   </button>
@@ -387,6 +433,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
           }}
         />
       )}
+      {previewDoc && <FilePreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   );
 }
