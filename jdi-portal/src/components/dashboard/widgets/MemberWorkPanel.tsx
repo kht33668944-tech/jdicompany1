@@ -13,6 +13,7 @@ import type {
 } from "@/lib/dashboard/dashboard-task-summary";
 import type { SentDirective } from "@/lib/directives/types";
 import { createDirective, getSentDirectivesFor } from "@/lib/directives/actions";
+import { getSentDirectiveStatus } from "@/lib/directives/constants";
 import { getErrorMessage } from "@/lib/utils/errors";
 import { useProjects } from "@/lib/projects/useProjects";
 import { toProjectEditOptions } from "@/lib/projects/utils";
@@ -37,19 +38,6 @@ const PRIORITY_OPTIONS = [
 // Select 컴포넌트는 테두리를 스스로 갖지 않는다. 옆의 마감일 입력칸과 같은 모양으로 맞춘다.
 const SELECT_BOX_CLASS =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-left";
-
-const STATE_BADGE: Record<string, string> = {
-  미확인: "bg-amber-50 text-amber-700",
-  거절: "bg-slate-100 text-slate-500",
-  대기: "bg-slate-100 text-slate-600",
-  진행중: "bg-amber-50 text-amber-700",
-  완료: "bg-emerald-50 text-emerald-700",
-};
-
-function stateLabel(item: SentDirective): string {
-  if (item.state === "수락") return item.task_status ?? "수락";
-  return item.state;
-}
 
 export default function MemberWorkPanel({
   member,
@@ -271,21 +259,22 @@ export default function MemberWorkPanel({
             <p className="text-xs text-slate-400">아직 보낸 지시가 없습니다.</p>
           )}
           <ul className="flex flex-col gap-1.5">
-            {(sent ?? []).map((item) => (
-              <li
-                key={item.recipient_id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
-              >
-                <span className="truncate text-xs text-slate-600">{item.title}</span>
-                <span
-                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
-                    STATE_BADGE[stateLabel(item)] ?? "bg-slate-100 text-slate-500"
-                  }`}
+            {(sent ?? []).map((item) => {
+              const status = getSentDirectiveStatus(item);
+              return (
+                <li
+                  key={item.recipient_id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
                 >
-                  {stateLabel(item)}
-                </span>
-              </li>
-            ))}
+                  <span className="truncate text-xs text-slate-600">{item.title}</span>
+                  <span
+                    className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${status.badge}`}
+                  >
+                    {status.label}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       </div>

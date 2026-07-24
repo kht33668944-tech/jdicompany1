@@ -1,4 +1,4 @@
-import type { DirectiveKind } from "./types";
+import type { DirectiveKind, SentDirective } from "./types";
 
 export const DIRECTIVE_TITLE_MAX_LENGTH = 200;
 export const DIRECTIVE_BODY_MAX_LENGTH = 4000;
@@ -23,4 +23,21 @@ export const DIRECTIVE_KIND_CONFIG: Record<
     accent: "border-l-indigo-300",
     canDecline: true,
   },
+};
+
+/**
+ * 보낸 지시 한 건을 화면에 뭐라고 표시할지.
+ * 수락된 건은 별도 상태를 저장하지 않고 연결된 할일의 상태를 그대로 보여준다.
+ */
+export function getSentDirectiveStatus(item: SentDirective): { label: string; badge: string } {
+  const label = item.state === "수락" ? (item.task_status ?? "수락") : item.state;
+  return { label, badge: SENT_DIRECTIVE_BADGE[label] ?? "bg-slate-100 text-slate-500" };
+}
+
+const SENT_DIRECTIVE_BADGE: Record<string, string> = {
+  미확인: "bg-amber-50 text-amber-700",
+  거절: "bg-slate-100 text-slate-500",
+  대기: "bg-slate-100 text-slate-600",
+  진행중: "bg-amber-50 text-amber-700",
+  완료: "bg-emerald-50 text-emerald-700",
 };

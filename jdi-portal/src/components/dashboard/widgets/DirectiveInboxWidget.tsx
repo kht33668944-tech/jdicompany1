@@ -35,37 +35,44 @@ export default function DirectiveInboxWidget({ userId, directives, attendanceSta
   const checkedIn = hasCheckedIn(attendanceStatuses, userId);
   const open = checkedIn || expanded;
 
-  const handleAccept = (recipientId: string) => {
+  /** 수락·거절이 공유하는 흐름: 잠금 → 서버 호출 → 알림 → 목록 갱신 */
+  const respond = (
+    recipientId: string,
+    action: () => Promise<void>,
+    successText: string,
+    failureText: string,
+  ) => {
     setBusyId(recipientId);
     startTransition(async () => {
       try {
-        await acceptDirective(recipientId);
-        toast.success("수락했습니다. 오늘 할 일에 추가되었어요.");
+        await action();
+        toast.success(successText);
+        setDeclineFor(null);
+        setReason("");
         router.refresh();
       } catch (error) {
-        toast.error(getErrorMessage(error, "수락하지 못했습니다. 잠시 후 다시 시도해 주세요."));
+        toast.error(getErrorMessage(error, failureText));
       } finally {
         setBusyId(null);
       }
     });
   };
 
-  const handleDecline = (recipientId: string) => {
-    setBusyId(recipientId);
-    startTransition(async () => {
-      try {
-        await declineDirective(recipientId, reason);
-        toast.success("거절했습니다.");
-        setDeclineFor(null);
-        setReason("");
-        router.refresh();
-      } catch (error) {
-        toast.error(getErrorMessage(error, "거절하지 못했습니다. 잠시 후 다시 시도해 주세요."));
-      } finally {
-        setBusyId(null);
-      }
-    });
-  };
+  const handleAccept = (recipientId: string) =>
+    respond(
+      recipientId,
+      () => acceptDirective(recipientId),
+      "수락했습니다. 오늘 할 일에 추가되었어요.",
+      "수락하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+
+  const handleDecline = (recipientId: string) =>
+    respond(
+      recipientId,
+      () => declineDirective(recipientId, reason),
+      "거절했습니다.",
+      "거절하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
 
   if (!open) {
     return (
@@ -98,6 +105,8 @@ export default function DirectiveInboxWidget({ userId, directives, attendanceSta
         {directives.map((directive) => {
           const config = DIRECTIVE_KIND_CONFIG[directive.kind];
           const busy = busyId === directive.recipient_id && pending;
+          // 아직 수락 전이므로 마감 표시는 '대기' 기준으로 계산한다.
+          const due = directive.due_date ? formatDueDate(directive.due_date, "대기") : null;
           return (
             <li
               key={directive.recipient_id}
@@ -115,11 +124,9 @@ export default function DirectiveInboxWidget({ userId, directives, attendanceSta
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
                   <span>{directive.sender_name}</span>
-                  {directive.due_date && (
-                    <span
-                      className={`rounded-full bg-slate-100 px-1.5 py-0.5 ${formatDueDate(directive.due_date, "대기").className}`}
-                    >
-                      {formatDueDate(directive.due_date, "대기").text}
+                  {due && (
+                    <span className={`rounded-full bg-slate-100 px-1.5 py-0.5 ${due.className}`}>
+                      {due.text}
                     </span>
                   )}
                   {directive.priority && (
