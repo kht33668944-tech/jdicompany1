@@ -104,3 +104,29 @@ test("대시보드: 미확인 지시를 빠른 경로와 폴백 양쪽에 싣는
   assert.match(snapshot, /pendingDirectives: PendingDirective\[\]/);
   assert.match(snapshot, /directivePendingCounts: DirectivePendingCount\[\]/);
 });
+
+test("받는 쪽 위젯: 출근 연동·종류 분리·수락 흐름", () => {
+  const path = "src/components/dashboard/widgets/DirectiveInboxWidget.tsx";
+  assert.ok(exists(path), `${path} 이 없습니다`);
+  const widget = read(path);
+
+  assert.match(widget, /^"use client";/);
+  // 출근 전에는 접힌 한 줄
+  assert.match(widget, /hasCheckedIn/);
+  // 종류별 배지
+  assert.match(widget, /DIRECTIVE_KIND_CONFIG/);
+  // 지시는 거절 불가
+  assert.match(widget, /canDecline/);
+  assert.match(widget, /acceptDirective/);
+  assert.match(widget, /declineDirective/);
+  // 수락 후 오늘 할 일과 함께 갱신
+  assert.match(widget, /router\.refresh\(\)/);
+
+  const client = read("src/components/dashboard/DashboardClient.tsx");
+  assert.match(client, /DirectiveInboxWidget/);
+  // 오늘 할 일 위젯보다 위에 놓인다
+  assert.ok(
+    client.indexOf("<DirectiveInboxWidget") < client.indexOf("<TodayWorkBoardWidget"),
+    "DirectiveInboxWidget 은 TodayWorkBoardWidget 보다 위에 있어야 합니다",
+  );
+});
