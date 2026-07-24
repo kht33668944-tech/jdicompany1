@@ -12,6 +12,7 @@ import {
   listDocumentVersions,
 } from "@/lib/vault/actions";
 import { getVaultSignedUrl, getVaultSignedUrls } from "@/lib/vault/storage";
+import { CORP_COLORS } from "@/lib/vault/constants";
 import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
 import { formatFileSize } from "@/lib/chat/utils";
 import DocumentFormModal from "./DocumentFormModal";
@@ -48,6 +49,13 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
     for (const d of documents) m.set(d.corporation_id, (m.get(d.corporation_id) ?? 0) + 1);
     return m;
   }, [documents]);
+
+  // 법인별 색상·이름 (순서대로 팔레트 배정 — 법인마다 다른 색)
+  const corpMeta = useMemo(() => {
+    const m = new Map<string, { color: string; name: string }>();
+    corporations.forEach((c, i) => m.set(c.id, { color: CORP_COLORS[i % CORP_COLORS.length], name: c.name }));
+    return m;
+  }, [corporations]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -229,7 +237,8 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
         </button>
         {corporations.map((c) => (
           <button key={c.id} type="button" onClick={() => setCorpId(c.id)} className={pillCls(corpId === c.id)}>
-            🏢 {c.name} <span className="text-xs text-slate-400">{countByCorp.get(c.id) ?? 0}</span>
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: corpMeta.get(c.id)?.color }} />
+            {c.name} <span className="text-xs text-slate-400">{countByCorp.get(c.id) ?? 0}</span>
           </button>
         ))}
         <button type="button" onClick={handleAddCorp} className="rounded-xl px-3.5 py-2 text-sm font-semibold border border-dashed border-slate-300 text-slate-500 hover:bg-slate-50">
@@ -256,7 +265,10 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
         ) : (
           filtered.map((d) => (
             <div key={d.id} className="border-t border-slate-100 first:border-t-0">
-              <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/60">
+              <div
+                className="flex items-center gap-3 pl-3 pr-4 py-3.5 hover:bg-slate-50/60 border-l-4"
+                style={{ borderLeftColor: corpMeta.get(d.corporation_id)?.color ?? "#94a3b8" }}
+              >
                 <button
                   type="button"
                   onClick={() => toggleSel(d.id)}
@@ -283,6 +295,9 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
                     )}
                   </div>
                   <div className="mt-1 text-xs text-slate-400 flex gap-3 flex-wrap">
+                    <span className="font-bold" style={{ color: corpMeta.get(d.corporation_id)?.color }}>
+                      {corpMeta.get(d.corporation_id)?.name ?? "미분류"}
+                    </span>
                     {d.file_name && <span className="truncate max-w-[220px]">{d.file_name}</span>}
                     {d.file_size ? <span>{formatFileSize(d.file_size)}</span> : null}
                     <span>최신화 {formatDate(d.updated_at)}</span>
