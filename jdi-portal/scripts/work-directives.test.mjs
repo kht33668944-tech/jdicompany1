@@ -57,3 +57,30 @@ test("103 마이그레이션: 수락/거절 RPC 의 권한 재검증", () => {
   // 수락 시 담당자 배정까지 한 트랜잭션 안에서
   assert.match(sql, /INSERT INTO public\.task_assignees/);
 });
+
+test("lib/directives: 모듈 구성과 서버 검증", () => {
+  for (const f of ["types.ts", "constants.ts", "actions.ts"]) {
+    assert.ok(exists(`src/lib/directives/${f}`), `src/lib/directives/${f} 이 없습니다`);
+  }
+
+  const actions = read("src/lib/directives/actions.ts");
+  assert.match(actions, /^"use server";/);
+  // 팝업(클라이언트 컴포넌트)이 부르므로 조회도 서버 액션이어야 한다
+  assert.match(actions, /export async function getSentDirectivesFor/);
+  // 상태 변경은 반드시 RPC 로만
+  assert.match(actions, /rpc\("accept_work_directive"/);
+  assert.match(actions, /rpc\("decline_work_directive"/);
+  // 수신자 테이블을 클라이언트에서 직접 UPDATE 하지 않는다
+  assert.doesNotMatch(actions, /from\("work_directive_recipients"\)[\s\S]{0,80}\.update\(/);
+  // Supabase error 무시 금지
+  assert.ok(
+    (actions.match(/\.error/g) ?? []).length >= 4,
+    "Supabase 응답의 error 를 매 호출마다 확인해야 합니다",
+  );
+  // 알림 실패가 지시 등록을 되돌리지 않는다
+  assert.match(actions, /알림/);
+
+  const constants = read("src/lib/directives/constants.ts");
+  assert.match(constants, /대표님 지시/);
+  assert.match(constants, /업무 요청/);
+});
