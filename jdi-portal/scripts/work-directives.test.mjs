@@ -58,6 +58,33 @@ test("103 마이그레이션: 수락/거절 RPC 의 권한 재검증", () => {
   assert.match(sql, /INSERT INTO public\.task_assignees/);
 });
 
+test("104 마이그레이션: RLS 상호 재귀를 SECURITY DEFINER 헬퍼로 끊는다", () => {
+  const path = "supabase/migrations/104_work_directive_rls_recursion_fix.sql";
+  assert.ok(exists(path), `${path} 이 없습니다`);
+  const sql = read(path);
+
+  // RLS 우회 헬퍼 (048 과 같은 패턴)
+  assert.match(sql, /FUNCTION public\.is_work_directive_sender\(p_directive_id UUID\)/);
+  assert.match(sql, /FUNCTION public\.is_work_directive_recipient\(p_directive_id UUID\)/);
+  assert.ok(
+    (sql.match(/SECURITY DEFINER/g) ?? []).length >= 3,
+    "헬퍼는 RLS 를 우회해야 하므로 SECURITY DEFINER 여야 합니다",
+  );
+
+  // 재작성된 정책에서는 상대 테이블을 직접 참조하지 않는다 (재귀 원인)
+  const policyBlock = sql.slice(sql.indexOf("work_directives 정책 재작성"));
+  assert.doesNotMatch(
+    policyBlock,
+    /FROM public\.work_directive_recipients/,
+    "정책 안에서 상대 테이블을 직접 조회하면 다시 무한 재귀(42P17)가 납니다",
+  );
+  assert.doesNotMatch(
+    policyBlock,
+    /FROM public\.work_directives\b/,
+    "정책 안에서 상대 테이블을 직접 조회하면 다시 무한 재귀(42P17)가 납니다",
+  );
+});
+
 test("lib/directives: 모듈 구성과 서버 검증", () => {
   for (const f of ["types.ts", "constants.ts", "actions.ts"]) {
     assert.ok(exists(`src/lib/directives/${f}`), `src/lib/directives/${f} 이 없습니다`);
@@ -129,4 +156,33 @@ test("받는 쪽 위젯: 출근 연동·종류 분리·수락 흐름", () => {
     client.indexOf("<DirectiveInboxWidget") < client.indexOf("<TodayWorkBoardWidget"),
     "DirectiveInboxWidget 은 TodayWorkBoardWidget 보다 위에 있어야 합니다",
   );
+});
+
+test("보내는 쪽 팝업: 오늘 업무 3줄 + 지시 작성 + 표 배지", () => {
+  const path = "src/components/dashboard/widgets/MemberWorkPanel.tsx";
+  assert.ok(exists(path), `${path} 이 없습니다`);
+  const panel = read(path);
+
+  assert.match(panel, /^"use client";/);
+  // 대기 / 진행중 / 완료 세 줄을 한 카드에
+  assert.match(panel, /대기/);
+  assert.match(panel, /진행중/);
+  assert.match(panel, /완료/);
+  assert.match(panel, /createDirective/);
+  // 보낸 지시 목록은 팝업을 열 때만 조회 (대시보드 초기 예산 보호)
+  assert.match(panel, /getSentDirectivesFor/);
+  assert.match(panel, /useEffect/);
+
+  const widget = read("src/components/dashboard/widgets/TodayWorkBoardWidget.tsx");
+  // 이름이 버튼이 된다 — 모바일/데스크톱 두 곳 모두
+  assert.match(widget, /MemberWorkPanel/);
+  assert.match(widget, /setPanelMember/);
+  assert.doesNotMatch(
+    widget,
+    /\{profile\.full_name\}<\/p>/,
+    "직원 이름은 모바일·데스크톱 두 곳 모두 버튼이어야 합니다",
+  );
+  // 미확인 배지
+  assert.match(widget, /directivePendingCounts/);
+  assert.match(widget, /미확인/);
 });

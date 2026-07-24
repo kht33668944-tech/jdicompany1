@@ -31,6 +31,8 @@ import { deleteTask, updateTask } from "@/lib/tasks/actions";
 import { formatTime } from "@/lib/utils/date";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
+import type { DirectivePendingCount } from "@/lib/directives/types";
+import MemberWorkPanel from "./MemberWorkPanel";
 import TaskCreateModal from "@/components/dashboard/tasks/TaskCreateModal";
 import TaskDetailPanel from "@/components/dashboard/tasks/TaskDetailPanel";
 import WorkTimelineCreateModal from "@/components/dashboard/work-timeline/WorkTimelineCreateModal";
@@ -44,6 +46,7 @@ interface Props {
   attendanceStatuses: TodayAttendanceStatus[];
   schedules: ScheduleWithProfile[];
   defaultAssigneeFilter: string;
+  directivePendingCounts: DirectivePendingCount[];
 }
 
 type StatusFilter = "all" | TaskStatus;
@@ -348,6 +351,7 @@ export default function TodayWorkBoardWidget({
   attendanceStatuses,
   schedules,
   defaultAssigneeFilter,
+  directivePendingCounts,
 }: Props) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -358,7 +362,31 @@ export default function TodayWorkBoardWidget({
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [completionPrompt, setCompletionPrompt] = useState<{ taskId: string; taskTitle: string } | null>(null);
   const [, startTransition] = useTransition();
+  const [panelMember, setPanelMember] = useState<DashboardTaskPerson | null>(null);
   const currentUserRole = profiles.find((profile) => profile.id === userId)?.role ?? "employee";
+
+  // 주의: 아래 목록 렌더링 안에는 이미 pendingCount(대기 업무 수)가 있다.
+  // 이름이 겹치지 않도록 지시 미확인 수는 directivePendingOf 로 읽는다.
+  const directivePendingOf = (profileId: string): number =>
+    directivePendingCounts.find((entry) => entry.user_id === profileId)?.count ?? 0;
+
+  const renderMemberNameButton = (profile: DashboardTaskPerson) => {
+    const count = directivePendingOf(profile.id);
+    return (
+      <button
+        type="button"
+        onClick={() => setPanelMember(profile)}
+        className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-2 focus-visible:outline-indigo-500"
+      >
+        <span className="truncate text-sm font-bold text-slate-800">{profile.full_name}</span>
+        {count > 0 && (
+          <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">
+            지시 {count} 미확인
+          </span>
+        )}
+      </button>
+    );
+  };
 
   useEffect(() => {
     setLocalTasks(taskSummary.tasks);
@@ -575,7 +603,7 @@ export default function TodayWorkBoardWidget({
                   <div className="lg:hidden">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-slate-800">{profile.full_name}</p>
+                        {renderMemberNameButton(profile)}
                         <p className="mt-0.5 text-xs text-slate-400">
                           {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
                         </p>
@@ -597,7 +625,7 @@ export default function TodayWorkBoardWidget({
                     <div className="flex min-w-0 items-center gap-3">
                       <UserAvatar name={profile.full_name} avatarUrl={profile.avatar_url} size="md" />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-slate-800">{profile.full_name}</p>
+                        {renderMemberNameButton(profile)}
                         <p className="mt-0.5 text-xs text-slate-400">
                           {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
                         </p>
@@ -864,6 +892,17 @@ export default function TodayWorkBoardWidget({
           taskTitle={completionPrompt.taskTitle}
           currentUserId={userId}
           onClose={() => setCompletionPrompt(null)}
+        />
+      )}
+
+      {panelMember && (
+        <MemberWorkPanel
+          member={panelMember}
+          tasks={todayBoardTasks.filter((task) => taskBelongsToProfile(task, panelMember.id))}
+          profiles={approvedProfiles}
+          pendingCount={directivePendingOf(panelMember.id)}
+          attendanceLabel={getAttendanceText(attendanceByUser.get(panelMember.id))}
+          onClose={() => setPanelMember(null)}
         />
       )}
     </section>

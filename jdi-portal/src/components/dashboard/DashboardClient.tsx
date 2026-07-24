@@ -102,6 +102,7 @@ export default function DashboardClient({
         attendanceStatuses={data.todayAttendanceStatuses}
         schedules={data.todaySchedules}
         defaultAssigneeFilter={defaultTaskAssigneeFilter}
+        directivePendingCounts={data.directivePendingCounts}
       />
     </div>
   );
