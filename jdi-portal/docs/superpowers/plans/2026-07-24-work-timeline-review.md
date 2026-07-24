@@ -18,21 +18,21 @@
 - **RLS**: 사용자 데이터 테이블은 RLS 활성 + `public.is_approved_user()`. `SECURITY DEFINER` 함수는 내부에서 `auth.uid()`·권한·상태 재검증. UPDATE 정책은 만들지 않고 RPC로만 상태 전이.
 - **Supabase 응답**: `error`를 무시하고 `data`만 처리하지 않는다.
 - **성능 불변조건**: 매 대시보드 로드가 읽는 경로는 부분 인덱스. 빠른 경로(`pg`)와 Supabase RPC 폴백 **양쪽**을 함께 수정. 작업 후 `npm run test:performance`(40개) 통과 필수.
-- **마이그레이션**: 현재 최신 `105`. 새 파일 `107_work_timeline_reviews.sql`로 **추가**(기존 수정 금지). `db push --linked`는 운영 DB 변경이므로 **사용자 확인 후** 실행.
+- **마이그레이션**: 현재 최신 `105`. 새 파일 `108_work_timeline_reviews.sql`로 **추가**(기존 수정 금지). `db push --linked`는 운영 DB 변경이므로 **사용자 확인 후** 실행.
 - **서버/클라이언트 경계**: `"use client"`는 필요한 곳만. 서버 전용 키 노출 금지.
 - **커밋**: 사용자가 요청하지 않은 `git push`/강제 푸시 금지. 커밋 메시지는 한국어, 끝에 `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
 - 상태 리터럴(코드 전반 통일): review.state = `'open' | 'submitted' | 'approved' | 'cancelled'`. event.kind = `'requested' | 'submitted' | 'approved' | 'rejected' | 'cancelled'`. 알림 타입 = `'timeline_review_requested' | 'timeline_review_submitted' | 'timeline_review_resolved'`. 할일 제목 접두어 = `'[검토 보완] '`.
 
 ---
 
-## Phase 1 — DB (마이그레이션 107)
+## Phase 1 — DB (마이그레이션 108)
 
-> 아래 Task 1~4는 **같은 파일** `supabase/migrations/107_work_timeline_reviews.sql`에 섹션을 순서대로 append 한다. 파일은 Task 5에서 한 번에 적용·검증한다. 각 Task는 "파일에 섹션 추가 + SQL 문법 자체 점검"까지가 deliverable이며, 커밋은 Task 5에서 모아서 한다(하나의 마이그레이션은 원자적 단위).
+> 아래 Task 1~4는 **같은 파일** `supabase/migrations/108_work_timeline_reviews.sql`에 섹션을 순서대로 append 한다. 파일은 Task 5에서 한 번에 적용·검증한다. 각 Task는 "파일에 섹션 추가 + SQL 문법 자체 점검"까지가 deliverable이며, 커밋은 Task 5에서 모아서 한다(하나의 마이그레이션은 원자적 단위).
 
 ### Task 1: 테이블·인덱스·RLS
 
 **Files:**
-- Create: `jdi-portal/supabase/migrations/107_work_timeline_reviews.sql` (섹션 1)
+- Create: `jdi-portal/supabase/migrations/108_work_timeline_reviews.sql` (섹션 1)
 
 **Interfaces:**
 - Produces 테이블 `work_timeline_reviews`(컬럼: id, entry_id, reviewer_id, author_id, task_id, comment, state, created_at, resolved_at, reminded_on, updated_at), `work_timeline_review_events`(id, review_id, actor_id, kind, note, created_at), `tasks.review_id` 컬럼.
@@ -41,7 +41,7 @@
 
 ```sql
 -- ============================================================
--- 107: 업무보고 검토 (work timeline reviews)
+-- 108: 업무보고 검토 (work timeline reviews)
 --   설계: docs/superpowers/specs/2026-07-24-work-timeline-review-design.md
 --   계획: docs/superpowers/plans/2026-07-24-work-timeline-review.md
 --   선례: 103_work_directives.sql (동일 패턴)
@@ -145,13 +145,13 @@ CREATE POLICY "검토이력: 검토를 볼 수 있으면 조회"
 
 - [ ] **Step 2: SQL 문법 자체 점검**
 
-Run: `cd jdi-portal && node -e "const s=require('fs').readFileSync('supabase/migrations/107_work_timeline_reviews.sql','utf8'); const o=(s.match(/\(/g)||[]).length, c=(s.match(/\)/g)||[]).length; if(o!==c) throw new Error('괄호 불균형 '+o+'/'+c); console.log('괄호 균형 OK', o);"`
+Run: `cd jdi-portal && node -e "const s=require('fs').readFileSync('supabase/migrations/108_work_timeline_reviews.sql','utf8'); const o=(s.match(/\(/g)||[]).length, c=(s.match(/\)/g)||[]).length; if(o!==c) throw new Error('괄호 불균형 '+o+'/'+c); console.log('괄호 균형 OK', o);"`
 Expected: `괄호 균형 OK <n>` (에러 없이 종료). 세미콜론으로 각 문이 끝나는지 육안 확인.
 
 ### Task 2: 완료 감지 트리거
 
 **Files:**
-- Modify: `jdi-portal/supabase/migrations/107_work_timeline_reviews.sql` (섹션 2 append)
+- Modify: `jdi-portal/supabase/migrations/108_work_timeline_reviews.sql` (섹션 2 append)
 
 **Interfaces:**
 - Produces 트리거 함수 `public.sync_review_on_task_status()` + `AFTER UPDATE OF status ON tasks` 트리거. 할일이 `완료` 진입 시 연결 검토를 `submitted`로, 이탈 시 `open`으로 되돌리고 이벤트·알림 기록.
@@ -218,13 +218,13 @@ CREATE TRIGGER tasks_sync_review_on_status
 
 - [ ] **Step 2: 괄호 균형 재점검**
 
-Run: `cd jdi-portal && node -e "const s=require('fs').readFileSync('supabase/migrations/107_work_timeline_reviews.sql','utf8'); const o=(s.match(/\(/g)||[]).length, c=(s.match(/\)/g)||[]).length; if(o!==c) throw new Error('괄호 불균형 '+o+'/'+c); console.log('OK');"`
+Run: `cd jdi-portal && node -e "const s=require('fs').readFileSync('supabase/migrations/108_work_timeline_reviews.sql','utf8'); const o=(s.match(/\(/g)||[]).length, c=(s.match(/\)/g)||[]).length; if(o!==c) throw new Error('괄호 불균형 '+o+'/'+c); console.log('OK');"`
 Expected: `OK`
 
 ### Task 3: RPC (요청/승인/반려/취소)
 
 **Files:**
-- Modify: `jdi-portal/supabase/migrations/107_work_timeline_reviews.sql` (섹션 3 append)
+- Modify: `jdi-portal/supabase/migrations/108_work_timeline_reviews.sql` (섹션 3 append)
 
 **Interfaces:**
 - Produces:
@@ -496,13 +496,13 @@ GRANT EXECUTE ON FUNCTION public.cancel_timeline_review(UUID) TO authenticated;
 
 - [ ] **Step 3: 괄호 균형 재점검**
 
-Run: `cd jdi-portal && node -e "const s=require('fs').readFileSync('supabase/migrations/107_work_timeline_reviews.sql','utf8'); const o=(s.match(/\(/g)||[]).length, c=(s.match(/\)/g)||[]).length; if(o!==c) throw new Error('불균형 '+o+'/'+c); console.log('OK');"`
+Run: `cd jdi-portal && node -e "const s=require('fs').readFileSync('supabase/migrations/108_work_timeline_reviews.sql','utf8'); const o=(s.match(/\(/g)||[]).length, c=(s.match(/\)/g)||[]).length; if(o!==c) throw new Error('불균형 '+o+'/'+c); console.log('OK');"`
 Expected: `OK`
 
 ### Task 4: 재촉 알림 (pg_cron)
 
 **Files:**
-- Modify: `jdi-portal/supabase/migrations/107_work_timeline_reviews.sql` (섹션 4 append)
+- Modify: `jdi-portal/supabase/migrations/108_work_timeline_reviews.sql` (섹션 4 append)
 
 **Interfaces:**
 - Produces `public.remind_pending_timeline_reviews() RETURNS VOID` + `cron.schedule('timeline_review_reminder', ...)`.
@@ -575,14 +575,14 @@ SELECT cron.schedule('timeline_review_reminder', '30 2 * * 1-5',
 
 - [ ] **Step 3: 괄호 균형 재점검**
 
-Run: `cd jdi-portal && node -e "const s=require('fs').readFileSync('supabase/migrations/107_work_timeline_reviews.sql','utf8'); const o=(s.match(/\(/g)||[]).length, c=(s.match(/\)/g)||[]).length; if(o!==c) throw new Error('불균형 '+o+'/'+c); console.log('OK');"`
+Run: `cd jdi-portal && node -e "const s=require('fs').readFileSync('supabase/migrations/108_work_timeline_reviews.sql','utf8'); const o=(s.match(/\(/g)||[]).length, c=(s.match(/\)/g)||[]).length; if(o!==c) throw new Error('불균형 '+o+'/'+c); console.log('OK');"`
 Expected: `OK`
 
 ### Task 5: 마이그레이션 적용 + RLS 회귀 테스트
 
 **Files:**
 - Create: `jdi-portal/supabase/tests/work_timeline_reviews_rls.sql`
-- (적용) `supabase/migrations/107_work_timeline_reviews.sql`
+- (적용) `supabase/migrations/108_work_timeline_reviews.sql`
 
 - [ ] **Step 1: RLS 회귀 테스트 작성** — 기존 `supabase/tests/work_timeline_rls.sql` 형식을 그대로 따른다.
 
@@ -594,10 +594,10 @@ Run(형식 확인): `cd jdi-portal && sed -n '1,60p' supabase/tests/work_timelin
 
 - [ ] **Step 2: 마이그레이션 적용 (운영 DB 변경 — 사용자 확인 게이트)**
 
-⚠️ 이 단계는 운영 DB를 바꾼다. 실행 전 사용자에게 "107 마이그레이션(검토 테이블/함수)을 운영 DB에 적용해도 될까요?"라고 확인한다. 승인 시:
+⚠️ 이 단계는 운영 DB를 바꾼다. 실행 전 사용자에게 "108 마이그레이션(검토 테이블/함수)을 운영 DB에 적용해도 될까요?"라고 확인한다. 승인 시:
 
 Run: `cd jdi-portal && printf 'y\n' | npx supabase db push --linked`
-Expected: `107_work_timeline_reviews.sql` 적용 성공, 에러 없음. (드리프트 경고가 나오면 중단하고 사용자에게 보고.)
+Expected: `108_work_timeline_reviews.sql` 적용 성공, 에러 없음. (드리프트 경고가 나오면 중단하고 사용자에게 보고.)
 
 - [ ] **Step 3: 적용 후 스모크 점검**
 
@@ -608,8 +608,8 @@ Expected: 추가 적용 없음(멱등).
 
 ```bash
 cd "C:/Users/jdico/orca/workspaces/jdicompany/업무-검토기능"
-git add jdi-portal/supabase/migrations/107_work_timeline_reviews.sql jdi-portal/supabase/tests/work_timeline_reviews_rls.sql
-git commit -m "기능: 업무보고 검토 DB(107) — 테이블·RLS·요청/승인/반려/취소 RPC·완료 트리거·재촉
+git add jdi-portal/supabase/migrations/108_work_timeline_reviews.sql jdi-portal/supabase/tests/work_timeline_reviews_rls.sql
+git commit -m "기능: 업무보고 검토 DB(108) — 테이블·RLS·요청/승인/반려/취소 RPC·완료 트리거·재촉
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -1004,7 +1004,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Modify: `jdi-portal/src/lib/dashboard/fast-queries.ts` (`DASHBOARD_SNAPSHOT_QUERY` + Supabase RPC 폴백)
 - Modify: `jdi-portal/src/lib/dashboard/dashboard-snapshot.ts` (스냅샷 타입·조립)
 - Modify: `jdi-portal/src/lib/dashboard/queries.ts` (`DashboardData` 타입)
-- (필요 시) Modify: Supabase RPC 폴백 함수 정의가 있는 마이그레이션 → **새 마이그레이션 `107`로 폴백 RPC 갱신** (기존 수정 금지)
+- (필요 시) Modify: Supabase RPC 폴백 함수 정의가 있는 마이그레이션 → **새 마이그레이션 `109`로 폴백 RPC 갱신** (기존 수정 금지)
 
 **Interfaces:**
 - Produces `DashboardData.pendingReviews: { toFix: PendingReviewItem[]; toConfirm: PendingReviewItem[] }`.
@@ -1051,7 +1051,7 @@ Run: `cd jdi-portal && grep -n "pending_directives\|directive_pending_counts\|js
 
 - [ ] **Step 3: 스냅샷 타입·조립·DashboardData 갱신** — `dashboard-snapshot.ts`의 `DashboardSnapshot` 타입과 `buildDashboardDataFromSnapshot`, `queries.ts`의 `DashboardData`에 `pendingReviews`(위 인터페이스) 추가. snake_case→camelCase 매핑을 기존 필드 방식대로.
 
-- [ ] **Step 4: Supabase RPC 폴백 갱신** — 빠른 경로 실패 시 쓰는 폴백이 RPC(예 `get_dashboard_snapshot`)라면, 그 RPC도 `pendingReviews`를 반환하도록 **새 마이그레이션 `108_dashboard_pending_reviews.sql`**에서 `CREATE OR REPLACE`로 갱신. (폴백이 별도 Supabase 쿼리 조합이면 그 TS 경로에 두 조회를 추가.) **성능 불변조건 3: 빠른 경로/폴백 양쪽 반영.**
+- [ ] **Step 4: Supabase RPC 폴백 갱신** — 빠른 경로 실패 시 쓰는 폴백이 RPC(예 `get_dashboard_snapshot`)라면, 그 RPC도 `pendingReviews`를 반환하도록 **새 마이그레이션 `109_dashboard_pending_reviews.sql`**에서 `CREATE OR REPLACE`로 갱신. (폴백이 별도 Supabase 쿼리 조합이면 그 TS 경로에 두 조회를 추가.) **성능 불변조건 3: 빠른 경로/폴백 양쪽 반영.**
 
 Run(폴백 형태 확인): `cd jdi-portal && grep -n "rpc(\|fallback\|get_dashboard" src/lib/dashboard/fast-queries.ts`
 
@@ -1060,14 +1060,14 @@ Run(폴백 형태 확인): `cd jdi-portal && grep -n "rpc(\|fallback\|get_dashbo
 Run: `cd jdi-portal && npx tsc --noEmit && npm run test:performance`
 Expected: 타입 OK, 성능 40개 통과(부분 인덱스·양쪽 경로 반영).
 
-- [ ] **Step 6: (폴백 마이그레이션이 있으면) 107 적용 (사용자 확인 게이트)** — Task 5 Step 2와 동일 절차.
+- [ ] **Step 6: (폴백 마이그레이션이 있으면) 109 적용 (사용자 확인 게이트)** — Task 5 Step 2와 동일 절차.
 
 - [ ] **Step 7: 커밋**
 
 ```bash
 cd "C:/Users/jdico/orca/workspaces/jdicompany/업무-검토기능"
 git add jdi-portal/src/lib/dashboard/fast-queries.ts jdi-portal/src/lib/dashboard/dashboard-snapshot.ts jdi-portal/src/lib/dashboard/queries.ts
-git add jdi-portal/supabase/migrations/108_dashboard_pending_reviews.sql 2>/dev/null || true
+git add jdi-portal/supabase/migrations/109_dashboard_pending_reviews.sql 2>/dev/null || true
 git commit -m "기능: 대시보드 스냅샷에 검토 인박스(pending_reviews) 추가 — 빠른 경로+폴백
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
@@ -1166,7 +1166,7 @@ Run: `cd jdi-portal && npm run test:security 2>&1 | head -30 && grep -rln "work_
 검토 관련 정적 검사를 추가할 파일 위치 파악(예: RPC가 SECURITY DEFINER인지, UPDATE 정책 부재, 알림 타입 매핑 등 기존 directive 검사와 대칭).
 
 - [ ] **Step 2: 검토 정적 검사 추가** — 기존 directive 검사 항목을 대칭 복제:
-- `107` 마이그레이션에 `work_timeline_reviews`/`_events` RLS 활성 + SELECT 정책이 당사자·admin 제한을 포함.
+- `108` 마이그레이션에 `work_timeline_reviews`/`_events` RLS 활성 + SELECT 정책이 당사자·admin 제한을 포함.
 - 4개 RPC가 `SECURITY DEFINER SET search_path = public` + `auth.uid()` 검증 포함.
 - `work_timeline_reviews`에 INSERT/UPDATE/DELETE 정책이 **없음**(RPC 전용).
 

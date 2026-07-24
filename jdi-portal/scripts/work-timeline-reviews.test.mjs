@@ -14,7 +14,7 @@ test("대시보드: 검토 인박스를 빠른 경로와 폴백 양쪽에 싣는
 
   // 같은 스냅샷 쿼리 안에서 처리 — DB 왕복을 늘리지 않는다
   assert.match(fast, /work_timeline_reviews/);
-  // 마이그레이션 107 의 부분 인덱스를 타야 한다: author_id + state = 'open' (보완 필요)
+  // 마이그레이션 108 의 부분 인덱스를 타야 한다: author_id + state = 'open' (보완 필요)
   assert.match(fast, /r\.author_id = prm\.user_id and r\.state = 'open'/);
   // 부분 인덱스: reviewer_id + state = 'submitted' (확인 필요)
   assert.match(fast, /r\.reviewer_id = prm\.user_id and r\.state = 'submitted'/);
@@ -41,8 +41,8 @@ test("대시보드: 검토 인박스를 빠른 경로와 폴백 양쪽에 싣는
 // 아래 두 테스트는 work-directives.test.mjs 의
 // "103 마이그레이션: 테이블 2개 + 연결 컬럼 + RLS" /
 // "103 마이그레이션: 수락/거절 RPC 의 권한 재검증" 과 대칭인 보안 회귀 검사다.
-test("107 마이그레이션: RLS 활성 + SELECT 정책은 당사자·관리자로 제한, 쓰기 정책 없음", () => {
-  const path = "supabase/migrations/107_work_timeline_reviews.sql";
+test("108 마이그레이션: RLS 활성 + SELECT 정책은 당사자·관리자로 제한, 쓰기 정책 없음", () => {
+  const path = "supabase/migrations/108_work_timeline_reviews.sql";
   const sql = read(path);
 
   // RLS 활성 — 두 테이블 모두
@@ -79,8 +79,8 @@ test("107 마이그레이션: RLS 활성 + SELECT 정책은 당사자·관리자
   );
 });
 
-test("107 마이그레이션: 검토 RPC 4개는 SECURITY DEFINER + search_path 고정 + auth.uid() 검증 + 최소 권한 부여", () => {
-  const path = "supabase/migrations/107_work_timeline_reviews.sql";
+test("108 마이그레이션: 검토 RPC 4개는 SECURITY DEFINER + search_path 고정 + auth.uid() 검증 + 최소 권한 부여", () => {
+  const path = "supabase/migrations/108_work_timeline_reviews.sql";
   const sql = read(path);
 
   const rpcs = [

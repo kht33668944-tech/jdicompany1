@@ -1,5 +1,5 @@
 -- ============================================================
--- 107: 업무보고 검토 (work timeline reviews)
+-- 108: 업무보고 검토 (work timeline reviews)
 --   설계: docs/superpowers/specs/2026-07-24-work-timeline-review-design.md
 --   계획: docs/superpowers/plans/2026-07-24-work-timeline-review.md
 --   선례: 103_work_directives.sql (동일 패턴)
