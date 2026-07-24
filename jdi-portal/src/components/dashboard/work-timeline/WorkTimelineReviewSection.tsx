@@ -1,29 +1,42 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
-  ArrowSquareOut,
   CaretDown,
   CaretUp,
   ChatCircleText,
   CheckCircle,
+  FileArrowUp,
+  Paperclip,
   Prohibit,
+  X,
   XCircle,
 } from "phosphor-react";
 import { toast } from "sonner";
 import UserAvatar from "@/components/shared/UserAvatar";
+import { triggerDownload } from "@/lib/utils/download";
 import {
   approveReview,
   cancelReview,
   rejectReview,
   requestReview,
+  submitRemediation,
 } from "@/lib/work-timeline/reviewActions";
-import { REVIEW_COMMENT_MAX_LENGTH, REVIEW_STATE_LABELS } from "@/lib/work-timeline/constants";
-import type { ReviewEventKind, WorkTimelineReviewWithEvents } from "@/lib/work-timeline/types";
-import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
-import type { TaskStatus } from "@/lib/tasks/types";
+import { cleanupReviewUploads, uploadReviewFilesDirect } from "@/lib/work-timeline/clientUploads";
+import {
+  REVIEW_COMMENT_MAX_LENGTH,
+  REVIEW_MAX_ATTACHMENTS,
+  REVIEW_REMEDIATION_MAX_LENGTH,
+  REVIEW_STATE_LABELS,
+} from "@/lib/work-timeline/constants";
+import { isWorkTimelineImage, validateWorkTimelineFile } from "@/lib/work-timeline/utils";
+import type {
+  ReviewEventKind,
+  WorkTimelineReviewAttachment,
+  WorkTimelineReviewWithEvents,
+} from "@/lib/work-timeline/types";
 
 interface WorkTimelineReviewSectionProps {
   entryId: string;
@@ -56,7 +69,7 @@ function eventLabel(kind: ReviewEventKind): string {
     case "requested":
       return "검토를 요청했습니다";
     case "submitted":
-      return "보완 할일을 완료했습니다";
+      return "보완을 제출했습니다";
     case "approved":
       return "승인했습니다 — 검토 완료";
     case "rejected":
@@ -66,6 +79,12 @@ function eventLabel(kind: ReviewEventKind): string {
     default:
       return "";
   }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${bytes}B`;
 }
 
 export default function WorkTimelineReviewSection({
@@ -79,6 +98,7 @@ export default function WorkTimelineReviewSection({
   const canRequest = currentUserRole === "admin" || entryOwnerId === currentUserId;
   const isReviewer = review !== null
     && (review.reviewer_id === currentUserId || currentUserRole === "admin");
+  const isAuthor = review !== null && review.author_id === currentUserId;
   const isActive = review !== null && (review.state === "open" || review.state === "submitted");
   const isTerminal = review !== null && (review.state === "approved" || review.state === "cancelled");
   const showRequestForm = canRequest && !isActive;
@@ -102,7 +122,14 @@ export default function WorkTimelineReviewSection({
 
       <div className="space-y-5 px-5 py-5 sm:px-7">
         {review && (
-          <ReviewCard review={review} isReviewer={isReviewer} collapsedTimeline={isTerminal} />
+          <ReviewCard
+            review={review}
+            entryId={entryId}
+            isReviewer={isReviewer}
+            isAuthor={isAuthor}
+            currentUserId={currentUserId}
+            collapsedTimeline={isTerminal}
+          />
         )}
 
         {showRequestForm && (
@@ -134,11 +161,17 @@ function StateBadge({
 
 function ReviewCard({
   review,
+  entryId,
   isReviewer,
+  isAuthor,
+  currentUserId,
   collapsedTimeline,
 }: {
   review: WorkTimelineReviewWithEvents;
+  entryId: string;
   isReviewer: boolean;
+  isAuthor: boolean;
+  currentUserId: string;
   collapsedTimeline: boolean;
 }) {
   const router = useRouter();
@@ -194,9 +227,7 @@ function ReviewCard({
     }
   };
 
-  const taskStatusConfig = review.task_status
-    ? TASK_STATUS_CONFIG[review.task_status as TaskStatus]
-    : null;
+  const showRemediationForm = isAuthor && review.state === "open";
 
   return (
     <div className="space-y-4">
@@ -209,29 +240,6 @@ function ReviewCard({
           {review.comment}
         </p>
       </div>
-
-      {review.task_id && (
-        <Link
-          href={`/dashboard/tasks/${review.task_id}`}
-          className="flex items-center gap-3 rounded-md border border-indigo-200 bg-indigo-50 px-4 py-3 hover:bg-indigo-100"
-        >
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-md bg-white shadow-sm">
-            <CheckCircle size={18} weight="bold" className="text-indigo-600" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-bold text-indigo-600">보완 할일</span>
-            <span className="block truncate text-sm font-bold text-slate-800">보완 할일 열기</span>
-          </span>
-          {taskStatusConfig && (
-            <span
-              className={`flex-none rounded-md px-2 py-0.5 text-xs font-bold ${taskStatusConfig.bg} ${taskStatusConfig.text}`}
-            >
-              {review.task_status}
-            </span>
-          )}
-          <ArrowSquareOut size={16} className="flex-none text-indigo-500" aria-hidden="true" />
-        </Link>
-      )}
 
       {review.events.length > 0 && (
         <div>
@@ -247,6 +255,21 @@ function ReviewCard({
           )}
           {timelineOpen && <ReviewTimeline events={review.events} />}
         </div>
+      )}
+
+      {showRemediationForm && (
+        <RemediationForm
+          entryId={entryId}
+          reviewId={review.id}
+          currentUserId={currentUserId}
+          onDone={() => router.refresh()}
+        />
+      )}
+
+      {isAuthor && !isReviewer && review.state === "submitted" && (
+        <p className="rounded-md border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-xs font-semibold text-indigo-700">
+          보완을 제출했습니다. 검토자의 확인을 기다리고 있어요.
+        </p>
       )}
 
       {isReviewer && review.state === "submitted" && (
@@ -323,6 +346,154 @@ function ReviewCard({
   );
 }
 
+function RemediationForm({
+  entryId,
+  reviewId,
+  currentUserId,
+  onDone,
+}: {
+  entryId: string;
+  reviewId: string;
+  currentUserId: string;
+  onDone: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSelectFiles = (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    const availableSlots = REVIEW_MAX_ATTACHMENTS - files.length;
+    if (availableSlots <= 0) {
+      toast.error(`파일은 최대 ${REVIEW_MAX_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
+      return;
+    }
+    const incoming = Array.from(list).slice(0, availableSlots);
+    if (list.length > availableSlots) {
+      toast.error(`파일은 최대 ${REVIEW_MAX_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
+    }
+    const accepted: File[] = [];
+    for (const file of incoming) {
+      try {
+        validateWorkTimelineFile(file);
+        accepted.push(file);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "첨부할 수 없는 파일입니다.");
+      }
+    }
+    if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((current) => current.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
+    if (!note.trim() && files.length === 0) {
+      toast.error("보완 내용이나 파일을 올려 주세요.");
+      return;
+    }
+    setSubmitting(true);
+    let uploadedPaths: string[] = [];
+    try {
+      const attachments = files.length > 0
+        ? await uploadReviewFilesDirect({ entryId, userId: currentUserId, files })
+        : [];
+      uploadedPaths = attachments.map((attachment) => attachment.file_path);
+      try {
+        await submitRemediation(entryId, reviewId, note, attachments);
+      } catch (submitError) {
+        // 상태 전이가 실패하면 방금 올린 파일을 정리한다.
+        if (uploadedPaths.length > 0) await cleanupReviewUploads(uploadedPaths);
+        throw submitError;
+      }
+      toast.success("보완을 제출했습니다.");
+      setNote("");
+      setFiles([]);
+      onDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "보완을 제출하지 못했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-md border border-indigo-200 bg-indigo-50/50 px-4 py-4">
+      <div>
+        <label className="mb-1.5 block text-xs font-bold text-indigo-700">보완 내용</label>
+        <textarea
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          maxLength={REVIEW_REMEDIATION_MAX_LENGTH}
+          rows={4}
+          placeholder="어떻게 보완했는지 적어 주세요. 파일만 올려도 됩니다."
+          className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+        />
+      </div>
+
+      {files.length > 0 && (
+        <ul className="space-y-1.5">
+          {files.map((file, index) => (
+            <li
+              key={`${file.name}-${index}`}
+              className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <Paperclip size={15} className="flex-none text-slate-400" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate font-semibold text-slate-700">{file.name}</span>
+              <span className="flex-none text-xs text-slate-400">{formatFileSize(file.size)}</span>
+              <button
+                type="button"
+                onClick={() => removeFile(index)}
+                disabled={submitting}
+                aria-label={`${file.name} 첨부 제거`}
+                className="flex-none rounded p-0.5 text-slate-400 hover:text-rose-500 disabled:opacity-50"
+              >
+                <X size={15} weight="bold" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="sr-only"
+            onChange={(event) => handleSelectFiles(event.target.files)}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={submitting || files.length >= REVIEW_MAX_ATTACHMENTS}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileArrowUp size={16} aria-hidden="true" />
+            파일 첨부
+          </button>
+          <span className="text-xs font-semibold text-slate-400">
+            {files.length}/{REVIEW_MAX_ATTACHMENTS}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+        >
+          <CheckCircle size={16} weight="bold" aria-hidden="true" />
+          {submitting ? "제출하는 중..." : "보완 완료"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ReviewTimeline({ events }: { events: WorkTimelineReviewWithEvents["events"] }) {
   return (
     <ol className="mt-3 space-y-0">
@@ -349,10 +520,62 @@ function ReviewTimeline({ events }: { events: WorkTimelineReviewWithEvents["even
                 {event.note}
               </p>
             )}
+            {event.attachments.length > 0 && (
+              <ReviewAttachmentList attachments={event.attachments} />
+            )}
           </li>
         );
       })}
     </ol>
+  );
+}
+
+function ReviewAttachmentList({ attachments }: { attachments: WorkTimelineReviewAttachment[] }) {
+  return (
+    <div className="mt-2 space-y-2">
+      {attachments.map((attachment) => {
+        const isImage = isWorkTimelineImage(attachment.mime_type);
+        if (isImage && attachment.url) {
+          return (
+            <button
+              key={attachment.id}
+              type="button"
+              onClick={() => triggerDownload(attachment.url!, attachment.file_name)}
+              className="block overflow-hidden rounded-md border border-slate-200 bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              aria-label={`${attachment.file_name} 저장`}
+              title={attachment.file_name}
+            >
+              <Image
+                src={attachment.url}
+                alt={attachment.file_name}
+                width={480}
+                height={320}
+                unoptimized
+                className="max-h-56 w-auto max-w-full object-contain"
+              />
+            </button>
+          );
+        }
+        return (
+          <a
+            key={attachment.id}
+            href={attachment.url ?? undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-disabled={attachment.url ? undefined : true}
+            className={`flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ${
+              attachment.url ? "hover:bg-slate-50" : "cursor-not-allowed opacity-60"
+            }`}
+          >
+            <Paperclip size={15} className="flex-none text-slate-400" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate font-semibold text-slate-700">
+              {attachment.file_name}
+            </span>
+            <span className="flex-none text-xs text-slate-400">{formatFileSize(attachment.file_size)}</span>
+          </a>
+        );
+      })}
+    </div>
   );
 }
 

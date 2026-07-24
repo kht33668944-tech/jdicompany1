@@ -104,7 +104,6 @@ export interface WorkTimelineReview {
   entry_id: string;
   reviewer_id: string;
   author_id: string;
-  task_id: string | null;
   comment: string;
   state: ReviewState;
   created_at: string;
@@ -112,7 +111,17 @@ export interface WorkTimelineReview {
   updated_at: string;
   reviewer_name: string | null;
   author_name: string | null;
-  task_status: string | null; // 연결 할일의 status (표시용)
+}
+
+/** 보완 이벤트(kind='submitted')에 붙는 첨부 파일. url 은 조회 시 발급하는 서명 URL. */
+export interface WorkTimelineReviewAttachment {
+  id: string;
+  event_id: string;
+  file_name: string;
+  file_path: string;
+  mime_type: string;
+  file_size: number;
+  url: string | null;
 }
 
 export interface WorkTimelineReviewEvent {
@@ -123,6 +132,15 @@ export interface WorkTimelineReviewEvent {
   kind: ReviewEventKind;
   note: string | null;
   created_at: string;
+  attachments: WorkTimelineReviewAttachment[];
+}
+
+/** 보완 제출 시 서버 액션으로 넘기는 업로드 완료 첨부 메타데이터. */
+export interface ReviewRemediationAttachmentInput {
+  file_name: string;
+  file_path: string;
+  mime_type: string;
+  file_size: number;
 }
 
 export interface WorkTimelineReviewWithEvents extends WorkTimelineReview {
@@ -137,5 +155,4 @@ export interface PendingReviewItem {
   comment: string;
   counterpartName: string | null;
   createdAt: string;
-  taskId: string | null;
 }

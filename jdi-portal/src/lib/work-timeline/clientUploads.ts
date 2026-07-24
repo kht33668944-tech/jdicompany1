@@ -7,6 +7,7 @@ import {
 } from "./actions";
 import { WORK_TIMELINE_BUCKET } from "./constants";
 import type {
+  ReviewRemediationAttachmentInput,
   WorkTimelineAttachment,
   WorkTimelineAttachmentInput,
   WorkTimelineFileUpload,
@@ -85,4 +86,58 @@ export async function uploadWorkTimelineFilesDirect({
     await cleanupUploadedPaths(uploadedPaths);
     throw error;
   }
+}
+
+interface ReviewUploadOptions {
+  entryId: string;
+  userId: string;
+  files: File[];
+}
+
+/**
+ * 검토 보완 첨부를 work-timeline 버킷에 직접 업로드하고 메타데이터를 돌려준다.
+ * 경로는 기존 업무 타임라인과 같은 규약 `{userId}/{entryId}/{uuid}.ext` 를 쓴다.
+ * 보완 제출자는 항상 업무보고 작성자(=버킷 소유자)이므로 스토리지 INSERT RLS(083)를 그대로 통과한다.
+ * 실제 첨부 행 저장은 서버 액션(submit_timeline_review_remediation RPC)이 담당한다.
+ * 업로드 도중 실패하면 이미 올린 파일을 정리한다.
+ */
+export async function uploadReviewFilesDirect({
+  entryId,
+  userId,
+  files,
+}: ReviewUploadOptions): Promise<ReviewRemediationAttachmentInput[]> {
+  const supabase = createClient();
+  const uploadedPaths: string[] = [];
+  const metadata: ReviewRemediationAttachmentInput[] = [];
+
+  try {
+    for (const file of files) {
+      validateWorkTimelineFile(file);
+      const uniqueId = crypto.randomUUID();
+      const filePath = `${userId}/${entryId}/${uniqueId}.${getFileExtension(file)}`;
+      const contentType = file.type || FALLBACK_MIME;
+
+      const { error: fileError } = await supabase.storage
+        .from(WORK_TIMELINE_BUCKET)
+        .upload(filePath, file, { contentType, upsert: false });
+      if (fileError) throw fileError;
+      uploadedPaths.push(filePath);
+
+      metadata.push({
+        file_name: file.name,
+        file_path: filePath,
+        mime_type: contentType,
+        file_size: file.size,
+      });
+    }
+    return metadata;
+  } catch (error) {
+    await cleanupUploadedPaths(uploadedPaths);
+    throw error;
+  }
+}
+
+/** 서버 액션 실패 등으로 업로드한 검토 첨부를 되돌려야 할 때 사용. */
+export async function cleanupReviewUploads(paths: string[]): Promise<void> {
+  await cleanupUploadedPaths(paths);
 }

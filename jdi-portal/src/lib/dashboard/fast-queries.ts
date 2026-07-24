@@ -291,8 +291,7 @@ const DASHBOARD_SNAPSHOT_QUERY = `
           'entry_title', e.title,
           'comment', r.comment,
           'counterpart_name', rp.full_name,
-          'created_at', r.created_at,
-          'task_id', r.task_id
+          'created_at', r.created_at
         )
         order by r.created_at desc
       ),
@@ -314,8 +313,7 @@ const DASHBOARD_SNAPSHOT_QUERY = `
           'entry_title', e.title,
           'comment', r.comment,
           'counterpart_name', ap.full_name,
-          'created_at', r.created_at,
-          'task_id', r.task_id
+          'created_at', r.created_at
         )
         order by r.created_at desc
       ),
@@ -374,7 +372,6 @@ interface PendingReviewItemWire {
   comment: string;
   counterpart_name: string | null;
   created_at: string;
-  task_id: string | null;
 }
 
 interface PendingReviewsWire {
@@ -474,7 +471,6 @@ function mapPendingReviewItemWire(row: PendingReviewItemWire) {
     comment: row.comment,
     counterpartName: row.counterpart_name,
     createdAt: row.created_at,
-    taskId: row.task_id,
   };
 }
 

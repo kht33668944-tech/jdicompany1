@@ -139,7 +139,6 @@ interface PendingReviewRow {
   entry_id: string;
   comment: string;
   created_at: string;
-  task_id: string | null;
   work_timeline_entries: { title: string } | null;
   counterpart: { full_name: string | null } | null;
 }
@@ -154,7 +153,6 @@ function mapPendingReviewRows(rows: PendingReviewRow[]): PendingReviewItem[] {
       comment: row.comment,
       counterpartName: row.counterpart?.full_name ?? null,
       createdAt: row.created_at,
-      taskId: row.task_id,
     }));
 }
 
@@ -171,7 +169,7 @@ async function getPendingReviews(
     supabase
       .from("work_timeline_reviews")
       .select(
-        "id, entry_id, comment, created_at, task_id, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_reviewer_id_fkey(full_name)"
+        "id, entry_id, comment, created_at, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_reviewer_id_fkey(full_name)"
       )
       .eq("author_id", userId)
       .eq("state", "open")
@@ -179,7 +177,7 @@ async function getPendingReviews(
     supabase
       .from("work_timeline_reviews")
       .select(
-        "id, entry_id, comment, created_at, task_id, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_author_id_fkey(full_name)"
+        "id, entry_id, comment, created_at, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_author_id_fkey(full_name)"
       )
       .eq("reviewer_id", userId)
       .eq("state", "submitted")

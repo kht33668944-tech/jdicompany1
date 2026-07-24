@@ -23,7 +23,8 @@ export const WORK_TIMELINE_IMAGE_MIME_TYPES = [
 ] as const;
 
 export const REVIEW_COMMENT_MAX_LENGTH = 2000;
-export const REVIEW_TASK_TITLE_PREFIX = "[검토 보완] ";
+export const REVIEW_REMEDIATION_MAX_LENGTH = 2000;
+export const REVIEW_MAX_ATTACHMENTS = 5;
 
 export const REVIEW_STATE_LABELS: Record<
   "open" | "submitted" | "approved" | "cancelled",

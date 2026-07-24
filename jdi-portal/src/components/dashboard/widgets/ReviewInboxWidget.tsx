@@ -132,15 +132,13 @@ export default function ReviewInboxWidget({
                   </div>
                 </div>
 
-                {item.taskId && (
-                  <Link
-                    href={`/dashboard/tasks/${item.taskId}`}
-                    className="inline-flex flex-shrink-0 items-center justify-center gap-1 self-start rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:border-indigo-300 hover:text-indigo-600"
-                  >
-                    보완 할일 열기
-                    <ArrowSquareOut size={14} />
-                  </Link>
-                )}
+                <Link
+                  href={`/dashboard/work-timeline/${item.entryId}`}
+                  className="inline-flex flex-shrink-0 items-center justify-center gap-1 self-start rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:border-indigo-300 hover:text-indigo-600"
+                >
+                  보완하러 가기
+                  <ArrowSquareOut size={14} />
+                </Link>
               </li>
             ))}
           </ul>
