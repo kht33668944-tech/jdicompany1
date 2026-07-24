@@ -301,103 +301,105 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
         />
       </div>
 
-      {/* 서류 리스트 */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="p-10 text-center text-sm text-slate-400">서류가 없습니다. ‘＋ 서류 올리기’로 추가하세요.</div>
-        ) : (
-          filtered.map((d) => (
-            <div key={d.id} className="border-t border-slate-100 first:border-t-0">
-              <div
-                className="flex items-center gap-3 pl-3 pr-4 py-3.5 hover:bg-slate-50/60 border-l-4"
-                style={{ borderLeftColor: corpMeta.get(d.corporation_id)?.color ?? "#94a3b8" }}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleSel(d.id)}
-                  className={`w-5 h-5 shrink-0 rounded-md border grid place-items-center text-[11px] font-black ${
-                    selected.has(d.id) ? "bg-brand-600 border-brand-600 text-white" : "border-slate-300 text-transparent"
-                  }`}
-                  aria-label="선택"
-                >
-                  ✓
-                </button>
-                <div className="w-9 h-10 shrink-0 rounded-md bg-slate-100 border border-slate-200 grid place-items-center text-[9px] font-extrabold text-slate-400">
-                  {(d.file_name?.split(".").pop() ?? "FILE").toUpperCase().slice(0, 4)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-sm text-slate-800 truncate">{d.title}</span>
-                    {d.category && (
-                      <span className="text-[11px] font-bold text-brand-600 bg-brand-50 rounded px-2 py-0.5">{d.category}</span>
-                    )}
-                    {d.current_version_no != null && (
-                      <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 rounded px-2 py-0.5">
-                        최신 v{d.current_version_no}
-                      </span>
-                    )}
+      {/* 서류 리스트 (법인 색 카드) */}
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
+          서류가 없습니다. ‘＋ 서류 올리기’로 추가하세요.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((d) => {
+            const color = corpMeta.get(d.corporation_id)?.color ?? "#94a3b8";
+            const corpName = corpMeta.get(d.corporation_id)?.name ?? "미분류";
+            return (
+              <div key={d.id} className="rounded-xl border" style={{ backgroundColor: `${color}12`, borderColor: `${color}33` }}>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSel(d.id)}
+                    className={`w-5 h-5 shrink-0 rounded-md border grid place-items-center text-[11px] font-black ${
+                      selected.has(d.id) ? "bg-brand-600 border-brand-600 text-white" : "border-slate-300 bg-white/70 text-transparent"
+                    }`}
+                    aria-label="선택"
+                  >
+                    ✓
+                  </button>
+                  <div className="w-9 h-10 shrink-0 rounded-md bg-white/70 border border-slate-200 grid place-items-center text-[9px] font-extrabold text-slate-400">
+                    {(d.file_name?.split(".").pop() ?? "FILE").toUpperCase().slice(0, 4)}
                   </div>
-                  <div className="mt-1 text-xs text-slate-400 flex gap-3 flex-wrap">
-                    <span className="font-bold" style={{ color: corpMeta.get(d.corporation_id)?.color }}>
-                      {corpMeta.get(d.corporation_id)?.name ?? "미분류"}
-                    </span>
-                    {d.file_name && <span className="truncate max-w-[220px]">{d.file_name}</span>}
-                    {d.file_size ? <span>{formatFileSize(d.file_size)}</span> : null}
-                    <span>최신화 {formatDate(d.updated_at)}</span>
-                    {d.updated_by_name && <span>올린이 {d.updated_by_name}</span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-slate-800 truncate">{d.title}</span>
+                      {d.category && (
+                        <span className="text-[11px] font-bold text-slate-500 bg-white/80 border border-slate-200 rounded px-2 py-0.5">{d.category}</span>
+                      )}
+                      {d.current_version_no != null && (
+                        <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 rounded px-2 py-0.5">
+                          최신 v{d.current_version_no}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <span className="font-bold" style={{ color }}>{corpName}</span>
+                      {d.file_name && (<><span className="text-slate-300">·</span><span className="truncate max-w-[200px]">{d.file_name}</span></>)}
+                      {d.file_size ? (<><span className="text-slate-300">·</span><span>{formatFileSize(d.file_size)}</span></>) : null}
+                      <span className="text-slate-300">·</span><span>최신화 {formatDate(d.updated_at)}</span>
+                      {d.updated_by_name && (<><span className="text-slate-300">·</span><span>올린이 {d.updated_by_name}</span></>)}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button type="button" onClick={() => setPreviewDoc(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-brand-400 hover:text-brand-600">
-                    👁 미리보기
-                  </button>
-                  <button type="button" onClick={() => handleDownload(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-brand-400 hover:text-brand-600">
-                    ⤓ 다운로드
-                  </button>
-                  <button type="button" onClick={() => setReplaceDoc(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-brand-400 hover:text-brand-600">
-                    🔄 최신화
-                  </button>
-                  <button type="button" onClick={() => toggleHistory(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-brand-600">
-                    🕘 지난 버전{d.version_count > 1 ? ` ${d.version_count}` : ""}
-                  </button>
-                  <button type="button" onClick={() => { setEditDoc(d); setFormOpen(true); }} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-slate-500 hover:text-brand-600" title="정보 수정">
-                    ✎
-                  </button>
-                  {isAdmin && (
-                    <button type="button" onClick={() => handleDeleteDoc(d)} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-slate-400 hover:text-red-600" title="삭제">
-                      🗑
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button type="button" onClick={() => setPreviewDoc(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white/60 text-slate-600 hover:border-brand-400 hover:text-brand-600">
+                      👁 미리보기
                     </button>
-                  )}
+                    <button type="button" onClick={() => handleDownload(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white/60 text-slate-600 hover:border-brand-400 hover:text-brand-600">
+                      ⤓ 다운로드
+                    </button>
+                    <button type="button" onClick={() => setReplaceDoc(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white/60 text-slate-600 hover:border-brand-400 hover:text-brand-600">
+                      🔄 최신화
+                    </button>
+                    <button type="button" onClick={() => toggleHistory(d)} className="text-xs font-semibold px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-brand-600">
+                      🕘 지난 버전{d.version_count > 1 ? ` ${d.version_count}` : ""}
+                    </button>
+                    <button type="button" onClick={() => { setEditDoc(d); setFormOpen(true); }} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-slate-500 hover:text-brand-600" title="정보 수정">
+                      ✎
+                    </button>
+                    {isAdmin && (
+                      <button type="button" onClick={() => handleDeleteDoc(d)} className="text-xs font-semibold px-2 py-1.5 rounded-lg text-slate-400 hover:text-red-600" title="삭제">
+                        🗑
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {expanded === d.id && (
-                <div className="mx-4 mb-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 p-3">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2">지난 버전 이력</div>
-                  {versions.length === 0 ? (
-                    <div className="text-xs text-slate-400 py-2">불러오는 중…</div>
-                  ) : (
-                    versions.map((v) => (
-                      <div key={v.id} className="flex items-center justify-between gap-2 text-xs py-1.5 border-t border-slate-200 first:border-t-0">
-                        <span className="text-slate-600 truncate">
-                          v{v.version_no} · {v.file_name ?? "파일"} {v.is_current && <span className="text-emerald-600 font-bold">(현재)</span>}
-                        </span>
-                        <span className="flex items-center gap-3 shrink-0 text-slate-400">
-                          <span>{formatDate(v.uploaded_at)}{v.uploaded_by_name ? ` · ${v.uploaded_by_name}` : ""}</span>
-                          <button type="button" onClick={() => handleVersionDownload(v)} className="text-brand-600 font-semibold hover:underline">다운로드</button>
-                          {!v.is_current && (
-                            <button type="button" onClick={() => handleRevert(d, v.id)} className="text-brand-600 font-semibold hover:underline">되돌리기</button>
-                          )}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+                {expanded === d.id && (
+                  <div className="mx-4 mb-3 rounded-xl bg-white/60 border border-dashed border-slate-200 p-3">
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2">지난 버전 이력</div>
+                    {versions.length === 0 ? (
+                      <div className="text-xs text-slate-400 py-2">불러오는 중…</div>
+                    ) : (
+                      versions.map((v) => (
+                        <div key={v.id} className="flex items-center justify-between gap-2 text-xs py-1.5 border-t border-slate-200 first:border-t-0">
+                          <span className="text-slate-600 truncate">
+                            v{v.version_no} · {v.file_name ?? "파일"} {v.is_current && <span className="text-emerald-600 font-bold">(현재)</span>}
+                          </span>
+                          <span className="flex items-center gap-3 shrink-0 text-slate-400">
+                            <span>{formatDate(v.uploaded_at)}{v.uploaded_by_name ? ` · ${v.uploaded_by_name}` : ""}</span>
+                            <button type="button" onClick={() => handleVersionDownload(v)} className="text-brand-600 font-semibold hover:underline">다운로드</button>
+                            {!v.is_current && (
+                              <button type="button" onClick={() => handleRevert(d, v.id)} className="text-brand-600 font-semibold hover:underline">되돌리기</button>
+                            )}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 선택 다운로드 바 */}
       {selected.size > 0 && (
