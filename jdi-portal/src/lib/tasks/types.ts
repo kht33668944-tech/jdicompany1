@@ -30,7 +30,6 @@ export interface Task {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
-  review_id: string | null;
 }
 
 export interface TaskAssignee {
@@ -42,8 +41,6 @@ export interface TaskAssignee {
 export interface TaskWithDetails extends Task {
   creator_profile: { full_name: string; avatar_url: string | null };
   project?: ProjectRef | null;
-  /** review_id로 연결된 검토의 원본 업무보고 id. 검토가 없거나 조인이 없는 경로에선 undefined. */
-  review?: { entry_id: string } | null;
   assignees: TaskAssignee[];
   checklist_total: number;
   checklist_completed: number;

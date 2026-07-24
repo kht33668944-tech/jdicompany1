@@ -145,12 +145,7 @@ export default function TaskDetailPanel({
     const supabase = createClient();
 
     const hasCachedTask = !!initialTask && initialTask.id === taskId;
-    // 캐시된 task 에 review_id 는 있지만 review(entry_id) 조인이 아직 로드되지 않았다면
-    // (목록 빠른 경로는 review 조인을 하지 않음) 상세 쿼리로 재조회해 역링크를 채운다.
-    const needsReviewRefetch = hasCachedTask
-      && !!initialTask!.review_id
-      && initialTask!.review === undefined;
-    const usesCachedTask = hasCachedTask && !needsReviewRefetch;
+    const usesCachedTask = hasCachedTask;
     const detailsPromise = getTaskDetails(supabase, taskId);
     const taskPromise = usesCachedTask
       ? Promise.resolve<TaskWithDetails | null>(initialTask)

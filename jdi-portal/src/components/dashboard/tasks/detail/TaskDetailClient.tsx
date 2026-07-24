@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
   CheckCircle,
-  LinkSimple,
   ShareNetwork,
   SpinnerGap,
   Trash,
@@ -452,16 +451,6 @@ export default function TaskDetailClient({
             <h1 className="text-lg font-bold text-slate-800">{title}</h1>
           )}
 
-          {task.review?.entry_id && (
-            <Link
-              href={`/dashboard/work-timeline/${task.review.entry_id}`}
-              className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-500"
-            >
-              <LinkSimple size={14} aria-hidden="true" />
-              검토 대상 업무보고 보기
-            </Link>
-          )}
-
           <div className="mt-4">
             <label className="mb-1 block text-xs font-bold text-slate-400">설명</label>
             <textarea
@@ -696,16 +685,6 @@ export default function TaskDetailClient({
               />
             ) : (
               <h1 className="text-xl font-bold text-slate-800">{title}</h1>
-            )}
-
-            {task.review?.entry_id && (
-              <Link
-                href={`/dashboard/work-timeline/${task.review.entry_id}`}
-                className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-500"
-              >
-                <LinkSimple size={16} aria-hidden="true" />
-                검토 대상 업무보고 보기
-              </Link>
             )}
 
             <div className="mt-4">
