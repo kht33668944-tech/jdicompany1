@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import WorkTimelineDetailClient from "@/components/dashboard/work-timeline/WorkTimelineDetailClient";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { getWorkTimelineEntryById } from "@/lib/work-timeline/queries";
+import { getEntryReview } from "@/lib/work-timeline/reviewQueries";
 
 interface WorkTimelineDetailPageProps {
   params: Promise<{ id: string }>;
@@ -15,7 +16,10 @@ export default async function WorkTimelineDetailPage({ params }: WorkTimelineDet
   if (!auth) redirect("/login");
   if (!UUID_PATTERN.test(id)) redirect("/dashboard/work-timeline");
 
-  const entry = await getWorkTimelineEntryById(auth.supabase, id);
+  const [entry, review] = await Promise.all([
+    getWorkTimelineEntryById(auth.supabase, id),
+    getEntryReview(id),
+  ]);
   if (!entry) redirect("/dashboard/work-timeline");
 
   return (
@@ -23,6 +27,7 @@ export default async function WorkTimelineDetailPage({ params }: WorkTimelineDet
       initialEntry={entry}
       currentUserId={auth.user.id}
       currentUserRole={auth.profile.role}
+      initialReview={review}
     />
   );
 }

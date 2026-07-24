@@ -22,16 +22,18 @@ import {
   WORK_TIMELINE_MAX_DESCRIPTION_LENGTH,
   WORK_TIMELINE_MAX_TITLE_LENGTH,
 } from "@/lib/work-timeline/constants";
-import type { WorkTimelineEntryWithProfile } from "@/lib/work-timeline/types";
+import type { WorkTimelineEntryWithProfile, WorkTimelineReviewWithEvents } from "@/lib/work-timeline/types";
 import { isWorkTimelineImage, validateWorkTimelineFile } from "@/lib/work-timeline/utils";
 import { createImageThumbnail, resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
 import AttachmentFileCard from "./AttachmentFileCard";
+import WorkTimelineReviewSection from "./WorkTimelineReviewSection";
 
 interface WorkTimelineDetailClientProps {
   initialEntry: WorkTimelineEntryWithProfile;
   currentUserId: string;
   currentUserRole: string;
+  initialReview: WorkTimelineReviewWithEvents | null;
 }
 
 function formatCompletedAt(timestamp: string): string {
@@ -74,6 +76,7 @@ export default function WorkTimelineDetailClient({
   initialEntry,
   currentUserId,
   currentUserRole,
+  initialReview,
 }: WorkTimelineDetailClientProps) {
   const router = useRouter();
   const [entry, setEntry] = useState(initialEntry);
@@ -536,6 +539,14 @@ export default function WorkTimelineDetailClient({
           </section>
         )}
       </article>
+
+      <WorkTimelineReviewSection
+        entryId={entry.id}
+        entryOwnerId={entry.user_id}
+        currentUserId={currentUserId}
+        currentUserRole={currentUserRole}
+        initialReview={initialReview}
+      />
 
       {confirmDelete && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4">
