@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChannelWithDetails, Message } from "./types";
-import { MESSAGES_PER_PAGE } from "./constants";
+import { CHAT_BUCKET, CHAT_FILE_URL_TTL_SECONDS, MESSAGES_PER_PAGE } from "./constants";
+import { collectMessageFilePaths } from "./fileUrlBatch";
 
 /**
  * 사용자가 속한 채널 목록 조회 (마지막 메시지 + 읽지 않은 수 포함)
@@ -78,6 +79,44 @@ export async function getMessages(
   });
   if (error) throw error;
   return (data as Message[] | null) ?? [];
+}
+
+/**
+ * 초기 메시지의 첨부 서명 URL을 **서버에서 미리** 일괄 발급한다.
+ *
+ * 기존 흐름: SSR(메시지) → 브라우저 렌더 → 서버 액션 왕복(URL 발급) → 그제서야 이미지 로드 시작.
+ *            채팅방을 열 때마다 사진이 한 박자 늦게 뜨는 원인이었다.
+ * 변경 흐름: SSR 단계에서 URL 까지 실어 보내 브라우저는 받자마자 이미지를 로드한다.
+ *
+ * - 첨부가 없는 채널은 스토리지 호출 자체를 하지 않는다(왕복 0).
+ * - 실패해도 예외를 던지지 않는다. 빈 값을 주면 클라이언트의 기존 배치 경로가 그대로
+ *   이어받아 URL을 발급하므로 화면이 깨지지 않는다(느려질 뿐).
+ */
+export async function getMessageFileUrls(
+  supabase: SupabaseClient,
+  messages: Message[]
+): Promise<Record<string, string>> {
+  const paths = collectMessageFilePaths(messages);
+  if (paths.length === 0) return {};
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(CHAT_BUCKET)
+      .createSignedUrls(paths, CHAT_FILE_URL_TTL_SECONDS);
+    if (error) {
+      console.warn("[chat] 초기 첨부 URL 프리페치 실패 — 클라이언트 경로로 폴백합니다.", error);
+      return {};
+    }
+
+    const urls: Record<string, string> = {};
+    for (const item of data ?? []) {
+      if (item?.path && item.signedUrl && !item.error) urls[item.path] = item.signedUrl;
+    }
+    return urls;
+  } catch (error) {
+    console.warn("[chat] 초기 첨부 URL 프리페치 예외 — 클라이언트 경로로 폴백합니다.", error);
+    return {};
+  }
 }
 
 /**

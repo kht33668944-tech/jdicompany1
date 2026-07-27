@@ -32,6 +32,8 @@ interface ChatPageClientProps {
   initialChannel?: ChannelWithDetails;
   initialMessages?: Message[];
   initialPeople?: ApprovedProfile[];
+  /** SSR 에서 미리 발급한 첨부 서명 URL (path → signedUrl). 첫 화면 왕복 제거용. */
+  initialFileUrls?: Record<string, string>;
   userId: string;
   userName: string;
   userAvatar?: string | null;
@@ -39,7 +41,7 @@ interface ChatPageClientProps {
 
 export default function ChatPageClient(props: ChatPageClientProps) {
   return (
-    <ChatFileUrlsProvider>
+    <ChatFileUrlsProvider initialUrls={props.initialFileUrls}>
       <ChatPageClientInner {...props} />
     </ChatFileUrlsProvider>
   );
