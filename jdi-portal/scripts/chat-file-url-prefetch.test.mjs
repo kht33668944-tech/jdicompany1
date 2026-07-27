@@ -61,3 +61,66 @@ test("채팅 상수에 버킷/TTL 단일 출처가 있다", () => {
   assert.match(src, /CHAT_BUCKET = "chat-attachments"/);
   assert.match(src, /CHAT_FILE_URL_TTL_SECONDS = 3600/);
 });
+
+// ---------------------------------------------------------------
+// 로컬 URL 캐시 — 만료 판단이 틀리면 깨진 이미지가 뜨므로 동작으로 검증한다.
+// localStorage 를 최소 구현으로 대체해 실제 함수를 돌린다.
+// ---------------------------------------------------------------
+
+function installFakeLocalStorage() {
+  const data = new Map();
+  globalThis.window = {
+    localStorage: {
+      getItem: (k) => (data.has(k) ? data.get(k) : null),
+      setItem: (k, v) => data.set(k, String(v)),
+      removeItem: (k) => data.delete(k),
+    },
+  };
+  return data;
+}
+
+async function loadFileUrlCache() {
+  // 매 테스트마다 새 모듈 인스턴스를 받아 상태 간섭을 없앤다.
+  const url = new URL("../src/lib/chat/fileUrlCache.ts", import.meta.url);
+  return import(`${url.href}?t=${Math.random()}`);
+}
+
+test("캐시는 유효한 URL 만 돌려주고 만료 임박분은 버린다", async () => {
+  installFakeLocalStorage();
+  const cache = await loadFileUrlCache();
+
+  cache.writeCachedFileUrls({ "ch/a.png": "https://x/a?sig=1" }, 3600);
+  // 만료까지 1분 남은 항목 — 여유(5분) 안에 들어오므로 못 쓴다고 판단해야 한다
+  cache.writeCachedFileUrls({ "ch/b.png": "https://x/b?sig=1" }, 60);
+
+  const got = cache.readCachedFileUrls(["ch/a.png", "ch/b.png", "ch/none.png"]);
+
+  assert.equal(got["ch/a.png"], "https://x/a?sig=1", "충분히 남은 URL 은 재사용한다");
+  assert.equal(got["ch/b.png"], undefined, "만료 임박 URL 은 쓰지 않는다");
+  assert.equal(got["ch/none.png"], undefined, "없는 경로는 담기지 않는다");
+});
+
+test("캐시가 없거나 저장소가 막혀도 예외를 던지지 않는다", async () => {
+  // window 자체가 없는 환경(SSR) 시뮬레이션
+  delete globalThis.window;
+  const cache = await loadFileUrlCache();
+
+  assert.deepEqual(cache.readCachedFileUrls(["ch/a.png"]), {});
+  assert.doesNotThrow(() => cache.writeCachedFileUrls({ "ch/a.png": "u" }, 3600));
+  assert.doesNotThrow(() => cache.clearChatFileUrlCache());
+});
+
+test("로그아웃 정리에 채팅 URL 캐시가 등록되어 있다", () => {
+  const src = read("src/lib/cache/clearAllLocalCaches.ts");
+  assert.match(src, /clearChatFileUrlCache/);
+});
+
+test("Provider 가 캐시를 먼저 확인하고 응답을 캐시에 적재한다", () => {
+  const src = read("src/components/dashboard/chat/ChatFileUrlsContext.tsx");
+
+  // 서버 요청 전에 로컬 캐시를 확인해야 채널 전환에서 왕복이 사라진다
+  assert.match(src, /readCachedFileUrls\(missing\)/);
+  // batch 응답과 SSR 시드 both 를 캐시에 넣어야 다음 전환에서 재사용된다
+  assert.match(src, /writeCachedFileUrls\(map, CHAT_FILE_URL_TTL_SECONDS\)/);
+  assert.match(src, /writeCachedFileUrls\(seed, CHAT_FILE_URL_TTL_SECONDS\)/);
+});

@@ -10,11 +10,15 @@
  */
 
 import { clearAllMessageCache } from "@/lib/chat/messageCache";
+import { clearChatFileUrlCache } from "@/lib/chat/fileUrlCache";
 import { clearScheduleCache } from "@/lib/schedule/scheduleCache";
 import { clearTasksCache } from "@/lib/tasks/tasksCache";
 import { clearWorkTimelineCache } from "@/lib/work-timeline/timelineCache";
 
 export async function clearAllLocalCaches(): Promise<void> {
+  // 동기 캐시(localStorage)는 먼저 비운다 — 실패해도 내부에서 no-op 처리된다.
+  clearChatFileUrlCache();
+
   await Promise.all([
     clearWorkTimelineCache(),
     clearScheduleCache(),
