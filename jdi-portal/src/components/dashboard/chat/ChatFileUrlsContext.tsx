@@ -59,50 +59,39 @@ export function ChatFileUrlsProvider({
       });
   }, []);
 
-  // initialUrls 는 마운트 시점 값만 쓰면 충분하다.
-  // 채널 전환은 ChatPageClient 가 클라이언트 상태로 처리하므로(Link/router.push 미사용)
-  // 이 Provider 가 새 initialUrls 를 받는 경우는 직접 진입·새로고침뿐이고,
-  // 그때는 컴포넌트가 새로 마운트되어 위 useState 초기값이 그대로 적용된다.
-  //
-  // 다만 서버가 내려준 URL 도 캐시에 넣어 둬야 이후 채널 전환에서 재사용된다.
-  // (localStorage 접근은 클라이언트 전용이라 마운트 후에 한다 — hydration 안전)
-  const initialUrlsRef = useRef(initialUrls);
+  // 서버가 내려준 URL 을 캐시에도 넣어 둬야 이후 채널 전환에서 재사용된다.
+  // (localStorage 접근은 클라이언트 전용이라 마운트 후에 한다 — hydration 안전.
+  //  같은 값을 다시 써도 결과가 같으므로 재실행돼도 무해하다)
   useEffect(() => {
-    const seed = initialUrlsRef.current;
-    if (!seed || Object.keys(seed).length === 0) return;
-    writeCachedFileUrls(seed, CHAT_FILE_URL_TTL_SECONDS);
-  }, []);
+    if (!initialUrls || Object.keys(initialUrls).length === 0) return;
+    writeCachedFileUrls(initialUrls, CHAT_FILE_URL_TTL_SECONDS);
+  }, [initialUrls]);
 
   const ensure = useCallback(
     (paths: string[]) => {
-      if (paths.length === 0) return;
+      // 아직 확보하지 않은 경로만 대상으로 한다
+      const fresh = paths.filter((p) => p && !requestedRef.current.has(p));
+      if (fresh.length === 0) return;
 
-      // 1) 아직 확보하지 않은 경로만 추린다
-      const missing: string[] = [];
-      for (const p of paths) {
-        if (!p) continue;
-        if (requestedRef.current.has(p)) continue;
-        missing.push(p);
-      }
-      if (missing.length === 0) return;
-
-      // 2) 로컬 캐시에 살아 있는 URL 은 즉시 반영 — 채널 전환 시 왕복 0
-      //    (localStorage 는 동기 접근이라 이 자리에서 바로 확인할 수 있다)
-      const cached = readCachedFileUrls(missing);
-      const cachedPaths = Object.keys(cached);
-      if (cachedPaths.length > 0) {
-        cachedPaths.forEach((p) => requestedRef.current.add(p));
-        setUrls((prev) => ({ ...prev, ...cached }));
-      }
-
-      // 3) 남은 것만 batch 요청
+      // 로컬 캐시에 살아 있는 URL 은 즉시 반영하고(채널 전환 시 왕복 0),
+      // 없는 것만 batch 요청 대기열에 넣는다.
+      // (localStorage 는 동기 접근이라 이 자리에서 바로 확인할 수 있다)
+      const cached = readCachedFileUrls(fresh);
+      const hits: Record<string, string> = {};
+      let hasHits = false;
       let added = false;
-      for (const p of missing) {
-        if (requestedRef.current.has(p)) continue;
+      for (const p of fresh) {
         requestedRef.current.add(p);
-        pendingRef.current.add(p);
-        added = true;
+        if (cached[p]) {
+          hits[p] = cached[p];
+          hasHits = true;
+        } else {
+          pendingRef.current.add(p);
+          added = true;
+        }
       }
+      if (hasHits) setUrls((prev) => ({ ...prev, ...hits }));
+
       if (!added) return;
       if (flushTimerRef.current) return;
       // 16ms 디바운스 — 같은 렌더 주기 내의 모든 ensure 를 하나로 합침

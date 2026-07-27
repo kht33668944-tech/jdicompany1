@@ -42,31 +42,45 @@ function getStorage(): Storage | null {
   }
 }
 
+// 파싱된 스토어의 탭 내 메모.
+// ensure() 는 이미지 하나마다 호출될 수 있어(채널 전환 시 수십 번) 매번 전체 JSON 을
+// 파싱하면 그 자체가 비용이 된다. 첫 읽기만 파싱하고 이후는 이 객체를 재사용한다.
+// (다른 탭의 쓰기는 반영되지 않지만, 이 탭의 URL 은 그대로 유효하므로 문제없다)
+let storeMemo: CacheStore | null = null;
+
 function readStore(): CacheStore {
+  if (storeMemo) return storeMemo;
   const storage = getStorage();
   if (!storage) return {};
+  let store: CacheStore = {};
   try {
     const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return parsed as CacheStore;
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        store = parsed as CacheStore;
+      }
+    }
   } catch {
-    return {};
+    // 손상된 값은 빈 스토어로 대체
   }
+  storeMemo = store;
+  return store;
 }
 
 function writeStore(store: CacheStore): void {
   const storage = getStorage();
   if (!storage) return;
+  storeMemo = store;
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(store));
   } catch {
     // 용량 초과 등 — 캐시를 통째로 비우고 한 번만 재시도한다.
     try {
       storage.removeItem(STORAGE_KEY);
+      storage.setItem(STORAGE_KEY, JSON.stringify(store));
     } catch {
-      // 여기까지 실패하면 캐시 없이 동작한다.
+      // 여기까지 실패하면 이 탭의 메모리 캐시만으로 동작한다.
     }
   }
 }
@@ -95,7 +109,9 @@ export function readCachedFileUrls(paths: string[]): Record<string, string> {
 
 /**
  * 발급받은 URL 을 캐시에 저장한다.
- * @param ttlSeconds 서명 URL 의 유효시간(초). 저장 시각 기준으로 만료 시각을 계산한다.
+ * @param ttlSeconds 서명 URL 의 유효시간(초) — 실제 발급 TTL(CHAT_FILE_URL_TTL_SECONDS)과
+ *                   같은 값을 넘겨야 한다. 저장 시각 기준으로 만료 시각을 계산한다.
+ *                   (이 모듈은 node 테스트가 직접 import 하므로 다른 모듈에 의존하지 않는다)
  */
 export function writeCachedFileUrls(
   urls: Record<string, string>,
@@ -129,6 +145,7 @@ export function writeCachedFileUrls(
 
 /** 로그아웃 시 정리 (clearAllLocalCaches 에서 호출) */
 export function clearChatFileUrlCache(): void {
+  storeMemo = null;
   const storage = getStorage();
   if (!storage) return;
   try {

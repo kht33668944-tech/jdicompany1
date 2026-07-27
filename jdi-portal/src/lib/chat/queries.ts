@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChannelWithDetails, Message } from "./types";
-import { CHAT_BUCKET, CHAT_FILE_URL_TTL_SECONDS, MESSAGES_PER_PAGE } from "./constants";
-import { collectMessageFilePaths } from "./fileUrlBatch";
+import { MESSAGES_PER_PAGE } from "./constants";
+import { collectMessageFilePaths, signChatFilePaths } from "./fileUrlBatch";
 
 /**
  * 사용자가 속한 채널 목록 조회 (마지막 메시지 + 읽지 않은 수 포함)
@@ -100,21 +100,9 @@ export async function getMessageFileUrls(
   if (paths.length === 0) return {};
 
   try {
-    const { data, error } = await supabase.storage
-      .from(CHAT_BUCKET)
-      .createSignedUrls(paths, CHAT_FILE_URL_TTL_SECONDS);
-    if (error) {
-      console.warn("[chat] 초기 첨부 URL 프리페치 실패 — 클라이언트 경로로 폴백합니다.", error);
-      return {};
-    }
-
-    const urls: Record<string, string> = {};
-    for (const item of data ?? []) {
-      if (item?.path && item.signedUrl && !item.error) urls[item.path] = item.signedUrl;
-    }
-    return urls;
+    return await signChatFilePaths(supabase, paths);
   } catch (error) {
-    console.warn("[chat] 초기 첨부 URL 프리페치 예외 — 클라이언트 경로로 폴백합니다.", error);
+    console.warn("[chat] 초기 첨부 URL 프리페치 실패 — 클라이언트 경로로 폴백합니다.", error);
     return {};
   }
 }

@@ -11,7 +11,7 @@ const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
  * 이미지 로드" 순서로 되돌아가 사진이 한 박자 늦게 뜬다.
  */
 
-test("경로 수집기는 미리보기와 원본을 모두 모으고 중복을 제거한다", async () => {
+test("경로 수집기는 미리보기와 원본을 모두 모으고 삭제된 메시지는 제외한다", async () => {
   const src = read("src/lib/chat/fileUrlBatch.ts");
 
   // 순수 함수라 정적 검사 + 동작 검사를 함께 한다.
@@ -19,15 +19,27 @@ test("경로 수집기는 미리보기와 원본을 모두 모으고 중복을 �
   // 원본(path)과 미리보기(getFilePreviewPath) 양쪽을 넣어야 저장 링크까지 즉시 동작한다.
   assert.match(src, /getFilePreviewPath\(file\)/);
   assert.match(src, /seen\.add\(file\.path\)/);
+  // 삭제된 메시지의 첨부는 화면에 안 그리므로 서명 발급도 하지 않는다.
+  assert.match(src, /is_deleted/);
 });
 
-test("서버 프리페치 함수가 채팅 버킷에서 일괄 발급하고 실패해도 던지지 않는다", () => {
+test("서명 발급은 단일 구현(signChatFilePaths)이 버킷/TTL 상수로 수행한다", () => {
+  const batchSrc = read("src/lib/chat/fileUrlBatch.ts");
+
+  assert.match(batchSrc, /export async function signChatFilePaths/);
+  assert.match(batchSrc, /from\(CHAT_BUCKET\)/);
+  assert.match(batchSrc, /createSignedUrls\(unique, CHAT_FILE_URL_TTL_SECONDS\)/);
+
+  // 서버 프리페치와 클라이언트 배치가 각자 발급 로직을 복제하지 않고 이 구현을 쓴다.
+  assert.match(read("src/lib/chat/queries.ts"), /signChatFilePaths\(/);
+  assert.match(read("src/lib/chat/actions.ts"), /signChatFilePaths\(/);
+});
+
+test("서버 프리페치 함수는 첨부 없으면 건너뛰고 실패해도 던지지 않는다", () => {
   const src = read("src/lib/chat/queries.ts");
 
   assert.match(src, /export async function getMessageFileUrls/);
   assert.match(src, /collectMessageFilePaths/);
-  assert.match(src, /createSignedUrls\(paths, CHAT_FILE_URL_TTL_SECONDS\)/);
-  assert.match(src, /from\(CHAT_BUCKET\)/);
 
   // 첨부가 없으면 스토리지 호출 자체를 건너뛴다(왕복 0).
   assert.match(src, /if \(paths\.length === 0\) return \{\};/);
@@ -40,8 +52,7 @@ test("서버 프리페치 함수가 채팅 버킷에서 일괄 발급하고 실�
 test("채널 페이지가 프리페치 결과를 클라이언트로 내려준다", () => {
   const src = read("src/app/dashboard/chat/[channelId]/page.tsx");
 
-  assert.match(src, /getMessageFileUrls/);
-  assert.match(src, /initialFileUrls = await getMessageFileUrls\(auth\.supabase, initialMessages\)/);
+  assert.match(src, /getMessageFileUrls\(/);
   assert.match(src, /initialFileUrls=\{initialFileUrls\}/);
 });
 
@@ -50,16 +61,21 @@ test("Provider 가 서버 URL 을 초기값으로 쓰고 재요청하지 않는�
 
   assert.match(src, /initialUrls\?: Record<string, string>/);
   // 초기 state 로 바로 사용 → 첫 렌더부터 이미지가 뜬다.
-  assert.match(src, /useState<Record<string, string>>\(initialUrls \?\? \{\}\)/);
+  assert.match(src, /useState<Record<string, string>>\(initialUrls/);
   // 이미 확보한 path 는 requested 에 등록해 중복 왕복을 막는다.
-  assert.match(src, /new Set\(Object\.keys\(initialUrls \?\? \{\}\)\)/);
+  assert.match(src, /new Set\(Object\.keys\(initialUrls/);
 });
 
-test("채팅 상수에 버킷/TTL 단일 출처가 있다", () => {
+test("채팅 상수에 버킷/TTL 단일 출처가 있고 하드코딩이 남아있지 않다", () => {
   const src = read("src/lib/chat/constants.ts");
 
   assert.match(src, /CHAT_BUCKET = "chat-attachments"/);
   assert.match(src, /CHAT_FILE_URL_TTL_SECONDS = 3600/);
+
+  // 상수가 진짜 단일 출처여야 캐시 만료 계산과 실제 서명 TTL 이 어긋나지 않는다.
+  const actionsSrc = read("src/lib/chat/actions.ts");
+  assert.doesNotMatch(actionsSrc, /"chat-attachments"/, "actions.ts 는 CHAT_BUCKET 상수를 써야 한다");
+  assert.doesNotMatch(actionsSrc, /createSignedUrls?\([^)]*\b3600\b/, "actions.ts 는 TTL 상수를 써야 한다");
 });
 
 // ---------------------------------------------------------------
@@ -119,8 +135,8 @@ test("Provider 가 캐시를 먼저 확인하고 응답을 캐시에 적재한�
   const src = read("src/components/dashboard/chat/ChatFileUrlsContext.tsx");
 
   // 서버 요청 전에 로컬 캐시를 확인해야 채널 전환에서 왕복이 사라진다
-  assert.match(src, /readCachedFileUrls\(missing\)/);
+  assert.match(src, /readCachedFileUrls\(/);
   // batch 응답과 SSR 시드 both 를 캐시에 넣어야 다음 전환에서 재사용된다
-  assert.match(src, /writeCachedFileUrls\(map, CHAT_FILE_URL_TTL_SECONDS\)/);
-  assert.match(src, /writeCachedFileUrls\(seed, CHAT_FILE_URL_TTL_SECONDS\)/);
+  const writes = src.match(/writeCachedFileUrls\(/g) ?? [];
+  assert.ok(writes.length >= 2, "batch 응답과 SSR 시드 양쪽을 캐시에 적재해야 한다");
 });

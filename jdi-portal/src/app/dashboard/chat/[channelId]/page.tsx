@@ -22,15 +22,19 @@ export default async function ChatChannelPage({ params }: Props) {
     // SSR critical path 최소화:
     // - 선택 채널 정보는 getChannels 결과에서 find — 별도 getChannelById 라운드트립 제거
     // - 멤버 목록은 ChannelSettingsDrawer가 열릴 때 lazy-load 함
-    [channels, initialMessages] = await Promise.all([
+    // 첨부 서명 URL 도 SSR 에서 함께 실어 보낸다(getMessageFileUrls) — 브라우저가
+    // 렌더 후 다시 서버로 왕복하던 1회가 사라져 사진이 화면과 같이 뜬다.
+    // 발급은 메시지에만 의존하므로 메시지 조회에 이어 붙여 getChannels 와 겹치게 한다.
+    // (첨부가 없으면 스토리지 호출 자체를 건너뛴다 — 왕복 0)
+    [channels, [initialMessages, initialFileUrls]] = await Promise.all([
       getChannels(auth.supabase, auth.user.id),
-      getMessages(auth.supabase, channelId),
+      getMessages(auth.supabase, channelId).then(
+        async (messages): Promise<[Message[], Record<string, string>]> => [
+          messages,
+          await getMessageFileUrls(auth.supabase, messages),
+        ]
+      ),
     ]);
-
-    // 첨부 서명 URL 을 여기서 함께 실어 보낸다. 메시지에 의존하므로 순차이지만,
-    // 첨부가 없으면 호출 자체를 건너뛰고(왕복 0), 있으면 브라우저가 렌더 후 다시
-    // 서버로 왕복하던 1회를 없앤다 → 사진이 화면과 같이 뜬다.
-    initialFileUrls = await getMessageFileUrls(auth.supabase, initialMessages);
   } catch {
     return (
       <div className="rounded-2xl bg-red-50 border border-red-200 p-6 text-center">

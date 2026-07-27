@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
 import { validateFile } from "@/lib/utils/upload";
 import type { Channel, Message, MessageReadReceipt, MessageReaction } from "./types";
+import { CHAT_BUCKET, CHAT_FILE_URL_TTL_SECONDS } from "./constants";
+import { signChatFilePaths } from "./fileUrlBatch";
 import { summarizeReactionsByMessage, type ReactionRow } from "./reactions";
 
 function getSupabase() {
@@ -100,11 +102,11 @@ export async function deleteChannel(channelId: string): Promise<void> {
   //    (마이그레이션 071에서 DB 트리거 제거됨)
   try {
     const { data: objects } = await supabase.storage
-      .from("chat-attachments")
+      .from(CHAT_BUCKET)
       .list(channelId, { limit: 1000 });
     if (objects && objects.length > 0) {
       const paths = objects.map((o) => `${channelId}/${o.name}`);
-      await supabase.storage.from("chat-attachments").remove(paths);
+      await supabase.storage.from(CHAT_BUCKET).remove(paths);
     }
   } catch {
     // 파일 정리는 실패해도 채널 삭제는 진행 (orphan 파일은 허용)
@@ -420,7 +422,7 @@ export async function uploadChatFile(
   const path = `${channelId}/${timestamp}_${safeName}`;
 
   const { error } = await supabase.storage
-    .from("chat-attachments")
+    .from(CHAT_BUCKET)
     .upload(path, file);
 
   if (error) throw error;
@@ -431,8 +433,8 @@ export async function uploadChatFile(
 export async function getChatFileUrl(path: string): Promise<string | null> {
   const supabase = getSupabase();
   const { data } = await supabase.storage
-    .from("chat-attachments")
-    .createSignedUrl(path, 3600); // 1시간
+    .from(CHAT_BUCKET)
+    .createSignedUrl(path, CHAT_FILE_URL_TTL_SECONDS);
   return data?.signedUrl ?? null;
 }
 
@@ -440,23 +442,12 @@ export async function getChatFileUrl(path: string): Promise<string | null> {
  * 여러 파일의 서명 URL을 한 번의 요청으로 일괄 생성.
  * - 채널 진입 시 이미지/파일 N개마다 개별 요청하던 것을 단일 roundtrip 로 통합
  * - 반환: path → signedUrl 매핑 (실패한 항목은 생략)
+ * - 스토리지 오류는 던진다 — 호출부(ChatFileUrlsContext.flush)가 catch 후 재시도한다.
  */
 export async function getChatFileUrls(
   paths: string[]
 ): Promise<Record<string, string>> {
-  if (paths.length === 0) return {};
-  const supabase = getSupabase();
-  const unique = Array.from(new Set(paths));
-  const { data } = await supabase.storage
-    .from("chat-attachments")
-    .createSignedUrls(unique, 3600);
-  const out: Record<string, string> = {};
-  for (const item of data ?? []) {
-    if (item?.path && item.signedUrl && !item.error) {
-      out[item.path] = item.signedUrl;
-    }
-  }
-  return out;
+  return signChatFilePaths(getSupabase(), paths);
 }
 
 // ============================================
