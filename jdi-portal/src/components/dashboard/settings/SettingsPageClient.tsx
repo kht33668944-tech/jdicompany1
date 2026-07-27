@@ -6,6 +6,7 @@ import { UserCircle, ShieldCheck, Bell, UsersThree } from "phosphor-react";
 import ProfileSection from "./ProfileSection";
 import AccountSection from "./AccountSection";
 import InstallAppCard from "./InstallAppCard";
+import DesktopAppCard from "./DesktopAppCard";
 import NotificationsSection from "./NotificationsSection";
 import AdminSection from "./AdminSection";
 import type { Profile, HireDateChangeRequest, IpChangeRequest } from "@/lib/attendance/types";
@@ -80,6 +81,7 @@ export default function SettingsPageClient({
           myIpChangeRequests={myIpChangeRequests}
         />
           <InstallAppCard />
+          <DesktopAppCard />
         </div>
       )}
       {activeTab === "notifications" && (

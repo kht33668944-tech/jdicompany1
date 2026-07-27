@@ -7,17 +7,26 @@
  * 주의: 원격 페이지를 로드하므로 보안 설정(contextIsolation/sandbox)을 절대 완화하지 않는다.
  */
 
-const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, dialog } = require("electron");
 const path = require("node:path");
+const { autoUpdater } = require("electron-updater");
 
 const PORTAL_URL = "https://jdiportal.com";
 const PORTAL_HOST = "jdiportal.com";
 const APP_ID = "com.jdicompany.portal";
+// 앱을 켠 뒤 새 버전을 확인하기까지의 지연 — 시작 속도를 방해하지 않기 위해 잠시 미룬다
+const UPDATE_CHECK_DELAY_MS = 10_000;
+// 켜둔 채로 며칠 쓰는 경우를 위해 6시간마다 다시 확인
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 let mainWindow = null;
 let tray = null;
 // 트레이 메뉴의 "완전히 종료"를 눌렀을 때만 true — 창 X 버튼은 숨김 처리만 한다
 let isQuitting = false;
+// 업데이트 상태 — 트레이 메뉴 표시에 사용
+let updateState = "idle"; // idle | checking | downloading | ready | error
+// 사용자가 트레이 메뉴에서 직접 확인한 경우에만 결과를 알림창으로 보여준다
+let updateCheckIsManual = false;
 
 // Windows 알림에 "JDI 포털" 이름이 뜨도록 앱 ID 지정 (지정하지 않으면 electron.app.* 으로 표시됨)
 app.setAppUserModelId(APP_ID);
@@ -119,11 +128,35 @@ function isAutoLaunchEnabled() {
   return app.getLoginItemSettings().openAtLogin;
 }
 
+function getUpdateMenuLabel() {
+  if (updateState === "checking") return "업데이트 확인 중...";
+  if (updateState === "downloading") return "새 버전 내려받는 중...";
+  if (updateState === "ready") return "새 버전 설치하고 다시 시작";
+  return "업데이트 확인";
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     {
       label: "포털 열기",
       click: () => showMainWindow(),
+    },
+    { type: "separator" },
+    {
+      label: `버전 ${app.getVersion()}`,
+      enabled: false,
+    },
+    {
+      label: getUpdateMenuLabel(),
+      enabled: updateState !== "checking" && updateState !== "downloading",
+      click: () => {
+        if (updateState === "ready") {
+          isQuitting = true;
+          autoUpdater.quitAndInstall();
+          return;
+        }
+        checkForUpdates({ manual: true });
+      },
     },
     { type: "separator" },
     {
@@ -169,6 +202,98 @@ function createTray() {
   });
 }
 
+// ============================================================
+// 자동 업데이트 — 껍데기 프로그램(.exe) 자체의 새 버전을 GitHub 릴리스에서 받아온다.
+// 포털 화면·기능은 서버에서 오므로 이 업데이트와 무관하게 항상 최신이다.
+// ============================================================
+
+function setUpdateState(next) {
+  updateState = next;
+  refreshTrayMenu();
+}
+
+function checkForUpdates({ manual = false } = {}) {
+  // 개발 중(npm start)에는 업데이트 정보가 없으므로 건너뛴다
+  if (!app.isPackaged) {
+    if (manual) {
+      dialog.showMessageBox({
+        type: "info",
+        title: "JDI 포털",
+        message: "개발 모드에서는 업데이트를 확인할 수 없습니다.",
+        buttons: ["확인"],
+      });
+    }
+    return;
+  }
+  updateCheckIsManual = manual;
+  setUpdateState("checking");
+  autoUpdater.checkForUpdates().catch((error) => {
+    console.warn("[jdi-desktop] 업데이트 확인 실패:", error);
+    setUpdateState("error");
+  });
+}
+
+function setupAutoUpdater() {
+  // 새 버전이 있으면 조용히 내려받고, 앱을 완전히 종료할 때 설치한다
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("update-not-available", () => {
+    setUpdateState("idle");
+    if (updateCheckIsManual) {
+      updateCheckIsManual = false;
+      dialog.showMessageBox({
+        type: "info",
+        title: "JDI 포털",
+        message: "이미 최신 버전입니다.",
+        detail: `현재 버전: ${app.getVersion()}`,
+        buttons: ["확인"],
+      });
+    }
+  });
+
+  autoUpdater.on("update-available", () => setUpdateState("downloading"));
+
+  autoUpdater.on("update-downloaded", (info) => {
+    setUpdateState("ready");
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "JDI 포털 업데이트",
+        message: "새 버전이 준비되었습니다.",
+        detail: `버전 ${info?.version ?? ""} 로 업데이트합니다.\n지금 다시 시작하면 바로 적용되고, 나중에 선택하면 프로그램을 완전히 종료할 때 자동으로 설치됩니다.`,
+        buttons: ["지금 다시 시작", "나중에"],
+        defaultId: 0,
+        cancelId: 1,
+      })
+      .then(({ response }) => {
+        if (response === 0) {
+          isQuitting = true;
+          autoUpdater.quitAndInstall();
+        }
+      });
+  });
+
+  autoUpdater.on("error", (error) => {
+    console.warn("[jdi-desktop] 업데이트 오류:", error);
+    setUpdateState("error");
+    if (updateCheckIsManual) {
+      updateCheckIsManual = false;
+      dialog.showMessageBox({
+        type: "error",
+        title: "JDI 포털",
+        message: "업데이트를 확인하지 못했습니다.",
+        detail: "잠시 후 다시 시도해 주세요. 포털 화면과 기능은 이 업데이트와 관계없이 항상 최신 상태입니다.",
+        buttons: ["확인"],
+      });
+    }
+  });
+
+  // 시작 직후 한 번, 이후 6시간마다 확인
+  setTimeout(() => checkForUpdates(), UPDATE_CHECK_DELAY_MS);
+  setInterval(() => checkForUpdates(), UPDATE_CHECK_INTERVAL_MS);
+}
+
 function onReady() {
   // 알림 권한만 허용하고 나머지(위치·카메라·마이크 등)는 거부
   const { session } = require("electron");
@@ -178,6 +303,7 @@ function onReady() {
 
   createTray();
   createMainWindow();
+  setupAutoUpdater();
 
   // Windows 시작 시 자동 실행으로 켜진 경우에는 창을 띄우지 않고 트레이에만 상주
   const startHidden = process.argv.includes("--hidden");

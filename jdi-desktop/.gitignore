@@ -1,0 +1,3 @@
+node_modules/
+# 빌드 산출물(.exe 등)은 git 이 아니라 GitHub 릴리스로 배포한다
+dist/

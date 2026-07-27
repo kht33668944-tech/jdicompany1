@@ -3,11 +3,48 @@
   "version": "1.0.0",
   "private": true,
   "description": "JDI 포털 데스크톱 앱 — 트레이 상주 껍데기",
+  "author": "JDICOMPANY",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --win --publish never",
+    "release": "electron-builder --win --publish always"
+  },
+  "build": {
+    "appId": "com.jdicompany.portal",
+    "productName": "JDI 포털",
+    "copyright": "Copyright © JDICOMPANY",
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png",
+      "artifactName": "JDI-Portal-Setup.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "JDI 포털",
+      "installerLanguages": ["ko-KR"],
+      "language": "1042"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "kht33668944-tech",
+      "repo": "jdicompany1"
+    }
   },
   "devDependencies": {
-    "electron": "^43.2.0"
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }
