@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AirplaneTilt, CalendarPlus, Timer, Megaphone, ChatCircle, BellRinging, Receipt } from "phosphor-react";
 import { updateNotificationSettings } from "@/lib/settings/actions";
 import { subscribeToPush, unsubscribeFromPush, checkPushSupport, getCurrentSubscription } from "@/lib/push/subscribe";
+import { useIsDesktopApp } from "@/lib/hooks/useIsDesktopApp";
 import type { NotificationSettings } from "@/lib/settings/types";
 
 interface NotificationsSectionProps {
@@ -86,8 +87,14 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
   const [error, setError] = useState<string | null>(null);
   const [supportMsg, setSupportMsg] = useState<string | null>(null);
 
+  // 데스크톱 앱(Electron)은 브라우저 푸시 서비스를 쓰지 않는다.
+  // 앱이 트레이에 떠 있는 동안 실시간으로 알림을 받아 Windows 알림으로 표시하므로
+  // 이 화면에서는 푸시 구독을 시도하지 않고 안내만 보여준다.
+  const isDesktopApp = useIsDesktopApp();
+
   // 초기 마운트 시 환경 지원 여부 + 실제 브라우저 subscription 상태 동기화
   useEffect(() => {
+    if (isDesktopApp) return;
     const support = checkPushSupport();
     if (support !== "ok") {
       const messages: Record<string, string> = {
@@ -107,10 +114,10 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isDesktopApp]);
 
   const handlePushMaster = async () => {
-    if (busy) return;
+    if (busy || isDesktopApp) return;
     setBusy(true);
     setError(null);
     try {
@@ -145,7 +152,9 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
     }
   };
 
-  const childDisabled = !settings.push_enabled;
+  // 데스크톱 앱에서는 마스터 푸시를 켤 수 없으므로(브라우저 푸시 미지원) 개별 항목까지 잠그지 않는다.
+  // 여기서 바꾼 값은 폰/브라우저 푸시에 그대로 적용된다.
+  const childDisabled = isDesktopApp ? false : !settings.push_enabled;
 
   return (
     <section className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 p-5 sm:p-8">
@@ -162,18 +171,28 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
           </div>
           <div>
             <h4 className="font-bold text-sm text-slate-700">푸시 알림 받기</h4>
-            <p className="text-xs text-slate-500 mt-0.5">
-              브라우저/PWA가 닫혀 있어도 폰에서 알림을 받습니다.
-              <br />
-              <span className="text-slate-400">※ iPhone은 홈 화면에 앱 설치 후 사용 가능합니다.</span>
-            </p>
-            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-            {supportMsg && <p className="text-xs text-amber-600 mt-1">{supportMsg}</p>}
+            {isDesktopApp ? (
+              <p className="text-xs text-slate-500 mt-0.5">
+                데스크톱 앱은 켜져 있는 동안 알림을 바로 받습니다. 따로 켜실 것이 없습니다.
+                <br />
+                <span className="text-slate-400">
+                  ※ 폰으로도 받으시려면 휴대폰 브라우저에서 포털에 접속해 이 설정을 켜주세요.
+                </span>
+              </p>
+            ) : (
+              <p className="text-xs text-slate-500 mt-0.5">
+                브라우저/PWA가 닫혀 있어도 폰에서 알림을 받습니다.
+                <br />
+                <span className="text-slate-400">※ iPhone은 홈 화면에 앱 설치 후 사용 가능합니다.</span>
+              </p>
+            )}
+            {!isDesktopApp && error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+            {!isDesktopApp && supportMsg && <p className="text-xs text-amber-600 mt-1">{supportMsg}</p>}
           </div>
         </div>
         <button
           onClick={handlePushMaster}
-          disabled={busy || !!supportMsg}
+          disabled={busy || !!supportMsg || isDesktopApp}
           className={`relative w-12 h-6 rounded-full transition-colors disabled:opacity-50 ${
             settings.push_enabled ? "bg-indigo-500" : "bg-slate-300"
           }`}

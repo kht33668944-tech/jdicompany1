@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { DownloadSimple, CheckCircle, Info, Monitor } from "phosphor-react";
+import { useIsDesktopApp } from "@/lib/hooks/useIsDesktopApp";
 
 /**
  * Windows 데스크톱 앱(트레이 상주) 다운로드 카드.
@@ -25,18 +26,9 @@ function useIsWindows(): boolean {
   );
 }
 
-function useInDesktopApp(): boolean {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () =>
-      (window as unknown as { jdiDesktop?: { isDesktopApp?: boolean } }).jdiDesktop?.isDesktopApp === true,
-    () => false
-  );
-}
-
 export default function DesktopAppCard() {
   const isWindows = useIsWindows();
-  const inDesktopApp = useInDesktopApp();
+  const inDesktopApp = useIsDesktopApp();
 
   if (inDesktopApp) {
     return (
