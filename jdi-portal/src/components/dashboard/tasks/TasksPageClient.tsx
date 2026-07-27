@@ -6,6 +6,7 @@ import {
   CheckCircle,
   ClockCounterClockwise,
   MagnifyingGlass,
+  PencilSimple,
   Plus,
   X,
 } from "phosphor-react";
@@ -26,6 +27,7 @@ import { cacheTasks } from "@/lib/tasks/tasksCache";
 import { createClient } from "@/lib/supabase/client";
 import TaskCreateModal from "./TaskCreateModal";
 import TaskDetailPanel from "./TaskDetailPanel";
+import TaskTitleEditForm from "./TaskTitleEditForm";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
 import { useProjects } from "@/lib/projects/useProjects";
@@ -60,6 +62,7 @@ function formatDueWithWeekday(dueDate: string | null, fallbackText: string, toda
 export default function TasksPageClient({ profiles, userId, initialTasks }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [editingTitleTaskId, setEditingTitleTaskId] = useState<string | null>(null);
   const [allTasks, setAllTasks] = useState<TaskWithDetails[]>(initialTasks);
   const [historyTasks, setHistoryTasks] = useState<TaskWithDetails[]>([]);
   const [historyCursor, setHistoryCursor] = useState<TaskHistoryCursor | null>(null);
@@ -213,6 +216,31 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
     setDetailInUrl(taskId);
   }, [setDetailInUrl]);
 
+  const currentUserRole = useMemo(
+    () => profiles.find((profile) => profile.id === userId)?.role,
+    [profiles, userId]
+  );
+
+  // 제목 수정 권한 — 서버(RLS)와 같은 기준: 관리자 / 만든 사람 / 담당자
+  const canEditTaskTitle = useCallback((task: TaskWithDetails) => (
+    currentUserRole === "admin"
+    || task.created_by === userId
+    || task.assignees.some((assignee) => assignee.user_id === userId)
+  ), [currentUserRole, userId]);
+
+  const handleTitleEditDone = useCallback(
+    (taskId: string) => (nextTitle: string | null) => {
+      setEditingTitleTaskId(null);
+      if (!nextTitle) return;
+      const applyTitle = (tasks: TaskWithDetails[]) =>
+        tasks.map((task) => (task.id === taskId ? { ...task, title: nextTitle } : task));
+      setAllTasks(applyTitle);
+      setHistoryTasks(applyTitle);
+      void refreshTasks();
+    },
+    [refreshTasks]
+  );
+
   const handleClosePanel = useCallback(() => {
     setDetailTaskId(null);
     setDetailInUrl(null);
@@ -288,55 +316,79 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
               const due = formatDueDate(task.due_date, task.status);
               const mainAssignee = task.assignees[0] ?? profiles.find((profile) => profile.id === userId);
 
-              return (
-                <button
-                  key={task.id}
-                  onClick={() => handleTaskClick(task.id)}
-                  className="flex w-full flex-col gap-2 px-5 py-3.5 text-left transition-colors hover:bg-slate-50 lg:flex-row lg:items-center lg:gap-4 lg:py-4"
-                >
-                  {/* 제목 줄 (PC에선 왼쪽 flex-1) */}
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusConfig.dot}`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        {task.project && (
-                          <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
-                            <span className="truncate">{task.project.name}</span>
-                          </span>
-                        )}
-                        <p className="min-w-0 truncate text-sm font-bold text-slate-800">{task.title}</p>
-                      </div>
-                      {task.description && (
-                        <p className="mt-1 hidden truncate text-xs text-slate-400 lg:block">{task.description}</p>
-                      )}
-                    </div>
-                    {/* 모바일 전용: 제목 오른쪽 상태 뱃지 */}
-                    <span className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold lg:hidden ${statusConfig.bg} ${statusConfig.text}`}>
-                      {task.status}
-                    </span>
+              if (editingTitleTaskId === task.id) {
+                return (
+                  <div key={task.id} className="px-5 py-3.5 lg:py-4">
+                    <TaskTitleEditForm
+                      taskId={task.id}
+                      initialTitle={task.title}
+                      onDone={handleTitleEditDone(task.id)}
+                    />
                   </div>
+                );
+              }
 
-                  {/* 메타 줄 (모바일: 제목 아래 옅게 / PC: 오른쪽 인라인) */}
-                  <div className="flex shrink-0 items-center gap-2 pl-[22px] text-xs lg:gap-3 lg:pl-0">
-                    {mainAssignee && (
-                      <>
+              return (
+                <div key={task.id} className="flex w-full items-center gap-1 px-5 transition-colors hover:bg-slate-50">
+                  <button
+                    onClick={() => handleTaskClick(task.id)}
+                    className="flex min-w-0 flex-1 flex-col gap-2 py-3.5 text-left lg:flex-row lg:items-center lg:gap-4 lg:py-4"
+                  >
+                    {/* 제목 줄 (PC에선 왼쪽 flex-1) */}
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusConfig.dot}`} />
+                      <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-1.5">
-                          <UserAvatar name={mainAssignee.full_name} avatarUrl={mainAssignee.avatar_url} size="sm" />
-                          <span className="truncate font-semibold text-slate-500">{mainAssignee.full_name}</span>
+                          {task.project && (
+                            <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
+                              <span className="truncate">{task.project.name}</span>
+                            </span>
+                          )}
+                          <p className="min-w-0 truncate text-sm font-bold text-slate-800">{task.title}</p>
                         </div>
-                        <span aria-hidden="true" className="text-slate-300 lg:hidden">·</span>
-                      </>
-                    )}
-                    {/* PC 전용: 상태 뱃지 */}
-                    <span className={`hidden shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold lg:inline-flex ${statusConfig.bg} ${statusConfig.text}`}>
-                      {task.status}
-                    </span>
-                    <span className={`shrink-0 font-bold ${due.className}`}>
-                      {formatDueWithWeekday(task.due_date, due.text, today)}
-                    </span>
-                  </div>
-                </button>
+                        {task.description && (
+                          <p className="mt-1 hidden truncate text-xs text-slate-400 lg:block">{task.description}</p>
+                        )}
+                      </div>
+                      {/* 모바일 전용: 제목 오른쪽 상태 뱃지 */}
+                      <span className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold lg:hidden ${statusConfig.bg} ${statusConfig.text}`}>
+                        {task.status}
+                      </span>
+                    </div>
+
+                    {/* 메타 줄 (모바일: 제목 아래 옅게 / PC: 오른쪽 인라인) */}
+                    <div className="flex shrink-0 items-center gap-2 pl-[22px] text-xs lg:gap-3 lg:pl-0">
+                      {mainAssignee && (
+                        <>
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <UserAvatar name={mainAssignee.full_name} avatarUrl={mainAssignee.avatar_url} size="sm" />
+                            <span className="truncate font-semibold text-slate-500">{mainAssignee.full_name}</span>
+                          </div>
+                          <span aria-hidden="true" className="text-slate-300 lg:hidden">·</span>
+                        </>
+                      )}
+                      {/* PC 전용: 상태 뱃지 */}
+                      <span className={`hidden shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold lg:inline-flex ${statusConfig.bg} ${statusConfig.text}`}>
+                        {task.status}
+                      </span>
+                      <span className={`shrink-0 font-bold ${due.className}`}>
+                        {formatDueWithWeekday(task.due_date, due.text, today)}
+                      </span>
+                    </div>
+                  </button>
+                  {canEditTaskTitle(task) && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingTitleTaskId(task.id)}
+                      className="shrink-0 rounded-lg p-1.5 text-slate-300 transition-colors hover:bg-slate-100 hover:text-indigo-500"
+                      title="제목 수정"
+                      aria-label={`${task.title} 제목 수정`}
+                    >
+                      <PencilSimple size={16} />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -468,38 +520,63 @@ export default function TasksPageClient({ profiles, userId, initialTasks }: Prop
                   {tasks.map((task) => {
                     const statusConfig = TASK_STATUS_CONFIG[task.status];
                     const owner = task.assignees[0];
+
+                    if (editingTitleTaskId === task.id) {
+                      return (
+                        <div key={task.id} className="px-5 py-3">
+                          <TaskTitleEditForm
+                            taskId={task.id}
+                            initialTitle={task.title}
+                            onDone={handleTitleEditDone(task.id)}
+                          />
+                        </div>
+                      );
+                    }
+
                     return (
-                      <button
-                        key={task.id}
-                        type="button"
-                        onClick={() => handleTaskClick(task.id)}
-                        className="grid w-full gap-3 px-5 py-3 text-left transition-colors hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-center"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            {task.project && (
-                              <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
-                                <span className="truncate">{task.project.name}</span>
-                              </span>
+                      <div key={task.id} className="flex w-full items-center gap-1 px-5 transition-colors hover:bg-slate-50">
+                        <button
+                          type="button"
+                          onClick={() => handleTaskClick(task.id)}
+                          className="grid min-w-0 flex-1 gap-3 py-3 text-left sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-center"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              {task.project && (
+                                <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
+                                  <span className="truncate">{task.project.name}</span>
+                                </span>
+                              )}
+                              <p className="min-w-0 truncate text-sm font-bold text-slate-800">{task.title}</p>
+                            </div>
+                            {task.description && (
+                              <p className="mt-1 truncate text-xs text-slate-400">{task.description}</p>
                             )}
-                            <p className="min-w-0 truncate text-sm font-bold text-slate-800">{task.title}</p>
                           </div>
-                          {task.description && (
-                            <p className="mt-1 truncate text-xs text-slate-400">{task.description}</p>
-                          )}
-                        </div>
-                        <div className="flex min-w-0 items-center gap-2">
-                          {owner && <UserAvatar name={owner.full_name} avatarUrl={owner.avatar_url} size="sm" />}
-                          <span className="truncate text-xs font-semibold text-slate-500">
-                            {owner?.full_name ?? "미배정"}
-                            {task.assignees.length > 1 ? ` 외 ${task.assignees.length - 1}명` : ""}
+                          <div className="flex min-w-0 items-center gap-2">
+                            {owner && <UserAvatar name={owner.full_name} avatarUrl={owner.avatar_url} size="sm" />}
+                            <span className="truncate text-xs font-semibold text-slate-500">
+                              {owner?.full_name ?? "미배정"}
+                              {task.assignees.length > 1 ? ` 외 ${task.assignees.length - 1}명` : ""}
+                            </span>
+                          </div>
+                          <span className={`w-fit rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
+                            {task.status}
                           </span>
-                        </div>
-                        <span className={`w-fit rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
-                          {task.status}
-                        </span>
-                      </button>
+                        </button>
+                        {canEditTaskTitle(task) && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingTitleTaskId(task.id)}
+                            className="shrink-0 rounded-lg p-1.5 text-slate-300 transition-colors hover:bg-slate-100 hover:text-indigo-500"
+                            title="제목 수정"
+                            aria-label={`${task.title} 제목 수정`}
+                          >
+                            <PencilSimple size={16} />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

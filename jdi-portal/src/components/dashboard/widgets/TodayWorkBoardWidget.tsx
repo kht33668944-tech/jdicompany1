@@ -8,6 +8,7 @@ import {
   CheckCircle,
   CheckSquare,
   Clock,
+  PencilSimple,
   Plus,
   ShareNetwork,
   SpinnerGap,
@@ -35,6 +36,7 @@ import type { DirectivePendingCount } from "@/lib/directives/types";
 import MemberWorkPanel from "./MemberWorkPanel";
 import TaskCreateModal from "@/components/dashboard/tasks/TaskCreateModal";
 import TaskDetailPanel from "@/components/dashboard/tasks/TaskDetailPanel";
+import TaskTitleEditForm from "@/components/dashboard/tasks/TaskTitleEditForm";
 import WorkTimelineCreateModal from "@/components/dashboard/work-timeline/WorkTimelineCreateModal";
 import { getTaskTimelineShare } from "@/lib/work-timeline/actions";
 import type { WorkTimelineTaskShareState } from "@/lib/work-timeline/types";
@@ -360,6 +362,7 @@ export default function TodayWorkBoardWidget({
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [editingTitleTaskId, setEditingTitleTaskId] = useState<string | null>(null);
   const [completionPrompt, setCompletionPrompt] = useState<{ taskId: string; taskTitle: string } | null>(null);
   const [, startTransition] = useTransition();
   const [panelMember, setPanelMember] = useState<DashboardTaskPerson | null>(null);
@@ -785,38 +788,71 @@ export default function TodayWorkBoardWidget({
                               <Square size={20} />
                             )}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setDetailTaskId(task.id)}
-                            disabled={isTaskPending}
-                            className="min-w-0 rounded-md text-left outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-default"
-                            aria-label={`${task.title} 상세 보기`}
-                          >
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex min-w-0 items-center gap-1.5">
-                                {task.project && (
-                                  <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
-                                    <span className="truncate">{task.project.name}</span>
-                                  </span>
-                                )}
-                                <p className={`min-w-0 truncate text-sm font-bold ${isDone ? "text-slate-400 line-through" : "text-slate-800"}`}>
-                                  {task.title}
-                                </p>
-                              </div>
-                              <div className="flex shrink-0 items-center gap-4">
-                                <span className={`rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
-                                  {task.status}
-                                </span>
-                                <span className={`text-xs font-bold ${due.className}`}>
-                                  {formatDueWithWeekday(task.due_date, due.text, today)}
-                                </span>
-                              </div>
+                          {editingTitleTaskId === task.id ? (
+                            <div className="flex min-w-0 items-center">
+                              <TaskTitleEditForm
+                                taskId={task.id}
+                                initialTitle={task.title}
+                                onDone={(nextTitle) => {
+                                  setEditingTitleTaskId(null);
+                                  if (!nextTitle) return;
+                                  setLocalTasks((current) =>
+                                    current.map((item) =>
+                                      item.id === task.id ? { ...item, title: nextTitle } : item,
+                                    ),
+                                  );
+                                  router.refresh();
+                                }}
+                              />
                             </div>
-                            {task.assignees.length > 1 && (
-                              <p className="mt-1 truncate text-xs text-slate-400">{getTaskOwnerLabel(task)}</p>
-                            )}
-                          </button>
+                          ) : (
+                            <div className="flex min-w-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setDetailTaskId(task.id)}
+                                disabled={isTaskPending}
+                                className="min-w-0 flex-1 rounded-md text-left outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-default"
+                                aria-label={`${task.title} 상세 보기`}
+                              >
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="flex min-w-0 items-center gap-1.5">
+                                    {task.project && (
+                                      <span className="inline-flex max-w-24 shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: task.project.color }} aria-hidden="true" />
+                                        <span className="truncate">{task.project.name}</span>
+                                      </span>
+                                    )}
+                                    <p className={`min-w-0 truncate text-sm font-bold ${isDone ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                                      {task.title}
+                                    </p>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-4">
+                                    <span className={`rounded-lg px-2 py-1 text-[11px] font-bold ${statusConfig.bg} ${statusConfig.text}`}>
+                                      {task.status}
+                                    </span>
+                                    <span className={`text-xs font-bold ${due.className}`}>
+                                      {formatDueWithWeekday(task.due_date, due.text, today)}
+                                    </span>
+                                  </div>
+                                </div>
+                                {task.assignees.length > 1 && (
+                                  <p className="mt-1 truncate text-xs text-slate-400">{getTaskOwnerLabel(task)}</p>
+                                )}
+                              </button>
+                              {canUpdate && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTitleTaskId(task.id)}
+                                  disabled={isTaskPending}
+                                  className="shrink-0 self-start p-1 text-slate-300 transition-colors hover:text-indigo-500 disabled:cursor-default disabled:opacity-40"
+                                  title="제목 수정"
+                                  aria-label={`${task.title} 제목 수정`}
+                                >
+                                  <PencilSimple size={16} />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {canShareTimeline && (
                             <CompletedTaskTimelineAction
                               taskId={task.id}
