@@ -1,6 +1,6 @@
 {
   "name": "jdi-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "JDI 포털 데스크톱 앱 — 트레이 상주 껍데기",
   "author": "JDICOMPANY",
@@ -37,7 +37,8 @@
     "publish": {
       "provider": "github",
       "owner": "kht33668944-tech",
-      "repo": "jdicompany1"
+      "repo": "jdicompany1",
+      "releaseType": "release"
     }
   },
   "devDependencies": {
