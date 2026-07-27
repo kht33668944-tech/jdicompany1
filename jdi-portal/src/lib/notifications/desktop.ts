@@ -107,6 +107,9 @@ export function showDesktopNotification(opts: ShowOptions): void {
     notification.onclick = (event) => {
       event.preventDefault();
       try {
+        // 데스크톱 앱(jdi-desktop)에서는 트레이로 숨겨진 창을 먼저 되살린다.
+        // 브라우저에는 window.jdiDesktop 이 없으므로 그대로 건너뛴다.
+        (window as unknown as { jdiDesktop?: { showWindow?: () => void } }).jdiDesktop?.showWindow?.();
         window.focus();
       } catch {
         /* noop */
