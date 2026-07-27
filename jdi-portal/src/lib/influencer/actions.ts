@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import type { CampaignStatus, InfluencerCampaign, InfluencerListItem } from "./types";
 import type { MilestoneKind } from "./calendar";
 import { getInfluencers } from "./queries";
@@ -403,9 +404,11 @@ export async function linkPostToCampaign(
   await getSessionUserId();
   const supabase = await createClient();
 
+  // KST(Asia/Seoul) 기준 날짜로 저장한다.
+  // toISOString() 은 UTC 기준이라 한국시간 오전 9시 이전에는 날짜가 하루 밀린다.
   const actualPostDate = posted_at
-    ? new Date(posted_at).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+    ? toDateStringFromTimestamp(posted_at)
+    : toDateString();
 
   const { data, error } = await supabase
     .from("influencer_campaigns")

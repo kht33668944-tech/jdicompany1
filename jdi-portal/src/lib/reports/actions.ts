@@ -29,11 +29,8 @@ export async function createReport(params: {
     .single();
 
   if (error) throw error;
-  notifyReportSubmitted({
-    reportId: data.id,
-    title: params.title,
-    authorId: params.userId,
-  }).catch(() => {});
+  // 작성자는 서버가 세션에서 결정한다 (클라이언트가 넘긴 userId 를 신뢰하지 않음)
+  notifyReportSubmitted({ reportId: data.id, title: params.title }).catch(() => {});
   return data;
 }
 

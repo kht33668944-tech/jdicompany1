@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { CorrectionRequest } from "./types";
 import type { VacationType } from "./types";
-import { createNotification } from "@/lib/notifications/actions";
+import { createNotification } from "@/lib/notifications/internal";
 
 async function getSessionUserId() {
   const supabase = await createClient();

@@ -143,13 +143,23 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // 네트워크 일시 오류는 "로그아웃"으로 취급하지 않음 — 기존 쿠키/세션 그대로 통과
+  // 네트워크 일시 오류는 "로그아웃"으로 취급하지 않음 — 기존 쿠키/세션 그대로 통과.
+  //
+  // ⚠️ 단, 통과 범위는 "화면 조회(GET 페이지)"로 제한한다.
+  //    이 문을 통과하면 뒤쪽 서버 코드는 auth.getSession()(= 쿠키 로컬 디코드, 서명 미검증)
+  //    으로 사용자 id 를 얻고, 일부 경로는 RLS 를 우회하는 pg 직결로 프로필/권한을 읽는다.
+  //    따라서 인증 서버 장애 중에 API 나 쓰기 요청까지 통과시키면 위조 쿠키로 관리자 권한을
+  //    흉내 낼 여지가 생긴다. 장애 중에도 읽기 화면은 열어두되, API·쓰기는 막는다.
+  //    (평시에는 이 분기를 타지 않으므로 속도에 영향이 없다.)
   const isTransientAuthError = isTransientError(authError);
+  const isSafeToPassThrough =
+    request.method === "GET" && !request.nextUrl.pathname.startsWith("/api/");
+  const allowTransientPassThrough = isTransientAuthError && isSafeToPassThrough;
 
   // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
   if (
     !user &&
-    !isTransientAuthError &&
+    !allowTransientPassThrough &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/signup") &&
     !request.nextUrl.pathname.startsWith("/forgot-password") &&

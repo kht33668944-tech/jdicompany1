@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TASK_PRIORITIES, TASK_STATUSES } from "./constants";
 import { validateFile } from "@/lib/utils/upload";
 import type { TaskPriority, TaskStatus, TaskChecklistItem, TaskAttachment, TaskActivity } from "./types";
-import { createNotification, createNotificationForMany } from "@/lib/notifications/actions";
+import { createNotification, createNotificationForMany } from "@/lib/notifications/internal";
 import { isProjectFkViolation } from "@/lib/projects/utils";
 
 async function getSessionUserId() {
@@ -15,17 +15,14 @@ async function getSessionUserId() {
   return session.user.id;
 }
 
+/**
+ * 다음 position 을 DB 에서 한 번에 계산한다.
+ * (조회 후 +1 하는 방식은 두 사람이 동시에 할일을 만들면 같은 번호를 받아 순서가 꼬였다.)
+ */
 async function getNextPosition(supabase: Awaited<ReturnType<typeof createClient>>, status: TaskStatus) {
-  const { data: maxRow, error } = await supabase
-    .from("tasks")
-    .select("position")
-    .eq("status", status)
-    .order("position", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
+  const { data, error } = await supabase.rpc("next_task_position", { p_status: status });
   if (error) throw error;
-  return (maxRow?.position ?? -1) + 1;
+  return typeof data === "number" ? data : 0;
 }
 
 function revalidateTaskViews(taskId?: string) {
@@ -297,6 +294,7 @@ export async function updateTask(
 }
 
 export async function deleteTask(taskId: string) {
+  await getSessionUserId();
   const supabase = await createClient();
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw error;
@@ -304,6 +302,7 @@ export async function deleteTask(taskId: string) {
 }
 
 export async function moveTask(taskId: string, newStatus: TaskStatus, newPosition: number) {
+  await getSessionUserId();
   const supabase = await createClient();
   const { error } = await supabase.rpc("reorder_task", {
     p_task_id: taskId,
@@ -370,6 +369,7 @@ export async function removeAssignee(taskId: string, userId: string) {
 // ============================================================
 
 export async function addChecklistItem(taskId: string, content: string): Promise<TaskChecklistItem> {
+  await getSessionUserId();
   const supabase = await createClient();
 
   const { data: maxRow } = await supabase
@@ -397,6 +397,7 @@ export async function updateChecklistItem(
   itemId: string,
   updates: { content?: string; is_completed?: boolean }
 ) {
+  await getSessionUserId();
   const supabase = await createClient();
   const { error } = await supabase
     .from("task_checklist_items")
@@ -407,6 +408,7 @@ export async function updateChecklistItem(
 }
 
 export async function deleteChecklistItem(itemId: string) {
+  await getSessionUserId();
   const supabase = await createClient();
   const { error } = await supabase
     .from("task_checklist_items")
@@ -418,11 +420,13 @@ export async function deleteChecklistItem(itemId: string) {
 
 export async function reorderChecklist(taskId: string, itemIds: string[]) {
   const supabase = await createClient();
-  const updates = itemIds.map((id, index) =>
-    supabase.from("task_checklist_items").update({ position: index }).eq("id", id)
-  );
-  // 체크리스트 항목은 보통 20개 미만이므로 개별 업데이트 허용
-  await Promise.all(updates);
+  // 한 트랜잭션으로 처리하고 오류를 사용자에게 알린다.
+  // (기존: 항목마다 개별 UPDATE + 결과의 error 를 확인하지 않아 조용히 실패했음)
+  const { error } = await supabase.rpc("reorder_task_checklist", {
+    p_task_id: taskId,
+    p_item_ids: itemIds,
+  });
+  if (error) throw new Error(`체크리스트 순서 변경에 실패했습니다: ${error.message}`);
   revalidateTaskViews(taskId);
 }
 
@@ -591,6 +595,7 @@ async function sendCommentNotifications(
 }
 
 export async function deleteActivity(activityId: string) {
+  await getSessionUserId();
   const supabase = await createClient();
   const { error } = await supabase
     .from("task_activities")

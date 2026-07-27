@@ -69,7 +69,20 @@ export async function createDirective(input: CreateDirectiveInput): Promise<void
   const recipients = await supabase
     .from("work_directive_recipients")
     .insert(recipientIds.map((id) => ({ directive_id: directive.id, user_id: id })));
-  if (recipients.error) throw recipients.error;
+  if (recipients.error) {
+    // 롤백: 받는 사람이 하나도 없는 "유령 지시"를 남기지 않는다.
+    const { error: rollbackError } = await supabase
+      .from("work_directives")
+      .delete()
+      .eq("id", directive.id);
+    if (rollbackError) {
+      console.error("업무지시 롤백 실패 — 수신자 없는 지시가 남았습니다.", {
+        directiveId: directive.id,
+        rollbackError,
+      });
+    }
+    throw recipients.error;
+  }
 
   // 알림 생성 실패가 지시 등록 자체를 되돌리지 않는다 (업무 도메인 규칙).
   const label = directive.kind === "지시" ? "새 업무지시" : "새 업무 요청";

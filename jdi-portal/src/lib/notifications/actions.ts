@@ -1,157 +1,42 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import type { NotificationType } from "./types";
-import { SETTING_TYPE_MAP } from "./constants";
+import {
+  notifyReportSubmittedInternal,
+  notifyReportStatusChangedInternal,
+} from "./internal";
 
-/** NotificationType → notification_settings 컬럼명 역방향 조회 */
-function getSettingKeyForType(type: NotificationType): string | null {
-  for (const [key, types] of Object.entries(SETTING_TYPE_MAP)) {
-    if ((types as NotificationType[]).includes(type)) return key;
-  }
-  return null;
+/**
+ * ⚠️ 이 파일의 export 는 브라우저에서 직접 호출 가능한 엔드포인트가 된다.
+ *    따라서 "누가 호출해도 안전한 것"만 둔다. 임의의 사용자에게 임의 내용으로 알림을
+ *    만드는 createNotification / createNotificationForMany 는 서버 내부 전용이므로
+ *    ./internal.ts 에 있다(브라우저에서 호출 불가).
+ */
+
+async function requireSessionUserId(): Promise<string> {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
+  return session.user.id;
 }
 
-/** 알림 생성 (서버 전용 — 다른 서버 액션에서만 호출) */
-export async function createNotification(params: {
-  userId: string;
-  type: NotificationType;
-  title: string;
-  body?: string;
-  link?: string;
-  metadata?: Record<string, unknown>;
-}) {
-  try {
-    const supabase = await createClient();
-
-    // 수신자의 알림 설정 확인
-    const settingKey = getSettingKeyForType(params.type);
-    if (settingKey) {
-      const { data: settings } = await supabase
-        .from("notification_settings")
-        .select("*")
-        .eq("user_id", params.userId)
-        .single();
-      if (settings && (settings as unknown as Record<string, unknown>)[settingKey] === false) return;
-    }
-
-    await supabase.rpc("insert_notification", {
-      p_user_id: params.userId,
-      p_type: params.type,
-      p_title: params.title,
-      p_body: params.body || null,
-      p_link: params.link || null,
-      p_metadata: params.metadata || {},
-    });
-  } catch {
-    // 알림 실패가 본 기능을 중단시키면 안 됨
-  }
+/** 오류접수 제출 알림 — 작성자는 세션에서 결정한다(클라이언트 값 신뢰 금지). */
+export async function notifyReportSubmitted(params: { reportId: string; title: string }) {
+  const authorId = await requireSessionUserId();
+  await notifyReportSubmittedInternal({
+    reportId: params.reportId,
+    title: params.title,
+    authorId,
+  });
 }
 
-/** 여러 사용자에게 동일 알림 생성 (배치 INSERT) */
-export async function createNotificationForMany(
-  userIds: string[],
-  params: {
-    type: NotificationType;
-    title: string;
-    body?: string;
-    link?: string;
-    metadata?: Record<string, unknown>;
-  }
-) {
-  if (userIds.length === 0) return;
-  try {
-    const supabase = await createClient();
-
-    // 수신자들의 알림 설정 확인 후 비활성화된 사용자 필터링
-    const settingKey = getSettingKeyForType(params.type);
-    let filteredUserIds = userIds;
-    if (settingKey) {
-      const { data: allSettings } = await supabase
-        .from("notification_settings")
-        .select("*")
-        .in("user_id", userIds);
-      if (allSettings && allSettings.length > 0) {
-        const disabledSet = new Set(
-          allSettings
-            .filter((s) => (s as unknown as Record<string, unknown>)[settingKey] === false)
-            .map((s) => s.user_id)
-        );
-        filteredUserIds = userIds.filter((uid) => !disabledSet.has(uid));
-      }
-    }
-
-    if (filteredUserIds.length === 0) return;
-
-    const notifications = filteredUserIds.map((userId) => ({
-      user_id: userId,
-      type: params.type,
-      title: params.title,
-      body: params.body || null,
-      link: params.link || null,
-      metadata: params.metadata || {},
-    }));
-    await supabase.rpc("insert_notifications_batch", {
-      p_notifications: notifications,
-    });
-  } catch {
-    // 알림 실패가 본 기능을 중단시키면 안 됨
-  }
-}
-
-/** 오류접수 제출 — 개발자 전원에게 알림 (작성자 제외) */
-export async function notifyReportSubmitted(params: {
-  reportId: string;
-  title: string;
-  authorId: string;
-}) {
-  try {
-    const supabase = await createClient();
-    const { data: devs } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("role", "developer")
-      .neq("id", params.authorId);
-    if (!devs || devs.length === 0) return;
-    await createNotificationForMany(
-      devs.map((d) => d.id),
-      {
-        type: "report_submitted",
-        title: "새 오류접수",
-        body: params.title,
-        link: `/dashboard/reports`,
-      }
-    );
-  } catch {
-    // ignore
-  }
-}
-
-/** 오류접수 상태 변경 — 작성자에게 알림 (본인이 변경하면 스킵) */
+/** 오류접수 상태 변경 알림 */
 export async function notifyReportStatusChanged(params: {
   reportId: string;
   newStatus: string;
 }) {
-  try {
-    const supabase = await createClient();
-    const { data: report } = await supabase
-      .from("reports")
-      .select("user_id, title")
-      .eq("id", params.reportId)
-      .single();
-    if (!report) return;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user?.id === report.user_id) return;
-    await createNotification({
-      userId: report.user_id,
-      type: "report_status_changed",
-      title: `오류접수가 "${params.newStatus}" 상태로 변경되었습니다`,
-      body: report.title,
-      link: `/dashboard/reports`,
-    });
-  } catch {
-    // ignore
-  }
+  await requireSessionUserId();
+  await notifyReportStatusChangedInternal(params);
 }
 
 /** 알림 읽음 처리 — 세션 사용자 본인의 알림만 */

@@ -38,8 +38,18 @@ export async function requestReview(entryId: string, comment: string): Promise<v
   revalidatePath("/dashboard");
 }
 
-const UUID_ATTACHMENT_PATH =
-  /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[^/]+$/i;
+/**
+ * 검토 보완 첨부 경로는 `{본인 userId}/{entryId}/{파일명}` 이어야 한다.
+ * (work-timeline/actions.ts 의 validateAttachmentInput 과 같은 규칙)
+ */
+function assertOwnedAttachmentPath(filePath: string, userId: string, entryId: string): void {
+  const segments = filePath.split("/");
+  if (segments.length !== 3) throw new Error("첨부 정보가 올바르지 않습니다.");
+  const [ownerId, pathEntryId, fileName] = segments;
+  if (ownerId !== userId || pathEntryId !== entryId || !fileName) {
+    throw new Error("첨부 파일 경로가 올바르지 않습니다.");
+  }
+}
 
 /**
  * 작성자가 검토 칸에서 보완(글 + 파일)을 제출한다. open -> submitted 전이는 RPC가 담당.
@@ -65,20 +75,21 @@ export async function submitRemediation(
   if (files.length > REVIEW_MAX_ATTACHMENTS) {
     throw new Error(`파일은 최대 ${REVIEW_MAX_ATTACHMENTS}개까지 첨부할 수 있습니다.`);
   }
+  const { supabase, userId } = await getAuth();
+
   for (const file of files) {
     if (
       !file.file_name?.trim()
       || file.file_name.length > 255
       || !file.file_path?.trim()
-      || !UUID_ATTACHMENT_PATH.test(file.file_path)
       || !Number.isInteger(file.file_size)
       || file.file_size < 0
     ) {
       throw new Error("첨부 정보가 올바르지 않습니다.");
     }
+    // 남의 파일 경로를 자기 보완 자료로 등록하지 못하게 소유자·업무보고를 확인한다.
+    assertOwnedAttachmentPath(file.file_path, userId, entryId);
   }
-
-  const { supabase } = await getAuth();
   const { error } = await supabase.rpc("submit_timeline_review_remediation", {
     p_review_id: reviewId,
     p_note: trimmedNote || null,

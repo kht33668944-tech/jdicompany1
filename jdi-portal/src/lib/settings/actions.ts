@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { NotificationSettings } from "@/lib/settings/types";
-import { createNotification } from "@/lib/notifications/actions";
+import { createNotification } from "@/lib/notifications/internal";
 import { validateAvatarFile } from "@/lib/utils/upload";
 
 async function getSessionUser() {

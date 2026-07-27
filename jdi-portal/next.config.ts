@@ -1,5 +1,26 @@
 import type { NextConfig } from "next";
 
+/**
+ * Content-Security-Policy — 악성 스크립트가 끼어들었을 때 피해를 막는 마지막 그물.
+ * Next.js 가 인라인 스크립트/스타일을 쓰므로 'unsafe-inline' 은 유지한다
+ * (nonce 방식으로 강화하려면 App Router 미들웨어에서 nonce 를 주입해야 함).
+ * connect-src 는 Supabase REST/Auth/Realtime(wss) 경로를 허용한다.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.supabase.co",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "media-src 'self' blob: https://*.supabase.co",
+  "worker-src 'self' blob:",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   turbopack: {
@@ -46,6 +67,14 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: CONTENT_SECURITY_POLICY,
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
           },
         ],
       },

@@ -1,9 +1,21 @@
 import { createClient } from "@/lib/supabase/client";
+import { validateFile } from "@/lib/utils/upload";
 import type { Channel, Message, MessageReadReceipt, MessageReaction } from "./types";
 import { summarizeReactionsByMessage, type ReactionRow } from "./reactions";
 
 function getSupabase() {
   return createClient();
+}
+
+/**
+ * 현재 로그인 사용자 id. 세션이 끊겼으면 명확한 한국어 오류로 알린다.
+ * (채팅창을 오래 열어두면 세션이 만료돼 user 가 null 이 될 수 있다.)
+ */
+async function requireUserId(): Promise<string> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("로그인이 만료되었습니다. 새로고침 후 다시 시도해 주세요.");
+  return user.id;
 }
 
 /**
@@ -116,6 +128,8 @@ export async function addMembers(
 ): Promise<void> {
   await assertNotMemoChannel(channelId, "멤버를 초대");
   const supabase = getSupabase();
+  // 쓰기 전에 세션을 먼저 확인한다 — 초대만 되고 안내 메시지가 빠지는 반쪽 상태 방지
+  const actorId = await requireUserId();
 
   const members = userIds.map((id) => ({
     channel_id: channelId,
@@ -136,7 +150,7 @@ export async function addMembers(
 
   await supabase.from("messages").insert({
     channel_id: channelId,
-    user_id: (await supabase.auth.getUser()).data.user!.id,
+    user_id: actorId,
     content: `${currentUserName}님이 ${names}님을 초대했습니다.`,
     type: "system",
   });
@@ -155,6 +169,7 @@ export async function removeMember(
 ): Promise<void> {
   await assertNotMemoChannel(channelId, "멤버를 제거");
   const supabase = getSupabase();
+  const actorId = await requireUserId();
 
   const { error } = await supabase
     .from("channel_members")
@@ -166,7 +181,7 @@ export async function removeMember(
 
   await supabase.from("messages").insert({
     channel_id: channelId,
-    user_id: (await supabase.auth.getUser()).data.user!.id,
+    user_id: actorId,
     content: `${currentUserName}님이 ${removedName}님을 내보냈습니다.`,
     type: "system",
   });
@@ -393,9 +408,12 @@ export async function uploadChatFile(
   channelId: string,
   file: File
 ): Promise<{ path: string; fileName: string; fileSize: number; fileType: string }> {
+  // 할일/오류접수 첨부와 동일한 기준(10MB + 확장자 화이트리스트)을 채팅에도 적용한다.
+  const validationError = validateFile(file);
+  if (validationError) throw new Error(validationError);
+
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("인증이 필요합니다.");
+  await requireUserId();
 
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");

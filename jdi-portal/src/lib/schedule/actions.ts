@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createNotification } from "@/lib/notifications/actions";
+import { createNotificationForMany } from "@/lib/notifications/internal";
 
 async function getSessionUserId() {
   const supabase = await createClient();
@@ -45,11 +45,10 @@ export async function createSchedule(params: {
     try {
       await setParticipants(data.id, params.participantIds);
 
-      // 알림: 참여자들에게 (생성자 제외)
+      // 알림: 참여자들에게 (생성자 제외) — 인원수만큼 왕복하지 않도록 한 번에 보낸다
       const notifyIds = params.participantIds.filter((id) => id !== userId);
-      for (const pid of notifyIds) {
-        await createNotification({
-          userId: pid,
+      if (notifyIds.length > 0) {
+        await createNotificationForMany(notifyIds, {
           type: "schedule_invite",
           title: "새 일정에 참여자로 추가되었습니다",
           body: params.title,
@@ -80,7 +79,7 @@ export async function updateSchedule(
     visibility?: string;
   }
 ) {
-  const supabase = await createClient();
+  const { supabase } = await getSessionUserId();
 
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -109,13 +108,13 @@ export async function updateSchedule(
 }
 
 export async function deleteSchedule(scheduleId: string) {
-  const supabase = await createClient();
+  const { supabase } = await getSessionUserId();
   const { error } = await supabase.from("schedules").delete().eq("id", scheduleId);
   if (error) throw error;
 }
 
 export async function setParticipants(scheduleId: string, userIds: string[]) {
-  const supabase = await createClient();
+  const { supabase } = await getSessionUserId();
 
   // 기존 참여자 삭제
   const { error: deleteError } = await supabase
@@ -156,7 +155,7 @@ export async function updateScheduleWithParticipants(
   },
   participantIds: string[] | null
 ) {
-  const supabase = await createClient();
+  const { supabase } = await getSessionUserId();
 
   // 변경된 필드만 JSONB 로 보냄 (DB 함수가 transmitted key 만 반영)
   const updates: Record<string, unknown> = {};
