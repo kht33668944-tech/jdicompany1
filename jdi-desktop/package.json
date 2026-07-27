@@ -1,6 +1,6 @@
 {
   "name": "jdi-desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "JDI 포털 데스크톱 앱 — 트레이 상주 껍데기",
   "author": "JDICOMPANY",
@@ -25,9 +25,8 @@
       "artifactName": "JDI-Portal-Setup.exe"
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "JDI 포털",
