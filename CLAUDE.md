@@ -42,7 +42,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 - `src/lib/<domain>/{queries,actions,types,constants}.ts` — `queries.ts`(읽기), `actions.ts`(쓰기), `types.ts`(도메인 타입). 일부 도메인엔 `*Cache.ts`(예: `tasks/tasksCache.ts`).
 - `src/components/dashboard/<domain>/` — 도메인 UI. 여기 하위 `CLAUDE.md`가 있으면 우선.
 
-도메인 목록: `dashboard`(대시보드 홈), `attendance`(근태), `tasks`(업무), `chat`(채팅), `schedule`(일정), `reports`(리포트), `influencer`(인플루언서), `work-timeline`(업무 타임라인), `expenses`(지출관리), `projects`(프로젝트 분류), `directives`(업무지시), `notifications`(알림), `push`(웹 푸시), `settings`(설정). (`src/lib/cache`, `src/lib/performance`, `src/lib/db`, `src/lib/supabase`, `src/lib/hooks`, `src/lib/utils`는 도메인이 아니라 공용 인프라 모듈입니다.)
+도메인 목록: `dashboard`(대시보드 홈), `attendance`(근태), `tasks`(업무), `chat`(채팅), `schedule`(일정), `reports`(리포트), `influencer`(인플루언서), `work-timeline`(업무 타임라인), `expenses`(지출관리), `projects`(프로젝트 분류), `directives`(업무지시), `vault`(보관함 — 서류·계정, 계정 비밀번호는 `ACCOUNT_VAULT_KEY`로 암호화 + 2차 비밀번호 게이트), `notifications`(알림), `push`(웹 푸시), `settings`(설정). (`src/lib/cache`, `src/lib/performance`, `src/lib/db`, `src/lib/supabase`, `src/lib/hooks`, `src/lib/utils`는 도메인이 아니라 공용 인프라 모듈입니다.)
 
 일부 도메인은 표준 4파일 형태와 조금 다릅니다: `directives`는 읽기를 대시보드 빠른 경로에 통합해 `queries.ts` 없이 `actions/constants/types.ts`만 둡니다. `projects`는 `useProjects.ts` 훅과 `utils.ts`(접두어 자동 분류), `expenses`는 `colors.ts`·`format.ts`·`receipts.ts`·`recurring.ts` 등 보조 모듈을 함께 둡니다.
 
@@ -66,7 +66,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 4. **대시보드 업무 요약 사전 필터** (마이그레이션 088 + `get_dashboard_task_summaries` RPC): `tasks` 전체 스캔 금지 — status/completed_at 사전 필터와 부분 인덱스를 유지합니다.
 5. **초기 JS 예산**: 무거운 라이브러리(xlsx 등)는 지연 로드, 라우트별 초기 JS 예산 준수(`npm run perf:audit`), 전역 prefetch 남용 금지, `/api/health`는 인증 우회 유지.
 
-기준선: `jdi-portal/docs/performance/production-baseline.md`. 회귀 방지 테스트: `jdi-portal/scripts/performance-architecture.test.mjs` 등(`npm run test:performance` = 40개 검사).
+기준선: `jdi-portal/docs/performance/production-baseline.md`. 회귀 방지 테스트: `jdi-portal/scripts/performance-architecture.test.mjs` 등(`npm run test:performance` = 60여 개 검사).
 
 ## 반드시 지킬 제약
 
