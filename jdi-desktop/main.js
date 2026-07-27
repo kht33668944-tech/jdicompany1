@@ -7,12 +7,24 @@
  * 주의: 원격 페이지를 로드하므로 보안 설정(contextIsolation/sandbox)을 절대 완화하지 않는다.
  */
 
-const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, dialog } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  Notification,
+  shell,
+  ipcMain,
+  nativeImage,
+  dialog,
+} = require("electron");
 const path = require("node:path");
 const { autoUpdater } = require("electron-updater");
 
-const PORTAL_URL = "https://jdiportal.com";
-const PORTAL_HOST = "jdiportal.com";
+// 운영 주소. 개발 중 로컬 서버로 시험할 때만 JDI_PORTAL_URL 로 바꾼다.
+// 예: JDI_PORTAL_URL=http://localhost:3000 npm start
+const PORTAL_URL = process.env.JDI_PORTAL_URL || "https://jdiportal.com";
+const PORTAL_HOST = new URL(PORTAL_URL).hostname;
 const APP_ID = "com.jdicompany.portal";
 // 앱을 켠 뒤 새 버전을 확인하기까지의 지연 — 시작 속도를 방해하지 않기 위해 잠시 미룬다
 const UPDATE_CHECK_DELAY_MS = 10_000;
@@ -313,6 +325,25 @@ function onReady() {
 
   // preload 에서 보낸 "창 보여줘" 신호 (알림 클릭 시)
   ipcMain.on("jdi:show-window", () => showMainWindow());
+
+  // 포털이 보낸 알림 요청 → 앱 이름("JDI 포털")과 앱 아이콘으로 Windows 알림 표시.
+  // 웹페이지가 직접 만든 알림은 앱 이름이 "Electron" 으로 표시되어 이 경로를 쓴다.
+  ipcMain.on("jdi:notify", (_event, payload) => {
+    if (!Notification.isSupported()) return;
+    const title = typeof payload?.title === "string" ? payload.title : "JDI 포털";
+    const body = typeof payload?.body === "string" ? payload.body : "";
+    // 내부 경로(/dashboard/...)만 허용 — 외부 주소로의 이동을 막는다
+    const link = typeof payload?.link === "string" && payload.link.startsWith("/") ? payload.link : null;
+
+    const notification = new Notification({ title, body, icon: getIcon() });
+    notification.on("click", () => {
+      showMainWindow();
+      if (link && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("jdi:navigate", link);
+      }
+    });
+    notification.show();
+  });
 
   app.on("activate", () => showMainWindow());
 }

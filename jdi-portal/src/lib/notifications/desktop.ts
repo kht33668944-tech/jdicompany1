@@ -93,6 +93,21 @@ export function showDesktopNotification(opts: ShowOptions): void {
   // 사용자가 로컬 토글로 꺼둔 경우 skip
   if (!isDesktopEnabled()) return;
 
+  // 데스크톱 앱(jdi-desktop) 안이라면 앱 본체가 알림을 띄우게 맡긴다.
+  // 웹에서 직접 띄우면 Windows 알림에 앱 이름이 "Electron" 으로 표시되기 때문.
+  // 브라우저에는 window.jdiDesktop 이 없으므로 아래 기본 경로를 그대로 탄다.
+  const desktopBridge = (window as unknown as {
+    jdiDesktop?: { notify?: (payload: { title: string; body?: string | null; link?: string | null }) => void };
+  }).jdiDesktop;
+  if (desktopBridge?.notify) {
+    try {
+      desktopBridge.notify({ title: opts.title, body: opts.body, link: opts.link });
+      return;
+    } catch {
+      // 실패하면 아래 브라우저 기본 경로로 넘어간다
+    }
+  }
+
   try {
     // renotify는 TS lib에 없지만 대부분 브라우저가 지원 — 옵셔널 필드로 캐스팅
     const options = {
