@@ -145,6 +145,29 @@ test("실적 카드: 추가 왕복 없이 이미 받은 캠페인으로 계산�
   assert.match(src, /campaigns\.reduce/);
 });
 
+test("113: 서류 삭제를 직원 전체에 열되 민감 폴더는 잠금 유지", () => {
+  const path = "supabase/migrations/113_influencer_document_delete_by_staff.sql";
+  assert.ok(exists(path), `${path} 이 없습니다`);
+  const sql = read(path);
+
+  // 관리자 전용 정책을 걷어내고 승인된 사용자로 교체
+  for (const t of [
+    "influencer_documents",
+    "influencer_document_versions",
+    "influencer_document_cleanup_queue",
+  ]) {
+    assert.match(
+      sql,
+      new RegExp(`CREATE POLICY "Approved users can delete ${t}"[\\s\\S]{0,200}?is_approved_user\\(\\)`),
+      `${t} 삭제 정책이 승인 사용자 기준이어야 합니다`
+    );
+  }
+
+  // Storage 삭제도 열되, 민감 폴더는 잠금 해제를 계속 요구해야 한다
+  assert.match(sql, /ON storage\.objects FOR DELETE[\s\S]{0,300}?split_part\(name, '\/', 2\) <> 'sensitive'/);
+  assert.match(sql, /ON storage\.objects FOR DELETE[\s\S]{0,300}?public\.has_vault_unlock\(\)/);
+});
+
 test("게이트: 쿠키 서명이 실패하면 DB 잠금 세션을 되돌린다", () => {
   // 되돌리지 않으면 Storage 는 열려 있는데 앱은 잠긴 어긋난 상태가 20분 남는다.
   const src = read("src/lib/vault/actions.ts");

@@ -163,13 +163,21 @@ export async function deleteInfluencerDocument(documentId: string): Promise<void
     .select("id");
   if (delErr) throw new Error(`서류 삭제에 실패했습니다: ${delErr.message}`);
   if (!deleted || deleted.length === 0) {
-    throw new Error("서류를 삭제할 권한이 없습니다. 관리자에게 요청해주세요.");
+    throw new Error("서류를 삭제할 권한이 없습니다.");
   }
 
-  // Storage 파일은 정리 큐에 맡긴다. 여기서 실패해도 DB 삭제를 되돌리지 않는다.
-  const paths = (versions ?? []).map((v) => ({ path: v.storage_path as string }));
+  // Storage 파일도 바로 지운다(마이그 113 으로 승인된 사용자에게 허용됨).
+  // 실패한 것만 정리 큐에 남긴다. 여기서 실패해도 DB 삭제를 되돌리지 않는다.
+  const paths = (versions ?? []).map((v) => v.storage_path as string);
   if (paths.length > 0) {
-    await supabase.from("influencer_document_cleanup_queue").insert(paths);
+    const { data: removed } = await supabase.storage.from(BUCKET).remove(paths);
+    const removedSet = new Set((removed ?? []).map((o) => o.name));
+    const leftover = paths.filter((p) => !removedSet.has(p));
+    if (leftover.length > 0) {
+      await supabase
+        .from("influencer_document_cleanup_queue")
+        .insert(leftover.map((path) => ({ path })));
+    }
   }
 
   revalidatePath("/dashboard/influencer");
