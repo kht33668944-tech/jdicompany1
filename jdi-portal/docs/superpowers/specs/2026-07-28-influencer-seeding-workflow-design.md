@@ -109,7 +109,9 @@ RLS: `is_approved_user()` 기준 SELECT / INSERT / UPDATE / DELETE 허용. INSER
 
 - 인덱스: `influencer_documents (influencer_id, kind)`, `influencer_document_versions (document_id, version_no DESC)`
 - 재계약 시 같은 문서에 버전을 올리면 이전 계약서가 남는다. 이것이 별도 표를 두는 이유다.
-- RLS: SELECT / INSERT / UPDATE 는 `is_approved_user()`. DELETE 는 관리자만(`vault_documents` 와 동일 기준).
+- RLS: SELECT / INSERT / UPDATE / DELETE 모두 `is_approved_user()`.
+  - 처음에는 `vault_documents` 를 따라 DELETE 를 관리자만 가능하게 두었으나, 직원이 4명이고 운영 담당자가 admin 이 아니어서 **잘못 올린 서류를 올린 사람조차 지울 수 없었다.** 마이그레이션 `113` 에서 직원 전체에 열었다.
+  - 민감 서류(신분증·통장)는 **지울 때도 2차 비밀번호가 필요하다** — Storage 삭제 정책이 `has_vault_unlock()` 을 계속 요구한다.
 - **민감 서류 열람 제한은 Storage RLS가 강제한다.** 잠금 상태를 쿠키가 아니라 DB(`vault_unlock_sessions`)에 두고, Storage 정책이 그 표를 보게 만들었다 (§4.6). 서버 액션의 쿠키 확인은 1차 방어일 뿐이고, 쿠키를 우회해도 파일에 닿을 수 없다.
 
 #### 새 테이블: `vault_unlock_sessions`
