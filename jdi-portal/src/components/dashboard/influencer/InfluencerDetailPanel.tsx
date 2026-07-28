@@ -58,6 +58,8 @@ import InfluencerContactSection from "./contact/InfluencerContactSection";
 import CampaignFulfillmentFields from "./contact/CampaignFulfillmentFields";
 import InfluencerDocumentSection from "./documents/InfluencerDocumentSection";
 import CampaignEventTimeline from "./events/CampaignEventTimeline";
+import CampaignResultBadge from "./result/CampaignResultBadge";
+import SeedingHistoryCard from "./result/SeedingHistoryCard";
 import type {
   InfluencerCampaignEvent,
   InfluencerContact,
@@ -985,6 +987,9 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                 </div>
               )}
 
+              {/* 자사 시딩 실적 — 팔로워 등급과 별개인 실제 성적표 */}
+              <SeedingHistoryCard campaigns={campaigns} />
+
               {/* 배송·정산 연락처 */}
               <InfluencerContactSection
                 influencerId={influencer.id}
@@ -1114,6 +1119,11 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                         {c.notes && (
                           <p className="text-xs text-slate-500 leading-relaxed">{c.notes}</p>
                         )}
+
+                        {/* 성과 */}
+                        <div className="pt-2 border-t border-slate-200/70">
+                          <CampaignResultBadge campaign={c} onChanged={reload} />
+                        </div>
 
                         {/* 배송·지급 */}
                         <div className="pt-2 border-t border-slate-200/70 space-y-1.5">

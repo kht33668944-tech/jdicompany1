@@ -144,6 +144,10 @@ export interface KpiCards {
   activeCampaigns: { value: number };
   doneCampaigns: { value: number };
   totalSeedingCost: { value: number };
+  /** 시딩으로 실제 얻은 총 조회수 (마이그 112) */
+  totalResultViews: { value: number };
+  /** 1만 조회당 원가. 성과가 없으면 null */
+  costPer10kViews: { value: number | null };
 }
 
 export type CampaignBasic = Pick<

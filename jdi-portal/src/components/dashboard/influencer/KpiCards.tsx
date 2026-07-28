@@ -2,8 +2,10 @@ import UsersThree from "phosphor-react/dist/icons/UsersThree.esm.js";
 import PaperPlaneTilt from "phosphor-react/dist/icons/PaperPlaneTilt.esm.js";
 import CheckCircle from "phosphor-react/dist/icons/CheckCircle.esm.js";
 import CurrencyKrw from "phosphor-react/dist/icons/CurrencyKrw.esm.js";
+import Eye from "phosphor-react/dist/icons/Eye.esm.js";
+import ChartLineUp from "phosphor-react/dist/icons/ChartLineUp.esm.js";
 import type { KpiCards as KpiCardsType } from "@/lib/influencer/types";
-import { formatKRW } from "@/lib/influencer/format";
+import { formatKRW, formatCount } from "@/lib/influencer/format";
 
 interface Props {
   data: KpiCardsType;
@@ -52,7 +54,7 @@ function KpiCard({ title, value, delta, icon, iconBg }: CardProps) {
 
 export default function KpiCards({ data }: Props) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2">
       <KpiCard
         title="전체 인플루언서"
         value={String(data.totalInfluencers.value)}
@@ -80,6 +82,24 @@ export default function KpiCards({ data }: Props) {
         delta={null}
         icon={<CurrencyKrw size={16} weight="duotone" className="text-amber-600" />}
         iconBg="bg-amber-50"
+      />
+      <KpiCard
+        title="총 조회수"
+        value={formatCount(data.totalResultViews.value)}
+        delta={null}
+        icon={<Eye size={16} weight="duotone" className="text-violet-600" />}
+        iconBg="bg-violet-50"
+      />
+      <KpiCard
+        title="1만 조회당 비용"
+        value={
+          data.costPer10kViews.value === null
+            ? "—"
+            : `${data.costPer10kViews.value.toLocaleString()}원`
+        }
+        delta={null}
+        icon={<ChartLineUp size={16} weight="duotone" className="text-rose-600" />}
+        iconBg="bg-rose-50"
       />
     </div>
   );

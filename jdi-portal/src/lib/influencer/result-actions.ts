@@ -42,26 +42,3 @@ export async function refreshCampaignResult(
     views: row.views ?? null,
   };
 }
-
-export interface SeedingHistory {
-  campaign_count: number;
-  done_count: number;
-  total_cost: number;
-  total_views: number;
-  total_likes: number;
-  total_comments: number;
-  avg_views: number | null;
-  cost_per_10k_views: number | null;
-}
-
-/** 인플루언서별 자사 실적. 팔로워 등급과 별개로 재섭외 판단에 쓴다. */
-export async function getSeedingHistory(influencerId: string): Promise<SeedingHistory | null> {
-  const { supabase } = await requireAuth();
-
-  const { data, error } = await supabase.rpc("get_influencer_seeding_history", {
-    p_influencer_id: influencerId,
-  });
-  if (error) throw new Error(`실적을 불러오지 못했습니다: ${error.message}`);
-
-  return (data as SeedingHistory) ?? null;
-}

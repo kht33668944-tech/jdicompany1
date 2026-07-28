@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { updateCampaignStatus } from "@/lib/influencer/actions";
 import CampaignStatusDropdown from "./CampaignStatusDropdown";
 import { CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
+import { formatCount } from "@/lib/influencer/format";
 import type { InfluencerCampaignWithInfluencer, CampaignStatus } from "@/lib/influencer/types";
 import {
   kstTodayStr,
@@ -134,6 +135,17 @@ function CampaignCard({
   }
   if (campaign.cost !== null) {
     metaParts.push(<span key="cost" className="tabular-nums">{formatCostShort(campaign.cost)}</span>);
+  }
+  // 성과·지급은 짧은 글자로만 — 보드가 무거워지지 않게 배지 컴포넌트를 쓰지 않는다.
+  if (campaign.result_views !== null) {
+    metaParts.push(
+      <span key="views" className="tabular-nums text-violet-600">
+        조회 {formatCount(campaign.result_views)}
+      </span>,
+    );
+  }
+  if (campaign.payout_status === "paid") {
+    metaParts.push(<span key="paid" className="text-emerald-600">지급완료</span>);
   }
 
   return (

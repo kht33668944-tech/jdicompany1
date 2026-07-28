@@ -149,31 +149,6 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.get_influencer_kpi_cards() TO authenticated;
 
--- ============================================================
--- 5) 인플루언서별 자사 실적
---    팔로워 기반 등급과 별개로, 우리와 실제로 낸 성과를 본다.
--- ============================================================
-CREATE OR REPLACE FUNCTION public.get_influencer_seeding_history(p_influencer_id uuid)
-RETURNS JSONB
-LANGUAGE sql
-STABLE
-SET search_path = public
-AS $$
-  SELECT jsonb_build_object(
-    'campaign_count', COUNT(*)::INT,
-    'done_count', COUNT(*) FILTER (WHERE status = 'done')::INT,
-    'total_cost', COALESCE(SUM(cost), 0)::BIGINT,
-    'total_views', COALESCE(SUM(result_views), 0)::BIGINT,
-    'total_likes', COALESCE(SUM(result_likes), 0)::BIGINT,
-    'total_comments', COALESCE(SUM(result_comments), 0)::BIGINT,
-    'avg_views', ROUND(AVG(result_views) FILTER (WHERE result_views IS NOT NULL)),
-    'cost_per_10k_views',
-      CASE WHEN COALESCE(SUM(result_views), 0) > 0
-           THEN ROUND(COALESCE(SUM(cost), 0) / (SUM(result_views) / 10000.0))
-           ELSE NULL END
-  )
-  FROM public.influencer_campaigns
-  WHERE influencer_id = p_influencer_id;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.get_influencer_seeding_history(uuid) TO authenticated;
+-- 참고: 인플루언서별 자사 실적은 별도 RPC 를 두지 않는다.
+-- 상세 패널이 그 인플루언서의 캠페인 전체를 이미 받아오므로 화면에서 합산하면
+-- 되고, RPC 를 두면 왕복만 한 번 늘어난다. (SeedingHistoryCard.tsx)

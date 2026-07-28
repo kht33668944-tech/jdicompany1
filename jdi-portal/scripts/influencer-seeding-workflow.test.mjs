@@ -133,7 +133,16 @@ test("112: KPI 는 단일 RPC 를 유지하고 성과 필드만 더한다", () =
   for (const f of ["total_result_views", "total_result_likes", "cost_per_10k_views"]) {
     assert.match(sql, new RegExp(`'${f}'`), `새 KPI 필드 ${f} 없음`);
   }
-  assert.match(sql, /FUNCTION public\.get_influencer_seeding_history\(p_influencer_id uuid\)/);
+});
+
+test("실적 카드: 추가 왕복 없이 이미 받은 캠페인으로 계산한다", () => {
+  const src = read("src/components/dashboard/influencer/result/SeedingHistoryCard.tsx");
+  assert.doesNotMatch(
+    src,
+    /rpc\(|createClient\(/,
+    "실적 카드가 따로 조회하면 상세 패널 왕복이 늘어납니다"
+  );
+  assert.match(src, /campaigns\.reduce/);
 });
 
 test("지급: 지출 생성과 캠페인 갱신이 한 트랜잭션(RPC)이다", () => {

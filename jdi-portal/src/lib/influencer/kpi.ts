@@ -6,6 +6,11 @@ export interface KpiRpcResult {
   active_campaign_count: number | null;
   done_campaign_count: number | null;
   total_seeding_cost: number | null;
+  // 성과 (마이그 112). 예전 응답에는 없을 수 있으므로 선택 필드로 둔다.
+  total_result_views?: number | null;
+  total_result_likes?: number | null;
+  total_result_comments?: number | null;
+  cost_per_10k_views?: number | null;
 }
 
 export function calcDeltaPct(current: number | null, prev: number | null): number | null {
@@ -23,5 +28,7 @@ export function mapKpiRpcResult(row: KpiRpcResult): KpiCards {
     activeCampaigns: { value: row.active_campaign_count ?? 0 },
     doneCampaigns: { value: row.done_campaign_count ?? 0 },
     totalSeedingCost: { value: row.total_seeding_cost ?? 0 },
+    totalResultViews: { value: row.total_result_views ?? 0 },
+    costPer10kViews: { value: row.cost_per_10k_views ?? null },
   };
 }

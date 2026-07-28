@@ -127,7 +127,9 @@ export async function getKpiCards(): Promise<KpiCards> {
       .from("influencers")
       .select("id", { count: "exact", head: true })
       .eq("status", "active"),
-    supabase.from("influencer_campaigns").select("status, cost"),
+    supabase
+      .from("influencer_campaigns")
+      .select("status, cost, result_views, result_likes, result_comments"),
     supabase
       .from("influencer_kpi_weekly_snapshots")
       .select("total_count")
@@ -143,10 +145,14 @@ export async function getKpiCards(): Promise<KpiCards> {
   const campaigns = (campaignRes.data ?? []) as {
     status: CampaignStatus;
     cost: number | null;
+    result_views: number | null;
+    result_likes: number | null;
+    result_comments: number | null;
   }[];
   const activeCount = campaigns.filter((c) => c.status !== "done").length;
   const doneCount = campaigns.filter((c) => c.status === "done").length;
   const totalCost = campaigns.reduce((acc, c) => acc + (c.cost ?? 0), 0);
+  const totalViews = campaigns.reduce((acc, c) => acc + (c.result_views ?? 0), 0);
 
   const totalCount = totalRes.count ?? 0;
   const prevTotal =
@@ -160,6 +166,10 @@ export async function getKpiCards(): Promise<KpiCards> {
     activeCampaigns: { value: activeCount },
     doneCampaigns: { value: doneCount },
     totalSeedingCost: { value: totalCost },
+    totalResultViews: { value: totalViews },
+    costPer10kViews: {
+      value: totalViews > 0 ? Math.round(totalCost / (totalViews / 10_000)) : null,
+    },
   };
 }
 
