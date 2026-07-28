@@ -16,6 +16,7 @@ import {
   Trash,
 } from "phosphor-react";
 import { toast } from "sonner";
+import type { ActivityLogEntry } from "@/lib/activity/types";
 import type { TodayAttendanceStatus } from "@/lib/attendance/types";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 import type { TaskStatus } from "@/lib/tasks/types";
@@ -34,6 +35,7 @@ import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
 import type { DirectivePendingCount } from "@/lib/directives/types";
 import MemberWorkPanel from "./MemberWorkPanel";
+import RecentActivityCard from "./RecentActivityCard";
 import TaskCreateModal from "@/components/dashboard/tasks/TaskCreateModal";
 import TaskDetailPanel from "@/components/dashboard/tasks/TaskDetailPanel";
 import TaskTitleEditForm from "@/components/dashboard/tasks/TaskTitleEditForm";
@@ -49,6 +51,7 @@ interface Props {
   schedules: ScheduleWithProfile[];
   defaultAssigneeFilter: string;
   directivePendingCounts: DirectivePendingCount[];
+  recentActivities: ActivityLogEntry[];
 }
 
 type StatusFilter = "all" | TaskStatus;
@@ -354,6 +357,7 @@ export default function TodayWorkBoardWidget({
   schedules,
   defaultAssigneeFilter,
   directivePendingCounts,
+  recentActivities,
 }: Props) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -881,6 +885,8 @@ export default function TodayWorkBoardWidget({
           </div>
         )}
       </section>
+
+      <RecentActivityCard activities={recentActivities} />
 
       <section className="overflow-hidden rounded-lg bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">

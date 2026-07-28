@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ActivityLogEntry } from "@/lib/activity/types";
 import { getWeekRange } from "@/lib/utils/date";
 import {
   getTodayAttendanceStatuses,
@@ -20,21 +21,7 @@ import {
   type PendingReviews,
 } from "./dashboard-snapshot";
 
-export interface RecentActivity {
-  id: string;
-  type: "comment" | "status_change" | "assignee_change" | "priority_change" | "attachment" | "checklist" | "edit";
-  content: string | null;
-  metadata: Record<string, unknown> | null;
-  task_title: string;
-  task_id: string;
-  user_name: string;
-  user_avatar: string | null;
-  created_at: string;
-}
-
-export interface DashboardData extends DashboardSnapshotData {
-  recentActivities: RecentActivity[];
-}
+export type DashboardData = DashboardSnapshotData;
 
 export function mapRpcDashboardTaskSummarySnapshot(
   snapshot: unknown,
@@ -197,6 +184,27 @@ async function getPendingReviews(
   };
 }
 
+/**
+ * 폴백 경로의 최근 활동 조회 (마이그레이션 117).
+ * 빠른 경로(fast-queries.ts 의 recent_activities CTE)와 반드시 같은 결과를 내야 한다.
+ * 한쪽만 고치면 운영에서만 안 보이는 사고가 난다 (성능 불변조건 3).
+ */
+async function getRecentActivities(
+  supabase: SupabaseClient,
+  window: DashboardTaskSummaryWindow
+): Promise<ActivityLogEntry[]> {
+  const { data, error } = await supabase
+    .from("activity_log")
+    .select("*")
+    .gte("created_at", window.dayStart)
+    .lt("created_at", window.nextDayStart)
+    .order("created_at", { ascending: false })
+    .limit(40);
+
+  if (error) throw error;
+  return (data ?? []) as ActivityLogEntry[];
+}
+
 export async function getDashboardData(
   supabase: SupabaseClient,
   userId: string,
@@ -217,6 +225,7 @@ export async function getDashboardData(
     pendingDirectives,
     directivePendingCounts,
     pendingReviews,
+    recentActivities,
   ] = await Promise.all([
     getTodayRecord(supabase, userId),
     getWeekRecords(supabase, userId, weekStart, weekEnd),
@@ -226,6 +235,7 @@ export async function getDashboardData(
     getPendingDirectives(supabase, userId),
     getDirectivePendingCounts(supabase),
     getPendingReviews(supabase, userId),
+    getRecentActivities(supabase, taskSummaryWindow),
   ]);
 
   const snapshotData = buildDashboardDataFromSnapshot({
@@ -237,14 +247,12 @@ export async function getDashboardData(
     pendingDirectives,
     directivePendingCounts,
     pendingReviews,
+    recentActivities,
   }, {
     userName,
     canViewCompanyWork,
     weekStart,
     now,
   });
-  return {
-    ...snapshotData,
-    recentActivities: [],
-  };
+  return snapshotData;
 }

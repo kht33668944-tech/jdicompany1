@@ -325,6 +325,25 @@ const DASHBOARD_SNAPSHOT_QUERY = `
     cross join parameters prm
     cross join approved_requester
     where r.reviewer_id = prm.user_id and r.state = 'submitted'
+  ),
+  -- 최근 활동(마이그레이션 117): 오늘(KST) 기록만. 같은 스냅샷 쿼리 안에서 처리해
+  -- DB 왕복을 늘리지 않는다. idx_activity_log_created_at 을 탄다.
+  -- 카드는 기본 8개만 보여주고 '더보기'로 나머지를 펼치므로 40개까지 싣는다.
+  recent_activities as (
+    select coalesce(
+      jsonb_agg(to_jsonb(a) order by a.created_at desc),
+      '[]'::jsonb
+    ) as value
+    from (
+      select al.*
+      from public.activity_log al
+      cross join parameters prm
+      cross join approved_requester
+      where al.created_at >= prm.day_start
+        and al.created_at < prm.next_day_start
+      order by al.created_at desc
+      limit 40
+    ) a
   )
   select jsonb_build_object(
     'todayRecord', coalesce((select value from today_record), 'null'::jsonb),
@@ -355,7 +374,8 @@ const DASHBOARD_SNAPSHOT_QUERY = `
     'pendingReviews', jsonb_build_object(
       'toFix', (select value from pending_reviews_to_fix),
       'toConfirm', (select value from pending_reviews_to_confirm)
-    )
+    ),
+    'recentActivities', (select value from recent_activities)
   ) as snapshot
   from approved_requester
 `;
@@ -528,10 +548,7 @@ async function getDashboardDataViaPostgres(
     weekStart,
     now,
   });
-  const data: DashboardData = {
-    ...snapshotDataWithSummary,
-    recentActivities: [],
-  };
+  const data: DashboardData = snapshotDataWithSummary;
 
   if (taskSummary.truncated) {
     logDashboardTaskSummary(requestId, "pool", "truncated", taskSummary);

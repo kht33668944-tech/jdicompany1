@@ -1,3 +1,4 @@
+import type { ActivityLogEntry } from "../activity/types";
 import type { AttendanceRecord, TodayAttendanceStatus } from "../attendance/types";
 import type { DirectivePendingCount, PendingDirective } from "../directives/types";
 import type { ScheduleWithProfile } from "../schedule/types";
@@ -18,6 +19,7 @@ export interface DashboardSnapshot {
   pendingDirectives: PendingDirective[];
   directivePendingCounts: DirectivePendingCount[];
   pendingReviews: PendingReviews;
+  recentActivities: ActivityLogEntry[];
 }
 
 export interface DashboardSnapshotContext {
@@ -34,7 +36,7 @@ export interface DashboardSnapshotData {
   taskSummary: DashboardTaskSummaryResult;
   todayAttendanceStatuses: TodayAttendanceStatus[];
   todaySchedules: ScheduleWithProfile[];
-  recentActivities: unknown[];
+  recentActivities: ActivityLogEntry[];
   nextScheduleMinutes: number | null;
   userName: string;
   canViewCompanyWork: boolean;
@@ -77,7 +79,8 @@ export function buildDashboardDataFromSnapshot(
     taskSummary: snapshot.taskSummary,
     todayAttendanceStatuses: snapshot.todayAttendanceStatuses,
     todaySchedules: snapshot.schedules,
-    recentActivities: [],
+    // 최근 활동 기능(117) 이전에 만들어진 스냅샷이 들어와도 화면이 깨지지 않도록 기본값을 둔다.
+    recentActivities: snapshot.recentActivities ?? [],
     nextScheduleMinutes,
     userName: context.userName,
     canViewCompanyWork: context.canViewCompanyWork,

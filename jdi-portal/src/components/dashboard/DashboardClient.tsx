@@ -111,6 +111,7 @@ export default function DashboardClient({
         schedules={data.todaySchedules}
         defaultAssigneeFilter={defaultTaskAssigneeFilter}
         directivePendingCounts={data.directivePendingCounts}
+        recentActivities={data.recentActivities}
       />
     </div>
   );
