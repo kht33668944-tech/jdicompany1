@@ -626,11 +626,13 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
     try {
       await updateCampaignStatus(campaignId, status);
       setCampaigns((prev) => prev.map((c) => c.id === campaignId ? { ...c, status } : c));
+      // 상태를 바꾸면 DB 트리거가 협의 이력을 남긴다. 다시 읽어야 화면에 바로 보인다.
+      reload();
       toast.success("상태가 변경되었습니다.");
     } catch {
       toast.error("상태 변경 실패");
     }
-  }, []);
+  }, [reload]);
 
   const handleDeleteCampaign = useCallback(async (campaignId: string) => {
     try {

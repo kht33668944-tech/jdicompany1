@@ -145,6 +145,29 @@ test("실적 카드: 추가 왕복 없이 이미 받은 캠페인으로 계산�
   assert.match(src, /campaigns\.reduce/);
 });
 
+test("삭제: RLS 로 막히면 거짓 성공을 내지 않는다", () => {
+  // Supabase delete 는 RLS 로 막혀도 오류 없이 0건을 지운다.
+  // .select() 로 실제 삭제 건수를 확인하지 않으면 "삭제했습니다" 토스트가 잘못 뜬다.
+  const doc = read("src/lib/influencer/document-actions.ts");
+  assert.match(doc, /\.delete\(\)[\s\S]{0,80}\.select\("id"\)/);
+  assert.match(doc, /deleted\.length === 0/);
+  assert.match(doc, /권한이 없습니다/);
+
+  const contact = read("src/lib/influencer/contact-actions.ts");
+  assert.match(contact, /\.delete\(\)[\s\S]{0,80}\.select\("id"\)/);
+  assert.match(contact, /deleted\.length === 0/);
+});
+
+test("협의 이력: 상태 변경 뒤 화면을 다시 읽는다", () => {
+  // 상태를 바꾸면 DB 트리거가 이력을 남기는데, 다시 읽지 않으면 화면에 안 보인다.
+  const src = read("src/components/dashboard/influencer/InfluencerDetailPanel.tsx");
+  assert.match(
+    src,
+    /updateCampaignStatus\([\s\S]{0,300}?reload\(\)/,
+    "handleStatusChange 가 reload() 를 불러야 자동 기록이 바로 보입니다"
+  );
+});
+
 test("지급: 지출 생성과 캠페인 갱신이 한 트랜잭션(RPC)이다", () => {
   const src = read("src/lib/influencer/contact-actions.ts");
   assert.match(
@@ -182,6 +205,20 @@ test("서류 업로드: 공용 검증 유틸을 쓰고 경로 규칙을 지킨�
   // 경로 2번째 조각이 general/sensitive 여야 스토리지 정책이 동작한다
   assert.match(src, /sensitive[\s\S]*general|general[\s\S]*sensitive/);
   assert.match(src, /INFLUENCER_DOC_BUCKET|"influencer-documents"/);
+});
+
+test("서류 업로드: 민감 서류는 올리기 전에 잠금을 먼저 확인한다", () => {
+  // 먼저 올리고 서버에서 막으면, 되돌리는 삭제가 관리자만 가능해서
+  // 일반 사용자에게는 Storage 에 찌꺼기 파일이 남는다.
+  const src = read("src/lib/influencer/document-storage.ts");
+  assert.match(src, /rpc\("has_vault_unlock"\)/);
+  assert.match(
+    src,
+    /documentFolder\(kind\) === "sensitive" && !\(await isVaultUnlocked\(\)\)/,
+    "업로드 직전에 민감 여부 + 잠금 상태를 함께 확인해야 합니다"
+  );
+  // 화면이 잠금 오류를 알아보고 비밀번호 창을 띄우려면 문구에 '잠금' 이 있어야 한다
+  assert.match(src, /잠금이 필요합니다/);
 });
 
 test("게이트: 잠금 해제·잠금이 DB 세션 RPC 를 거친다", () => {

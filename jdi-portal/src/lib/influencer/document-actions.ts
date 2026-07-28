@@ -155,11 +155,16 @@ export async function deleteInfluencerDocument(documentId: string): Promise<void
     .eq("document_id", documentId);
   if (vErr) throw new Error(`서류 이력을 읽지 못했습니다: ${vErr.message}`);
 
-  const { error: delErr } = await supabase
+  // RLS 로 막히면 오류 없이 0건이 지워진다. 지워졌는지 확인해야 거짓 성공을 막는다.
+  const { data: deleted, error: delErr } = await supabase
     .from("influencer_documents")
     .delete()
-    .eq("id", documentId);
+    .eq("id", documentId)
+    .select("id");
   if (delErr) throw new Error(`서류 삭제에 실패했습니다: ${delErr.message}`);
+  if (!deleted || deleted.length === 0) {
+    throw new Error("서류를 삭제할 권한이 없습니다. 관리자에게 요청해주세요.");
+  }
 
   // Storage 파일은 정리 큐에 맡긴다. 여기서 실패해도 DB 삭제를 되돌리지 않는다.
   const paths = (versions ?? []).map((v) => ({ path: v.storage_path as string }));

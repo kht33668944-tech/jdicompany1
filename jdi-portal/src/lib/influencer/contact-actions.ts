@@ -82,8 +82,16 @@ export async function addCampaignEvent(
 export async function deleteCampaignEvent(eventId: string): Promise<void> {
   const { supabase } = await requireAuth();
   // 삭제 가능 범위(본인이 쓴 note)는 RLS 가 강제한다.
-  const { error } = await supabase.from("influencer_campaign_events").delete().eq("id", eventId);
+  // RLS 로 막히면 오류 없이 0건이 지워지므로, 지워졌는지 확인해 거짓 성공을 막는다.
+  const { data: deleted, error } = await supabase
+    .from("influencer_campaign_events")
+    .delete()
+    .eq("id", eventId)
+    .select("id");
   if (error) throw new Error(`기록 삭제에 실패했습니다: ${error.message}`);
+  if (!deleted || deleted.length === 0) {
+    throw new Error("이 기록은 지울 수 없습니다. 자동으로 남은 기록이거나 다른 사람이 쓴 기록입니다.");
+  }
   revalidatePath("/dashboard/influencer");
 }
 
