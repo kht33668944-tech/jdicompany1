@@ -3,7 +3,8 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { encryptSecret, decryptSecret, signUnlock, verifyUnlockToken } from "./crypto";
+import { encryptSecret, decryptSecret, signUnlock } from "./crypto";
+import { requireUnlock } from "./gate";
 import { VAULT_BUCKET, VAULT_UNLOCK_COOKIE, VAULT_UNLOCK_TTL_SEC } from "./constants";
 import { getDocumentVersions, getProfileNameMap } from "./queries";
 import type {
@@ -23,15 +24,6 @@ async function requireAuth() {
 
 function requireAdmin(role: string) {
   if (role !== "admin") throw new Error("관리자만 할 수 있는 작업입니다.");
-}
-
-/** 계정 탭 잠금 해제 상태 확인. 미해제면 throw. */
-async function requireUnlock(userId: string) {
-  const store = await cookies();
-  const token = store.get(VAULT_UNLOCK_COOKIE)?.value;
-  if (!verifyUnlockToken(token, userId)) {
-    throw new Error("잠금이 필요합니다. 2차 비밀번호를 입력해주세요.");
-  }
 }
 
 // ============================================================
@@ -210,7 +202,9 @@ export async function deleteDocument(documentId: string) {
 // ============================================================
 export async function unlockVault(password: string): Promise<{ ok: boolean }> {
   const { supabase, user } = await requireAuth();
-  const { data, error } = await supabase.rpc("verify_vault_gate", { p_password: password });
+  // vault_unlock: 비밀번호 검증 + DB 잠금 세션 생성(20분).
+  // Storage RLS 가 이 세션을 보므로, 쿠키만 세우면 민감 파일이 열리지 않는다.
+  const { data, error } = await supabase.rpc("vault_unlock", { p_password: password });
   if (error) throw new Error(`잠금 해제에 실패했습니다: ${error.message}`);
   if (data !== true) return { ok: false };
 
@@ -228,6 +222,9 @@ export async function unlockVault(password: string): Promise<{ ok: boolean }> {
 }
 
 export async function lockVault() {
+  const { supabase } = await requireAuth();
+  const { error } = await supabase.rpc("vault_lock");
+  if (error) throw new Error(`잠금에 실패했습니다: ${error.message}`);
   const store = await cookies();
   store.delete(VAULT_UNLOCK_COOKIE);
 }

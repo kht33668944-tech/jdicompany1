@@ -80,3 +80,28 @@ test("111: 캠페인에 배송·지급 컬럼 추가", () => {
   }
   assert.match(sql, /payout_status[\s\S]*?CHECK[\s\S]*?'none'[\s\S]*?'pending'[\s\S]*?'paid'/);
 });
+
+test("게이트: requireUnlock 이 공유 모듈로 분리되고 중복 정의가 없다", () => {
+  assert.ok(exists("src/lib/vault/gate.ts"), "src/lib/vault/gate.ts 가 없습니다");
+  const gate = read("src/lib/vault/gate.ts");
+  assert.match(gate, /export async function requireUnlock\(userId: string\)/);
+
+  const actions = read("src/lib/vault/actions.ts");
+  assert.doesNotMatch(
+    actions,
+    /^async function requireUnlock/m,
+    "vault/actions.ts 에 requireUnlock 중복 정의가 남아 있습니다"
+  );
+  assert.match(actions, /from "\.\/gate"/);
+});
+
+test("게이트: 잠금 해제·잠금이 DB 세션 RPC 를 거친다", () => {
+  const actions = read("src/lib/vault/actions.ts");
+  assert.match(actions, /rpc\("vault_unlock"/, "unlockVault 가 vault_unlock RPC 를 써야 합니다");
+  assert.match(actions, /rpc\("vault_lock"\)/, "lockVault 가 vault_lock RPC 를 써야 합니다");
+  assert.doesNotMatch(
+    actions,
+    /rpc\("verify_vault_gate"/,
+    "쿠키만 세우면 DB 세션이 없어 스토리지가 막힙니다"
+  );
+});
