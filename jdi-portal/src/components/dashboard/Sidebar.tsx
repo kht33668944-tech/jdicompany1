@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import { useProjects } from "@/lib/projects/useProjects";
@@ -18,6 +19,7 @@ import GearSix from "phosphor-react/dist/icons/GearSix.esm.js";
 import SignOut from "phosphor-react/dist/icons/SignOut.esm.js";
 import Receipt from "phosphor-react/dist/icons/Receipt.esm.js";
 import Archive from "phosphor-react/dist/icons/Archive.esm.js";
+import CaretDown from "phosphor-react/dist/icons/CaretDown.esm.js";
 
 interface SidebarProps {
   user: { email: string; name: string; avatarUrl?: string | null };
@@ -46,8 +48,10 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
   const searchParams = useSearchParams();
   const { activeProjects } = useProjects();
   const onTimeline = pathname.startsWith("/dashboard/work-timeline");
+  // 업무 타임라인 하위 목록(프로젝트 필터) 펼침/접힘 — 기본은 접힘
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const currentProject = searchParams.get("project") ?? "";
-  const timelineSubItems = onTimeline ? [
+  const timelineSubItems = onTimeline && timelineOpen ? [
     { value: "", label: "전체", color: null as string | null },
     ...activeProjects.map((project) => ({
       value: project.id,
@@ -79,12 +83,26 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
         {navItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
+          const isTimelineItem = item.href === "/dashboard/work-timeline";
           return (
             <div key={item.href}>
               <Link
                 href={item.href}
                 prefetch={false}
-                onClick={onMobileClose}
+                onClick={(event) => {
+                  if (isTimelineItem && !collapsed) {
+                    if (pathname === "/dashboard/work-timeline") {
+                      // 이미 타임라인 목록 화면 → 이동 없이 하위 목록만 펼치기/접기
+                      event.preventDefault();
+                      setTimelineOpen((prev) => !prev);
+                      return;
+                    }
+                    // 다른 화면(상세 포함)에서는 목록으로 이동하면서 펼치기
+                    setTimelineOpen(true);
+                  }
+                  onMobileClose();
+                }}
+                aria-expanded={isTimelineItem && !collapsed ? (onTimeline && timelineOpen) : undefined}
                 className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                   active
                     ? "bg-brand-50 text-brand-600 shadow-sm"
@@ -102,8 +120,18 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
                 {collapsed && item.href === "/dashboard/chat" && chatUnreadCount > 0 && (
                   <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-blue-600 rounded-full" />
                 )}
+                {!collapsed && isTimelineItem && onTimeline && (
+                  <CaretDown
+                    size={14}
+                    weight="bold"
+                    aria-hidden="true"
+                    className={`ml-auto shrink-0 transition-transform duration-200 ${
+                      timelineOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                )}
               </Link>
-              {!collapsed && item.href === "/dashboard/work-timeline" && onTimeline && (
+              {!collapsed && isTimelineItem && onTimeline && timelineOpen && (
                 <div className="mt-1 space-y-0.5 pl-9 pr-1">
                   {timelineSubItems.map((sub) => {
                     const subActive = currentProject === sub.value;
