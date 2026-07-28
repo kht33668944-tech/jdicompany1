@@ -1,5 +1,26 @@
 const MAX_XLSX_ROWS = 5_000;
 
+/**
+ * 게시물 주소를 비교용으로 다듬는다.
+ * 시딩에 저장된 post_url 과 influencer_posts.post_url 이 끝 슬래시·쿼리스트링
+ * 차이로 어긋나는 것을 막는다.
+ *
+ * ⚠️ 규칙은 supabase/migrations/112 의 public.normalize_post_url() 과 동기 유지.
+ *    (SQL 쪽은 호스트 소문자화를 하지 않는다 — 저장값이 이미 소문자 호스트다)
+ */
+export function normalizePostUrl(url: string | null | undefined): string | null {
+  const raw = url?.trim();
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const path = parsed.pathname.replace(/\/+$/, "");
+    return `${parsed.protocol}//${host}${path}`;
+  } catch {
+    return null;
+  }
+}
+
 export interface ParsedUrl {
   raw: string;
   url: string;

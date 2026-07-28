@@ -95,6 +95,47 @@ test("게이트: requireUnlock 이 공유 모듈로 분리되고 중복 정의�
   assert.match(actions, /from "\.\/gate"/);
 });
 
+const MIG_112 = "supabase/migrations/112_influencer_campaign_results.sql";
+
+test("112: 성과 컬럼 + 정규화 함수 + 매칭 인덱스", () => {
+  assert.ok(exists(MIG_112), `${MIG_112} 이 없습니다`);
+  const sql = read(MIG_112);
+  for (const c of ["result_likes", "result_comments", "result_views", "result_captured_at"]) {
+    assert.match(sql, new RegExp(`ADD COLUMN IF NOT EXISTS ${c}`), `${c} 컬럼 없음`);
+  }
+  assert.match(sql, /FUNCTION public\.normalize_post_url\(p_url text\)[\s\S]*?IMMUTABLE/);
+  assert.match(sql, /idx_influencer_posts_normalized_url/);
+  assert.doesNotMatch(sql, /CURRENT_DATE/);
+});
+
+test("112: 정규화 규칙이 TS 와 동기 유지 주석으로 묶여 있다", () => {
+  const sql = read(MIG_112);
+  const ts = read("src/lib/influencer/url.ts");
+  assert.match(sql, /url\.ts[\s\S]*?normalizePostUrl/, "SQL 에 TS 동기 유지 주석이 없습니다");
+  assert.match(ts, /112[\s\S]*?normalize_post_url/, "TS 에 SQL 동기 유지 주석이 없습니다");
+  assert.match(ts, /export function normalizePostUrl/);
+});
+
+test("112: 성과 갱신은 매칭 실패 시 기존 값을 지우지 않는다", () => {
+  const sql = read(MIG_112);
+  assert.match(sql, /FUNCTION public\.refresh_campaign_result\(p_campaign_id uuid\)/);
+  // 못 찾으면 UPDATE 없이 빠져나가야 한다
+  assert.match(sql, /IF NOT FOUND THEN\s*RETURN;/);
+});
+
+test("112: KPI 는 단일 RPC 를 유지하고 성과 필드만 더한다", () => {
+  const sql = read(MIG_112);
+  assert.match(sql, /FUNCTION public\.get_influencer_kpi_cards\(\)/);
+  // 기존 필드 유지 (화면 호환)
+  for (const f of ["total_count", "active_campaign_count", "done_campaign_count", "total_seeding_cost"]) {
+    assert.match(sql, new RegExp(`'${f}'`), `기존 KPI 필드 ${f} 가 사라졌습니다`);
+  }
+  for (const f of ["total_result_views", "total_result_likes", "cost_per_10k_views"]) {
+    assert.match(sql, new RegExp(`'${f}'`), `새 KPI 필드 ${f} 없음`);
+  }
+  assert.match(sql, /FUNCTION public\.get_influencer_seeding_history\(p_influencer_id uuid\)/);
+});
+
 test("지급: 지출 생성과 캠페인 갱신이 한 트랜잭션(RPC)이다", () => {
   const src = read("src/lib/influencer/contact-actions.ts");
   assert.match(

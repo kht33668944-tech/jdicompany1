@@ -423,6 +423,24 @@ export async function linkPostToCampaign(
     .single();
 
   if (error) throw error;
+
+  // 연결하는 즉시 성과 수치를 캠페인에 복사한다.
+  // 실패해도 연결 자체는 성공으로 둔다(나중에 '성과 새로고침'으로 다시 시도 가능).
+  const { data: result } = await supabase.rpc("refresh_campaign_result", {
+    p_campaign_id: campaign_id,
+  });
+  const copied = Array.isArray(result) ? result[0] : null;
+
   revalidatePath("/dashboard/influencer");
-  return data as InfluencerCampaign;
+  return {
+    ...(data as InfluencerCampaign),
+    ...(copied
+      ? {
+          result_likes: copied.likes ?? null,
+          result_comments: copied.comments ?? null,
+          result_views: copied.views ?? null,
+          result_captured_at: new Date().toISOString(),
+        }
+      : {}),
+  } as InfluencerCampaign;
 }
