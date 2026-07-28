@@ -145,6 +145,16 @@ test("실적 카드: 추가 왕복 없이 이미 받은 캠페인으로 계산�
   assert.match(src, /campaigns\.reduce/);
 });
 
+test("게이트: 쿠키 서명이 실패하면 DB 잠금 세션을 되돌린다", () => {
+  // 되돌리지 않으면 Storage 는 열려 있는데 앱은 잠긴 어긋난 상태가 20분 남는다.
+  const src = read("src/lib/vault/actions.ts");
+  assert.match(
+    src,
+    /signUnlock\([\s\S]{0,600}?catch[\s\S]{0,120}?rpc\("vault_lock"\)/,
+    "unlockVault 는 쿠키 설정 실패 시 vault_lock 으로 세션을 되돌려야 합니다"
+  );
+});
+
 test("삭제: RLS 로 막히면 거짓 성공을 내지 않는다", () => {
   // Supabase delete 는 RLS 로 막혀도 오류 없이 0건을 지운다.
   // .select() 로 실제 삭제 건수를 확인하지 않으면 "삭제했습니다" 토스트가 잘못 뜬다.

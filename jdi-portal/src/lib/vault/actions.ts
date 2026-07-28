@@ -208,16 +208,23 @@ export async function unlockVault(password: string): Promise<{ ok: boolean }> {
   if (error) throw new Error(`잠금 해제에 실패했습니다: ${error.message}`);
   if (data !== true) return { ok: false };
 
-  const expEpochSec = Math.floor(Date.now() / 1000) + VAULT_UNLOCK_TTL_SEC;
-  const token = signUnlock(user.id, expEpochSec);
-  const store = await cookies();
-  store.set(VAULT_UNLOCK_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: VAULT_UNLOCK_TTL_SEC,
-  });
+  // 쿠키 서명이 실패하면(예: ACCOUNT_VAULT_KEY 미설정) 방금 만든 DB 세션을 되돌린다.
+  // 되돌리지 않으면 "DB 는 열렸는데 앱은 잠긴" 어긋난 상태로 20분간 남는다.
+  try {
+    const expEpochSec = Math.floor(Date.now() / 1000) + VAULT_UNLOCK_TTL_SEC;
+    const token = signUnlock(user.id, expEpochSec);
+    const store = await cookies();
+    store.set(VAULT_UNLOCK_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: VAULT_UNLOCK_TTL_SEC,
+    });
+  } catch (err) {
+    await supabase.rpc("vault_lock");
+    throw err;
+  }
   return { ok: true };
 }
 
