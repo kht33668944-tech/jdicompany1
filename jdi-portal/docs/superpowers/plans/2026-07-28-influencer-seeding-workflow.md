@@ -11,6 +11,14 @@
 **설계서:** `jdi-portal/docs/superpowers/specs/2026-07-28-influencer-seeding-workflow-design.md`
 **작업 브랜치:** `worktree-influencer-seeding-workflow-spec` (PR #3)
 
+> **구현 완료 (2026-07-28).** 실제 코드와 다른 점 3가지는 설계서에 반영해 두었다.
+>
+> 1. **서류 업로드는 브라우저에서** 하고 서버 액션은 메타데이터만 받는다. 계획서에는 `file: File` 을 서버로 넘기는 것처럼 적혀 있었으나, 보관함(`vault/storage.ts`)이 이미 브라우저 업로드 방식이라 그대로 따랐다. Next 서버 액션의 본문 크기 제한도 피할 수 있다.
+> 2. **`get_influencer_seeding_history` RPC 를 만들지 않았다.** 상세 패널이 캠페인 전체를 이미 받아오므로 화면에서 합산하면 되고, RPC 를 두면 왕복만 늘어난다. `SeedingHistoryCard.tsx` 가 계산하고, 정적 검사가 별도 조회를 하지 않는지 확인한다.
+> 3. **지급 RPC(`mark_campaign_paid`)를 `111` 에 넣었다.** 아직 운영 DB 에 적용 전이라 `113` 을 새로 만들 필요가 없었다.
+>
+> **운영 DB 적용은 아직 하지 않았다.** 코드와 마이그레이션이 반드시 함께 올라가야 한다(§ 배포 주의).
+
 ---
 
 ## Context

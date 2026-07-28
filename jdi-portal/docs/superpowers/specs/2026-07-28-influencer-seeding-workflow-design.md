@@ -110,7 +110,21 @@ RLS: `is_approved_user()` 기준 SELECT / INSERT / UPDATE / DELETE 허용. INSER
 - 인덱스: `influencer_documents (influencer_id, kind)`, `influencer_document_versions (document_id, version_no DESC)`
 - 재계약 시 같은 문서에 버전을 올리면 이전 계약서가 남는다. 이것이 별도 표를 두는 이유다.
 - RLS: SELECT / INSERT / UPDATE 는 `is_approved_user()`. DELETE 는 관리자만(`vault_documents` 와 동일 기준).
-- **민감 서류 열람 제한은 RLS가 아니라 서버 액션의 잠금 게이트로 건다** (§4.7). RLS만으로는 쿠키 기반 잠금을 표현할 수 없기 때문이다. 파일 자체는 비공개 버킷에 있어 서명 URL 없이는 받을 수 없다.
+- **민감 서류 열람 제한은 Storage RLS가 강제한다.** 잠금 상태를 쿠키가 아니라 DB(`vault_unlock_sessions`)에 두고, Storage 정책이 그 표를 보게 만들었다 (§4.6). 서버 액션의 쿠키 확인은 1차 방어일 뿐이고, 쿠키를 우회해도 파일에 닿을 수 없다.
+
+#### 새 테이블: `vault_unlock_sessions`
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `user_id` | uuid PK | `auth.users(id)` ON DELETE CASCADE |
+| `unlocked_at` | timestamptz | |
+| `expires_at` | timestamptz NOT NULL | 잠금 해제 후 20분 |
+
+- RLS: **SELECT 정책만 둔다(본인 것).** INSERT / UPDATE / DELETE 정책을 두지 않는 것이 핵심이다. 정책을 열면 사용자가 스스로 행을 넣어 비밀번호 없이 잠금을 풀 수 있다.
+- 기록은 `SECURITY DEFINER` 함수로만 이뤄진다.
+  - `public.vault_unlock(p_password TEXT)` — 기존 `verify_vault_gate()` 로 검증한 뒤 세션 생성. 비밀번호 해시 방식은 건드리지 않는다(기존 2차 비밀번호가 그대로 동작)
+  - `public.vault_lock()` — 본인 세션 삭제
+  - `public.has_vault_unlock()` — Storage 정책이 호출하는 유효성 확인
 
 #### Storage 버킷: `influencer-documents`
 
@@ -118,9 +132,17 @@ RLS: `is_approved_user()` 기준 SELECT / INSERT / UPDATE / DELETE 허용. INSER
 ('influencer-documents', 'influencer-documents', FALSE, 10485760)
 ```
 
-비공개, 10MB 제한. `vault-documents` 와 같은 설정이다. 경로 규칙은 `{influencer_id}/{document_id}/{version_no}-{파일명}`.
+비공개, 10MB 제한. `vault-documents` 와 같은 설정이다.
 
-storage 정책은 `is_approved_user()` 기준 읽기·쓰기, 삭제는 관리자. 파일 내려받기는 항상 **서버에서 발급한 단기 서명 URL**로만 한다.
+**경로 규칙: `{influencer_id}/{general|sensitive}/{uuid}.{ext}`** — 2번째 조각이 잠금 여부를 결정하므로 정책과 코드가 이 규칙을 공유한다.
+
+```sql
+bucket_id = 'influencer-documents'
+AND public.is_approved_user()
+AND (split_part(name, '/', 2) <> 'sensitive' OR public.has_vault_unlock())
+```
+
+읽기·쓰기 모두 이 조건을 쓰고, 삭제는 관리자만. 파일 내려받기는 항상 **서버 액션이 발급한 60초짜리 서명 URL**로만 한다.
 
 #### 새 테이블: `influencer_document_cleanup_queue`
 
@@ -194,16 +216,9 @@ storage 정책은 `is_approved_user()` 기준 읽기·쓰기, 삭제는 관리�
 
 기존 필드는 그대로 두어 화면 호환을 유지한다. 단일 왕복 구조도 유지한다.
 
-#### 새 RPC: `get_influencer_seeding_history(p_influencer_id uuid)`
+#### 인플루언서별 실적은 RPC를 두지 않는다
 
-해당 인플루언서와 진행한 시딩의 실적을 반환한다.
-
-- `campaign_count`, `done_count`
-- `total_cost`, `total_views`, `total_likes`, `total_comments`
-- `avg_views` — 성과가 기록된 건 기준 평균
-- `cost_per_10k_views`
-
-권한 상승이 필요 없으므로 `SECURITY INVOKER` 로 만들고 접근 제어는 `influencer_campaigns` 의 RLS에 맡긴다.
+상세 패널이 그 인플루언서의 캠페인 전체를 이미 받아오므로, 실적(시딩 횟수·총 원가·총 조회·평균 조회·1만 조회당 비용)은 화면에서 합산한다. RPC를 두면 왕복만 한 번 늘어난다. 계산은 `SeedingHistoryCard.tsx` 에 있고, 정적 검사가 이 컴포넌트에서 별도 조회를 하지 않는지 확인한다.
 
 #### 인덱스
 
@@ -271,34 +286,54 @@ unmarkCampaignPaid(campaignId: string, deleteExpense: boolean): Promise<void>
 
 ### 4.5 서류 보관과 잠금 게이트
 
-새 파일 `src/lib/influencer/document-actions.ts`.
+파일 업로드는 **브라우저에서** 하고 서버 액션은 메타데이터만 받는다. 보관함(`src/lib/vault/storage.ts` + `actions.ts`)이 쓰는 방식 그대로다.
+
+`src/lib/influencer/document-storage.ts` (브라우저)
 
 ```
-uploadInfluencerDocument(influencerId: string, input: { kind: DocumentKind; title: string; note?: string; file: File }): Promise<void>
-addDocumentVersion(documentId: string, file: File): Promise<void>
+documentFolder(kind: DocumentKind): "sensitive" | "general"
+uploadInfluencerDocumentFile(influencerId: string, kind: DocumentKind, file: File): Promise<UploadedFileMeta>
+removeInfluencerDocumentFile(path: string): Promise<void>
+```
+
+`src/lib/influencer/document-actions.ts` (서버)
+
+```
+createInfluencerDocument(input: { influencerId; kind; title; note? }, file: UploadedFileMeta): Promise<string>
+addDocumentVersion(documentId: string, file: UploadedFileMeta): Promise<void>
 getDocumentDownloadUrl(versionId: string): Promise<string>
 deleteInfluencerDocument(documentId: string): Promise<void>
 ```
 
+`UploadedFileMeta` 는 `@/lib/vault/types` 의 기존 타입(`{ storagePath, fileName, fileSize, mimeType }`)을 재사용한다.
+
 동작 규칙:
 
-1. 업로드 전 `src/lib/utils/upload.ts` 의 `validateFile()` 로 확장자·용량(10MB)을 검증한다. 새 검증 로직을 만들지 않는다.
+1. 업로드 전 `src/lib/utils/upload.ts` 의 `validateFile()` 로 확장자·용량(10MB)을 검증한다. 새 검증 로직을 만들지 않는다. 서버 기록이 실패하면 방금 올린 파일을 지워 고아 파일을 남기지 않는다.
 2. `kind` 가 `id_card` 또는 `bankbook` 이면 `is_sensitive` 가 TRUE 로 강제된다(DB 트리거). 액션은 이 값을 클라이언트에서 받지 않는다.
-3. **민감 서류(`is_sensitive = TRUE`)를 올리거나 내려받거나 지우려면 잠금이 풀려 있어야 한다.** 잠금 확인은 §4.7 의 공유 함수를 쓴다.
+3. **민감 서류(`is_sensitive = TRUE`)를 올리거나 내려받거나 지우려면 잠금이 풀려 있어야 한다.** 잠금 확인은 §4.6 의 공유 함수를 쓴다.
 4. `getDocumentDownloadUrl()` 은 유효기간 60초짜리 서명 URL만 반환한다. 경로를 클라이언트에 그대로 주지 않는다.
 5. 삭제 시 DB 행을 지우고 `influencer_document_cleanup_queue` 에 `storage_path` 를 넣는다. Storage 삭제 실패가 DB 작업을 막지 않게 한다.
 
 ### 4.6 잠금 게이트 공유 (기존 코드 정리)
 
-보관함의 잠금 확인 함수 `requireUnlock()` 은 현재 `src/lib/vault/actions.ts` 안의 **비공개 함수**라 다른 도메인에서 쓸 수 없다.
+보관함의 잠금에는 두 가지 문제가 있었다.
 
-이 함수를 `src/lib/vault/gate.ts` 로 옮겨 `export` 하고, `vault/actions.ts` 와 `influencer/document-actions.ts` 가 함께 import 한다. 함수 본문(쿠키 읽기 → `verifyUnlockToken()` → 실패 시 예외)은 그대로 옮기기만 한다.
+1. 확인 함수 `requireUnlock()` 이 `src/lib/vault/actions.ts` 안의 **비공개 함수**라 다른 도메인에서 쓸 수 없다.
+2. **서명 쿠키만 검사**하므로, 승인된 사용자가 서버 액션을 거치지 않고 Storage 를 직접 호출하면 잠금이 의미가 없다.
+
+두 가지를 함께 해결한다.
+
+**(1) 함수 분리** — `requireUnlock()` 을 `src/lib/vault/gate.ts` 로 옮겨 `export` 하고, `vault/actions.ts` 와 `influencer/document-actions.ts` 가 함께 import 한다. 본문(쿠키 읽기 → `verifyUnlockToken()` → 실패 시 예외)은 그대로 옮기기만 한다.
+
+**(2) DB 세션으로 서버 강제** — `unlockVault()` 가 `verify_vault_gate` 대신 `vault_unlock` RPC 를 부른다. 이 RPC 는 비밀번호를 검증하고 `vault_unlock_sessions` 에 20분짜리 행을 남긴다. Storage 정책이 `has_vault_unlock()` 으로 그 행을 보므로, **쿠키를 위조해도 민감 파일에는 닿을 수 없다.** `lockVault()` 는 `vault_lock` RPC 로 세션을 지우고 쿠키도 지운다.
 
 - 서명 키는 기존 `ACCOUNT_VAULT_KEY` 를 그대로 쓴다. **새 환경변수가 필요 없다.**
-- 잠금 쿠키(`vault_unlock`)와 유지 시간(20분)도 공유한다. 보관함을 풀면 인플루언서 민감 서류도 함께 열린다. 자물쇠를 하나만 기억하면 되므로 4명 규모에서는 이 편이 낫다.
-- 화면에서 잠금이 안 걸려 있으면 보관함과 같은 2차 비밀번호 입력창을 띄운다. 기존 컴포넌트를 재사용한다.
+- 서비스 롤 키를 Next 앱에 들이지 않는다. 보안 경계를 RLS 하나로 유지한다(저장소 원칙).
+- 잠금 쿠키(`vault_unlock`)와 유지 시간(20분)을 보관함과 공유한다. 보관함을 풀면 인플루언서 민감 서류도 함께 열린다. 자물쇠를 하나만 기억하면 되므로 4명 규모에서는 이 편이 낫다.
+- 화면에서 잠금 오류가 나면 2차 비밀번호 입력창(`UnlockPrompt`)을 띄우고, 해제 후 하던 작업을 자동으로 다시 시도한다.
 
-이 이동은 새 기능이 이미 있는 잠금을 그대로 쓰기 위한 최소 변경이며, 동작은 바뀌지 않는다.
+비밀번호 해시 방식(`verify_vault_gate`)은 건드리지 않으므로 기존 2차 비밀번호가 그대로 동작한다.
 
 ### 4.7 성과 복사·갱신
 
