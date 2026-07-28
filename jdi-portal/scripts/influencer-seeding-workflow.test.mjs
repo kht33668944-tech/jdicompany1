@@ -95,6 +95,20 @@ test("게이트: requireUnlock 이 공유 모듈로 분리되고 중복 정의�
   assert.match(actions, /from "\.\/gate"/);
 });
 
+test("지급: 지출 생성과 캠페인 갱신이 한 트랜잭션(RPC)이다", () => {
+  const src = read("src/lib/influencer/contact-actions.ts");
+  assert.match(
+    src,
+    /rpc\("mark_campaign_paid"/,
+    "지출만 생기고 캠페인이 안 바뀌는 부분 성공을 막으려면 단일 RPC 여야 합니다"
+  );
+  assert.doesNotMatch(
+    src,
+    /from\("expenses"\)\s*\.insert/,
+    "지출을 액션에서 직접 insert 하면 부분 성공이 생깁니다"
+  );
+});
+
 test("서류 액션: 민감 서류 경로 전부가 잠금을 확인한다", () => {
   const p = "src/lib/influencer/document-actions.ts";
   assert.ok(exists(p), `${p} 가 없습니다`);

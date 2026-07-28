@@ -1,3 +1,5 @@
+import type { PayoutStatus } from "./contact-types";
+
 export type InfluencerGrade = "S" | "A" | "B" | "C" | "UNRATED";
 export type InfluencerStatus = "active" | "archived";
 export type CampaignStatus =
@@ -88,6 +90,17 @@ export interface InfluencerCampaign {
   actual_post_date: string | null;
   post_url: string | null;
   notes: string | null;
+  // 배송·지급 (마이그 111)
+  courier: string | null;
+  tracking_number: string | null;
+  payout_status: PayoutStatus;
+  paid_at: string | null;
+  expense_id: string | null;
+  // 성과 스냅샷 (마이그 112) — 게시물이 최근 목록에서 밀려나도 남도록 복사해 보관
+  result_likes: number | null;
+  result_comments: number | null;
+  result_views: number | null;
+  result_captured_at: string | null;
   created_at: string;
   updated_at: string;
 }

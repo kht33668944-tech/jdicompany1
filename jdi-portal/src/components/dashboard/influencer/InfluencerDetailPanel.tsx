@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { InfluencerWithPosts, InfluencerCampaign, CampaignStatus, InfluencerPost } from "@/lib/influencer/types";
@@ -55,7 +55,9 @@ import Tag from "phosphor-react/dist/icons/Tag.esm.js";
 import NotePencil from "phosphor-react/dist/icons/NotePencil.esm.js";
 import PencilSimple from "phosphor-react/dist/icons/PencilSimple.esm.js";
 import InfluencerContactSection from "./contact/InfluencerContactSection";
+import CampaignFulfillmentFields from "./contact/CampaignFulfillmentFields";
 import InfluencerDocumentSection from "./documents/InfluencerDocumentSection";
+import CampaignEventTimeline from "./events/CampaignEventTimeline";
 import type {
   InfluencerCampaignEvent,
   InfluencerContact,
@@ -406,6 +408,19 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
   // 서류·이력이 바뀌면 올려서 다시 읽는다
   const [reloadKey, setReloadKey] = useState(0);
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+  const [openEventsId, setOpenEventsId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // 캠페인별 협의 이력 — 한 번 받아온 목록을 캠페인 기준으로 나눈다
+  const eventsByCampaign = useMemo(() => {
+    const map = new Map<string, InfluencerCampaignEvent[]>();
+    for (const event of events) {
+      const list = map.get(event.campaign_id);
+      if (list) list.push(event);
+      else map.set(event.campaign_id, [event]);
+    }
+    return map;
+  }, [events]);
 
   const [phase, setPhase] = useState<PanelPhase>("closed");
   const [prevId, setPrevId] = useState<string | null>(null);
@@ -465,6 +480,11 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
     let cancelled = false;
     setLoading(true);
     const supabase = createClient();
+
+    // 내가 쓴 기록만 삭제 버튼을 보여주기 위한 값. 로컬 쿠키 디코드라 네트워크 왕복이 없다.
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled) setCurrentUserId(data.session?.user.id ?? null);
+    });
 
     Promise.all([
       supabase
@@ -1094,6 +1114,35 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                         {c.notes && (
                           <p className="text-xs text-slate-500 leading-relaxed">{c.notes}</p>
                         )}
+
+                        {/* 배송·지급 */}
+                        <div className="pt-2 border-t border-slate-200/70 space-y-1.5">
+                          <CampaignFulfillmentFields campaign={c} onChanged={reload} />
+                        </div>
+
+                        {/* 협의 이력 */}
+                        <div className="pt-2 border-t border-slate-200/70">
+                          <button
+                            onClick={() =>
+                              setOpenEventsId(openEventsId === c.id ? null : c.id)
+                            }
+                            aria-expanded={openEventsId === c.id}
+                            className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            협의 이력 {eventsByCampaign.get(c.id)?.length ?? 0}건
+                            {openEventsId === c.id ? " 접기" : " 보기"}
+                          </button>
+                          {openEventsId === c.id && (
+                            <div className="mt-2">
+                              <CampaignEventTimeline
+                                campaignId={c.id}
+                                currentUserId={currentUserId}
+                                events={eventsByCampaign.get(c.id) ?? []}
+                                onChanged={reload}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )
                   ))}
