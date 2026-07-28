@@ -54,6 +54,13 @@ import Trash from "phosphor-react/dist/icons/Trash.esm.js";
 import Tag from "phosphor-react/dist/icons/Tag.esm.js";
 import NotePencil from "phosphor-react/dist/icons/NotePencil.esm.js";
 import PencilSimple from "phosphor-react/dist/icons/PencilSimple.esm.js";
+import InfluencerContactSection from "./contact/InfluencerContactSection";
+import InfluencerDocumentSection from "./documents/InfluencerDocumentSection";
+import type {
+  InfluencerCampaignEvent,
+  InfluencerContact,
+  InfluencerDocumentWithVersions,
+} from "@/lib/influencer/contact-types";
 
 type PanelPhase = "closed" | "opening" | "open" | "closing";
 
@@ -392,6 +399,14 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 시딩 실무 정보 — 아래 데이터 로드의 같은 Promise.all 에서 병렬로 받는다(왕복 증가 없음)
+  const [contact, setContact] = useState<InfluencerContact | null>(null);
+  const [documents, setDocuments] = useState<InfluencerDocumentWithVersions[]>([]);
+  const [events, setEvents] = useState<InfluencerCampaignEvent[]>([]);
+  // 서류·이력이 바뀌면 올려서 다시 읽는다
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+
   const [phase, setPhase] = useState<PanelPhase>("closed");
   const [prevId, setPrevId] = useState<string | null>(null);
 
@@ -436,6 +451,9 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       setPhase("closed");
       setInfluencer(null);
       setCampaigns([]);
+      setContact(null);
+      setDocuments([]);
+      setEvents([]);
       setError(null);
     }, 220);
     return () => clearTimeout(t);
@@ -476,11 +494,44 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
           if (error) throw error;
           return (data ?? []) as InfluencerCampaign[];
         }),
+      // 연락처 — 없을 수 있으므로 maybeSingle
+      supabase
+        .from("influencer_contacts")
+        .select("*")
+        .eq("influencer_id", influencerId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return (data ?? null) as InfluencerContact | null;
+        }),
+      // 서류 + 버전 (한 번에 중첩 조회 → 서류 개수만큼 왕복하지 않는다)
+      supabase
+        .from("influencer_documents")
+        .select("*, versions:influencer_document_versions(*)")
+        .eq("influencer_id", influencerId)
+        .order("created_at", { ascending: false })
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return (data ?? []) as InfluencerDocumentWithVersions[];
+        }),
+      // 협의 이력 — 캠페인을 기다리지 않도록 내부 조인으로 인플루언서 기준 한 번에 가져온다
+      supabase
+        .from("influencer_campaign_events")
+        .select("*, influencer_campaigns!inner(influencer_id)")
+        .eq("influencer_campaigns.influencer_id", influencerId)
+        .order("created_at", { ascending: false })
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return (data ?? []) as InfluencerCampaignEvent[];
+        }),
     ])
-      .then(([inf, cams]) => {
+      .then(([inf, cams, cont, docs, evts]) => {
         if (cancelled) return;
         setInfluencer(inf);
         setCampaigns(cams);
+        setContact(cont);
+        setDocuments(docs);
+        setEvents(evts);
         setNotes(inf.notes ?? "");
         setTags(inf.tags ?? []);
       })
@@ -493,7 +544,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       });
 
     return () => { cancelled = true; };
-  }, [influencerId]);
+  }, [influencerId, reloadKey]);
 
   // ── ESC 닫기 / body scroll lock ──
   useEffect(() => {
@@ -913,6 +964,33 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                   </div>
                 </div>
               )}
+
+              {/* 배송·정산 연락처 */}
+              <InfluencerContactSection
+                influencerId={influencer.id}
+                contact={contact}
+                onSaved={(input) =>
+                  setContact((prev) =>
+                    prev
+                      ? { ...prev, ...input }
+                      : ({
+                          id: "",
+                          influencer_id: influencer.id,
+                          created_by: null,
+                          created_at: new Date().toISOString(),
+                          updated_at: new Date().toISOString(),
+                          ...input,
+                        } as InfluencerContact)
+                  )
+                }
+              />
+
+              {/* 서류 — 계약서·신분증 사본·통장 사본 */}
+              <InfluencerDocumentSection
+                influencerId={influencer.id}
+                documents={documents}
+                onChanged={reload}
+              />
 
               {/* 캠페인 */}
               <div className="space-y-3">

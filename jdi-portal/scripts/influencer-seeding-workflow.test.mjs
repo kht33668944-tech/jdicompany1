@@ -95,6 +95,31 @@ test("게이트: requireUnlock 이 공유 모듈로 분리되고 중복 정의�
   assert.match(actions, /from "\.\/gate"/);
 });
 
+test("서류 액션: 민감 서류 경로 전부가 잠금을 확인한다", () => {
+  const p = "src/lib/influencer/document-actions.ts";
+  assert.ok(exists(p), `${p} 가 없습니다`);
+  const src = read(p);
+  assert.match(src, /from "@\/lib\/vault\/gate"/);
+  const unlockCalls = (src.match(/await requireUnlock\(/g) ?? []).length;
+  assert.ok(
+    unlockCalls >= 3,
+    `업로드·다운로드·삭제 3곳에서 requireUnlock 이 필요합니다 (현재 ${unlockCalls})`
+  );
+  // 공개 URL 금지 — 서명 URL 만 허용
+  assert.doesNotMatch(src, /getPublicUrl/);
+  assert.match(src, /createSignedUrl\(/);
+});
+
+test("서류 업로드: 공용 검증 유틸을 쓰고 경로 규칙을 지킨다", () => {
+  const p = "src/lib/influencer/document-storage.ts";
+  assert.ok(exists(p), `${p} 가 없습니다`);
+  const src = read(p);
+  assert.match(src, /validateFile/);
+  // 경로 2번째 조각이 general/sensitive 여야 스토리지 정책이 동작한다
+  assert.match(src, /sensitive[\s\S]*general|general[\s\S]*sensitive/);
+  assert.match(src, /INFLUENCER_DOC_BUCKET|"influencer-documents"/);
+});
+
 test("게이트: 잠금 해제·잠금이 DB 세션 RPC 를 거친다", () => {
   const actions = read("src/lib/vault/actions.ts");
   assert.match(actions, /rpc\("vault_unlock"/, "unlockVault 가 vault_unlock RPC 를 써야 합니다");
