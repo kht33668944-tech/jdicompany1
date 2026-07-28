@@ -16,6 +16,7 @@ JDI는 **자사 제품**을 인플루언서에게 보내 게시물을 얻는 시
 | 2. 제안 DM 발송 | 상태값 `dm_sent`만. 발송 내용·답장 기록 없음 |
 | 3. 단가·조건 협의 | `cost` 한 칸. 협의 이력 없음 |
 | 4. 주소·연락처 수령 | **저장 위치 없음** |
+| 4-2. 계약서 작성·보관, 신분증·통장 사본 수령 | **저장 위치 없음.** 인플루언서에 파일을 붙이는 구조가 전혀 없다 (보관함은 법인 전용) |
 | 5. 제품 발송 | `ship_date`만. 택배사·송장번호 없음 |
 | 6. 게시물 확인 | `post_url` 문자열만 저장 |
 | 7. 성과 수집 | **캠페인에 수치가 없음.** KPI는 인원수·건수·비용뿐 |
@@ -31,9 +32,10 @@ JDI는 **자사 제품**을 인플루언서에게 보내 게시물을 얻는 시
 ### 목표
 
 1. 시딩 1건을 처리하는 데 필요한 정보(연락처·주소·정산·협의 이력·배송 추적)를 모두 사이트 안에 둔다.
-2. 캠페인에 연결된 게시물의 성과 수치를 캠페인에 복사·보관하고 집계한다.
-3. 인플루언서별 **자사 실적**(원가 대비 성과)을 재섭외 판단 근거로 제공한다.
-4. 지급 완료 시 지출관리에 자동 반영한다.
+2. **정산에 필요한 서류(계약서·신분증 사본·통장 사본)를 인플루언서별로 올리고 보관한다.**
+3. 캠페인에 연결된 게시물의 성과 수치를 캠페인에 복사·보관하고 집계한다.
+4. 인플루언서별 **자사 실적**(원가 대비 성과)을 재섭외 판단 근거로 제공한다.
+5. 지급 완료 시 지출관리에 자동 반영한다.
 
 ### 비목표 (YAGNI)
 
@@ -42,6 +44,9 @@ JDI는 **자사 제품**을 인플루언서에게 보내 게시물을 얻는 시
 - 제안 DM 자동 발송 — 인스타그램 정책·계정 위험. 초안 생성도 이번 범위 밖
 - 계좌 정보 암호화·권한 분리 — 사용자 결정에 따라 일반 컬럼으로 둔다 (§7 참고)
 - 성과 수치 자동 정기 갱신 — 사용자 결정에 따라 수동 버튼만
+- **계약서 자동 작성(양식에 정보를 채워 PDF 생성)** — 사용자 결정에 따라 이번엔 업로드·보관까지만. 나중에 붙이기 쉽도록 문서 종류에 `contract` 를 두고 `influencer_documents` 를 확장 가능한 형태로 만든다
+- **전자서명** — 계약서 자동 작성이 들어간 뒤에 검토할 사항
+- **서류 보유기간·파기 관리** — 사용자 결정에 따라 이번 범위 밖. 다만 §9 에 남는 위험으로 기록한다
 
 ## 3. 데이터 설계
 
@@ -69,6 +74,66 @@ JDI는 **자사 제품**을 인플루언서에게 보내 게시물을 얻는 시
 | `created_at` / `updated_at` | timestamptz | `updated_at` 트리거 |
 
 RLS: `is_approved_user()` 기준 SELECT / INSERT / UPDATE / DELETE 허용. INSERT 시 `created_by = auth.uid()`.
+
+#### 새 테이블: `influencer_documents` / `influencer_document_versions`
+
+정산에 필요한 서류를 인플루언서별로 보관한다. 구조는 보관함(`106_vault.sql`)의 `vault_documents` / `vault_document_versions` 를 그대로 따른다. 보관함 쪽은 `corporation_id` 가 NOT NULL 이라 인플루언서에 붙일 수 없어 같은 모양의 표를 새로 만든다.
+
+`influencer_documents`
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | uuid PK | |
+| `influencer_id` | uuid NOT NULL | `influencers(id)` ON DELETE CASCADE |
+| `kind` | text NOT NULL | CHECK `('contract','id_card','bankbook','etc')` |
+| `title` | text NOT NULL | |
+| `note` | text | |
+| `is_sensitive` | boolean NOT NULL | `kind IN ('id_card','bankbook')` 이면 TRUE. 트리거로 강제해 클라이언트가 낮출 수 없게 한다 |
+| `created_by` | uuid | `profiles(id)` |
+| `created_at` / `updated_at` | timestamptz | |
+
+`influencer_document_versions`
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| `id` | uuid PK | |
+| `document_id` | uuid NOT NULL | `influencer_documents(id)` ON DELETE CASCADE |
+| `storage_path` | text NOT NULL | |
+| `file_name` | text | |
+| `file_size` | bigint | |
+| `mime_type` | text | |
+| `version_no` | int NOT NULL | |
+| `is_current` | boolean NOT NULL DEFAULT TRUE | |
+| `uploaded_by` | uuid | `profiles(id)` |
+| `uploaded_at` | timestamptz DEFAULT now() | |
+
+- 인덱스: `influencer_documents (influencer_id, kind)`, `influencer_document_versions (document_id, version_no DESC)`
+- 재계약 시 같은 문서에 버전을 올리면 이전 계약서가 남는다. 이것이 별도 표를 두는 이유다.
+- RLS: SELECT / INSERT / UPDATE 는 `is_approved_user()`. DELETE 는 관리자만(`vault_documents` 와 동일 기준).
+- **민감 서류 열람 제한은 RLS가 아니라 서버 액션의 잠금 게이트로 건다** (§4.7). RLS만으로는 쿠키 기반 잠금을 표현할 수 없기 때문이다. 파일 자체는 비공개 버킷에 있어 서명 URL 없이는 받을 수 없다.
+
+#### Storage 버킷: `influencer-documents`
+
+```
+('influencer-documents', 'influencer-documents', FALSE, 10485760)
+```
+
+비공개, 10MB 제한. `vault-documents` 와 같은 설정이다. 경로 규칙은 `{influencer_id}/{document_id}/{version_no}-{파일명}`.
+
+storage 정책은 `is_approved_user()` 기준 읽기·쓰기, 삭제는 관리자. 파일 내려받기는 항상 **서버에서 발급한 단기 서명 URL**로만 한다.
+
+#### 새 테이블: `influencer_document_cleanup_queue`
+
+문서를 지울 때 Storage 파일이 고아로 남는 것을 막는다. `work_timeline_storage_cleanup_queue`(098) 패턴을 따르되, 경로 첫 조각이 `influencer_id` 이므로 CHECK 제약도 그에 맞춘다.
+
+| 컬럼 | 타입 |
+|---|---|
+| `id` | uuid PK |
+| `path` | text NOT NULL UNIQUE |
+| `attempts` | integer NOT NULL DEFAULT 0 |
+| `last_error` | text |
+| `last_attempt_at` | timestamptz |
+| `created_at` | timestamptz DEFAULT now() |
 
 #### 새 테이블: `influencer_campaign_events`
 
@@ -147,9 +212,10 @@ RLS: `is_approved_user()` 기준 SELECT / INSERT / UPDATE / DELETE 허용. INSER
 
 ## 4. 서버 액션 설계
 
-기존 `src/lib/influencer/actions.ts` 는 이미 400줄대이므로 여기에 더하지 않고, 새 액션은 다음 두 파일에 나눠 넣는다.
+기존 `src/lib/influencer/actions.ts` 는 이미 400줄대이므로 여기에 더하지 않고, 새 액션은 다음 세 파일에 나눠 넣는다.
 
 - `src/lib/influencer/contact-actions.ts` — 연락처·정산·배송·지급
+- `src/lib/influencer/document-actions.ts` — 서류 업로드·열람·버전·삭제
 - `src/lib/influencer/result-actions.ts` — 성과 복사·갱신
 
 기존 `linkPostToCampaign()` 만 예외적으로 `actions.ts` 에 남긴 채 확장한다(호출부가 이미 그 경로를 쓰고 있다).
@@ -203,7 +269,38 @@ unmarkCampaignPaid(campaignId: string, deleteExpense: boolean): Promise<void>
 
 지출 생성이 실패하면 캠페인 상태도 바꾸지 않는다. 두 작업을 하나의 RPC(`SECURITY INVOKER`)로 묶어 부분 성공을 막는다.
 
-### 4.5 성과 복사·갱신
+### 4.5 서류 보관과 잠금 게이트
+
+새 파일 `src/lib/influencer/document-actions.ts`.
+
+```
+uploadInfluencerDocument(influencerId: string, input: { kind: DocumentKind; title: string; note?: string; file: File }): Promise<void>
+addDocumentVersion(documentId: string, file: File): Promise<void>
+getDocumentDownloadUrl(versionId: string): Promise<string>
+deleteInfluencerDocument(documentId: string): Promise<void>
+```
+
+동작 규칙:
+
+1. 업로드 전 `src/lib/utils/upload.ts` 의 `validateFile()` 로 확장자·용량(10MB)을 검증한다. 새 검증 로직을 만들지 않는다.
+2. `kind` 가 `id_card` 또는 `bankbook` 이면 `is_sensitive` 가 TRUE 로 강제된다(DB 트리거). 액션은 이 값을 클라이언트에서 받지 않는다.
+3. **민감 서류(`is_sensitive = TRUE`)를 올리거나 내려받거나 지우려면 잠금이 풀려 있어야 한다.** 잠금 확인은 §4.7 의 공유 함수를 쓴다.
+4. `getDocumentDownloadUrl()` 은 유효기간 60초짜리 서명 URL만 반환한다. 경로를 클라이언트에 그대로 주지 않는다.
+5. 삭제 시 DB 행을 지우고 `influencer_document_cleanup_queue` 에 `storage_path` 를 넣는다. Storage 삭제 실패가 DB 작업을 막지 않게 한다.
+
+### 4.6 잠금 게이트 공유 (기존 코드 정리)
+
+보관함의 잠금 확인 함수 `requireUnlock()` 은 현재 `src/lib/vault/actions.ts` 안의 **비공개 함수**라 다른 도메인에서 쓸 수 없다.
+
+이 함수를 `src/lib/vault/gate.ts` 로 옮겨 `export` 하고, `vault/actions.ts` 와 `influencer/document-actions.ts` 가 함께 import 한다. 함수 본문(쿠키 읽기 → `verifyUnlockToken()` → 실패 시 예외)은 그대로 옮기기만 한다.
+
+- 서명 키는 기존 `ACCOUNT_VAULT_KEY` 를 그대로 쓴다. **새 환경변수가 필요 없다.**
+- 잠금 쿠키(`vault_unlock`)와 유지 시간(20분)도 공유한다. 보관함을 풀면 인플루언서 민감 서류도 함께 열린다. 자물쇠를 하나만 기억하면 되므로 4명 규모에서는 이 편이 낫다.
+- 화면에서 잠금이 안 걸려 있으면 보관함과 같은 2차 비밀번호 입력창을 띄운다. 기존 컴포넌트를 재사용한다.
+
+이 이동은 새 기능이 이미 있는 잠금을 그대로 쓰기 위한 최소 변경이며, 동작은 바뀌지 않는다.
+
+### 4.7 성과 복사·갱신
 
 ```
 refreshCampaignResult(campaignId: string): Promise<CampaignResult | null>
@@ -217,7 +314,7 @@ refreshCampaignResult(campaignId: string): Promise<CampaignResult | null>
 
 `linkPostToCampaign()`(기존 함수)도 확장해, 게시물을 연결하는 순간 위 복사를 함께 수행한다.
 
-### 4.6 정규화 규칙
+### 4.8 정규화 규칙
 
 `normalizePostUrl()` 은 다음을 적용한다.
 
@@ -243,6 +340,13 @@ SQL 쪽은 동일 규칙을 표현하는 불변 함수 `public.normalize_post_ur
     은행 · 계좌번호 · 예금주
     [수정] → 인라인 편집
   ───────────────────────────────
+  서류                                      ← InfluencerDocumentSection (신규)
+    계약서 (v2)          2026-07-20  [보기] [새 버전]
+    신분증 사본 🔒       2026-07-18  [보기]
+    통장 사본  🔒        2026-07-18  [보기]
+    [+ 서류 올리기]
+    · 🔒 표시는 2차 비밀번호를 풀어야 열림
+  ───────────────────────────────
   자사 시딩 실적                            ← SeedingHistoryCard (신규)
     3회 · 총 원가 90,000원 · 총 조회 114,000
     평균 조회 38,000 · 1만 조회당 7,900원
@@ -260,6 +364,9 @@ SQL 쪽은 동일 규칙을 표현하는 불변 함수 `public.normalize_post_ur
 | `influencer/contact/InfluencerContactSection.tsx` | 연락처·정산 표시와 편집 |
 | `influencer/contact/CampaignFulfillmentFields.tsx` | 택배사·송장·지급 체크 |
 | `influencer/contact/PayoutConfirmDialog.tsx` | 지급일·결제수단 확인 후 지출 생성 |
+| `influencer/documents/InfluencerDocumentSection.tsx` | 서류 목록·업로드·버전 |
+| `influencer/documents/DocumentUploadModal.tsx` | 종류 선택 + 파일 선택 + 검증 |
+| `influencer/documents/DocumentVersionList.tsx` | 버전 이력, 이전 버전 열람 |
 | `influencer/events/CampaignEventTimeline.tsx` | 협의 이력 목록 + 메모 입력 |
 | `influencer/result/CampaignResultBadge.tsx` | 조회·좋아요·댓글 배지, 갱신 버튼 |
 | `influencer/result/SeedingHistoryCard.tsx` | 인플루언서별 자사 실적 |
@@ -285,13 +392,23 @@ SQL 쪽은 동일 규칙을 표현하는 불변 함수 `public.normalize_post_ur
 
 `node --test` 정적 검사. 기존 `work-directives.test.mjs` 형식을 따른다.
 
-1. `111` / `112` 마이그레이션에 새 테이블 3종의 `ENABLE ROW LEVEL SECURITY` 가 있는지
+1. `111` 이 만드는 새 테이블 5종(`influencer_contacts`, `influencer_documents`, `influencer_document_versions`, `influencer_document_cleanup_queue`, `influencer_campaign_events`) 모두에 `ENABLE ROW LEVEL SECURITY` 가 있는지
 2. `influencer_campaign_events` 에 UPDATE 정책이 **없는지**(기록 불변)
 3. `expenses.source` CHECK 에 `'seeding'` 이 포함되는지
 4. `'인플루언서 시딩'` 카테고리가 `is_sensitive = FALSE` 로 시드되는지
 5. SQL에 KST 변환 없는 `CURRENT_DATE` / `NOW()::date` 가 없는지
 6. `normalizePostUrl()`(TS)과 `normalize_post_url()`(SQL)이 양쪽에 모두 존재하고 동기 유지 주석이 있는지
 7. `markCampaignPaid` 경로가 지출 생성 실패 시 캠페인을 갱신하지 않는지(단일 RPC 사용 여부 정적 확인)
+
+서류 관련:
+
+8. `influencer-documents` 버킷이 `public = FALSE` 로 생성되는지
+9. `influencer_documents.kind` CHECK 에 4종(`contract`/`id_card`/`bankbook`/`etc`)이 있는지
+10. `is_sensitive` 를 강제하는 트리거가 있는지 (클라이언트가 민감 표시를 낮출 수 없어야 한다)
+11. `document-actions.ts` 의 민감 서류 경로 3곳(업로드·다운로드·삭제)이 모두 잠금 확인 함수를 호출하는지
+12. `getDocumentDownloadUrl()` 이 `createSignedUrl` 을 쓰고 `getPublicUrl` 을 쓰지 않는지
+13. `requireUnlock` 이 `vault/gate.ts` 에서 export 되고, `vault/actions.ts` 에 중복 정의가 남아 있지 않은지
+14. 업로드 경로가 `validateFile()` 을 거치는지
 
 ### 6.2 단위 테스트 — `scripts/influencer-post-url.test.mjs`
 
@@ -314,7 +431,11 @@ SQL 쪽은 동일 규칙을 표현하는 불변 함수 `public.normalize_post_ur
 
 | 결정 | 선택 | 근거 |
 |---|---|---|
-| 정산 정보 보관 | 일반 컬럼, 승인 사용자 전원 조회 | 사용자 결정. 직원 4명 전원이 정산에 관여함. 필요해지면 `is_sensitive` 카테고리처럼 나중에 권한을 분리할 수 있게 `influencer_contacts` 를 별도 테이블로 두었다 |
+| 정산 정보(계좌번호 등 텍스트) 보관 | 일반 컬럼, 승인 사용자 전원 조회 | 사용자 결정. 직원 4명 전원이 정산에 관여함. 필요해지면 나중에 권한을 분리할 수 있게 `influencer_contacts` 를 별도 테이블로 두었다 |
+| 신분증·통장 **사본 파일** | 비공개 버킷 + 2차 비밀번호 잠금 | 사용자 결정. 주민등록번호가 담긴 사본은 개인정보보호법상 고유식별정보라 접근을 제한해야 한다. 보관함 잠금을 재사용하므로 추가 개발과 새 환경변수가 없다 |
+| 계약서 작성 | 이번엔 업로드·보관만 | 사용자 결정. 자동 작성은 다음 단계. `kind='contract'` 를 미리 두어 나중에 생성된 PDF를 같은 표에 넣을 수 있다 |
+| 서류 버전 관리 | 넣는다 | 재계약 시 이전 계약서가 사라지면 안 된다. 보관함에 이미 검증된 구조가 있어 비용이 낮다 |
+| 서류 파기 관리 | 이번엔 뺀다 | 사용자 결정. §9 에 남는 위험으로 기록 |
 | 성과 갱신 시점 | 수동 버튼만 | 사용자 결정. 외부 수집 비용이 발생하지 않고 동작이 예측 가능하다 |
 | 지급 → 지출 | 자동 생성(확인 창 1회) | 사용자 결정. 결제수단은 NOT NULL이라 물어봐야 하므로 확인 창에서 지급일과 함께 받는다 |
 | 성과 수치 보관 방식 | 캠페인 행에 복사 | 게시물이 최근 목록에서 밀려나면 원본이 사라진다 |
@@ -324,14 +445,19 @@ SQL 쪽은 동일 규칙을 표현하는 불변 함수 `public.normalize_post_ur
 
 | 단계 | 내용 | 사용자가 체감하는 것 |
 |---|---|---|
-| 1 | 마이그 `111` 작성·적용 | — |
+| 1 | 마이그 `111` 작성·적용 (연락처·서류·이력·캠페인 컬럼·버킷) | — |
 | 2 | 연락처 액션 + `InfluencerContactSection` | 주소를 카톡에서 찾지 않아도 됨 |
-| 3 | 협의 이력 액션 + `CampaignEventTimeline` + 상태 변경 트리거 | 협의 내용이 남음 |
-| 4 | 배송 필드 + 지급 체크 + 지출 자동 생성 | 송장·지급 관리가 사이트 안에서 끝남 |
-| 5 | 마이그 `112` + `normalize_post_url` + 성과 복사·갱신 | 성과 숫자가 자동으로 붙음 |
-| 6 | KPI 확장 + `SeedingHistoryCard` | 엑셀 정리가 사라지고 재섭외 판단 근거가 생김 |
+| 3 | `vault/gate.ts` 분리 + 서류 업로드·열람·버전 UI | **계약서·신분증 사본이 사이트에 보관됨** |
+| 4 | 협의 이력 액션 + `CampaignEventTimeline` + 상태 변경 트리거 | 협의 내용이 남음 |
+| 5 | 배송 필드 + 지급 체크 + 지출 자동 생성 | 송장·지급 관리가 사이트 안에서 끝남 |
+| 6 | 마이그 `112` + `normalize_post_url` + 성과 복사·갱신 | 성과 숫자가 자동으로 붙음 |
+| 7 | KPI 확장 + `SeedingHistoryCard` | 엑셀 정리가 사라지고 재섭외 판단 근거가 생김 |
 
-각 단계는 독립적으로 배포 가능하다. 1~4는 `111` 한 번으로, 5~6은 `112` 한 번으로 커버된다.
+각 단계는 독립적으로 배포 가능하다. 1~5는 `111` 한 번으로, 6~7은 `112` 한 번으로 커버된다.
+
+3단계를 2단계 바로 뒤에 두는 이유: 정산을 하려면 서류가 먼저 있어야 하고, 5단계(지급)가 서류 없이 먼저 열리면 실무 순서가 뒤집힌다.
+
+배포 전 확인: 운영 환경에 `ACCOUNT_VAULT_KEY` 가 이미 설정되어 있어야 한다(보관함 때문에 설정되어 있음). 없으면 잠금 게이트가 동작하지 않는다.
 
 ## 9. 위험과 대응
 
@@ -342,3 +468,6 @@ SQL 쪽은 동일 규칙을 표현하는 불변 함수 `public.normalize_post_ur
 | KPI RPC 변경이 대시보드 속도에 영향 | `test:performance` 로 검증. 반환 필드만 추가하고 왕복 수는 유지 |
 | `InfluencerDetailPanel.tsx` 가 더 비대해짐 | 신규 UI를 전부 하위 컴포넌트로 분리. 패널은 배치만 담당 |
 | 상태 변경 트리거가 배치·마이그레이션에서 오작동 | `auth.uid()` 가 NULL이면 기록을 건너뜀 |
+| **신분증 사본의 보유기간·파기가 관리되지 않음** | 이번 범위에서 제외한 항목이라 **위험이 남아 있다.** 개인정보는 목적이 끝나면 파기해야 하며, 사본이 무기한 쌓인다. 다음 단계 후보로 기록해 둔다: 정산 완료 후 N개월이 지난 민감 서류를 목록으로 보여주고 사람이 확인해 지우는 화면 |
+| 잠금 쿠키를 보관함과 공유해, 보관함을 푼 사람이 서류도 볼 수 있음 | 의도된 설계다(§4.6). 4명 전원이 정산에 관여하므로 자물쇠를 나누지 않는다. 나눠야 할 상황이 오면 쿠키를 분리하면 된다 |
+| 서류 삭제 시 Storage 파일이 남음 | 정리 큐에 넣고 관리자가 처리. DB 삭제는 Storage 실패에 막히지 않는다 |
