@@ -26,13 +26,18 @@ npm run lint
 | 경로 | 내용 |
 |---|---|
 | `package.json` | Railway/Railpack용 루트 래퍼 스크립트 |
+| `CLAUDE.md` | 저장소 구조·아키텍처·성능 불변조건 (작업 전 필독) |
 | `AGENTS.md` | 저장소 루트 작업 지침 |
 | `jdi-portal/` | 실제 Next.js 16 포털 앱 |
 | `jdi-portal/AGENTS.md` | 앱 작업 지침 |
 | `jdi-portal/README.md` | 앱 실행과 구조 안내 |
+| `jdi-desktop/` | Windows 데스크톱 앱(Electron 껍데기, 별도 npm 프로젝트) |
+| `jdi-desktop/README.md` | 데스크톱 앱 사용·배포·자동 업데이트 안내 |
 
 ## 주의
 
 - 실제 환경 변수와 키는 커밋하지 않습니다.
 - 앱 코드 변경 전 `jdi-portal/AGENTS.md`를 확인합니다.
 - DB, RLS, Edge Function 작업은 `jdi-portal/supabase/CLAUDE.md`를 확인합니다.
+- 코드를 고쳤으면 `cd jdi-portal && npm run test:performance`로 속도 회귀가 없는지 확인합니다.
+- 데스크톱 앱은 웹을 배포하면 자동 반영됩니다. `jdi-desktop/`은 트레이·자동 실행 같은 껍데기 동작을 바꿀 때만 건드립니다.

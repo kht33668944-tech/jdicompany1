@@ -4,11 +4,12 @@ JDICOMPANY 내부 포털입니다. 비개발자 운영자가 쓰는 업무 도�
 
 ## 현재 스택
 
-- Next.js 16.2.11 App Router, React 19.2.4, TypeScript strict
+- Next.js 16.2.11 App Router, React 19.2.4, TypeScript strict, Node ≥ 22
 - Tailwind CSS 4, ESLint 9
 - Supabase Auth, Postgres, RLS, Storage, Realtime, Edge Functions
-- 주요 라이브러리: `@supabase/ssr`, `@supabase/supabase-js`, `@hello-pangea/dnd`, `phosphor-react`, `recharts`, `sonner`, `xlsx`, `idb`, `pg`
+- 주요 라이브러리: `@supabase/ssr`, `@supabase/supabase-js`, `@hello-pangea/dnd`, `phosphor-react`, `recharts`, `sonner`, `xlsx`(CDN tarball 고정), `idb`, `pg`
 - 배포: Railway 루트 래퍼에서 `jdi-portal` 빌드
+- 데스크톱 껍데기: `jdi-desktop/` (Electron, 별도 npm 프로젝트 — 웹 배포만으로 자동 반영)
 
 ## 앱 기능 영역
 
@@ -20,11 +21,14 @@ JDICOMPANY 내부 포털입니다. 비개발자 운영자가 쓰는 업무 도�
 - 일정: 월/주/일/목록 뷰, 참여자, 공개 범위, 휴가 연동
 - 리포트: 생성, 상세, 빠른 패널
 - 인플루언서: 캠페인, 시딩 일정, 등급/지표, 미디어, 자동 분석 Edge Function
-- 업무 타임라인: 업무 기록 타임라인, 파일 첨부, 프로젝트별 필터
+- 업무 타임라인: 업무 기록 타임라인, 파일 첨부, 프로젝트별 필터, 사이드바 하위 목록 접기/펴기
+- 업무보고 검토: 검토 요청 → 보완(글+첨부) 제출 → 승인/반려, 대시보드 검토 인박스, 재촉 알림
 - 지출관리: 고정/변동 지출, 분류·색상, 결제수단, 영수증, 변동성 금액 확정, 캘린더, 엑셀 다운로드
 - 프로젝트: 프로젝트 분류(색상·보관), 타임라인·업무 연동, 접두어 자동 분류
 - 업무지시: 포털 내 업무 지시·수락/거절, 미확인 배지, 재촉 알림
-- 설정: 프로필, 계정, 알림, 앱 설치, 관리자 섹션
+- 보관함: 서류(파일)와 계정(아이디/비밀번호). 계정 비밀번호는 `ACCOUNT_VAULT_KEY`로 암호화하고 2차 비밀번호 게이트를 통과해야 열람
+- 최근 활동: 대시보드 요약 카드 + `/dashboard/activity` 전체 보기. 기록은 DB 트리거가 쌓고 문장은 TS에서 조립하며, 개인 일정은 제외
+- 설정: 프로필, 계정, 알림, 앱 설치, Windows 데스크톱 앱 내려받기 카드, 관리자 섹션
 
 ## 경로 규칙
 
@@ -36,8 +40,13 @@ JDICOMPANY 내부 포털입니다. 비개발자 운영자가 쓰는 업무 도�
 | 도메인 로직 | `src/lib/<domain>/` |
 | Supabase 클라이언트 | `src/lib/supabase/` |
 | 공용 유틸 | `src/lib/utils/`, `src/lib/hooks/` |
+| 세션 갱신 진입점 | `src/proxy.ts` (Next 16 — `middleware.ts` 아님) |
+| 서버 시작 훅(풀 warm-up) | `src/instrumentation.ts` |
+| Route Handler | `src/app/api/<name>/route.ts` |
 | DB 마이그레이션 | `supabase/migrations/NNN_*.sql` |
 | Edge Function | `supabase/functions/<name>/index.ts` |
+| SQL RLS 점검 스크립트 | `supabase/tests/*.sql` |
+| 회귀 테스트 | `scripts/*.test.mjs` |
 | 설계/계획 문서 | `docs/superpowers/specs/`, `docs/superpowers/plans/` |
 
 `@/*`는 `./src/*`를 가리킵니다.
@@ -50,9 +59,20 @@ npm run build
 npm run lint
 ```
 
+검증(코드를 고쳤으면 최소한 `test:performance`는 돌립니다):
+
+```bash
+npm run test:performance      # 성능·아키텍처 회귀 검사
+npm run test:security
+npm run test:expenses
+npm run test:search-privacy
+npm run perf:audit            # 빌드 후 실행
+```
+
 Supabase 작업:
 
 ```bash
+npx supabase migration list --linked   # 새 번호 잡기 전 확인
 npx supabase db push --linked
 npx supabase functions deploy <name> --no-verify-jwt
 ```
@@ -84,7 +104,11 @@ npx supabase functions deploy <name> --no-verify-jwt
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
 
-서버 전용 값은 `DATABASE_URL`, Edge Function secrets 등으로 관리하며 클라이언트 코드에 노출하지 않습니다.
+서버 전용 값은 클라이언트 코드에 노출하지 않습니다.
+
+- `DATABASE_URL` — 빠른 경로(pg 직접 연결)용. 없으면 Supabase 경로로만 동작해 느려집니다.
+- `ACCOUNT_VAULT_KEY` — 보관함 계정 비밀번호 암복호 키(`src/lib/vault/crypto.ts`). 값이 바뀌면 기존 비밀번호를 복호화할 수 없습니다.
+- Edge Function secrets, VAPID private key는 Supabase Secrets에 둡니다.
 
 ## 코드 작성 기준
 
@@ -115,6 +139,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 - Realtime 구독 cleanup 누락
 - 무한 렌더링, race condition, stale cache
 - N+1 쿼리와 불필요한 전체 로드
+- 성능 불변조건 훼손(인증 캐시 우회, keepalive 제거, 빠른 경로만/폴백만 수정)
 - 민감 정보 노출
 
 보고는 파일과 라인을 포함해 심각도 순으로 작성합니다.

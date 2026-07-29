@@ -4,7 +4,9 @@
 
 ## 개요
 
-JDICOMPANY 사내 업무 포털입니다. 승인된 사용자만 접근하며, 근태/업무/채팅/일정/리포트/인플루언서/업무 타임라인/지출관리/프로젝트/업무지시 운영을 통합합니다. 한국어 UI와 Asia/Seoul 기준 날짜 처리가 기본입니다.
+JDICOMPANY 사내 업무 포털입니다. 승인된 사용자만 접근하며, 근태/업무/채팅/일정/리포트/인플루언서/업무 타임라인·검토/지출관리/프로젝트/업무지시/보관함/최근 활동 운영을 통합합니다. 한국어 UI와 Asia/Seoul 기준 날짜 처리가 기본입니다.
+
+Windows 사용자는 같은 포털을 `jdi-desktop/`(Electron 트레이 앱)으로도 씁니다. 화면과 기능은 전부 웹에서 불러오므로 **웹만 배포하면 데스크톱 앱에도 반영**됩니다.
 
 ## 스택
 
@@ -20,6 +22,14 @@ JDICOMPANY 사내 업무 포털입니다. 승인된 사용자만 접근하며, �
 npm run dev
 npm run build
 npm run lint
+
+npm run test:performance      # 성능·아키텍처 회귀 검사
+npm run test:security
+npm run test:expenses
+npm run test:search-privacy
+npm run perf:audit            # 빌드 후 라우트별 초기 JS 예산
+
+npx supabase migration list --linked
 npx supabase db push --linked
 npx supabase functions deploy <name> --no-verify-jwt
 ```
@@ -44,11 +54,14 @@ npx supabase functions deploy <name> --no-verify-jwt
 
 ## 아키텍처 메모
 
-- 인증 세션 갱신은 `src/proxy.ts`와 `src/lib/supabase/middleware.ts` 흐름을 확인합니다.
+- 인증 세션 갱신은 `src/proxy.ts`와 `src/lib/supabase/middleware.ts` 흐름을 확인합니다. `middleware.ts`에는 **5분짜리 인증 검증 캐시**가 있어 매 요청마다 인증 서버로 나가지 않습니다. 이 캐시를 제거하면 전 화면이 느려집니다.
 - 서버 컴포넌트는 `getAuthUser()`와 도메인 `queries.ts`를 통해 초기 데이터를 가져옵니다.
 - 클라이언트 컴포넌트는 필요한 경우 도메인 `actions.ts`에서 Supabase client를 사용합니다. 보안은 RLS가 최종 방어선입니다.
-- Postgres 직접 연결이 가능한 일부 서버 흐름은 `src/lib/db/postgres.ts`를 통해 fallback과 함께 동작합니다.
+- Postgres 직접 연결이 가능한 일부 서버 흐름은 `src/lib/db/postgres.ts`를 통해 fallback과 함께 동작합니다. 연결 실패 시 60초 동안 Supabase 경로로 우회합니다.
+- 대시보드와 할일 초기 데이터는 **빠른 경로**(`src/lib/dashboard/fast-queries.ts`, `src/lib/tasks/fast-queries.ts`)와 **Supabase RPC 폴백**이 짝을 이룹니다. 초기 데이터를 바꾸면 반드시 **양쪽 다** 고칩니다. 실제 운영이 어느 쪽을 썼는지는 로그의 `source`로 확인합니다.
+- `src/instrumentation.ts`가 서버 시작 시 pg 풀을 데우고 2분마다 keepalive를 보냅니다. 이게 없으면 유휴 후 첫 요청이 3~7초로 늘어납니다.
 - 캐시가 있는 도메인은 stale 데이터가 UI를 덮어쓰지 않도록 로드 순서를 확인합니다.
+- 무거운 라이브러리(`xlsx` 등)는 지연 로드하고, 라우트별 초기 JS 예산은 `npm run perf:audit`으로 확인합니다. `/api/health`는 인증을 거치지 않습니다.
 
 ## 보안 기준
 
@@ -108,3 +121,12 @@ npx supabase functions deploy <name> --no-verify-jwt
 - IP 처리: `src/lib/utils/ip.ts`
 - 휴가 계산: `src/lib/utils/vacation.ts`
 - 공용 프로필 타입: `src/lib/attendance/types.ts`
+- 데스크톱 앱 여부 판별: `src/lib/hooks/useIsDesktopApp.ts`
+- 로컬 캐시 일괄 삭제(로그아웃 등): `src/lib/cache/clearAllLocalCaches.ts`
+- 성능 계측: `src/lib/performance/timing.ts`
+
+## 환경 변수(서버 전용) 메모
+
+- `DATABASE_URL` — 빠른 경로(pg 직접 연결)에 필요합니다. 없으면 조용히 Supabase 경로로만 동작해 느려집니다.
+- `ACCOUNT_VAULT_KEY` — 보관함 계정 비밀번호 암복호 키. 값이 바뀌면 기존 저장 비밀번호를 못 읽습니다.
+- Edge Function secrets와 VAPID private key는 Supabase Secrets에 둡니다.

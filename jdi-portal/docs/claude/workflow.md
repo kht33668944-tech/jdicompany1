@@ -5,7 +5,7 @@
 ## 1. 이해
 
 - 사용자의 실제 목표를 한 문장으로 정리합니다.
-- 영향 범위를 도메인 단위로 나눕니다. 예: 근태, 업무, 채팅, 일정, 인플루언서, 지출관리, 프로젝트, 업무지시, Supabase.
+- 영향 범위를 도메인 단위로 나눕니다. 예: 근태, 업무, 채팅, 일정, 리포트, 인플루언서, 업무 타임라인·검토, 지출관리, 프로젝트, 업무지시, 보관함, 최근 활동, Supabase.
 - 운영 데이터, 권한, 배포에 영향이 있으면 먼저 위험을 확인합니다.
 
 ## 2. 설계
@@ -46,17 +46,21 @@
 ```bash
 npm run lint
 npm run build
+npm run test:performance   # 코드를 고쳤다면 항상 (속도 회귀 방지)
 ```
 
 변경 유형별 추가 확인:
 
 | 변경 | 확인 |
 |---|---|
-| DB/RLS | 마이그레이션 순서, 정책 조건, 관리자/일반 사용자 접근 |
-| Edge Function | Deno 호환성, secrets, 배포 명령 |
+| DB/RLS | `migration list --linked`로 번호 확인, 정책 조건, 관리자/일반 사용자 접근, `supabase/tests/*.sql` |
+| Edge Function | Deno 호환성, secrets, 배포 명령, 새 알림 타입은 `push-dispatch` 등록 |
 | Realtime | 구독 cleanup, 중복 이벤트, 권한 |
 | 날짜/근태 | KST 경계, 월말/자정, 휴가 연동 |
-| 파일 업로드 | 크기, 확장자, Storage 정책 |
+| 파일 업로드 | 크기, 확장자, Storage 정책, signed URL 일괄 발급 |
+| 대시보드 초기 데이터 | 빠른 경로와 RPC 폴백 **양쪽** 수정 후 `npm run test:performance` |
+| 보안/권한 | `npm run test:security` |
+| 지출관리 | `npm run test:expenses` |
 | UI | 모바일/데스크톱, 로딩/빈 상태/오류 상태 |
 
 ## 6. 보고
