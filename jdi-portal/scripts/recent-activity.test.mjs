@@ -20,10 +20,13 @@ function loadModule(relativePath) {
     },
   }).outputText;
   const compiledModule = { exports: {} };
+  // tsconfig 의 "@/*" → src/* 별칭을 테스트 로더에서도 풀어준다.
+  const scopedRequire = (id) =>
+    id.startsWith("@/") ? loadModule(`src/${id.slice(2)}.ts`) : require(id);
   new Function("exports", "module", "require", compiled)(
     compiledModule.exports,
     compiledModule,
-    require,
+    scopedRequire,
   );
   return compiledModule.exports;
 }
@@ -98,6 +101,44 @@ test("최근 활동: 카드는 '오늘 내 할 일' 과 '오늘 일정' 사이�
 
   const client = read("src/components/dashboard/DashboardClient.tsx");
   assert.match(client, /recentActivities=\{data\.recentActivities\}/);
+});
+
+test("최근 활동: 카드 상단 더보기로만 전체 페이지에 들어간다 (사이드바 미등록)", () => {
+  const card = read("src/components/dashboard/widgets/RecentActivityCard.tsx");
+  assert.match(card, /href="\/dashboard\/activity"/);
+  // 하단 펼치기는 상단 더보기와 중복이라 제거했다.
+  assert.doesNotMatch(card, /setShowAll|더보기 \(/);
+
+  // 사이드바에는 넣지 않기로 했다.
+  const sidebar = read("src/components/dashboard/Sidebar.tsx");
+  assert.doesNotMatch(sidebar, /\/dashboard\/activity/);
+});
+
+test("최근 활동 페이지: 오늘 것 먼저 그리고 나머지는 뒤에서 받는다", () => {
+  const page = read("src/app/dashboard/activity/page.tsx");
+  // 첫 화면은 오늘 하루만 서버에서 실어 보낸다(초기 로딩을 짧게).
+  assert.match(page, /getActivitiesByDateRange\(auth\.supabase, today, addDays\(today, 1\)\)/);
+  // KST 이중 변환 방지 — kstNow() 를 toDateString() 에 넣으면 자정 근처에서 날짜가 틀어진다.
+  assert.doesNotMatch(page, /toDateString\(kstNow\(\)\)/);
+
+  const client = read("src/components/dashboard/activity/ActivityPageClient.tsx");
+  assert.match(client, /fetch\("\/api\/activity"\)/);
+  // 날짜 토글 나열이 아니라 달력 범위 선택이어야 한다.
+  assert.match(client, /type="date"/);
+  assert.match(client, /min=\{earliest\}/);
+  assert.match(client, /max=\{today\}/);
+
+  const route = read("src/app/api/activity/route.ts");
+  assert.match(route, /getAuthUser\(\)/);
+  assert.match(route, /Unauthorized/);
+  assert.doesNotMatch(route, /toDateString\(kstNow\(\)\)/);
+});
+
+test("최근 활동 날짜 라벨: 오늘·어제·그 외 날짜", () => {
+  const { activityDateLabel } = loadModule("src/lib/activity/format.ts");
+  assert.equal(activityDateLabel("2026-07-29", "2026-07-29"), "오늘");
+  assert.equal(activityDateLabel("2026-07-28", "2026-07-29"), "어제");
+  assert.match(activityDateLabel("2026-07-26", "2026-07-29"), /^7월 26일 \(.\)$/);
 });
 
 test("최근 활동 문장: 사실을 한국어 문장으로 조립한다", () => {

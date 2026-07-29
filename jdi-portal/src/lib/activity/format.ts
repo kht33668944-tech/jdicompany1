@@ -1,3 +1,4 @@
+import { addDays, getKoreanWeekday } from "@/lib/utils/date";
 import type { ActivityLogEntry } from "./types";
 
 /**
@@ -98,6 +99,15 @@ export function activityHref(entry: ActivityLogEntry): string | null {
   if (entry.entity_type === "task") return `/dashboard/tasks/${entry.entity_id}`;
   if (entry.entity_type === "schedule") return "/dashboard/schedule";
   return `/dashboard/tasks?project=${entry.entity_id}`;
+}
+
+/** 목록 날짜 구분선용 라벨. '오늘' / '어제' / '7월 27일 (일)' */
+export function activityDateLabel(date: string, today: string): string {
+  if (date === today) return "오늘";
+  if (date === addDays(today, -1)) return "어제";
+
+  const [, month, day] = date.split("-").map(Number);
+  return `${month}월 ${day}일 (${getKoreanWeekday(date)})`;
 }
 
 export interface ActivityGroup {
