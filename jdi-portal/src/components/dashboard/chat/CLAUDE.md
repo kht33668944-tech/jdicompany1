@@ -36,9 +36,20 @@
 
 ## 파일과 이미지
 
-- 파일 URL은 일괄 서명 흐름을 우선 사용합니다.
+버킷 이름과 TTL은 `src/lib/chat/constants.ts`의 `CHAT_BUCKET`(`chat-attachments`, 비공개)과 `CHAT_FILE_URL_TTL_SECONDS`가 **단일 출처**입니다. 다른 파일에 문자열이나 숫자를 하드코딩하면 캐시 만료 계산과 실제 서명 만료가 어긋나고, 회귀 테스트도 실패합니다.
+
+서명 URL은 3단으로 동작합니다. 순서를 흐트러뜨리면 "메시지 먼저 → 사진 나중" 으로 되돌아갑니다.
+
+1. **SSR 선발급** — 채널 페이지가 `getMessageFileUrls()`로 첫 화면 첨부 URL을 미리 발급해 `initialFileUrls`로 내려주고, `ChatFileUrlsContext`가 그걸 초기값으로 써서 첫 렌더부터 이미지가 뜹니다. 이미 받은 경로는 재요청하지 않습니다.
+2. **일괄 발급** — 서버·클라이언트 모두 `src/lib/chat/fileUrlBatch.ts`의 `signChatFilePaths()` 하나만 씁니다(발급 로직 복제 금지).
+3. **로컬 캐시** — `src/lib/chat/fileUrlCache.ts`가 만료 전까지 재사용해 채널을 오갈 때 왕복이 0이 됩니다.
+
+- 선발급이 실패해도 **throw하지 않고 빈 값을 돌려** 클라이언트 배치로 폴백합니다. 여기서 던지면 채팅방 전체가 오류 화면이 됩니다.
+- 삭제된 메시지(`is_deleted`)의 첨부는 서명하지 않습니다.
+
 - 메시지마다 개별 signed URL 요청을 반복하지 않습니다.
 - 연속 이미지 그룹 표시를 바꿀 때는 모바일 레이아웃을 확인합니다.
+- 이 흐름을 고쳤으면 `npm run test:performance`(`scripts/chat-file-url-prefetch.test.mjs` 포함)로 확인합니다.
 
 ## 권한
 

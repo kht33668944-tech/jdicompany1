@@ -14,24 +14,30 @@
 
 | 문서 | 용도 |
 |---|---|
+| `../CLAUDE.md` (저장소 루트) | 저장소 구조, 아키텍처 큰 그림, **성능 불변조건** |
 | `AGENTS.md` | Codex/공통 에이전트 작업 지침 |
 | `README.md` | 프로젝트 시작과 구조 안내 |
 | `docs/claude/project-guide.md` | 스택, 경로, 아키텍처, 보안 기준 |
 | `docs/claude/workflow.md` | 설계, 계획, 구현, 검증 흐름 |
 | `docs/claude/user-profile.md` | 사용자와 커뮤니케이션 방식 |
+| `docs/performance/production-baseline.md` | 성능 기준선과 확인 절차 |
+| `docs/operations/backup-and-recovery.md` | 백업·복구 운영 절차 |
 | `supabase/CLAUDE.md` | DB, RLS, Edge Function 규칙 |
 | `src/components/dashboard/attendance/CLAUDE.md` | 근태 도메인 규칙 |
 | `src/components/dashboard/chat/CLAUDE.md` | 채팅 도메인 규칙 |
 | `src/components/dashboard/tasks/CLAUDE.md` | 업무 도메인 규칙 |
+| `../jdi-desktop/README.md` | Windows 데스크톱 앱(껍데기) 규칙과 배포 |
 
 ## 빠른 프로젝트 정보
 
 - 앱 위치: `jdi-portal/`
-- 프레임워크: Next.js 16.2.11 App Router, React 19.2.4
-- 언어: TypeScript strict
+- 프레임워크: Next.js 16.2.11 App Router, React 19.2.4 (Next 16이라 `middleware.ts` 대신 **`src/proxy.ts`**)
+- 언어: TypeScript strict, Node ≥ 22
 - 스타일: Tailwind CSS 4
 - 백엔드: Supabase Auth, Postgres, RLS, Storage, Realtime, Edge Functions
-- 배포: Railway
+- 데이터 접근: Supabase SSR 클라이언트가 기본, 일부 성능 민감 경로는 `pg` 직접 연결 + 폴백 (`src/lib/db/postgres.ts`)
+- 배포: Railway (루트 래퍼가 `jdi-portal` 빌드)
+- 데스크톱: `jdi-desktop/` Electron 껍데기 — 웹만 고치면 자동 반영
 - UI 언어와 날짜 기준: 한국어, Asia/Seoul
 
 ## 자주 쓰는 명령
@@ -40,6 +46,16 @@
 npm run dev
 npm run build
 npm run lint
+
+# 검증 (node:test 기반, jest/vitest 아님)
+npm run test:performance      # 성능·아키텍처 회귀 75개 — 코드 수정 후 필수
+npm run test:security         # 보안 회귀
+npm run test:expenses         # 지출관리
+npm run test:search-privacy   # 검색 프라이버시
+npm run perf:audit            # 라우트별 초기 JS 예산 (빌드 후)
+
+# Supabase
+npx supabase migration list --linked                   # 새 번호 잡기 전 원격 적용 상태 확인
 npx supabase db push --linked
 npx supabase functions deploy <name> --no-verify-jwt
 ```
@@ -55,6 +71,8 @@ npx supabase functions deploy <name> --no-verify-jwt
 
 ## 금지/주의
 
+- **성능 불변조건을 되돌리지 않습니다.** 미들웨어 인증 캐시(`src/lib/supabase/middleware.ts`), keepalive(`src/instrumentation.ts`), 빠른 경로+폴백(`src/lib/*/fast-queries.ts`), 대시보드 업무 요약 사전 필터 — 자세한 내용은 저장소 루트 `CLAUDE.md`. 코드 수정 후 `npm run test:performance`로 확인합니다.
+- 대시보드 초기 데이터를 건드리면 **빠른 경로와 Supabase RPC 폴백 양쪽**을 함께 고칩니다. 한쪽만 고치면 운영에 반영되지 않거나 회귀 테스트가 실패합니다.
 - `tsconfig.json`의 `exclude`에서 `supabase/functions/**`를 제거하지 않습니다.
 - SQL에서 `CURRENT_DATE`, `NOW()`를 KST 변환 없이 직접 사용하지 않습니다.
 - 클라이언트 코드에 서버 전용 키를 노출하지 않습니다.

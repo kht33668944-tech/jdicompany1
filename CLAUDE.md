@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 루트 `package.json`은 Railway/Railpack이 Node 프로젝트를 감지하고 하위 앱을 빌드하도록 두는 얇은 래퍼입니다. 루트 스크립트는 `jdi-portal`로 진입해 실행합니다.
 - **거의 모든 작업(코드, 문서, Supabase, 테스트)은 `jdi-portal/` 안에서 진행합니다.**
 - 앱 작업 전 `jdi-portal/CLAUDE.md`와 `jdi-portal/AGENTS.md`를 먼저 읽습니다. 도메인/DB 작업은 아래 계층별 문서를 우선 확인합니다.
+- `jdi-desktop/`은 **별도의 Electron 프로젝트**입니다(웹앱과 의존성·빌드 분리). 포털 웹을 감싸 Windows 트레이에 상주시키는 껍데기이며, **웹 기능을 고치면 데스크톱 앱은 자동 반영되므로 건드릴 필요가 없습니다.** 트레이/아이콘/자동 실행/자동 업데이트 같은 껍데기 동작을 바꿀 때만 작업하고, 절차는 `jdi-desktop/README.md`를 따릅니다. 웹 쪽 연동 지점은 `src/lib/hooks/useIsDesktopApp.ts`와 `src/lib/notifications/desktop.ts`입니다.
 
 ## 명령
 
@@ -22,11 +23,15 @@ npm run lint     # ESLint (eslint-config-next + typescript)
 
 # 테스트 (jdi-portal 안에서만, node:test 기반 — jest/vitest 아님)
 npm run test:search-privacy   # 검색 프라이버시 회귀 검사 (scripts/check-search-privacy.mjs)
-npm run test:security         # 보안 회귀 검사 (RLS/권한/경계)
-npm run test:expenses         # 지출관리 도메인 정적 검사
-npm run perf:audit            # 성능 감사 (scripts/performance-audit.mjs)
-npm run test:performance      # 성능/아키텍처/로그인 성능 테스트 스위트
+npm run test:security         # 보안 회귀 검사 (인플루언서 Edge 인증 + 업무보고 검토 RLS)
+npm run test:expenses         # 지출관리 도메인 정적 검사 (--experimental-strip-types 로 .ts 직접 로드)
+npm run perf:audit            # 성능 감사 (scripts/performance-audit.mjs, 빌드 결과 필요)
+npm run test:performance      # 성능/아키텍처 회귀 스위트 — 현재 13개 파일, 75개 검사
 #   단일 테스트 파일: node --test scripts/<파일>.test.mjs
+
+# npm 스크립트에 묶여 있지 않아 직접 실행해야 하는 테스트
+node --test scripts/projects-feature.test.mjs scripts/work-timeline-attachments.test.mjs \
+  scripts/attendance-multi-task-entry.test.mjs scripts/influencer-thumbnail-failure.test.mjs
 
 # Supabase
 npx supabase db push --linked                          # 마이그레이션 적용
@@ -42,9 +47,15 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 - `src/lib/<domain>/{queries,actions,types,constants}.ts` — `queries.ts`(읽기), `actions.ts`(쓰기), `types.ts`(도메인 타입). 일부 도메인엔 `*Cache.ts`(예: `tasks/tasksCache.ts`).
 - `src/components/dashboard/<domain>/` — 도메인 UI. 여기 하위 `CLAUDE.md`가 있으면 우선.
 
-도메인 목록: `dashboard`(대시보드 홈), `attendance`(근태), `tasks`(업무), `chat`(채팅), `schedule`(일정), `reports`(리포트), `influencer`(인플루언서), `work-timeline`(업무 타임라인), `expenses`(지출관리), `projects`(프로젝트 분류), `directives`(업무지시), `vault`(보관함 — 서류·계정, 계정 비밀번호는 `ACCOUNT_VAULT_KEY`로 암호화 + 2차 비밀번호 게이트), `notifications`(알림), `push`(웹 푸시), `settings`(설정). (`src/lib/cache`, `src/lib/performance`, `src/lib/db`, `src/lib/supabase`, `src/lib/hooks`, `src/lib/utils`는 도메인이 아니라 공용 인프라 모듈입니다.)
+도메인 목록: `dashboard`(대시보드 홈), `attendance`(근태), `tasks`(업무), `chat`(채팅), `schedule`(일정), `reports`(리포트), `influencer`(인플루언서), `work-timeline`(업무 타임라인 + 업무보고 검토), `expenses`(지출관리), `projects`(프로젝트 분류), `directives`(업무지시), `vault`(보관함 — 서류·계정, 계정 비밀번호는 `ACCOUNT_VAULT_KEY`로 암호화 + 2차 비밀번호 게이트), `activity`(최근 활동 피드), `notifications`(알림), `push`(웹 푸시), `settings`(설정). (`src/lib/cache`, `src/lib/performance`, `src/lib/db`, `src/lib/supabase`, `src/lib/hooks`, `src/lib/utils`는 도메인이 아니라 공용 인프라 모듈입니다.)
 
-일부 도메인은 표준 4파일 형태와 조금 다릅니다: `directives`는 읽기를 대시보드 빠른 경로에 통합해 `queries.ts` 없이 `actions/constants/types.ts`만 둡니다. `projects`는 `useProjects.ts` 훅과 `utils.ts`(접두어 자동 분류), `expenses`는 `colors.ts`·`format.ts`·`receipts.ts`·`recurring.ts` 등 보조 모듈을 함께 둡니다.
+일부 도메인은 표준 4파일 형태와 조금 다릅니다.
+- `directives` — 읽기를 대시보드 빠른 경로에 통합해 `queries.ts` 없이 `actions/constants/types.ts`만 둡니다.
+- `activity` — 쓰기가 DB 트리거이므로 `actions.ts`가 없고 `queries.ts`·`types.ts`·`format.ts`(문장 조립)만 둡니다. UI는 `components/dashboard/widgets/RecentActivityCard.tsx`(요약)와 `components/dashboard/activity/`(전체 보기, `/dashboard/activity` + `/api/activity`).
+- `projects` — `useProjects.ts` 훅과 `utils.ts`(접두어 자동 분류).
+- `expenses` — `colors.ts`·`format.ts`·`receipts.ts`·`recurring.ts` 등 보조 모듈.
+- `work-timeline` — 검토 기능이 같은 도메인에 들어가 `reviewQueries.ts`·`reviewActions.ts`가 추가로 있고, `timelineCache.ts`·`draftStore.ts`·`clientUploads.ts`·`fileKind.ts`도 함께 둡니다.
+- `vault` — `crypto.ts`(계정 비밀번호 암복호)·`storage.ts`(서류 파일).
 
 **이중 데이터 접근 — 이 앱의 핵심 특징.** 두 경로가 공존하며, 보안의 최종 방어선은 항상 RLS입니다.
 - **Supabase (기본)**: `src/lib/supabase/`의 SSR 클라이언트. `server.ts`(서버 컴포넌트/Route Handler, 쿠키 기반), `client.ts`(브라우저, 캐시된 싱글턴), `middleware.ts`(세션 갱신), `auth.ts`(`getAuthUser()` 등). RLS + `public.is_approved_user()`로 접근 제어.
@@ -54,7 +65,13 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 
 **Edge Functions** (`supabase/functions/`, **Deno 런타임** — Node 전용 패키지 금지): `influencer-analyze`, `influencer-extract`(인플루언서 자동 분석), `push-dispatch`(웹 푸시). PWA/웹 푸시는 `src/lib/push/`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
 
-**마이그레이션**: `supabase/migrations/NNN_설명.sql` 순차 번호. 현재 최신은 **`110_review_fixes.sql`** — 기존 파일 수정 대신 다음 번호로 **추가**합니다.
+**마이그레이션**: `supabase/migrations/NNN_설명.sql` 순차 번호. 현재 최신은 **`117_activity_log.sql`** 이고 **다음 번호는 118**입니다 — 기존 파일 수정 대신 다음 번호로 **추가**합니다.
+
+> **번호 공백 주의**: `111`~`116`은 이 브랜치에 없습니다. 병합되지 않은 다른 작업 브랜치가 이미 그 번호를 운영 DB에 적용했기 때문입니다. 모든 worktree/브랜치가 **같은 운영 Supabase를 공유**하므로, 이미 적용된 번호를 다시 쓰면 `db push`가 그 파일을 조용히 건너뜁니다. 새 마이그레이션은 **파일 목록의 최댓값이 아니라 원격에 적용된 최신 번호 다음**으로 잡고, 새 번호를 쓰기 전에 아래로 확인합니다.
+>
+> ```bash
+> cd jdi-portal && npx supabase migration list --linked   # Local/Remote 열 비교
+> ```
 
 ## 성능 불변조건 (속도 회귀 방지 — 되돌리지 말 것)
 
@@ -66,7 +83,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 4. **대시보드 업무 요약 사전 필터** (마이그레이션 088 + `get_dashboard_task_summaries` RPC): `tasks` 전체 스캔 금지 — status/completed_at 사전 필터와 부분 인덱스를 유지합니다.
 5. **초기 JS 예산**: 무거운 라이브러리(xlsx 등)는 지연 로드, 라우트별 초기 JS 예산 준수(`npm run perf:audit`), 전역 prefetch 남용 금지, `/api/health`는 인증 우회 유지.
 
-기준선: `jdi-portal/docs/performance/production-baseline.md`. 회귀 방지 테스트: `jdi-portal/scripts/performance-architecture.test.mjs` 등(`npm run test:performance` = 60여 개 검사).
+기준선: `jdi-portal/docs/performance/production-baseline.md`. 회귀 방지 테스트: `jdi-portal/scripts/performance-architecture.test.mjs` 등 13개 파일(`npm run test:performance` = 75개 검사, 2026-07-29 기준 전부 통과). 새 기능이 대시보드 초기 데이터에 얹히면(예: 업무지시·검토 인박스·최근 활동) **빠른 경로와 RPC 폴백 양쪽에 싣는지 검사하는 테스트가 추가되어 있으므로**, 한쪽만 고치면 이 스위트가 실패합니다.
 
 ## 반드시 지킬 제약
 
@@ -88,6 +105,9 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 | `jdi-portal/supabase/CLAUDE.md` | DB, RLS, SECURITY DEFINER, Edge Function, Storage 규칙 |
 | `src/components/dashboard/{attendance,chat,tasks}/CLAUDE.md` | 해당 도메인 규칙 |
 | `jdi-portal/docs/superpowers/{specs,plans}/` | 기능 설계·구현 계획 기록 |
+| `jdi-portal/docs/performance/production-baseline.md` | 운영 성능 기준선과 재현 확인 절차 |
+| `jdi-portal/docs/operations/backup-and-recovery.md` | 백업·복구 운영 절차 |
+| `jdi-desktop/README.md` | Windows 데스크톱 앱(트레이·자동 업데이트·배포) |
 
 ## 사용자/커뮤니케이션
 
