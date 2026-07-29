@@ -114,3 +114,47 @@ test("middleware caches auth verification so every request skips the auth server
   assert.match(middleware, /if \(user && cookieKey\)/);
   assert.match(middleware, /cache\.set\(cookieKey,/);
 });
+
+test("sidebar prefetches routes on hover intent without global auto-prefetch", () => {
+  // 탭 이동 실측(2026-07): prefetch 없음 + 라우터 캐시 만료 조합이면 매 탭 클릭이
+  // 서버 왕복(0.6~1.4초)을 생으로 기다린다. hover 시점 prefetch 는 곧 클릭할 라우트
+  // 1개만 미리 받아 이 왕복을 클릭 전에 숨긴다. 반대로 전체 메뉴 자동 prefetch
+  // (prefetch={true})는 초기 로딩과 경쟁해 첫 화면을 수 초 늦춘 전력이 있어 금지.
+  const sidebar = source("src/components/dashboard/Sidebar.tsx");
+
+  // hover/포커스 intent prefetch 는 유지한다.
+  assert.match(sidebar, /const prefetchOnIntent = useCallback/);
+  assert.match(sidebar, /router\.prefetch\(href\)/);
+  assert.match(sidebar, /onMouseEnter=\{\(\) => prefetchOnIntent\(item\.href\)\}/);
+  assert.match(sidebar, /onFocus=\{\(\) => prefetchOnIntent\(item\.href\)\}/);
+
+  // 전체 메뉴 자동 prefetch 재도입 금지 + 링크별 prefetch={false} 유지.
+  assert.doesNotMatch(sidebar, /prefetch=\{true\}/);
+  assert.match(sidebar, /prefetch=\{false\}/);
+
+  // 연속 hover 로 같은 라우트를 반복 요청하지 않도록 시간 제한을 둔다.
+  assert.match(sidebar, /prefetchAtRef/);
+});
+
+test("client router cache keeps visited dashboard tabs for at least five minutes", () => {
+  // 탭 이동 실측: 라우터 캐시 히트 10~40ms vs 미스 600~1400ms. dynamic staleTime 을
+  // 5분 미만으로 줄이면 대부분의 탭 이동이 다시 서버 왕복이 된다.
+  const config = source("next.config.ts");
+  const dynamicStale = config.match(/dynamic:\s*(\d+)/);
+
+  assert.ok(dynamicStale, "next.config.ts must configure staleTimes.dynamic");
+  assert.ok(
+    Number(dynamicStale[1]) >= 300,
+    `staleTimes.dynamic must stay >= 300s (got ${dynamicStale[1]})`,
+  );
+});
+
+test("reports list resolves attachment counts in the same round trip", () => {
+  // 오류 접수 탭 RSC 가 1초를 넘던 원인 중 하나: 목록 조회 후 첨부 개수를 별도
+  // 왕복으로 다시 조회(서울↔싱가포르 순차 2회). PostgREST 내장 집계로 1회에 합친다.
+  const queries = source("src/lib/reports/queries.ts");
+
+  assert.match(queries, /attachment_rows:report_attachments\(count\)/);
+  assert.doesNotMatch(queries, /fetchAttachmentCounts/);
+  assert.doesNotMatch(queries, /\.in\(["']report_id["']/);
+});
