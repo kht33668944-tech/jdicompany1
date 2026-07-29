@@ -9,6 +9,8 @@
  * 모든 함수는 SSR-safe (window 체크) 이며, 미지원/거부 환경에서는 silent no-op.
  */
 
+import { SW_PATH } from "@/lib/push/constants";
+
 export type DesktopPermission = "default" | "granted" | "denied" | "unsupported";
 
 const STORAGE_KEY = "jdi:desktop-notification-prompted";
@@ -41,6 +43,35 @@ export function onDesktopEnabledChange(handler: (enabled: boolean) => void): () 
 
 export function isDesktopSupported(): boolean {
   return typeof window !== "undefined" && "Notification" in window;
+}
+
+/**
+ * 이 기기가 웹푸시 구독 중인지 (동기 조회용 캐시).
+ *
+ * 화면이 보이지 않는 동안 오는 알림은 서비스워커(웹푸시)가 대신 띄운다.
+ * 그때 페이지에서도 띄우면 같은 메시지로 Windows 알림이 2개 뜬다.
+ * `showDesktopNotification`은 동기 함수라 매번 조회할 수 없어 값을 캐시해 두고,
+ * 화면 표시 상태가 바뀔 때마다(=구독을 켜고 끈 직후 포함) 다시 확인한다.
+ */
+let pushSubscribed = false;
+
+function refreshPushSubscribed(): void {
+  if (typeof window === "undefined") return;
+  if (!("serviceWorker" in navigator)) return;
+  void navigator.serviceWorker
+    .getRegistration(SW_PATH)
+    .then((reg) => reg?.pushManager.getSubscription() ?? null)
+    .then((sub) => {
+      pushSubscribed = sub !== null;
+    })
+    .catch(() => {
+      pushSubscribed = false;
+    });
+}
+
+if (typeof window !== "undefined") {
+  refreshPushSubscribed();
+  document.addEventListener("visibilitychange", refreshPushSubscribed);
 }
 
 export function getDesktopPermission(): DesktopPermission {
@@ -92,6 +123,11 @@ export function showDesktopNotification(opts: ShowOptions): void {
   if (window.Notification.permission !== "granted") return;
   // 사용자가 로컬 토글로 꺼둔 경우 skip
   if (!isDesktopEnabled()) return;
+
+  // 화면이 안 보이는 동안(최소화·다른 탭·백그라운드)에는 웹푸시가 같은 알림을 띄운다.
+  // 여기서도 띄우면 알림이 2개가 되므로 푸시 구독이 있는 기기에서는 양보한다.
+  // 데스크톱 앱은 웹푸시를 쓰지 않아 pushSubscribed 가 false → 항상 표시된다.
+  if (pushSubscribed && document.visibilityState === "hidden") return;
 
   // 데스크톱 앱(jdi-desktop) 안이라면 앱 본체가 알림을 띄우게 맡긴다.
   // 웹에서 직접 띄우면 Windows 알림에 앱 이름이 "Electron" 으로 표시되기 때문.
