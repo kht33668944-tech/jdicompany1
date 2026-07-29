@@ -494,6 +494,14 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
   // 스크롤 컨테이너 안에서 전체 표시 — 페이지 자체는 늘어나지 않음.
   const displayed = sorted;
 
+  // 등록된 인플루언서가 아예 없는 경우와, 검색·필터 때문에 0건인 경우를 구분해서 안내.
+  const emptyMessage =
+    influencers.length === 0
+      ? "인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요."
+      : filters.search.trim().length > 0
+        ? `'${filters.search.trim()}' 검색 결과가 없습니다.`
+        : "조건에 맞는 인플루언서가 없습니다. 필터를 확인해 주세요.";
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       {/* 헤더 — 모바일: 제목+재동기화 1행 / 검색 별도 행. 데스크탑: 한 줄 */}
@@ -590,7 +598,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       <div className="sm:hidden">
         {displayed.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-slate-400">
-            인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요.
+            {emptyMessage}
           </div>
         ) : (
           displayed.map((inf) => {
@@ -784,7 +792,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
             {displayed.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400">
-                  인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요.
+                  {emptyMessage}
                 </td>
               </tr>
             ) : (
