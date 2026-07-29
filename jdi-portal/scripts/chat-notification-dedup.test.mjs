@@ -69,6 +69,23 @@ test("페이지 알림: 화면이 안 보이고 푸시 구독이 있으면 서�
   );
 });
 
+test("데스크톱 앱 판정: preload 브리지가 없는 구버전도 Electron 으로 인식한다", () => {
+  const hook = read("src/lib/hooks/useIsDesktopApp.ts");
+
+  assert.match(
+    hook,
+    /jdiDesktop\?\.isDesktopApp/,
+    "최신 앱은 preload 브리지로 판정해야 합니다.",
+  );
+  // 구버전 앱에는 브리지가 없어 브라우저로 오인되고, 설정 화면이 웹푸시 구독을
+  // 시도하다 "push service not available" 오류를 낸다.
+  assert.match(
+    hook,
+    /\/\\bElectron\\\/\/\.test\(window\.navigator\.userAgent\)/,
+    "구버전 앱 대비 Electron UA 판정이 없으면 설정 화면에서 푸시 구독 오류가 납니다.",
+  );
+});
+
 test("설정: 푸시 끄기는 이 기기 구독만 해제하고 DB 전역 값을 끄지 않는다", () => {
   const section = read("src/components/dashboard/settings/NotificationsSection.tsx");
 
