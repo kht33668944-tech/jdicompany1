@@ -101,39 +101,60 @@ function extractUsername(profileUrl: string): string | null {
 
 // ============================================================
 // Apify Actor 동기 호출
+//
+// 💰 비용 주의 — Apify는 "결과(dataset item) 1건" 단위로 과금한다.
+// 예전에는 apify/instagram-scraper 를 resultsType:"details" 로 호출했는데,
+// 이 모드에서는 resultsLimit 이 **무시되어** 게시물 100건이 통째로 딸려오고
+// 1명 등록에 101건(약 390원)이 청구됐다.
+//   → 1순위를 프로필 전용 actor(1명 = 결과 1건, 약 4원)로 바꾸고,
+//     폴백도 details 가 아닌 posts 모드(결과 12건)로 제한한다.
+// 어느 경로로 가든 100건이 청구되는 일은 없어야 한다.
 // ============================================================
-async function scrapeInstagramProfile(
-  username: string,
-): Promise<ApifyProfileResult> {
-  // instagram-scraper details 모드 — 한 번에 프로필 메타 + 최근 게시물 24개.
-  // directUrls + details가 검증된 조합 (usernames는 빈 응답 반환 사례 발견).
+
+// 프로필 1명 = 결과 1건. 프로필 메타 + 최근 게시물 12개를 한 항목에 담아 준다.
+const PROFILE_ACTOR = "apify~instagram-profile-scraper";
+// 폴백용 범용 scraper. posts 모드에서는 resultsLimit 이 정상 적용된다.
+const FALLBACK_ACTOR = "apify~instagram-scraper";
+// 게시물 12개면 ER 계산과 AI 분석에 충분하다 (influencer-analyze 도 12개만 사용).
+const POSTS_PER_PROFILE = 12;
+
+interface ScrapeResult {
+  profile: ApifyProfileResult;
+  actor: string;
+  /** Apify 과금 단위(결과 건수). 비용 추적용으로 sync log 에 남긴다. */
+  resultCount: number;
+}
+
+async function callApifyActor(
+  actor: string,
+  input: Record<string, unknown>,
+): Promise<unknown[]> {
   const url =
-    `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
+    `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}`;
 
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      directUrls: [`https://www.instagram.com/${username}/`],
-      resultsType: "details",
-      resultsLimit: 24,
-      searchType: "user",
-      addParentData: false,
-    }),
+    body: JSON.stringify(input),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Apify error ${res.status}: ${text}`);
+    throw new Error(`Apify error ${res.status} (${actor}): ${text}`);
   }
 
-  // 응답이 ApifyProfileResult 형식이 아니라 게시물 배열일 수 있어 형식 감지 필요.
-  // 첫 항목에 followersCount/biography 같은 프로필 필드가 있으면 ApifyProfileResult,
-  // 없고 likesCount/timestamp 같은 게시물 필드뿐이면 ApifyPost[]로 간주하고 메타 구성.
-  const raw = await res.json() as unknown[];
-  if (!raw || raw.length === 0) {
-    throw new Error(`Apify returned empty result for @${username}`);
-  }
+  const raw = await res.json();
+  return Array.isArray(raw) ? raw as unknown[] : [];
+}
+
+// 응답이 프로필 형식인지 게시물 배열 형식인지 감지해 ApifyProfileResult 로 정규화.
+// 첫 항목에 followersCount/biography 같은 프로필 필드가 있으면 프로필,
+// 없고 likesCount/timestamp 같은 게시물 필드뿐이면 게시물 배열로 보고 owner* 에서 메타를 복원한다.
+function normalizeToProfile(
+  raw: unknown[],
+  username: string,
+): ApifyProfileResult | null {
+  if (raw.length === 0) return null;
 
   const first = raw[0] as Record<string, unknown>;
   const looksLikeProfile =
@@ -144,17 +165,15 @@ async function scrapeInstagramProfile(
 
   if (looksLikeProfile) {
     const profile = first as unknown as ApifyProfileResult;
-    console.log(
-      `[scrape] @${username} (profile-shape) — posts:${profile.latestPosts?.length ?? 0}`,
-    );
-    return profile;
+    return {
+      ...profile,
+      latestPosts: (profile.latestPosts ?? []).slice(0, POSTS_PER_PROFILE),
+    };
   }
 
-  // 게시물 배열 형식 — 첫 게시물의 owner* 필드에서 메타를 복원하고
-  // 전체 항목을 latestPosts로 사용.
-  const posts = raw as unknown as ApifyPost[];
+  const posts = (raw as unknown as ApifyPost[]).slice(0, POSTS_PER_PROFILE);
   const ownerFields = first as Record<string, unknown>;
-  const constructedProfile: ApifyProfileResult = {
+  return {
     username,
     fullName: (ownerFields.ownerFullName as string | undefined) ??
       (ownerFields.fullName as string | undefined),
@@ -166,10 +185,51 @@ async function scrapeInstagramProfile(
     postsCount: undefined,
     latestPosts: posts,
   };
+}
+
+async function scrapeInstagramProfile(username: string): Promise<ScrapeResult> {
+  // 1순위 — 프로필 전용 actor (결과 1건). 실패해도 폴백이 있으므로 오류는 삼키고 넘어간다.
+  try {
+    const raw = await callApifyActor(PROFILE_ACTOR, { usernames: [username] });
+    const profile = normalizeToProfile(raw, username);
+    if (profile && (profile.followersCount ?? 0) > 0) {
+      console.log(
+        `[scrape] @${username} via ${PROFILE_ACTOR} — results:${raw.length}, posts:${
+          profile.latestPosts?.length ?? 0
+        }`,
+      );
+      return { profile, actor: PROFILE_ACTOR, resultCount: raw.length };
+    }
+    console.warn(
+      `[scrape] @${username} — ${PROFILE_ACTOR} 가 쓸 수 있는 프로필을 주지 않음(results:${raw.length}). 폴백으로 전환.`,
+    );
+  } catch (err) {
+    console.warn(
+      `[scrape] @${username} — ${PROFILE_ACTOR} 실패, 폴백으로 전환: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+
+  // 2순위 — 범용 scraper의 posts 모드. details 모드는 resultsLimit 이 무시되므로 절대 쓰지 않는다.
+  const raw = await callApifyActor(FALLBACK_ACTOR, {
+    directUrls: [`https://www.instagram.com/${username}/`],
+    resultsType: "posts",
+    resultsLimit: POSTS_PER_PROFILE,
+    addParentData: false,
+  });
+  const profile = normalizeToProfile(raw, username);
+  if (!profile) {
+    throw new Error(
+      `@${username} 정보를 가져오지 못했습니다. 아이디가 맞는지, 비공개 계정은 아닌지 확인해 주세요.`,
+    );
+  }
   console.log(
-    `[scrape] @${username} (posts-shape) — posts:${posts.length}, owner-meta-recovered`,
+    `[scrape] @${username} via ${FALLBACK_ACTOR}(posts) — results:${raw.length}, posts:${
+      profile.latestPosts?.length ?? 0
+    }`,
   );
-  return constructedProfile;
+  return { profile, actor: FALLBACK_ACTOR, resultCount: raw.length };
 }
 
 // ============================================================
@@ -445,7 +505,9 @@ Deno.serve(async (req) => {
 
   try {
     // 1. Apify 스크래핑 (단일 호출)
-    const profile = await scrapeInstagramProfile(username);
+    const { profile, actor: scrapeActor, resultCount } = await scrapeInstagramProfile(
+      username,
+    );
 
     const followerCount = profile.followersCount ?? 0;
     const followingCount = profile.followsCount ?? 0;
@@ -588,10 +650,15 @@ Deno.serve(async (req) => {
     }
 
     // 7. sync_logs — 성공
+    // _scrape 는 Apify 비용 추적용(어느 actor로 결과 몇 건을 썼는지). 과금 단위가 결과 건수라
+    // 여기 숫자가 갑자기 커지면 비용이 새고 있다는 뜻이다.
     await supabaseAdmin.from("influencer_sync_logs").insert({
       influencer_id: influencerId,
       status: "success",
-      raw_data: profile as unknown as Record<string, unknown>,
+      raw_data: {
+        ...(profile as unknown as Record<string, unknown>),
+        _scrape: { actor: scrapeActor, result_count: resultCount },
+      },
     });
 
     const result: ExtractResponse = {
