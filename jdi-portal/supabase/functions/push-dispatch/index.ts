@@ -229,10 +229,13 @@ async function resolveRecipientsForMessages(
   else if (msgType === "file") preview = "파일을 보냈습니다";
   else preview = content.length > 100 ? content.slice(0, 100) + "..." : content;
 
+  // 1:1 대화방은 이름이 빈 문자열이라(069_chat_dm.sql) 그대로 쓰면 "- 이용준" 이 된다.
+  const channelName = (channel.name ?? "").trim();
+
   return {
     userIds: candidates,
     payload: {
-      title: `${channel.name} - ${senderName}`,
+      title: channelName ? `${channelName} - ${senderName}` : senderName,
       body: preview,
       link: `/dashboard/chat/${channelId}`,
       tag: `chat:${channelId}`,

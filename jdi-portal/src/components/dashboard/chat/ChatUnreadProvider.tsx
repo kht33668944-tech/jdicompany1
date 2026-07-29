@@ -134,7 +134,10 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
             ]);
 
             const senderName = profile?.full_name ?? "알 수 없음";
-            const channelName = channelInfo?.name ?? "채팅";
+            // 1:1 대화방은 이름이 빈 문자열로 저장된다(069_chat_dm.sql).
+            // `?? "채팅"` 은 null 만 걸러내므로 빈 문자열이 그대로 통과해
+            // 제목이 "이용준 ()" 처럼 깨져 보였다.
+            const channelName = channelInfo?.name?.trim() ?? "";
             if (channelInfo?.type === "memo") return;
 
             const bodyText =
@@ -144,7 +147,9 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
                   ? "파일을 보냈습니다"
                   : newMsg.content;
 
-            toast.info(`${senderName} (${channelName})`, {
+            const notifyTitle = channelName ? `${senderName} (${channelName})` : senderName;
+
+            toast.info(notifyTitle, {
               description: bodyText,
               duration: 4000,
               action: {
@@ -156,7 +161,7 @@ export default function ChatUnreadProvider({ userId, onUnreadChange }: ChatUnrea
             });
 
             showDesktopNotification({
-              title: `${senderName} (${channelName})`,
+              title: notifyTitle,
               body: bodyText,
               link: `/dashboard/chat/${newMsg.channel_id}`,
               tag: `chat-msg:${newMsg.id}`,

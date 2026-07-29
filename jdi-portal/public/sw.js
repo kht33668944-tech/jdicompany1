@@ -145,6 +145,25 @@ self.addEventListener("fetch", (event) => {
 // ============================================================
 // Web Push 알림
 // ============================================================
+/**
+ * 포털 화면이 지금 눈에 보이는 상태로 열려 있는지 확인한다.
+ *
+ * 화면이 보이는 동안에는 페이지 쪽 Realtime 구독(ChatUnreadProvider 등)이
+ * 이미 OS 알림을 띄우므로, 여기서 또 띄우면 같은 메시지로 알림이 2개 뜬다.
+ * 창이 보일 때 알림을 생략하는 것은 userVisibleOnly 구독에서도 허용되는 동작이다.
+ */
+async function hasVisiblePortalWindow() {
+  const windows = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  return windows.some(
+    (client) =>
+      client.visibilityState === "visible" &&
+      client.url.startsWith(self.location.origin)
+  );
+}
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
@@ -164,7 +183,13 @@ self.addEventListener("push", (event) => {
     renotify: true,
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      // 포털 화면을 보고 있는 중이면 페이지가 띄우는 알림 하나로 충분하다.
+      if (await hasVisiblePortalWindow()) return;
+      await self.registration.showNotification(title, options);
+    })()
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

@@ -122,11 +122,13 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
     setError(null);
     try {
       if (settings.push_enabled) {
-        // OFF 전환
+        // OFF 전환 — **이 기기의 구독만** 해제한다.
+        // DB의 push_enabled 는 전체 기기 공용이라 여기서 false 로 쓰면
+        // PC에서 껐을 때 휴대폰 푸시까지 같이 죽는다(실제로 그 증상이 있었음).
+        // 기기별 수신 여부는 push_subscriptions 행의 존재 여부가 결정하므로
+        // 로컬 구독만 지우면 이 기기로만 푸시가 끊긴다.
         await unsubscribeFromPush(userId);
-        const next = { ...settings, push_enabled: false };
-        setSettings(next);
-        await updateNotificationSettings({ push_enabled: false });
+        setSettings((s) => ({ ...s, push_enabled: false }));
       } else {
         // ON 전환
         await subscribeToPush(userId);
@@ -170,7 +172,7 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
             <BellRinging size={24} weight="fill" />
           </div>
           <div>
-            <h4 className="font-bold text-sm text-slate-700">푸시 알림 받기</h4>
+            <h4 className="font-bold text-sm text-slate-700">이 기기에서 푸시 알림 받기</h4>
             {isDesktopApp ? (
               <p className="text-xs text-slate-500 mt-0.5">
                 데스크톱 앱은 켜져 있는 동안 알림을 바로 받습니다. 따로 켜실 것이 없습니다.
@@ -181,7 +183,11 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
               </p>
             ) : (
               <p className="text-xs text-slate-500 mt-0.5">
-                브라우저/PWA가 닫혀 있어도 폰에서 알림을 받습니다.
+                브라우저/PWA가 닫혀 있어도 알림을 받습니다.
+                <br />
+                <span className="text-slate-400">
+                  ※ 이 스위치는 <b>지금 쓰는 기기에만</b> 적용됩니다. PC에서 꺼도 휴대폰 알림은 계속 옵니다.
+                </span>
                 <br />
                 <span className="text-slate-400">※ iPhone은 홈 화면에 앱 설치 후 사용 가능합니다.</span>
               </p>
