@@ -19,6 +19,8 @@ const {
   dialog,
 } = require("electron");
 const path = require("node:path");
+const fs = require("node:fs");
+const { execFile } = require("node:child_process");
 const { autoUpdater } = require("electron-updater");
 
 // 운영 주소. 개발 중 로컬 서버로 시험할 때만 JDI_PORTAL_URL 로 바꾼다.
@@ -54,6 +56,40 @@ if (!gotTheLock) {
 
 function getIcon() {
   return nativeImage.createFromPath(path.join(__dirname, "icon.png"));
+}
+
+/**
+ * Windows 알림 헤더에 "JDI 포털" 이 뜨게 한다.
+ *
+ * 위의 `app.setAppUserModelId(APP_ID)` 는 "이 알림이 어느 앱 것인지" 만 정한다.
+ * 화면에 보여줄 **이름** 은 Windows 가 따로 찾는데, 보통 같은 ID 를 가진 시작메뉴
+ * 바로가기에서 가져온다. 그런데 NSIS 설치본이 만든 바로가기에는 그 ID 가 비어 있어
+ * (실측 확인) 이름을 못 찾고 알림에 "Electron" 이 표시됐다.
+ *
+ * 레지스트리에 ID 를 직접 등록해두면 바로가기 상태와 무관하게 이름이 잡히고,
+ * 앱을 켤 때마다 다시 써주므로 설치가 꼬여도 스스로 복구된다.
+ */
+function registerAppUserModelId() {
+  if (process.platform !== "win32") return;
+
+  // 패키징하면 icon.png 는 asar 안이라 Windows 가 직접 읽지 못한다 → 밖으로 한 번 복사한다.
+  let iconPath = path.join(__dirname, "icon.png");
+  try {
+    const copied = path.join(app.getPath("userData"), "app-icon.png");
+    fs.copyFileSync(iconPath, copied);
+    iconPath = copied;
+  } catch {
+    /* 아이콘 복사에 실패해도 이름 등록은 계속 진행한다 */
+  }
+
+  const key = `HKCU\\Software\\Classes\\AppUserModelId\\${APP_ID}`;
+  const write = (name, value) => {
+    execFile("reg", ["add", key, "/v", name, "/t", "REG_SZ", "/d", value, "/f"], (error) => {
+      if (error) console.error(`[aumid] ${name} 등록 실패:`, error.message);
+    });
+  };
+  write("DisplayName", "JDI 포털");
+  write("IconUri", iconPath);
 }
 
 function createMainWindow() {
@@ -313,6 +349,7 @@ function onReady() {
     callback(permission === "notifications");
   });
 
+  registerAppUserModelId();
   createTray();
   createMainWindow();
   setupAutoUpdater();
