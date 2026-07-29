@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useCallback, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import { useProjects } from "@/lib/projects/useProjects";
 // 아이콘별 deep import — 전체 phosphor-react 배럴 로드 회피 (서버 cold-start ↓)
@@ -45,7 +45,24 @@ const navItems = [
 
 export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, chatUnreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  // hover/포커스 시 해당 메뉴 1개만 미리 불러온다(intent prefetch).
+  // 전체 메뉴 자동 prefetch 는 RSC 요청 7개가 초기 로딩과 경쟁해 첫 화면을
+  // 수 초 늦춘 전력이 있어 금지(perf 가드) — hover 방식은 곧 클릭할 라우트만
+  // 받아 클릭 전 서버 왕복(0.4~1초)을 숨긴다. 같은 메뉴 연속 hover 로 요청이
+  // 반복되지 않도록 10초 간격으로 제한한다(라우터 캐시 만료 후 재-prefetch 허용).
+  const prefetchAtRef = useRef<Map<string, number>>(new Map());
+  const prefetchOnIntent = useCallback(
+    (href: string) => {
+      const now = Date.now();
+      const last = prefetchAtRef.current.get(href) ?? 0;
+      if (now - last < 10_000) return;
+      prefetchAtRef.current.set(href, now);
+      router.prefetch(href);
+    },
+    [router]
+  );
   const { activeProjects } = useProjects();
   const onTimeline = pathname.startsWith("/dashboard/work-timeline");
   // 업무 타임라인 하위 목록(프로젝트 필터) 펼침/접힘 — 기본은 접힘
@@ -89,6 +106,9 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
               <Link
                 href={item.href}
                 prefetch={false}
+                onMouseEnter={() => prefetchOnIntent(item.href)}
+                onFocus={() => prefetchOnIntent(item.href)}
+                onTouchStart={() => prefetchOnIntent(item.href)}
                 onClick={(event) => {
                   if (isTimelineItem && !collapsed) {
                     if (pathname === "/dashboard/work-timeline") {
@@ -135,17 +155,20 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
                 <div className="mt-1 space-y-0.5 pl-9 pr-1">
                   {timelineSubItems.map((sub) => {
                     const subActive = currentProject === sub.value;
+                    const subHref =
+                      sub.value === ""
+                        ? "/dashboard/work-timeline"
+                        : sub.value === "none"
+                          ? "/dashboard/work-timeline?project=none"
+                          : `/dashboard/work-timeline?project=${sub.value}`;
                     return (
                       <Link
                         key={sub.value || "all"}
-                        href={
-                          sub.value === ""
-                            ? "/dashboard/work-timeline"
-                            : sub.value === "none"
-                              ? "/dashboard/work-timeline?project=none"
-                              : `/dashboard/work-timeline?project=${sub.value}`
-                        }
+                        href={subHref}
                         prefetch={false}
+                        onMouseEnter={() => prefetchOnIntent(subHref)}
+                        onFocus={() => prefetchOnIntent(subHref)}
+                        onTouchStart={() => prefetchOnIntent(subHref)}
                         onClick={onMobileClose}
                         aria-current={subActive ? "page" : undefined}
                         className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${

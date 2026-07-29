@@ -37,9 +37,12 @@ const nextConfig: NextConfig = {
     // 클라이언트 라우터 캐시 — 방문했던 페이지를 짧은 시간 재사용
     //   dynamic: prefetch={false} 이거나 fully dynamic 한 페이지용 (기본 0초 → 사실상 캐시 없음)
     //   static: prefetch={true} 거나 정적 페이지용 (기본 5분)
-    // 3분/10분으로 둬서 메뉴를 빠르게 오갈 때 RSC payload를 재사용
+    // 5분/10분으로 둬서 메뉴를 오갈 때 RSC payload를 재사용 (탭 이동 실측에서
+    // 캐시 히트는 10~40ms, 미스는 600~1400ms — 만료가 잦으면 체감이 크게 나빠짐.
+    // 대부분 화면은 mount 후 클라이언트에서 최신 데이터를 다시 받으므로 5분 캐시가
+    // 오래된 화면을 고정시키지는 않는다.)
     staleTimes: {
-      dynamic: 180,
+      dynamic: 300,
       static: 600,
     },
   },
