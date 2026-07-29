@@ -23,6 +23,22 @@ npx supabase migration list --linked   # push 후 새 번호가 Remote 에 찍�
 - 그래서 새 번호는 **로컬 파일 최댓값이 아니라 위 명령의 Remote 열 최댓값 다음**으로 잡습니다.
 - 마이그레이션은 **멱등하게**(`IF NOT EXISTS`, `DROP POLICY IF EXISTS` 후 `CREATE`) 작성합니다. 재적용 사고가 실제로 있었습니다(107).
 
+### 파일이 사라졌을 때 복구하는 법
+
+`migration list --linked` 에서 **Local 은 비었는데 Remote 에만 번호가 있으면**, 그 마이그레이션 파일이 유실된 것입니다(병합 없이 삭제된 브랜치/worktree 등). 운영 DB의 `supabase_migrations.schema_migrations` 테이블이 **적용했던 SQL 원문을 `statements` 컬럼에 그대로 보관**하므로 되살릴 수 있습니다.
+
+```sql
+SELECT version, name, array_to_string(statements, E';\n') AS sql
+  FROM supabase_migrations.schema_migrations
+ WHERE version BETWEEN '111' AND '116'   -- 유실된 번호 범위
+ ORDER BY version;
+```
+
+- 접속은 `railway run --service jdi-portal -- node <스크립트>` 로 하면 `DATABASE_URL` 이 주입되어 비밀번호를 파일·로그에 남기지 않습니다.
+- `supabase db dump` 는 Docker Desktop 이 필요하고, 로컬 `.env.local` 의 `DATABASE_URL` 은 비밀번호가 만료돼 있을 수 있습니다.
+- 복구 후 `migration list --linked` 로 Local/Remote 가 모두 채워졌는지 확인합니다.
+- **실제 사례**: `111`~`116`(인플루언서 시딩·후보 발굴 계열)이 이 방법으로 복구되었습니다. 단, 이 6개가 만든 테이블을 쓰는 **앱 코드는 master 에 없습니다**(병합되지 않은 작업). DB 구조만 운영에 남아 있는 상태이므로, 관련 작업을 할 때 이미 존재하는 테이블을 다시 만들지 않도록 주의합니다.
+
 ## RLS
 
 - 사용자 데이터 테이블은 RLS를 켭니다.
