@@ -4,6 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+// 내부 경로 import — Next 업그레이드 시 경로가 바뀌면 빌드가 실패해 바로 드러난다.
+// 기본 prefetch(AUTO)는 동적 라우트의 껍데기(loading 경계)만 미리 받아 클릭 후
+// 본문 RSC 왕복(0.6~0.9초)이 그대로 남는다. FULL 은 본문 데이터까지 미리 받는다.
+import { PrefetchKind } from "next/dist/client/components/router-reducer/router-reducer-types";
 import LogoutButton from "@/components/LogoutButton";
 import { useProjects } from "@/lib/projects/useProjects";
 // 아이콘별 deep import — 전체 phosphor-react 배럴 로드 회피 (서버 cold-start ↓)
@@ -59,7 +63,7 @@ export default function Sidebar({ user, collapsed, mobileOpen, onMobileClose, ch
       const last = prefetchAtRef.current.get(href) ?? 0;
       if (now - last < 10_000) return;
       prefetchAtRef.current.set(href, now);
-      router.prefetch(href);
+      router.prefetch(href, { kind: PrefetchKind.FULL });
     },
     [router]
   );
