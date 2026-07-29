@@ -62,7 +62,7 @@ npm run lint
 검증(코드를 고쳤으면 최소한 `test:performance`는 돌립니다):
 
 ```bash
-npm run test:performance      # 성능·아키텍처 회귀 75개
+npm run test:performance      # 성능·아키텍처 회귀 검사
 npm run test:security
 npm run test:expenses
 npm run test:search-privacy

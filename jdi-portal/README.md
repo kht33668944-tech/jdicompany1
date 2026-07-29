@@ -51,7 +51,7 @@ npm run lint     # ESLint
 검증(테스트):
 
 ```bash
-npm run test:performance      # 성능·아키텍처 회귀 75개 — 코드 수정 후 필수
+npm run test:performance      # 성능·아키텍처 회귀 검사 — 코드 수정 후 필수
 npm run test:security         # 보안 회귀
 npm run test:expenses         # 지출관리
 npm run test:search-privacy   # 검색 프라이버시

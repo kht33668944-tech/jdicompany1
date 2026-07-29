@@ -23,7 +23,7 @@ npm run dev
 npm run build
 npm run lint
 
-npm run test:performance      # 성능·아키텍처 회귀 75개
+npm run test:performance      # 성능·아키텍처 회귀 검사
 npm run test:security
 npm run test:expenses
 npm run test:search-privacy

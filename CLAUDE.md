@@ -26,7 +26,7 @@ npm run test:search-privacy   # 검색 프라이버시 회귀 검사 (scripts/ch
 npm run test:security         # 보안 회귀 검사 (인플루언서 Edge 인증 + 업무보고 검토 RLS)
 npm run test:expenses         # 지출관리 도메인 정적 검사 (--experimental-strip-types 로 .ts 직접 로드)
 npm run perf:audit            # 성능 감사 (scripts/performance-audit.mjs, 빌드 결과 필요)
-npm run test:performance      # 성능/아키텍처 회귀 스위트 — 현재 13개 파일, 75개 검사
+npm run test:performance      # 성능/아키텍처 회귀 스위트 (코드 수정 후 필수)
 #   단일 테스트 파일: node --test scripts/<파일>.test.mjs
 
 # npm 스크립트에 묶여 있지 않아 직접 실행해야 하는 테스트
@@ -34,6 +34,7 @@ node --test scripts/projects-feature.test.mjs scripts/work-timeline-attachments.
   scripts/attendance-multi-task-entry.test.mjs scripts/influencer-thumbnail-failure.test.mjs
 
 # Supabase
+npx supabase migration list --linked                   # 새 번호 잡기 전 원격 적용 상태 확인 (필수)
 npx supabase db push --linked                          # 마이그레이션 적용
 npx supabase functions deploy <name> --no-verify-jwt   # Edge Function 배포
 ```
@@ -65,13 +66,18 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 
 **Edge Functions** (`supabase/functions/`, **Deno 런타임** — Node 전용 패키지 금지): `influencer-analyze`, `influencer-extract`(인플루언서 자동 분석), `push-dispatch`(웹 푸시). PWA/웹 푸시는 `src/lib/push/`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
 
-**마이그레이션**: `supabase/migrations/NNN_설명.sql` 순차 번호. 현재 최신은 **`117_activity_log.sql`** 이고 **다음 번호는 118**입니다 — 기존 파일 수정 대신 다음 번호로 **추가**합니다.
+**마이그레이션**: `supabase/migrations/NNN_설명.sql` 순차 번호. 기존 파일 수정 대신 다음 번호로 **추가**합니다.
 
-> **번호 공백 주의**: `111`~`116`은 이 브랜치에 없습니다. 병합되지 않은 다른 작업 브랜치가 이미 그 번호를 운영 DB에 적용했기 때문입니다. 모든 worktree/브랜치가 **같은 운영 Supabase를 공유**하므로, 이미 적용된 번호를 다시 쓰면 `db push`가 그 파일을 조용히 건너뜁니다. 새 마이그레이션은 **파일 목록의 최댓값이 아니라 원격에 적용된 최신 번호 다음**으로 잡고, 새 번호를 쓰기 전에 아래로 확인합니다.
+> **번호는 이 문서에 적지 않습니다. 매번 직접 확인하세요.**
 >
 > ```bash
-> cd jdi-portal && npx supabase migration list --linked   # Local/Remote 열 비교
+> cd jdi-portal && npx supabase migration list --linked   # Local / Remote 열 비교
 > ```
+>
+> 모든 worktree/브랜치가 **같은 운영 Supabase를 공유**합니다. 그래서 파일 목록에는 번호 공백이 생길 수 있고(병합 안 된 다른 브랜치가 이미 그 번호를 운영 DB에 적용), **이미 적용된 번호를 다시 쓰면 `db push`가 그 파일을 오류 없이 조용히 건너뜁니다.**
+>
+> - 새 번호는 **로컬 파일 최댓값이 아니라 위 명령의 Remote 열 최댓값 다음**으로 잡습니다.
+> - push 후에도 같은 명령으로 새 번호가 Remote에 찍혔는지 확인합니다.
 
 ## 성능 불변조건 (속도 회귀 방지 — 되돌리지 말 것)
 
@@ -83,7 +89,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 4. **대시보드 업무 요약 사전 필터** (마이그레이션 088 + `get_dashboard_task_summaries` RPC): `tasks` 전체 스캔 금지 — status/completed_at 사전 필터와 부분 인덱스를 유지합니다.
 5. **초기 JS 예산**: 무거운 라이브러리(xlsx 등)는 지연 로드, 라우트별 초기 JS 예산 준수(`npm run perf:audit`), 전역 prefetch 남용 금지, `/api/health`는 인증 우회 유지.
 
-기준선: `jdi-portal/docs/performance/production-baseline.md`. 회귀 방지 테스트: `jdi-portal/scripts/performance-architecture.test.mjs` 등 13개 파일(`npm run test:performance` = 75개 검사, 2026-07-29 기준 전부 통과). 새 기능이 대시보드 초기 데이터에 얹히면(예: 업무지시·검토 인박스·최근 활동) **빠른 경로와 RPC 폴백 양쪽에 싣는지 검사하는 테스트가 추가되어 있으므로**, 한쪽만 고치면 이 스위트가 실패합니다.
+기준선: `jdi-portal/docs/performance/production-baseline.md`. 회귀 방지 테스트는 `jdi-portal/scripts/performance-architecture.test.mjs` 등이며 `npm run test:performance`로 한 번에 돌립니다(검사 개수는 계속 늘어나므로 여기에 적지 않습니다 — 실행하면 마지막 줄에 `pass`/`fail`이 나옵니다). 새 기능이 대시보드 초기 데이터에 얹히면(예: 업무지시·검토 인박스·최근 활동) **빠른 경로와 RPC 폴백 양쪽에 싣는지 검사하는 테스트가 추가되어 있으므로**, 한쪽만 고치면 이 스위트가 실패합니다.
 
 ## 반드시 지킬 제약
 
