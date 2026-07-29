@@ -17,6 +17,7 @@ import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluence
 import Image from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { formatKRW } from "@/lib/influencer/format";
+import { APIFY_COST_PER_INFLUENCER_KRW } from "@/lib/influencer/constants";
 import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
 import type { InfluencerTier } from "@/lib/influencer/metrics";
@@ -403,7 +404,15 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       toast.info("재동기화할 활성 인플루언서가 없습니다.");
       return;
     }
-    if (!confirm(`활성 인플루언서 ${activeCount}명을 모두 재동기화합니다. 약 ${activeCount * 5}초 소요. 진행할까요?`)) {
+    const estimatedCost = activeCount * APIFY_COST_PER_INFLUENCER_KRW;
+    if (
+      !confirm(
+        `활성 인플루언서 ${activeCount}명을 모두 다시 긁어옵니다.\n\n` +
+          `· 예상 시간: 약 ${activeCount * 5}초\n` +
+          `· 예상 비용: 약 ${formatKRW(estimatedCost)} (Apify 크레딧 차감)\n\n` +
+          `진행할까요?`,
+      )
+    ) {
       return;
     }
     startResyncAll(async () => {
