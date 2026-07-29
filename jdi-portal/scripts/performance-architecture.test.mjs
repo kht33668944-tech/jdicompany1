@@ -122,9 +122,10 @@ test("sidebar prefetches routes on hover intent without global auto-prefetch", (
   // (prefetch={true})는 초기 로딩과 경쟁해 첫 화면을 수 초 늦춘 전력이 있어 금지.
   const sidebar = source("src/components/dashboard/Sidebar.tsx");
 
-  // hover/포커스 intent prefetch 는 유지한다.
+  // hover/포커스 intent prefetch 는 유지한다. FULL 이어야 본문 데이터까지 미리 받는다
+  // (기본 AUTO 는 껍데기만 받아 클릭 후 본문 RSC 왕복 0.6~0.9초가 그대로 남는다).
   assert.match(sidebar, /const prefetchOnIntent = useCallback/);
-  assert.match(sidebar, /router\.prefetch\(href\)/);
+  assert.match(sidebar, /router\.prefetch\(href, \{ kind: PrefetchKind\.FULL \}\)/);
   assert.match(sidebar, /onMouseEnter=\{\(\) => prefetchOnIntent\(item\.href\)\}/);
   assert.match(sidebar, /onFocus=\{\(\) => prefetchOnIntent\(item\.href\)\}/);
 
