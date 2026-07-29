@@ -176,6 +176,7 @@ function CompletedTaskTimelineShare({
           initialTitle={shareState.task.title}
           initialDescription={shareState.task.description ?? ""}
           initialCompletedAt={shareState.task.completedAt}
+          initialProjectId={shareState.task.projectId}
           taskId={task.id}
         />
       )}

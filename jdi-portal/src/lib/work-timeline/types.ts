@@ -92,6 +92,7 @@ export interface WorkTimelineTaskShareState {
     title: string;
     description: string | null;
     completedAt: string;
+    projectId: string | null;
   } | null;
 }
 

@@ -465,7 +465,7 @@ export async function getTaskTimelineShare(taskId: string): Promise<WorkTimeline
   const [taskResult, assigneeResult, existingResult] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, description, status, completed_at, updated_at, created_by")
+      .select("id, title, description, status, completed_at, updated_at, created_by, project_id")
       .eq("id", taskId)
       .maybeSingle(),
     supabase.from("task_assignees").select("user_id").eq("task_id", taskId).eq("user_id", userId).maybeSingle(),
@@ -487,6 +487,7 @@ export async function getTaskTimelineShare(taskId: string): Promise<WorkTimeline
     title: task.title,
     description: task.description,
     completedAt: task.completed_at ?? task.updated_at,
+    projectId: task.project_id ?? null,
   };
   if (existingResult.data) {
     return {

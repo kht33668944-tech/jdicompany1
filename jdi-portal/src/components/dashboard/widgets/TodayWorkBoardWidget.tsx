@@ -227,6 +227,7 @@ function CompletedTaskTimelineAction({
           initialTitle={shareState.task.title}
           initialDescription={shareState.task.description ?? ""}
           initialCompletedAt={shareState.task.completedAt}
+          initialProjectId={shareState.task.projectId}
           taskId={taskId}
         />
       )}
@@ -342,6 +343,7 @@ function CompletedTaskTimelineSnackbar({
           initialTitle={shareState.task.title}
           initialDescription=""
           initialCompletedAt={shareState.task.completedAt}
+          initialProjectId={shareState.task.projectId}
           taskId={taskId}
         />
       )}

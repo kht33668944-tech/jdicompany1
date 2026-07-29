@@ -38,6 +38,7 @@ interface WorkTimelineCreateModalProps {
   initialTitle?: string;
   initialDescription?: string;
   initialCompletedAt?: string;
+  initialProjectId?: string | null;
   taskId?: string | null;
 }
 
@@ -76,8 +77,10 @@ export default function WorkTimelineCreateModal({
   initialTitle = "",
   initialDescription = "",
   initialCompletedAt,
+  initialProjectId = null,
   taskId = null,
 }: WorkTimelineCreateModalProps) {
+  const initialProjectIdValue = initialProjectId ?? "";
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [initialCompletedAtValue] = useState(() =>
@@ -91,7 +94,7 @@ export default function WorkTimelineCreateModal({
   const [draftStatus, setDraftStatus] = useState<"loading" | "restored" | "ready">("loading");
   const [restoredDraftUpdatedAt, setRestoredDraftUpdatedAt] = useState<number | null>(null);
   const [autosaveArmed, setAutosaveArmed] = useState(false);
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState(initialProjectIdValue);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectColor, setNewProjectColor] = useState<string>(PROJECT_COLORS[0]);
@@ -120,7 +123,7 @@ export default function WorkTimelineCreateModal({
       || description.trim()
       || images.length > 0
       || completedAt !== initialCompletedAtValue
-      || projectId !== "",
+      || projectId !== initialProjectIdValue,
     );
     if (!hasContent) {
       await clearWorkTimelineDraft(currentUserId, draftScope);
@@ -148,7 +151,7 @@ export default function WorkTimelineCreateModal({
       draftUnavailableNotifiedRef.current = true;
       toast.warning("브라우저 저장소를 사용할 수 없어 초안을 자동 저장하지 못했습니다.");
     }
-  }), [completedAt, currentUserId, description, draftScope, enqueueDraftOperation, images, initialCompletedAtValue, projectId, taskId, title]);
+  }), [completedAt, currentUserId, description, draftScope, enqueueDraftOperation, images, initialCompletedAtValue, initialProjectIdValue, projectId, taskId, title]);
 
   const applyDraft = useCallback((draft: WorkTimelineDraftRecord) => {
     const restoredImages: SelectedAttachment[] = [];
@@ -306,7 +309,7 @@ export default function WorkTimelineCreateModal({
     setTitle(initialTitle);
     setDescription(initialDescription);
     setCompletedAt(initialCompletedAtValue);
-    setProjectId("");
+    setProjectId(initialProjectIdValue);
     setAutosaveArmed(false);
     setRestoredDraftUpdatedAt(null);
     setDraftStatus("ready");
