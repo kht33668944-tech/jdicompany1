@@ -37,7 +37,8 @@ npm run test:performance      # 성능/아키텍처 회귀 스위트 (코드 수
 
 # npm 스크립트에 묶여 있지 않아 직접 실행해야 하는 테스트
 node --test scripts/projects-feature.test.mjs scripts/work-timeline-attachments.test.mjs \
-  scripts/attendance-multi-task-entry.test.mjs scripts/influencer-thumbnail-failure.test.mjs
+  scripts/attendance-multi-task-entry.test.mjs scripts/influencer-thumbnail-failure.test.mjs \
+  scripts/work-timeline-latest-day-fallback.test.mjs
 
 # Supabase
 npx supabase migration list --linked                   # 새 번호 잡기 전 원격 적용 상태 확인 (필수)

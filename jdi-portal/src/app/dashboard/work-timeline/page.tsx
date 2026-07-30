@@ -7,7 +7,7 @@ import {
 } from "@/lib/work-timeline/queries";
 import { getKstDayRange } from "@/lib/work-timeline/utils";
 import { normalizeProjectParam } from "@/lib/projects/utils";
-import { toDateString } from "@/lib/utils/date";
+import { pickLatestKstDayEntries, toDateString } from "@/lib/utils/date";
 
 interface WorkTimelinePageProps {
   searchParams: Promise<{
@@ -45,7 +45,7 @@ export default async function WorkTimelinePage({ searchParams }: WorkTimelinePag
   // 전체 보기는 date 파라미터를 삭제하므로, 파라미터 유무로 처음 진입을 구분한다.
   // 이렇게 하면 서버 초기 조회도 오늘로 좁혀져 전체 조회의 지연이 사라진다.
   const dateParam = firstValue(params.date);
-  const initialDate = dateParam ? validDate(dateParam) : toDateString();
+  let initialDate = dateParam ? validDate(dateParam) : toDateString();
   const employeeId = UUID_PATTERN.test(initialEmployeeId) ? initialEmployeeId : "";
   const projectParam = firstValue(params.project);
   const initialProjectId = normalizeProjectParam(projectParam);
@@ -58,10 +58,28 @@ export default async function WorkTimelinePage({ searchParams }: WorkTimelinePag
         date: initialDate || null,
         projectId: initialProjectId || null,
       });
-  const [entries, profiles] = await Promise.all([
+  const [todayEntries, profiles] = await Promise.all([
     entriesPromise,
     getWorkTimelineProfiles(auth.supabase),
   ]);
+  let entries = todayEntries;
+
+  // 날짜 없이 처음 들어왔는데 오늘 완료 업무가 없으면,
+  // 같은 필터로 가장 최근 업무가 있던 날짜를 찾아 그 날짜를 대신 보여준다.
+  if (!dateParam && entries.length === 0 && initialQuery.length !== 1) {
+    const latest = await getWorkTimelineEntries(auth.supabase, {
+      limit: 15,
+      query: initialQuery.length >= 2 ? initialQuery : null,
+      employeeId: employeeId || null,
+      date: null,
+      projectId: initialProjectId || null,
+    });
+    const picked = pickLatestKstDayEntries(latest);
+    if (picked) {
+      initialDate = picked.date;
+      entries = picked.entries;
+    }
+  }
 
   return (
     <div className="mx-auto max-w-6xl">
