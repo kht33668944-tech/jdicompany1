@@ -39,7 +39,13 @@ steps:
       - |
         set -e
         IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}"
+        # Cloud Build 워커는 매번 새 머신이라 로컬 이미지 캐시가 비어 있다.
+        # 직전 이미지를 받아 --cache-from 으로 주지 않으면 Dockerfile 의 deps 레이어
+        # 분리가 무의미해져 배포마다 npm ci 를 처음부터 다시 돌린다.
+        docker pull "$$IMAGE:latest" || true
         docker build \
+          --cache-from "$$IMAGE:latest" \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
           --build-arg NEXT_PUBLIC_SUPABASE_URL="$$NEXT_PUBLIC_SUPABASE_URL" \
           --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
           --build-arg NEXT_PUBLIC_VAPID_PUBLIC_KEY="$$NEXT_PUBLIC_VAPID_PUBLIC_KEY" \
@@ -72,11 +78,11 @@ steps:
       # CPU 는 요청을 처리할 때만 할당한다(요청기반 과금). 상시 할당(--no-cpu-throttling)은
       # 서울 기준 월 $124 인데 이쪽은 월 $38 로 같은 속도가 나왔다(실측).
       #
-      # 대신 요청 사이에는 CPU 가 멈추므로 instrumentation.ts 의 pg/Supabase keepalive
-      # 타이머가 스스로 돌지 못한다. 그래서 **Cloud Scheduler 작업
-      # `jdi-portal-keepalive` 가 1분마다 /api/health 를 두드려 CPU 를 깨운다**
-      # (그 순간 밀려 있던 타이머가 실행된다). 이 작업을 지우면 유휴 후 첫 요청이
-      # 다시 수 초로 느려질 수 있다 — docs/operations/cloud-run-seoul.md 참고.
+      # 대신 요청 사이에는 CPU 가 멈추므로 instrumentation.ts 의 keepalive 타이머가
+      # fetch 를 시작만 하고 끝내지 못한다. 그래서 **Cloud Scheduler 작업
+      # `jdi-portal-keepalive` 가 1분마다 /api/keepalive 를 불러** 같은 데우기를
+      # 요청 안에서 await 로 완료시킨다. 이 작업을 지우면 유휴 후 첫 요청이 다시
+      # 느려진다 — docs/operations/cloud-run-seoul.md 참고.
       - --cpu-throttling
       # CPU 1개로는 부족하다(실측): 동시 요청이 몰리면 이벤트 루프가 밀려
       # middleware.getUser 가 2.6~3.7초로 부풀고 업무 타임라인이 2.9초까지 갔다.

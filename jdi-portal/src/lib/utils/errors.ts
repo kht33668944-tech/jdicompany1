@@ -35,15 +35,25 @@ export function isStaleDeploymentError(error: unknown): boolean {
 }
 
 /**
+ * 새로고침을 담당하는 감시자(`StaleDeploymentWatcher`)에게 알린다.
+ * 서버 렌더링 중에는 아무것도 하지 않는다.
+ */
+export function notifyStaleDeployment(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(STALE_DEPLOYMENT_EVENT));
+}
+
+/**
  * 앱 전체가 오류 문구를 만들 때 지나는 통로.
- * 배포 갱신 오류라면 영어 원문 대신 안내 문구를 돌려주고, 브라우저에서는
- * 새로고침을 담당하는 감시자에게 알린다(서버 렌더링 중에는 알리지 않는다).
+ *
+ * 배포 갱신 오류라면 영어 원문 대신 안내 문구를 돌려주고, **감시자에게 알린다.**
+ * 순수 함수가 아닌 점은 의도한 것이다 — 19곳의 호출부가 저마다 try/catch 로 오류를
+ * 삼키기 때문에, 감시자의 `unhandledrejection`/`error` 리스너로는 이 오류를 볼 수
+ * 없다. 클라이언트에서 이 오류가 지나는 유일한 공통 지점이 여기다.
  */
 export function getErrorMessage(error: unknown, fallback: string): string {
   if (isStaleDeploymentError(error)) {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent(STALE_DEPLOYMENT_EVENT));
-    }
+    notifyStaleDeployment();
     return STALE_DEPLOYMENT_MESSAGE;
   }
   if (error instanceof Error && error.message) return error.message;

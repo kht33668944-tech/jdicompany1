@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -10,14 +10,10 @@ import { createClient } from "@/lib/supabase/server";
  * `https://0.0.0.0:8080` 으로 확인됨). 그 주소로 리다이렉트되면 비밀번호 재설정
  * 메일의 링크를 눌러도 열리지 않는다.
  *
- * Location 을 상대 경로로 내보내면 브라우저가 "자기가 접속한 도메인" 기준으로
- * 해석하므로, 호스팅·프록시 구성이 바뀌어도 항상 올바른 주소로 이동한다.
- * (미들웨어와 signout 도 이미 상대 경로로 리다이렉트한다.)
+ * `next/navigation` 의 `redirect` 는 준 경로를 그대로 Location 에 넣고, 브라우저는
+ * "자기가 접속한 도메인" 기준으로 해석하므로 호스팅·프록시 구성이 바뀌어도 안전하다.
+ * 같은 폴더의 `signout`·`not-approved` 도 이미 이 방식을 쓴다.
  */
-function redirectTo(path: string) {
-  return new NextResponse(null, { status: 307, headers: { Location: path } });
-}
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
@@ -30,10 +26,9 @@ export async function GET(request: Request) {
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return redirectTo(safeNext);
-    }
+    // 세션 쿠키는 next/headers 의 cookies() 로 기록되므로 redirect 응답에도 실린다.
+    if (!error) redirect(safeNext);
   }
 
-  return redirectTo("/login");
+  redirect("/login");
 }
