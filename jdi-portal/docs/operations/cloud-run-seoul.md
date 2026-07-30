@@ -128,6 +128,25 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
 
 ## 배포
 
+> ### ⚠️ 반드시 `master` 를 배포하세요
+>
+> `gcloud builds submit` 은 **지금 이 폴더의 파일을 그대로** 올려 빌드합니다. git 브랜치를
+> 보지 않습니다. 그래서 작업 브랜치에서 그냥 실행하면 **다른 브랜치가 master 에 이미
+> 병합해 둔 수정이 빠진 채로 배포되어, 남의 작업이 조용히 되돌아갑니다.**
+>
+> 2026-07-30 실제로 이 일이 있었습니다 — 서울 전환을 작업 브랜치에서 배포하는 바람에
+> 인플루언서 수정 2건이 빠졌습니다(다행히 비용 관련 핵심은 Edge Function 쪽이라
+> 영향은 화면 표시에 그쳤습니다).
+>
+> 배포 전에 확인하세요.
+>
+> ```bash
+> git fetch origin master
+> git log --oneline HEAD..origin/master   # 결과가 비어 있어야 한다
+> ```
+>
+> 비어 있지 않으면 먼저 `git merge origin/master` 로 합친 뒤 배포합니다.
+
 ```bash
 # 저장소 루트에서
 gcloud builds submit --config cloudbuild.yaml \
