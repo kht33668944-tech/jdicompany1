@@ -21,11 +21,27 @@ const CONTENT_SECURITY_POLICY = [
   "object-src 'none'",
 ].join("; ");
 
+/**
+ * Docker(Cloud Run) 이미지용 standalone 출력 스위치.
+ * Railway 는 `next start` 로 실행하므로 기본값(끔)을 유지하고, 컨테이너 빌드에서만
+ * NEXT_OUTPUT_STANDALONE=1 로 켠다. 이렇게 두면 배포 대상이 바뀌어도 한쪽이
+ * 다른 쪽 실행 방식을 깨뜨리지 않는다(이전 중 Railway 는 롤백 경로로 살려둔다).
+ */
+const STANDALONE = process.env.NEXT_OUTPUT_STANDALONE === "1";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   turbopack: {
     root: __dirname,
   },
+  ...(STANDALONE
+    ? {
+        output: "standalone" as const,
+        // 저장소 루트(래퍼)가 아니라 이 앱을 추적 기준으로 삼아
+        // .next/standalone/server.js 가 항상 같은 위치에 생기게 한다.
+        outputFileTracingRoot: __dirname,
+      }
+    : {}),
   experimental: {
     // 배럴 import 최적화 — phosphor-react(58MB)·recharts·dnd가 쓰는 아이콘/모듈만 골라 번들
     // → 모든 대시보드 페이지의 초기 JS 번들 수백 KB 절감
@@ -44,6 +60,16 @@ const nextConfig: NextConfig = {
     staleTimes: {
       dynamic: 300,
       static: 600,
+    },
+    // 앱 앞에 Cloudflare 가 있고, Cloudflare 는 오리진(Cloud Run)으로 보낼 때 Host 를
+    // 오리진 주소로 바꿔 보낸다. 그러면 Server Action 의 CSRF 검사(브라우저가 보낸
+    // Origin 과 서버가 본 Host 를 비교)가 정상 요청을 거부한다 — 출근 체크·할일 저장
+    // 같은 모든 쓰기 동작이 막힌다. 실제 서비스 도메인을 허용해 이를 막는다.
+    // (Next 가 리버스 프록시 환경을 위해 제공하는 공식 설정이다.)
+    // `*.jdiportal.com` 은 본 도메인을 건드리기 전에 하위 도메인(예: seoul.jdiportal.com)
+    // 으로 쓰기 동작까지 검증할 수 있게 두는 것이다.
+    serverActions: {
+      allowedOrigins: ["jdiportal.com", "www.jdiportal.com", "*.jdiportal.com"],
     },
   },
   async headers() {

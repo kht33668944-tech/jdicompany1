@@ -22,6 +22,7 @@
 | `docs/claude/user-profile.md` | 사용자와 커뮤니케이션 방식 |
 | `docs/performance/production-baseline.md` | 성능 기준선과 확인 절차 |
 | `docs/operations/backup-and-recovery.md` | 백업·복구 운영 절차 |
+| `docs/operations/cloud-run-seoul.md` | 서울 리전 배포(Cloud Run) 구성·배포·롤백 |
 | `supabase/CLAUDE.md` | DB, RLS, Edge Function 규칙 |
 | `src/components/dashboard/attendance/CLAUDE.md` | 근태 도메인 규칙 |
 | `src/components/dashboard/chat/CLAUDE.md` | 채팅 도메인 규칙 |
@@ -36,7 +37,7 @@
 - 스타일: Tailwind CSS 4
 - 백엔드: Supabase Auth, Postgres, RLS, Storage, Realtime, Edge Functions
 - 데이터 접근: Supabase SSR 클라이언트가 기본, 일부 성능 민감 경로는 `pg` 직접 연결 + 폴백 (`src/lib/db/postgres.ts`)
-- 배포: Railway (루트 래퍼가 `jdi-portal` 빌드)
+- 배포: **GCP Cloud Run 서울(`asia-northeast3`)** — 프로젝트 `jdi-portal-seoul`, 서비스 `jdi-portal`. 루트에서 `gcloud builds submit --config cloudbuild.yaml` 로 **수동** 배포(자동 트리거 없음). `jdiportal.com` 은 Cloudflare Worker 가 전달. 절차·롤백·비용은 `docs/operations/cloud-run-seoul.md`. (2026-07-30 Railway 싱가포르에서 이전, Railway 배포는 중지)
 - 데스크톱: `jdi-desktop/` Electron 껍데기 — 웹만 고치면 자동 반영
 - UI 언어와 날짜 기준: 한국어, Asia/Seoul
 

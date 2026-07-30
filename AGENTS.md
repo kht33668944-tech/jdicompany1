@@ -5,7 +5,7 @@
 ## 작업 위치
 
 - 앱 코드, 문서, Supabase 설정은 모두 `jdi-portal/` 아래에서 관리합니다.
-- 루트 `package.json`은 Railway/Railpack이 Node 프로젝트를 감지하도록 두는 래퍼입니다.
+- 루트 `package.json`은 하위 앱 빌드를 위한 래퍼입니다. 운영 배포는 **GCP Cloud Run 서울** — `jdi-portal/docs/operations/cloud-run-seoul.md`.
 - 앱 작업 전에는 루트 `CLAUDE.md`(구조·성능 불변조건)와 `jdi-portal/AGENTS.md`를 우선 읽고 그 지침을 따릅니다.
 - `jdi-desktop/`은 포털 웹을 감싸는 Electron 껍데기입니다. 웹을 배포하면 자동 반영되므로, 트레이/자동 실행/자동 업데이트 같은 껍데기 동작을 바꿀 때만 작업합니다(`jdi-desktop/README.md`).
 

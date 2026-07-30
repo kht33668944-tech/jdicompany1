@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 이 저장소는 **래퍼(wrapper)** 입니다. 실제 앱은 `jdi-portal/` 하위에 있습니다.
 
-- 루트 `package.json`은 Railway/Railpack이 Node 프로젝트를 감지하고 하위 앱을 빌드하도록 두는 얇은 래퍼입니다. 루트 스크립트는 `jdi-portal`로 진입해 실행합니다.
+- 루트 `package.json`은 하위 앱을 빌드하도록 두는 얇은 래퍼입니다. 루트 스크립트는 `jdi-portal`로 진입해 실행합니다.
+
+**운영 배포는 GCP Cloud Run 서울(`asia-northeast3`)입니다** — 2026-07-30 Railway 싱가포르에서 이전했고, **Railway 배포는 중지했습니다**(설정은 남아 있으나 켜져 있지 않으므로 즉시 롤백 대상이 아닙니다). 배포는 자동이 아니라 루트에서 `gcloud builds submit --config cloudbuild.yaml` 로 사람이 실행합니다. `jdiportal.com` 은 Cloudflare Worker `jdi-portal-seoul-proxy` 가 Cloud Run 으로 전달합니다. 구성·배포·롤백·비용은 **`jdi-portal/docs/operations/cloud-run-seoul.md`** 를 먼저 읽으세요. 관련 파일: 루트 `Dockerfile`, `cloudbuild.yaml`(`railway.toml` 은 과거 구성으로 남겨 둔 것입니다).
 - **거의 모든 작업(코드, 문서, Supabase, 테스트)은 `jdi-portal/` 안에서 진행합니다.**
 - 앱 작업 전 `jdi-portal/CLAUDE.md`와 `jdi-portal/AGENTS.md`를 먼저 읽습니다. 도메인/DB 작업은 아래 계층별 문서를 우선 확인합니다.
 - `jdi-desktop/`은 **별도의 Electron 프로젝트**입니다(웹앱과 의존성·빌드 분리). 포털 웹을 감싸 Windows 트레이에 상주시키는 껍데기이며, **웹 기능을 고치면 데스크톱 앱은 자동 반영되므로 건드릴 필요가 없습니다.** 트레이/아이콘/자동 실행/자동 업데이트 같은 껍데기 동작을 바꿀 때만 작업하고, 절차는 `jdi-desktop/README.md`를 따릅니다. 웹 쪽 연동 지점은 `src/lib/hooks/useIsDesktopApp.ts`와 `src/lib/notifications/desktop.ts`입니다.
@@ -60,7 +62,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 
 **이중 데이터 접근 — 이 앱의 핵심 특징.** 두 경로가 공존하며, 보안의 최종 방어선은 항상 RLS입니다.
 - **Supabase (기본)**: `src/lib/supabase/`의 SSR 클라이언트. `server.ts`(서버 컴포넌트/Route Handler, 쿠키 기반), `client.ts`(브라우저, 캐시된 싱글턴), `middleware.ts`(세션 갱신), `auth.ts`(`getAuthUser()` 등). RLS + `public.is_approved_user()`로 접근 제어.
-- **직접 Postgres (`pg` Pool)**: `src/lib/db/postgres.ts`. 일부 성능 민감 서버 흐름에서 `DATABASE_URL`로 직접 연결. **fallback 설계가 핵심** — 연결 실패 시 `markPostgresUnavailable()`로 60초간 차단하고 Supabase 경로로 우회. `src/instrumentation.ts`가 Railway 프로세스 시작 시 풀을 warm-up 합니다.
+- **직접 Postgres (`pg` Pool)**: `src/lib/db/postgres.ts`. 일부 성능 민감 서버 흐름에서 `DATABASE_URL`로 직접 연결. **fallback 설계가 핵심** — 연결 실패 시 `markPostgresUnavailable()`로 60초간 차단하고 Supabase 경로로 우회. `src/instrumentation.ts`가 서버 프로세스 시작 시 풀을 warm-up 합니다.
 
 **인증/세션 흐름**: Next.js 16이라 `middleware.ts`가 아니라 **`src/proxy.ts`** 가 진입점입니다(`src/lib/supabase/middleware.ts`의 `updateSession` 호출). 승인된 사용자만 대시보드 접근.
 
@@ -84,7 +86,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 이 앱은 여러 차례 성능 최적화를 거쳤고, 아래 장치들이 사이트 속도를 유지합니다. **큰 작업 중 실수로 이것들을 지우거나 우회하면 사이트가 다시 3~7초로 느려집니다.** 관련 파일을 수정할 땐 아래를 깨지 않는지 확인하고, **작업 후 반드시 `cd jdi-portal && npm run test:performance`로 검증**합니다(회귀가 있으면 테스트가 실패). 자동 검증은 세션 종료 시 성능 회귀 방지 훅(`jdi-portal/scripts/perf-guard-hook.mjs`)이 코드 변경을 감지해 이 테스트를 돌립니다.
 
 1. **미들웨어 인증 캐시** (`jdi-portal/src/lib/supabase/middleware.ts`): 5분 내 검증된 로그인 쿠키는 `getUser()` 네트워크 왕복(서울 인증 서버, 평시 300~500ms)을 생략합니다. **최대 개선(전역 지연 제거)** 이므로 `getAuthVerifyCache`/`AUTH_CACHE_TTL_MS` 로직을 제거·우회하지 않습니다.
-2. **DB/HTTPS keepalive** (`jdi-portal/src/instrumentation.ts`): 2분 주기로 pg 풀과 Supabase 경로를 데워 콜드 스타트(유휴 후 첫 요청 3~7초)를 방지합니다. `setInterval`/keepalive와 pg 풀 설정(`min:1`, `keepAlive:true`, `idleTimeoutMillis: 10*60_000` — `src/lib/db/postgres.ts`)을 유지합니다.
+2. **DB/HTTPS keepalive** (`jdi-portal/src/instrumentation.ts`): 2분 주기로 pg 풀과 Supabase 경로를 데워 콜드 스타트(유휴 후 첫 요청 3~7초)를 방지합니다. `setInterval`/keepalive와 pg 풀 설정(`min:1`, `keepAlive:true`, `idleTimeoutMillis: 10*60_000` — `src/lib/db/postgres.ts`)을 유지합니다. 운영(Cloud Run)은 CPU 요청기반 과금이라 요청 사이에 CPU 가 멈춰 이 타이머가 `fetch` 를 시작만 하고 끝내지 못합니다. 그래서 **Cloud Scheduler 작업 `jdi-portal-keepalive` 가 1분마다 `/api/keepalive` 를 불러 같은 데우기(`src/lib/warmup.ts`)를 요청 안에서 `await` 로 완료시킵니다** — 스케줄러도 이 경로도 지우면 안 됩니다(`jdi-portal/docs/operations/cloud-run-seoul.md`).
 3. **빠른 경로(직접 Postgres) + 폴백**: 대시보드·할일 초기 데이터는 단일 pg 왕복(`src/lib/dashboard/fast-queries.ts`, `src/lib/tasks/fast-queries.ts`). 성능 최적화 시 **빠른 경로와 Supabase RPC 폴백 양쪽**을 함께 고쳐야 운영에 반영됩니다(운영이 쓰는 경로는 로그 `source`로 확인).
 4. **대시보드 업무 요약 사전 필터** (마이그레이션 088 + `get_dashboard_task_summaries` RPC): `tasks` 전체 스캔 금지 — status/completed_at 사전 필터와 부분 인덱스를 유지합니다.
 5. **초기 JS 예산**: 무거운 라이브러리(xlsx 등)는 지연 로드, 라우트별 초기 JS 예산 준수(`npm run perf:audit`), 전역 prefetch 남용 금지, `/api/health`는 인증 우회 유지.
@@ -113,6 +115,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 | `jdi-portal/docs/superpowers/{specs,plans}/` | 기능 설계·구현 계획 기록 |
 | `jdi-portal/docs/performance/production-baseline.md` | 운영 성능 기준선과 재현 확인 절차 |
 | `jdi-portal/docs/operations/backup-and-recovery.md` | 백업·복구 운영 절차 |
+| `jdi-portal/docs/operations/cloud-run-seoul.md` | 서울 리전 배포(Cloud Run) 구성·배포·롤백 |
 | `jdi-desktop/README.md` | Windows 데스크톱 앱(트레이·자동 업데이트·배포) |
 
 ## 사용자/커뮤니케이션

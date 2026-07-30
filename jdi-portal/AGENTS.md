@@ -8,7 +8,7 @@ JDICOMPANY 내부 포털입니다. 비개발자 운영자가 쓰는 업무 도�
 - Tailwind CSS 4, ESLint 9
 - Supabase Auth, Postgres, RLS, Storage, Realtime, Edge Functions
 - 주요 라이브러리: `@supabase/ssr`, `@supabase/supabase-js`, `@hello-pangea/dnd`, `phosphor-react`, `recharts`, `sonner`, `xlsx`(CDN tarball 고정), `idb`, `pg`
-- 배포: Railway 루트 래퍼에서 `jdi-portal` 빌드
+- 배포: **GCP Cloud Run 서울(`asia-northeast3`)** — 루트에서 `gcloud builds submit --config cloudbuild.yaml` 수동 실행. `docs/operations/cloud-run-seoul.md` 참고 (2026-07-30 Railway 에서 이전)
 - 데스크톱 껍데기: `jdi-desktop/` (Electron, 별도 npm 프로젝트 — 웹 배포만으로 자동 반영)
 
 ## 앱 기능 영역
@@ -96,7 +96,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 
 ## 환경 변수
 
-커밋 가능한 예시는 `.env.local.example`에만 둡니다. 실제 값은 `.env.local`, Railway Variables, Supabase Secrets에서 관리합니다.
+커밋 가능한 예시는 `.env.local.example`에만 둡니다. 실제 값은 `.env.local`, **GCP Secret Manager**(운영 — `gcloud secrets`, Cloud Run 이 `--set-secrets` 로 주입), Supabase Secrets 에서 관리합니다.
 
 현재 공개 환경 변수:
 

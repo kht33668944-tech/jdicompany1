@@ -80,12 +80,47 @@ test("Railway healthcheck bypasses auth while startup warms one persistent DB co
   assert.match(health, /NextResponse\.json\(\{ ok: true \}\)/);
   assert.match(instrumentation, /await getPool\(\)\.query\("select 1"\)/);
   // 콜드 스타트(유휴 후 첫 요청 지연) 방지용 in-process keepalive는 의도된 구성이다:
-  // pg 연결은 setInterval 로, Supabase HTTPS 경로는 fetch 로 주기적으로 데워둔다.
+  // pg 연결과 Supabase HTTPS 경로를 setInterval 로 주기적으로 데워둔다.
   assert.match(instrumentation, /setInterval\(/);
-  assert.match(instrumentation, /fetch\(/);
+  assert.match(instrumentation, /pingSupabase\(\)/);
+  assert.match(instrumentation, /pingPostgres\(\)/);
   assert.match(postgres, /min: 1/);
   assert.match(postgres, /idleTimeoutMillis: 10 \* 60_000/);
   assert.match(postgres, /keepAlive: true/);
+});
+
+test("외부 스케줄러용 데우기 경로: 요청 안에서 await 로 완료 + 인증 우회 + 연타 방지", () => {
+  // 운영(Cloud Run)은 요청을 처리할 때만 CPU 를 준다. 그래서 instrumentation.ts 의
+  // setInterval 은 fetch 를 시작만 하고 끝내지 못한다 — 실측(2026-07-30)에서 11분
+  // 유휴 뒤 첫 요청의 middleware.getUser 가 720ms 로 부풀었다. Cloud Scheduler 가
+  // 1분마다 이 경로를 불러 같은 데우기를 요청 안에서 완료시킨다.
+  const warmup = source("src/lib/warmup.ts");
+  const route = source("src/app/api/keepalive/route.ts");
+  const middleware = source("src/lib/supabase/middleware.ts");
+  const health = source("src/app/api/health/route.ts");
+
+  // 실제로 상류를 두드려야 의미가 있다(인증 서버 + PostgREST + pg).
+  assert.match(warmup, /auth\/v1\/health/);
+  assert.match(warmup, /rest\/v1\/profiles/);
+  assert.match(warmup, /getPool\(\)\.query\("select 1"\)/);
+
+  // 시작만 하고 끝내지 않으면 이 경로의 존재 이유가 없어진다.
+  assert.match(route, /await warmUpstreams\(\)/);
+  assert.doesNotMatch(route, /void warmUpstreams\(/);
+
+  // 1분마다 불리므로 인증 왕복을 태우면 안 된다.
+  assert.ok(
+    middleware.indexOf('pathname === "/api/keepalive"') <
+      middleware.indexOf("createServerClient("),
+  );
+
+  // 인증 없이 열려 있으므로 연타해도 실제 작업은 간격을 두고만 한다.
+  assert.match(route, /MIN_INTERVAL_MS/);
+
+  // health 는 순수한 생존 확인으로 남긴다(외부 헬스체크가 DB 상태에 끌려가면 안 된다).
+  assert.doesNotMatch(health, /warmUpstreams|supabase|createClient|DATABASE_URL/);
+
+  // 예전에 쓰다 버린 경로가 되살아나 두 벌이 되는 것을 막는다.
   assert.equal(existsSync(path.join(appRoot, "src/app/api/keep-warm/route.ts")), false);
 });
 
@@ -148,6 +183,21 @@ test("client router cache keeps visited dashboard tabs for at least five minutes
     Number(dynamicStale[1]) >= 300,
     `staleTimes.dynamic must stay >= 300s (got ${dynamicStale[1]})`,
   );
+});
+
+test("auth redirects stay host-agnostic (프록시/컨테이너 뒤에서도 올바른 주소로)", () => {
+  // 실측(2026-07): `new URL(request.url).origin` 은 서비스 도메인이 아니라 서버가
+  // listen 하는 내부 주소로 잡힌다 — Railway 에서 `https://localhost:8080`,
+  // 컨테이너에서 `https://0.0.0.0:8080`. 그 주소로 리다이렉트되면 비밀번호 재설정
+  // 메일 링크가 열리지 않는다. Location 을 상대 경로로 내보내야 브라우저가 자기가
+  // 접속한 도메인 기준으로 해석한다.
+  const callback = source("src/app/auth/callback/route.ts");
+
+  assert.doesNotMatch(callback, /NextResponse\.redirect\(/);
+  assert.doesNotMatch(callback, /\$\{origin\}/);
+  assert.match(callback, /headers:\s*\{\s*Location:\s*path\s*\}/);
+  // 열린 리다이렉트 방지(외부 주소로 튕기지 않게)는 그대로 유지한다.
+  assert.match(callback, /next\.startsWith\("\/"\) && !next\.startsWith\("\/\/"\)/);
 });
 
 test("reports list resolves attachment counts in the same round trip", () => {

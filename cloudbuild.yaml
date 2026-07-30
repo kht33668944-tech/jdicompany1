@@ -1,0 +1,94 @@
+# Google Cloud Build — JDI 포털을 서울(asia-northeast3) Cloud Run 에 배포한다.
+#
+# 수동 배포:
+#   gcloud builds submit --config cloudbuild.yaml .
+# GitHub 트리거(master push)로도 같은 파일을 그대로 쓴다.
+#
+# 공개 환경변수(NEXT_PUBLIC_*)는 클라이언트 번들에 박히므로 빌드 시점에 필요하다.
+# 저장소에 값을 두지 않기 위해 Secret Manager 에서 읽어 --build-arg 로만 전달한다.
+
+substitutions:
+  _REGION: asia-northeast3
+  _SERVICE: jdi-portal
+  _REPO: jdi
+
+options:
+  # Next.js 빌드는 CPU/메모리를 많이 쓴다. 기본 머신은 느리고 OOM 위험이 있다.
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_SUPABASE_URL/versions/latest
+      env: NEXT_PUBLIC_SUPABASE_URL
+    - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_SUPABASE_ANON_KEY/versions/latest
+      env: NEXT_PUBLIC_SUPABASE_ANON_KEY
+    - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_VAPID_PUBLIC_KEY/versions/latest
+      env: NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    secretEnv:
+      - NEXT_PUBLIC_SUPABASE_URL
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY
+      - NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    args:
+      - -c
+      - |
+        set -e
+        IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}"
+        docker build \
+          --build-arg NEXT_PUBLIC_SUPABASE_URL="$$NEXT_PUBLIC_SUPABASE_URL" \
+          --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+          --build-arg NEXT_PUBLIC_VAPID_PUBLIC_KEY="$$NEXT_PUBLIC_VAPID_PUBLIC_KEY" \
+          -t "$$IMAGE:$BUILD_ID" \
+          -t "$$IMAGE:latest" \
+          .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
+      - --region=${_REGION}
+      - --platform=managed
+      # 사내 포털이지만 로그인 게이트는 앱이 처리한다(Cloud Run 단계에서 막으면 로그인 화면도 못 본다).
+      - --allow-unauthenticated
+      # 항상 1대를 켜 둔다(콜드 스타트 방지). 이 값은 줄이지 말 것.
+      - --min-instances=1
+      - --max-instances=6
+      # CPU 는 요청을 처리할 때만 할당한다(요청기반 과금). 상시 할당(--no-cpu-throttling)은
+      # 서울 기준 월 $124 인데 이쪽은 월 $38 로 같은 속도가 나왔다(실측).
+      #
+      # 대신 요청 사이에는 CPU 가 멈추므로 instrumentation.ts 의 pg/Supabase keepalive
+      # 타이머가 스스로 돌지 못한다. 그래서 **Cloud Scheduler 작업
+      # `jdi-portal-keepalive` 가 1분마다 /api/health 를 두드려 CPU 를 깨운다**
+      # (그 순간 밀려 있던 타이머가 실행된다). 이 작업을 지우면 유휴 후 첫 요청이
+      # 다시 수 초로 느려질 수 있다 — docs/operations/cloud-run-seoul.md 참고.
+      - --cpu-throttling
+      # CPU 1개로는 부족하다(실측): 동시 요청이 몰리면 이벤트 루프가 밀려
+      # middleware.getUser 가 2.6~3.7초로 부풀고 업무 타임라인이 2.9초까지 갔다.
+      # 2개로 올리자 같은 부하에서 225~414ms 로 정상화됐다. 낮추지 말 것.
+      - --cpu=2
+      - --memory=2Gi
+      - --cpu-boost
+      - --execution-environment=gen2
+      # SSR 은 CPU 를 많이 쓰므로 한 대에 과하게 몰지 않고 인스턴스를 늘려 받는다.
+      - --concurrency=20
+      - --timeout=120
+      - --service-account=jdi-run@$PROJECT_ID.iam.gserviceaccount.com
+      - --set-secrets=NEXT_PUBLIC_SUPABASE_URL=NEXT_PUBLIC_SUPABASE_URL:latest,NEXT_PUBLIC_SUPABASE_ANON_KEY=NEXT_PUBLIC_SUPABASE_ANON_KEY:latest,NEXT_PUBLIC_VAPID_PUBLIC_KEY=NEXT_PUBLIC_VAPID_PUBLIC_KEY:latest,DATABASE_URL=DATABASE_URL:latest,ACCOUNT_VAULT_KEY=ACCOUNT_VAULT_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest
+
+timeout: 1800s

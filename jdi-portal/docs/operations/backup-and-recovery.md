@@ -15,7 +15,7 @@
 
 **대시보드에서만 확인 가능(추측 금지)**
 - 운영 DB의 자동 백업 켜짐 여부, 보존 기간, 시점 복구(PITR) 가능 여부 → **Supabase 대시보드 확인 필요**.
-- Railway 배포 알림·로그 보존 → **Railway 대시보드 확인 필요**.
+- Cloud Run 배포 알림·로그 보존 → **Google Cloud 콘솔 확인 필요**.
 
 ---
 
@@ -48,16 +48,40 @@ Supabase에서의 복원 위치: **Database → Backups → 원하는 백업의 
 
 ---
 
-## 3. Railway 배포 롤백 방법
+## 3. 배포 롤백 방법 (Cloud Run)
 
-증상이 "최근 배포 이후 사이트가 이상함"이라면, 코드/DB를 건드리기 전에 **직전 정상 배포로 되돌리는 것**이 가장 빠르고 안전합니다.
+증상이 "최근 배포 이후 사이트가 이상함"이라면, 코드/DB를 건드리기 전에 **직전 정상
+배포로 되돌리는 것**이 가장 빠르고 안전합니다.
 
-1. https://railway.app 로그인 → 이 프로젝트 → 해당 서비스 클릭.
-2. **Deployments** 탭에서 배포 이력을 봅니다. 각 배포에 커밋 메시지가 붙어 있습니다.
-3. **직전 정상 배포**를 찾아 오른쪽 **⋯ 메뉴 → Redeploy(또는 Rollback)** 를 누릅니다. → 그 시점 코드로 즉시 되돌아갑니다.
-4. 롤백은 **코드만** 되돌립니다. 그 사이 **DB 마이그레이션이 있었다면** 코드만 되돌려선 안 맞을 수 있으니, 마이그레이션이 포함된 배포였는지 개발자와 확인합니다.
+Cloud Run 은 배포할 때마다 **리비전(revision)** 이라는 이름의 스냅샷을 남깁니다.
+되돌리기는 트래픽을 이전 리비전으로 옮기는 것이고, **다시 빌드하지 않으므로 몇 초면
+끝납니다.**
 
-> 참고: 배포는 GitHub `master`에 커밋이 올라가면 Railway가 자동으로 빌드합니다(`railway.toml`). 문제가 있는 커밋을 되돌리려면 롤백 후, git에서 해당 변경을 정리하는 것을 개발자에게 요청하세요.
+**화면에서 하는 방법**
+
+1. https://console.cloud.google.com 로그인 → 프로젝트 **`jdi-portal-seoul`** 선택.
+2. 왼쪽 메뉴 **Cloud Run** → 서비스 **`jdi-portal`** 클릭.
+3. **`Revisions`** 탭에서 배포 이력을 봅니다(최신이 위).
+4. 위쪽 **`Manage traffic`** 을 누르고, 직전 정상 리비전에 **100%** 를 준 뒤 저장합니다.
+
+**명령으로 하는 방법(개발자용)**
+
+```bash
+gcloud run revisions list --service jdi-portal --region=asia-northeast3 --project jdi-portal-seoul
+gcloud run services update-traffic jdi-portal --to-revisions=<리비전이름>=100 \
+  --region=asia-northeast3 --project jdi-portal-seoul
+```
+
+5. 롤백은 **코드만** 되돌립니다. 그 사이 **DB 마이그레이션이 있었다면** 코드만
+   되돌려선 안 맞을 수 있으니, 마이그레이션이 포함된 배포였는지 개발자와 확인합니다.
+
+> **되돌린 뒤에는 Cloudflare 캐시를 비우세요.** 정적 페이지가 `s-maxage=31536000`
+> 이라 이전/이후 빌드의 HTML 과 청크 이름이 어긋나 화면이 깨질 수 있습니다.
+> (Cloudflare → 해당 도메인 → Caching → Purge Everything)
+
+> 참고: 배포는 자동이 아닙니다. `gcloud builds submit` 으로 사람이 실행합니다
+> (절차: `docs/operations/cloud-run-seoul.md`). GitHub `master` 에 올려도 자동
+> 배포되지 않습니다.
 
 ---
 
@@ -65,13 +89,27 @@ Supabase에서의 복원 위치: **Database → Backups → 원하는 백업의 
 
 | 증상 | 어디서 보나 | 무엇을 보나 |
 |---|---|---|
-| 사이트가 안 뜸 / 500 오류 | **Railway → 서비스 → Deployments/Logs** | 앱 시작 실패, `console.error` 메시지, 크래시 스택 |
+| 사이트가 안 뜸 / 500 오류 | **Cloud Run → `jdi-portal` → Logs** | 앱 시작 실패, `console.error` 메시지, 크래시 스택 |
 | 로그인/DB 관련 오류 | **Supabase → Logs**(Postgres / Auth / Edge Functions) | 인증 실패, 쿼리 오류, RLS 거부 |
 | 인플루언서 수집/분석 오류 | **Supabase → Edge Functions → Logs** | `influencer-extract`/`influencer-analyze`/`push-dispatch` 실행 로그 |
-| 헬스체크 실패로 재시작 반복 | **Railway → Deployments** | `/api/health` 응답, restart 이력(`railway.toml`: 최대 10회 재시도) |
-| 첫 요청이 느림(콜드스타트) | 정상 동작일 수 있음 | `instrumentation.ts` keepalive 관련, 성능 기준선(`docs/performance/production-baseline.md`) |
+| 컨테이너가 계속 재시작 | **Cloud Run → Revisions** | 리비전 상태, 시작 로그 |
+| 도메인은 되는데 내용이 이상 | **Cloudflare → Workers & Pages** | Worker `jdi-portal-seoul-proxy` 라우트, 캐시 |
+| 첫 요청이 느림(콜드스타트) | 정상 동작일 수 있음 | 데우기(`/api/keepalive` + Cloud Scheduler), 성능 기준선(`docs/performance/production-baseline.md`) |
 
-> 현재 이 앱에는 Sentry 같은 **오류 자동 알림이 없습니다.** 오류를 능동적으로 알려면 Railway 로그 알림 또는 Sentry(무료 티어) 도입을 개발자와 검토하세요. (별도 개선 항목)
+**개발자용 로그 명령**
+
+```bash
+# 최근 로그
+gcloud run services logs read jdi-portal --region=asia-northeast3 --project jdi-portal-seoul
+
+# 오류만
+gcloud logging read 'resource.type=cloud_run_revision AND severity>=ERROR' \
+  --project jdi-portal-seoul --limit 20 --freshness=1h
+```
+
+> 현재 이 앱에는 Sentry 같은 **오류 자동 알림이 없습니다.** 오류를 능동적으로 알려면
+> Cloud Logging 의 로그 기반 알림 또는 Sentry(무료 티어) 도입을 개발자와 검토하세요.
+> (별도 개선 항목)
 
 ---
 
@@ -79,7 +117,7 @@ Supabase에서의 복원 위치: **Database → Backups → 원하는 백업의 
 
 - [ ] Supabase **Database → Backups**: 자동 백업 있음? 보존 며칠? PITR 켜짐? → 메모
 - [ ] Supabase **Settings → Billing**: 현재 플랜 확인(백업 정책과 직결)
-- [ ] Railway **Deployments**: 직전 정상 배포가 무엇인지 눈으로 확인(롤백 대비)
+- [ ] Cloud Run **Revisions**: 직전 정상 리비전이 무엇인지 눈으로 확인(롤백 대비)
 - [ ] 문제가 생기면 → **먼저 로그 확인 → 범위 파악 → 별도 환경 검증 → 마지막에 운영 반영**
 - [ ] 운영 DB 복원·삭제·권한 변경은 **실행 전 반드시 재확인**, 진행 전 **즉시 백업 1회 추가**
 
@@ -88,4 +126,4 @@ Supabase에서의 복원 위치: **Database → Backups → 원하는 백업의 
 ### 부록: 개발자에게 요청할 때 쓰는 문장 예시
 - "Supabase 백업이 며칠 보존인지, PITR이 켜져 있는지 확인해 주세요."
 - "이번 사고는 OO 테이블 OO 시각부터입니다. 전체 복원 말고 해당 데이터만 별도 환경에서 검증한 뒤 복구해 주세요."
-- "최근 배포 이후 문제가 생겼어요. 직전 정상 배포로 Railway 롤백하고, 그 배포에 DB 마이그레이션이 있었는지 확인해 주세요."
+- "최근 배포 이후 문제가 생겼어요. Cloud Run 에서 직전 정상 리비전으로 트래픽을 되돌리고, 그 배포에 DB 마이그레이션이 있었는지 확인해 주세요."
