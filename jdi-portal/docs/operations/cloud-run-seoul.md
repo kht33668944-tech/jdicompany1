@@ -14,7 +14,7 @@
 | 데우기 | Cloud Scheduler `jdi-portal-keepalive` (1분마다 `/api/keepalive`) |
 | DB | Supabase 서울 (변경 없음) |
 | 비용 | 월 약 $38 |
-| 배포 방식 | **수동** `gcloud builds submit --config cloudbuild.yaml` (자동 트리거 없음) |
+| 배포 방식 | **자동**: `master` 푸시/병합 → Cloud Build 트리거 `deploy-master-to-seoul` (**global** 리전). 수동도 가능: `gcloud builds submit --config cloudbuild.yaml` |
 | Railway | **중지됨 + 새 배포는 실패함** (아래 "Railway 는 이제 되살리기 어렵다") |
 | 데스크톱 앱 | `jdi-desktop` 은 `https://jdiportal.com` 을 띄우므로 자동 반영, 수정 불필요 |
 
@@ -128,6 +128,29 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
 
 ## 배포
 
+### 자동 배포 (기본, 2026-07-30부터)
+
+GitHub `master` 에 커밋이 올라가면(보통 PR 병합) Cloud Build 트리거
+**`deploy-master-to-seoul`** 이 `cloudbuild.yaml` 로 빌드 → 이미지 푸시 → Cloud Run
+배포까지 자동으로 진행합니다. **PR 병합 버튼이 곧 배포 버튼입니다.**
+
+- 트리거 리전은 **global** 입니다(서울 아님). GitHub 앱(1세대) 저장소 연결이 global 에
+  등록되어 있어서인데, `cloudbuild.yaml` 의 `_REGION: asia-northeast3` 가 배포 대상을
+  서울로 못 박고 있으므로 **배포 결과는 동일**합니다.
+- 연결을 다시 만들 일이 있으면 주의: 콘솔의 "저장소 연결" 이 asia-northeast3 화면에서
+  성공했다고 떠도 실제 매핑이 그 리전에 안 생길 수 있습니다(2026-07-30 실제 겪음).
+  트리거 만들기 화면에서 리전을 global 로 두고 연결하면 됩니다.
+- 빌드 상태 확인:
+  ```bash
+  gcloud builds list --project jdi-portal-seoul --region=global --limit=5
+  ```
+- 트리거를 수동으로 다시 돌리기(재배포):
+  ```bash
+  gcloud builds triggers run deploy-master-to-seoul --region=global --branch=master --project=jdi-portal-seoul
+  ```
+
+### 수동 배포 (필요할 때만)
+
 > ### ⚠️ 반드시 `master` 를 배포하세요
 >
 > `gcloud builds submit` 은 **지금 이 폴더의 파일을 그대로** 올려 빌드합니다. git 브랜치를
@@ -229,8 +252,10 @@ Host 가 바뀌므로 두 가지를 코드에서 미리 맞춰 두었습니다. 
 이전이 안정화된 뒤 **Railway 배포를 중지했습니다**(Deployments → 활성 배포 → Remove).
 그런데 그 뒤 두 가지가 겹쳐서, Railway 는 "누르면 살아나는 예비 서버" 가 아닙니다.
 
-1. **Railway 는 GitHub `master` 에 자동 배포가 켜져 있습니다.** (Cloud Build 에는
-   트리거가 없지만 Railway 에는 있습니다 — 헷갈리기 쉬우니 주의.)
+1. **Railway 는 GitHub `master` 에 자동 배포가 켜져 있습니다.** (2026-07-30 부터는
+   Cloud Build 에도 자동 트리거가 있으므로, `master` 병합 한 번에 **Cloud Build 는
+   성공하고 Railway 는 실패하는** 두 개의 빌드가 함께 돕니다. 사이트는 Cloud Build
+   쪽만 반영됩니다.)
 2. **저장소 루트에 `Dockerfile` 이 생기면서 Railway 의 빌드 방식이 바뀝니다.**
    `railway.toml` 의 시작 명령 `cd jdi-portal && node ...` 이 그 안에서 실행되지 않아
    `The executable "cd" could not be found` 로 **배포가 실패**합니다.
