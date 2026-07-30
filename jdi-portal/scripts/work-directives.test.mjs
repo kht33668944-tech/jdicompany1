@@ -232,3 +232,20 @@ test("push-dispatch: 알림 타입 등록 + 밤 시간 푸시 차단", () => {
   assert.match(fn, /QUIET_HOURS/);
   assert.match(fn, /Asia\/Seoul/);
 });
+
+test("보낸 지시 조회: tasks embed 는 FK 이름을 명시해야 한다 (PGRST201 재발 방지)", () => {
+  // 마이그레이션 103 이 work_directive_recipients 와 tasks 사이에 연결을 두 개 만든다.
+  //   work_directive_recipients.task_id -> tasks.id            (many-to-one, 1건)
+  //   tasks.directive_recipient_id      -> work_directive_recipients.id (one-to-many, 배열)
+  // 이름을 안 붙이면 PostgREST 가 거부하고(PGRST201) 조회가 500 으로 죽는다.
+  // 2026-07-30 운영에서 실제로 발생했다.
+  const src = read("src/lib/directives/actions.ts");
+
+  assert.match(src, /tasks!work_directive_recipients_task_id_fkey\(status\)/);
+  // 이름 없는 embed 가 다시 들어오면 실패시킨다.
+  assert.doesNotMatch(src, /,\s*tasks\(/);
+
+  // 코드가 단일 객체를 기대하므로(배열이 아님) many-to-one 쪽이어야 한다.
+  assert.match(src, /tasks:\s*\{\s*status:[^}]*\}\s*\|\s*null/);
+  assert.match(src, /row\.tasks\?\.status/);
+});

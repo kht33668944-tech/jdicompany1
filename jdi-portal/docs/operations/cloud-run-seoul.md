@@ -15,7 +15,7 @@
 | DB | Supabase 서울 (변경 없음) |
 | 비용 | 월 약 $38 |
 | 배포 방식 | **수동** `gcloud builds submit --config cloudbuild.yaml` (자동 트리거 없음) |
-| Railway | **중지됨** — 배포 Remove 완료. 설정·변수는 남아 있으나 켜져 있지 않음 |
+| Railway | **중지됨 + 새 배포는 실패함** (아래 "Railway 는 이제 되살리기 어렵다") |
 | 데스크톱 앱 | `jdi-desktop` 은 `https://jdiportal.com` 을 띄우므로 자동 반영, 수정 불필요 |
 
 ## 왜 옮겼나
@@ -202,17 +202,32 @@ Host 가 바뀌므로 두 가지를 코드에서 미리 맞춰 두었습니다. 
    gcloud run services update-traffic jdi-portal --to-revisions=<리비전이름>=100 \
      --region=asia-northeast3 --project jdi-portal-seoul
    ```
-2. **Railway 로 복귀 (2026-07-30 이후: 즉시 불가)**: 이전이 안정화된 것을 확인하고
-   **Railway 배포를 중지했습니다**(Deployments → 활성 배포 → Remove). 서비스 설정과
-   환경변수, `railway.toml` 은 남아 있으므로 되살릴 수는 있지만, Railway 대시보드에서
-   해당 배포를 **Redeploy** 해야 하고 **빌드부터 다시 하므로 몇 분 걸립니다.**
+2. **Railway 로 복귀**: → 아래를 읽으세요. **더 이상 실용적인 복구 경로가 아닙니다.**
+   실무적으로는 **1번(리비전 되돌리기)이 유일하게 빠르고 안전한 복구 경로**입니다.
 
-   DNS 는 여전히 Railway(`51v7n8wk.up.railway.app`)를 가리키고 있어서, Workers
-   라우트를 지우면 트래픽이 Railway 로 갑니다 — **지금은 Railway 가 꺼져 있으므로
-   먼저 Redeploy 로 살린 다음** 라우트를 지워야 합니다. 순서를 바꾸면 그동안 사이트가
-   404 를 냅니다.
+## Railway 는 이제 되살리기 어렵다 (2026-07-30)
 
-   → 실무적으로는 **1번(리비전 되돌리기)이 훨씬 빠르고 안전한 복구 경로**입니다.
+이전이 안정화된 뒤 **Railway 배포를 중지했습니다**(Deployments → 활성 배포 → Remove).
+그런데 그 뒤 두 가지가 겹쳐서, Railway 는 "누르면 살아나는 예비 서버" 가 아닙니다.
+
+1. **Railway 는 GitHub `master` 에 자동 배포가 켜져 있습니다.** (Cloud Build 에는
+   트리거가 없지만 Railway 에는 있습니다 — 헷갈리기 쉬우니 주의.)
+2. **저장소 루트에 `Dockerfile` 이 생기면서 Railway 의 빌드 방식이 바뀝니다.**
+   `railway.toml` 의 시작 명령 `cd jdi-portal && node ...` 이 그 안에서 실행되지 않아
+   `The executable "cd" could not be found` 로 **배포가 실패**합니다.
+   (PR #10 병합 때 실제로 이렇게 실패했습니다.)
+
+즉 **`master` 에 커밋을 올릴 때마다 Railway 에서 실패한 배포가 하나씩 쌓입니다.**
+사이트에는 영향이 없지만(트래픽은 Cloudflare Worker 가 전부 Cloud Run 으로 보냄)
+알림이 오고 보기에 지저분합니다.
+
+**정말로 Railway 로 돌아가야 한다면**, Deployments 이력에서 **`Dockerfile` 이 생기기
+전의 배포**(= PR #9 병합분)를 찾아 **Redeploy** 해야 합니다. 최신 배포를 Redeploy 하면
+같은 이유로 또 실패합니다. 그리고 Workers 라우트는 **Railway 가 살아난 것을 확인한
+뒤에** 지워야 합니다 — 순서를 바꾸면 그동안 사이트가 404 를 냅니다.
+
+**정리할 때**: Railway 플랜을 해지하거나, 그 전까지 실패 알림이 거슬리면 Railway
+서비스 Settings 에서 GitHub 자동 배포 연결을 끄면 됩니다.
 
 ## 더 빠르게 (후속 최적화)
 

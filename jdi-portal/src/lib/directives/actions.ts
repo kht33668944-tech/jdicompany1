@@ -155,7 +155,13 @@ export async function getSentDirectivesFor(targetUserId: string): Promise<SentDi
   const { data, error } = await supabase
     .from("work_directive_recipients")
     .select(
-      "id, directive_id, state, decline_reason, created_at, work_directives(title, kind), tasks(status)"
+      // tasks 는 반드시 FK 이름을 붙여 지정한다. 마이그레이션 103 이 이 두 표 사이에
+      // 연결을 두 개 만들어 두었기 때문이다(수락 시 양쪽 다 채워진다).
+      //   work_directive_recipients.task_id       -> tasks.id            (여기서 쓰는 것, 1건)
+      //   tasks.directive_recipient_id            -> work_directive_recipients.id (역방향, 배열)
+      // 이름을 안 붙이면 PostgREST 가 어느 쪽인지 몰라 거부하고(PGRST201) 이 조회가
+      // 500 으로 실패한다 — 운영에서 실제로 발생했다(2026-07-30).
+      "id, directive_id, state, decline_reason, created_at, work_directives(title, kind), tasks!work_directive_recipients_task_id_fkey(status)"
     )
     .eq("user_id", targetUserId)
     .order("created_at", { ascending: false })
