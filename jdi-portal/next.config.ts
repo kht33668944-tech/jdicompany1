@@ -61,6 +61,14 @@ const nextConfig: NextConfig = {
       dynamic: 300,
       static: 600,
     },
+    // 앱 앞에 Cloudflare 가 있고, Cloudflare 는 오리진(Cloud Run)으로 보낼 때 Host 를
+    // 오리진 주소로 바꿔 보낸다. 그러면 Server Action 의 CSRF 검사(브라우저가 보낸
+    // Origin 과 서버가 본 Host 를 비교)가 정상 요청을 거부한다 — 출근 체크·할일 저장
+    // 같은 모든 쓰기 동작이 막힌다. 실제 서비스 도메인을 허용해 이를 막는다.
+    // (Next 가 리버스 프록시 환경을 위해 제공하는 공식 설정이다.)
+    serverActions: {
+      allowedOrigins: ["jdiportal.com", "www.jdiportal.com"],
+    },
   },
   async headers() {
     return [

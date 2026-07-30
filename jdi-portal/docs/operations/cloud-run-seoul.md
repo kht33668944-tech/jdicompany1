@@ -75,6 +75,33 @@ printf '%s' '새-값' | gcloud secrets versions add DATABASE_URL --data-file=- -
 `NEXT_PUBLIC_*` 는 클라이언트 번들에 값이 박히므로 바꾼 뒤 **반드시 다시 빌드**해야
 합니다(재배포만으로는 브라우저 쪽 값이 바뀌지 않습니다).
 
+## 도메인 연결 (Cloudflare)
+
+`jdiportal.com` 은 Cloudflare 프록시를 지나 오리진으로 전달됩니다. Cloud Run 은
+**자기 주소(`*.run.app`)로 온 요청만 받고, 다른 도메인 이름으로 온 요청은 404** 로
+거부합니다(실측 확인). 서울 리전은 Cloud Run 커스텀 도메인 매핑 생성이 막혀 있어
+(`501 Creating domain mappings is not allowed in asia-northeast3`) 다음 두 가지를
+Cloudflare 에 설정합니다.
+
+1. **DNS**: `jdiportal.com` 레코드를 CNAME → Cloud Run 주소, **Proxied(주황 구름) 유지**
+2. **Origin Rules → Host Header Override**: 오리진으로 보낼 Host 를 Cloud Run 주소로 변경
+
+Host 를 바꾸면 앱이 보는 도메인이 달라지므로 두 가지를 코드에서 미리 맞춰 두었습니다.
+**되돌리지 마세요.**
+
+- `next.config.ts` 의 `experimental.serverActions.allowedOrigins` — 이게 없으면 Server
+  Action 의 CSRF 검사가 Origin(브라우저의 `jdiportal.com`)과 Host(오리진 주소) 불일치로
+  **모든 쓰기 동작(출근 체크·할일 저장·지출 등록 등)을 거부**합니다.
+- `src/app/auth/callback/route.ts` 의 상대 경로 리다이렉트 — 절대 주소로 되돌리면
+  내부 주소(`0.0.0.0:8080`)로 튕깁니다.
+
+전환 직후 확인할 것:
+
+- 로그인 → 대시보드 진입
+- **출근 체크** (쓰기 동작 + 사무실 IP 판정이 함께 걸리는 대표 경로).
+  IP 는 `/api/ip` 로도 확인할 수 있고, 사무실에서 접속했을 때 실제 공인 IP 가 나와야 합니다.
+- 파일 업로드 1건 (업무 타임라인 또는 채팅)
+
 ## 되돌리기 (롤백)
 
 1. **직전 버전으로**: Cloud Run 은 배포마다 리비전을 남기므로 트래픽만 되돌리면 됩니다.
