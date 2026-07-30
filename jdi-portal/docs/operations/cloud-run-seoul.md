@@ -79,15 +79,27 @@ printf '%s' '새-값' | gcloud secrets versions add DATABASE_URL --data-file=- -
 
 `jdiportal.com` 은 Cloudflare 프록시를 지나 오리진으로 전달됩니다. Cloud Run 은
 **자기 주소(`*.run.app`)로 온 요청만 받고, 다른 도메인 이름으로 온 요청은 404** 로
-거부합니다(실측 확인). 서울 리전은 Cloud Run 커스텀 도메인 매핑 생성이 막혀 있어
-(`501 Creating domain mappings is not allowed in asia-northeast3`) 다음 두 가지를
-Cloudflare 에 설정합니다.
+거부합니다(실측 확인). 그래서 Cloudflare 가 오리진으로 보낼 때 Host 를 Cloud Run
+주소로 맞춰 줘야 하는데, 막힌 길이 두 개 있습니다.
 
-1. **DNS**: `jdiportal.com` 레코드를 CNAME → Cloud Run 주소, **Proxied(주황 구름) 유지**
-2. **Origin Rules → Host Header Override**: 오리진으로 보낼 Host 를 Cloud Run 주소로 변경
+- Cloud Run 커스텀 도메인 매핑: 서울 리전은 **생성이 금지**
+  (`501 Creating domain mappings is not allowed in asia-northeast3`).
+- Cloudflare Origin Rules 의 Host Header Override: **무료 플랜 미포함**
+  (`not entitled to use the HostHeader override`).
 
-Host 를 바꾸면 앱이 보는 도메인이 달라지므로 두 가지를 코드에서 미리 맞춰 두었습니다.
-**되돌리지 마세요.**
+남는 방법이 **Cloudflare Workers**(무료 플랜 포함)입니다. Worker 가 요청을 받아
+Cloud Run 주소로 그대로 전달합니다. 이 방식의 장점은 **DNS 를 건드리지 않는다**는
+점입니다 — 라우트만 지우면 즉시 기존 오리진으로 되돌아갑니다.
+
+1. Worker 스크립트 `jdi-portal-seoul-proxy`: 요청 URL 의 host 를 Cloud Run 주소로 바꿔
+   `fetch` 합니다. **`redirect: "manual"` 필수** — 없으면 Worker 가 앱의 307 리다이렉트를
+   대신 따라가 버려서 주소창과 로그인 흐름이 어긋납니다.
+2. Workers Routes 에 `jdiportal.com/*`, `www.jdiportal.com/*` 등록.
+
+> Workers 는 **계정 이메일 인증**이 되어 있어야 씁니다(안 되어 있으면
+> `10034 You need to verify your email address to use Workers`).
+
+Host 가 바뀌므로 두 가지를 코드에서 미리 맞춰 두었습니다. **되돌리지 마세요.**
 
 - `next.config.ts` 의 `experimental.serverActions.allowedOrigins` — 이게 없으면 Server
   Action 의 CSRF 검사가 Origin(브라우저의 `jdiportal.com`)과 Host(오리진 주소) 불일치로
@@ -111,8 +123,21 @@ Host 를 바꾸면 앱이 보는 도메인이 달라지므로 두 가지를 코�
      --region=asia-northeast3 --project jdi-portal-seoul
    ```
 2. **Railway 로 완전 복귀**: Railway 서비스와 `railway.toml` 을 그대로 남겨 뒀습니다.
-   Cloudflare 에서 `jdiportal.com` 의 오리진을 Railway 주소로 되돌리면 끝입니다
-   (DNS 이므로 몇 분 내 반영). 이전이 안정화될 때까지 Railway 를 끄지 마세요.
+   Workers 라우트 방식이라 **DNS 는 여전히 Railway(`51v7n8wk.up.railway.app`)를 가리키고
+   있으므로**, Cloudflare 에서 Workers Routes 의 `jdiportal.com/*` 항목만 지우면 즉시
+   Railway 로 돌아갑니다. 이전이 안정화될 때까지 Railway 를 끄지 마세요.
+
+## 더 빠르게 (후속 최적화)
+
+Cloudflare 는 이 회선에서 서울(ICN) 거점을 쓰지 않습니다 — 실측상 `CF-RAY` 가 홍콩
+8/10, 도쿄 2/10 입니다. 그래서 Cloudflare 를 지나면 서울 서버를 써도 약 70ms 를
+그냥 잃습니다(연결 재사용 기준 `/api/health`: 서울 직접 13~17ms vs Cloudflare 경유 예상 85ms).
+
+프록시를 걷어내려면 `jdiportal.com` 인증서를 서울에서 직접 서비스해야 합니다.
+
+- **Firebase Hosting** — 무료. `asia-northeast3` Cloud Run rewrite 를 지원합니다.
+  GCP 프로젝트에 Firebase 를 추가할 때 **Firebase 약관 동의(사람이 직접)** 가 필요합니다.
+- **GCP 외부 Application Load Balancer** — 월 $18~25. 자동화는 가능하지만 비용이 듭니다.
 
 ## 주의
 

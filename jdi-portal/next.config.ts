@@ -66,8 +66,10 @@ const nextConfig: NextConfig = {
     // Origin 과 서버가 본 Host 를 비교)가 정상 요청을 거부한다 — 출근 체크·할일 저장
     // 같은 모든 쓰기 동작이 막힌다. 실제 서비스 도메인을 허용해 이를 막는다.
     // (Next 가 리버스 프록시 환경을 위해 제공하는 공식 설정이다.)
+    // `*.jdiportal.com` 은 본 도메인을 건드리기 전에 하위 도메인(예: seoul.jdiportal.com)
+    // 으로 쓰기 동작까지 검증할 수 있게 두는 것이다.
     serverActions: {
-      allowedOrigins: ["jdiportal.com", "www.jdiportal.com"],
+      allowedOrigins: ["jdiportal.com", "www.jdiportal.com", "*.jdiportal.com"],
     },
   },
   async headers() {
