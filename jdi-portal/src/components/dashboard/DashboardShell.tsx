@@ -8,6 +8,7 @@ import NotificationProvider from "./NotificationProvider";
 import ChatUnreadProvider from "./chat/ChatUnreadProvider";
 import AnalysisJobsProvider from "./AnalysisJobsProvider";
 import AnalysisJobsWidget from "./AnalysisJobsWidget";
+import StaleDeploymentWatcher from "./StaleDeploymentWatcher";
 
 interface DashboardShellProps {
   user: { id: string; email: string; name: string; avatarUrl?: string | null };
@@ -76,6 +77,9 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
       <ChatUnreadProvider userId={user.id} onUnreadChange={setChatUnreadCount} />
 
       <AnalysisJobsWidget />
+
+      {/* 배포로 화면이 낡으면(Server Action 불일치) 대신 새로고침해 준다 */}
+      <StaleDeploymentWatcher />
 
       <Toaster
         position="bottom-right"
