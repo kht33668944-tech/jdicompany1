@@ -79,9 +79,13 @@ gcloud run services update-traffic jdi-portal --to-revisions=<리비전이름>=1
 > 이라 이전/이후 빌드의 HTML 과 청크 이름이 어긋나 화면이 깨질 수 있습니다.
 > (Cloudflare → 해당 도메인 → Caching → Purge Everything)
 
-> 참고: 배포는 자동이 아닙니다. `gcloud builds submit` 으로 사람이 실행합니다
-> (절차: `docs/operations/cloud-run-seoul.md`). GitHub `master` 에 올려도 자동
-> 배포되지 않습니다.
+> 참고: **운영(Cloud Run) 배포는 자동이 아닙니다.** `gcloud builds submit` 으로 사람이
+> 실행합니다(절차: `docs/operations/cloud-run-seoul.md`). GitHub `master` 에 올려도
+> 서울 서버에는 반영되지 않습니다.
+>
+> 반대로 **Railway 는 `master` 자동 배포가 켜져 있어** 커밋을 올리면 빌드를 시도하고,
+> 지금은 반드시 실패합니다(루트 `Dockerfile` 때문). 사이트에는 영향이 없습니다 —
+> 자세한 내용은 `docs/operations/cloud-run-seoul.md` 의 "Railway 는 이제 되살리기 어렵다".
 
 ---
 
