@@ -29,6 +29,17 @@ DB(Supabase)는 서울에 있는데 앱은 Railway **싱가포르**에 있었습
 `--min-instances=1`, `--no-cpu-throttling` 을 빼면 keepalive 가 멈춰 유휴 후 첫 요청이
 다시 수 초로 느려집니다. **줄이지 마세요.**
 
+### CPU 는 2개 이상 (실측 근거)
+
+처음 `--cpu=1` 로 띄웠더니 동시 요청이 몰릴 때 이벤트 루프가 밀려
+`[stage] middleware.getUser` 가 **2.6~3.7초**로 부풀고 업무 타임라인이 2.9초까지
+갔습니다. Supabase 가 같은 서울에 있으므로 네트워크 문제가 아니라 **CPU 부족**입니다
+(Railway Pro 는 CPU 여유가 훨씬 컸습니다). `--cpu=2 --memory=2Gi --concurrency=20` 으로
+올리자 같은 부하에서 225~414ms 로 정상화됐습니다.
+
+> 이 값은 `cloudbuild.yaml` 의 deploy 단계에도 적어 두었습니다. 거기서 낮추면
+> **다음 배포 때 조용히 되돌아갑니다.**
+
 ## 구성
 
 | 항목 | 값 |

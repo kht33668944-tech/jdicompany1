@@ -69,14 +69,17 @@ steps:
       # 성능 불변조건 유지: 항상 1대를 켜 두고 CPU 를 상시 할당해야
       # instrumentation.ts 의 pg 풀 warm-up 과 2분 주기 keepalive 가 계속 돈다.
       - --min-instances=1
-      - --max-instances=4
+      - --max-instances=6
       - --no-cpu-throttling
-      - --cpu=1
-      - --memory=1Gi
+      # CPU 1개로는 부족하다(실측): 동시 요청이 몰리면 이벤트 루프가 밀려
+      # middleware.getUser 가 2.6~3.7초로 부풀고 업무 타임라인이 2.9초까지 갔다.
+      # 2개로 올리자 같은 부하에서 225~414ms 로 정상화됐다. 낮추지 말 것.
+      - --cpu=2
+      - --memory=2Gi
       - --cpu-boost
       - --execution-environment=gen2
-      # SSR 은 단일 스레드라 한 대에 과하게 몰면 오히려 느려진다.
-      - --concurrency=40
+      # SSR 은 CPU 를 많이 쓰므로 한 대에 과하게 몰지 않고 인스턴스를 늘려 받는다.
+      - --concurrency=20
       - --timeout=120
       - --service-account=jdi-run@$PROJECT_ID.iam.gserviceaccount.com
       - --set-secrets=NEXT_PUBLIC_SUPABASE_URL=NEXT_PUBLIC_SUPABASE_URL:latest,NEXT_PUBLIC_SUPABASE_ANON_KEY=NEXT_PUBLIC_SUPABASE_ANON_KEY:latest,NEXT_PUBLIC_VAPID_PUBLIC_KEY=NEXT_PUBLIC_VAPID_PUBLIC_KEY:latest,DATABASE_URL=DATABASE_URL:latest,ACCOUNT_VAULT_KEY=ACCOUNT_VAULT_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest
