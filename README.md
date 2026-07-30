@@ -1,6 +1,6 @@
 # JDICOMPANY
 
-JDICOMPANY 포털 저장소입니다. 실제 Next.js 앱은 `jdi-portal/`에 있고, 루트는 Railway/Railpack이 Node 프로젝트를 감지하고 하위 앱을 빌드하도록 둔 래퍼입니다.
+JDICOMPANY 포털 저장소입니다. 실제 Next.js 앱은 `jdi-portal/`에 있고, 루트는 하위 앱을 빌드하도록 둔 래퍼입니다. 운영 배포는 **GCP Cloud Run 서울**입니다(`Dockerfile`, `cloudbuild.yaml`).
 
 ## 빠른 실행
 
@@ -25,7 +25,8 @@ npm run lint
 
 | 경로 | 내용 |
 |---|---|
-| `package.json` | Railway/Railpack용 루트 래퍼 스크립트 |
+| `package.json` | 루트 래퍼 스크립트 |
+| `Dockerfile` · `cloudbuild.yaml` | Cloud Run 서울 배포용 |
 | `CLAUDE.md` | 저장소 구조·아키텍처·성능 불변조건 (작업 전 필독) |
 | `AGENTS.md` | 저장소 루트 작업 지침 |
 | `jdi-portal/` | 실제 Next.js 16 포털 앱 |

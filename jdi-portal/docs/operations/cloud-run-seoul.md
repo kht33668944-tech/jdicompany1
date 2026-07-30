@@ -3,6 +3,21 @@
 앱을 **서울**에서 돌리기 위한 배포 구성 문서입니다. 왜 옮겼는지, 어떻게 배포하는지,
 문제가 생기면 어떻게 되돌리는지를 담습니다.
 
+## 현재 서버 상태 (2026-07-30 기준)
+
+| | |
+|---|---|
+| 운영 서버 | **GCP Cloud Run 서울** `asia-northeast3` / 프로젝트 `jdi-portal-seoul` / 서비스 `jdi-portal` |
+| 스펙 | CPU 2, 메모리 2GiB, 최소 1대 상시, 최대 6대, 동시 20, CPU 요청기반 과금 |
+| 도메인 | `jdiportal.com` → Cloudflare Worker `jdi-portal-seoul-proxy` → Cloud Run |
+| DNS | 아직 Railway(`51v7n8wk.up.railway.app`)를 가리킴 — Worker 가 가로채므로 무관 |
+| 데우기 | Cloud Scheduler `jdi-portal-keepalive` (1분마다 `/api/keepalive`) |
+| DB | Supabase 서울 (변경 없음) |
+| 비용 | 월 약 $38 |
+| 배포 방식 | **수동** `gcloud builds submit --config cloudbuild.yaml` (자동 트리거 없음) |
+| Railway | **중지됨** — 배포 Remove 완료. 설정·변수는 남아 있으나 켜져 있지 않음 |
+| 데스크톱 앱 | `jdi-desktop` 은 `https://jdiportal.com` 을 띄우므로 자동 반영, 수정 불필요 |
+
 ## 왜 옮겼나
 
 DB(Supabase)는 서울에 있는데 앱은 Railway **싱가포르**에 있었습니다. DNS 가 Cloudflare
@@ -187,10 +202,17 @@ Host 가 바뀌므로 두 가지를 코드에서 미리 맞춰 두었습니다. 
    gcloud run services update-traffic jdi-portal --to-revisions=<리비전이름>=100 \
      --region=asia-northeast3 --project jdi-portal-seoul
    ```
-2. **Railway 로 완전 복귀**: Railway 서비스와 `railway.toml` 을 그대로 남겨 뒀습니다.
-   Workers 라우트 방식이라 **DNS 는 여전히 Railway(`51v7n8wk.up.railway.app`)를 가리키고
-   있으므로**, Cloudflare 에서 Workers Routes 의 `jdiportal.com/*` 항목만 지우면 즉시
-   Railway 로 돌아갑니다. 이전이 안정화될 때까지 Railway 를 끄지 마세요.
+2. **Railway 로 복귀 (2026-07-30 이후: 즉시 불가)**: 이전이 안정화된 것을 확인하고
+   **Railway 배포를 중지했습니다**(Deployments → 활성 배포 → Remove). 서비스 설정과
+   환경변수, `railway.toml` 은 남아 있으므로 되살릴 수는 있지만, Railway 대시보드에서
+   해당 배포를 **Redeploy** 해야 하고 **빌드부터 다시 하므로 몇 분 걸립니다.**
+
+   DNS 는 여전히 Railway(`51v7n8wk.up.railway.app`)를 가리키고 있어서, Workers
+   라우트를 지우면 트래픽이 Railway 로 갑니다 — **지금은 Railway 가 꺼져 있으므로
+   먼저 Redeploy 로 살린 다음** 라우트를 지워야 합니다. 순서를 바꾸면 그동안 사이트가
+   404 를 냅니다.
+
+   → 실무적으로는 **1번(리비전 되돌리기)이 훨씬 빠르고 안전한 복구 경로**입니다.
 
 ## 더 빠르게 (후속 최적화)
 

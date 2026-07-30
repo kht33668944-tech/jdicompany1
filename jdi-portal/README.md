@@ -9,7 +9,7 @@ JDICOMPANY 사내 업무 포털입니다. 근태, 업무, 채팅, 일정, 리포
 - TypeScript strict
 - Tailwind CSS 4
 - Supabase Auth, Postgres, RLS, Realtime, Storage, Edge Functions
-- Railway 배포
+- GCP Cloud Run 서울 배포 (`docs/operations/cloud-run-seoul.md`)
 
 ## 시작하기
 
@@ -37,7 +37,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 ```
 
-실제 키와 운영 값은 커밋하지 않습니다. Railway Variables와 Supabase Secrets에서 관리합니다.
+실제 키와 운영 값은 커밋하지 않습니다. GCP Secret Manager 와 Supabase Secrets 에서 관리합니다.
 
 ## 주요 명령
 

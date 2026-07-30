@@ -13,7 +13,7 @@ Windows 사용자는 같은 포털을 `jdi-desktop/`(Electron 트레이 앱)으�
 - Frontend: Next.js 16.2.11 App Router, React 19.2.4, TypeScript strict
 - Styling: Tailwind CSS 4
 - Backend: Supabase Auth, Postgres, RLS, Realtime, Storage, Edge Functions
-- Runtime/Deploy: Node 22 이상, Railway
+- Runtime/Deploy: Node 22 이상, **GCP Cloud Run 서울(`asia-northeast3`)** — 수동 배포(`gcloud builds submit --config cloudbuild.yaml`), 앞단은 Cloudflare Worker. 절차는 `docs/operations/cloud-run-seoul.md`
 - Libraries: `@supabase/ssr`, `@hello-pangea/dnd`, `phosphor-react`, `recharts`, `sonner`, `xlsx`, `idb`, `pg`
 
 ## 명령
@@ -34,7 +34,7 @@ npx supabase db push --linked
 npx supabase functions deploy <name> --no-verify-jwt
 ```
 
-루트 저장소의 `package.json`은 Railway/Railpack 감지를 위한 래퍼입니다. 앱 작업은 `jdi-portal`에서 진행합니다.
+루트 저장소의 `package.json`은 하위 앱 빌드를 위한 래퍼입니다. 앱 작업은 `jdi-portal`에서 진행합니다.
 
 ## 경로
 
@@ -69,7 +69,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 - `is_approved_user()` 체크가 빠진 정책을 추가하지 않습니다.
 - 관리자 기능은 서버 또는 RPC에서 권한을 다시 검증합니다.
 - `SECURITY DEFINER` 함수는 `auth.uid()`와 권한 검증을 포함합니다.
-- 민감 정보는 서버 환경 변수, Railway Variables, Supabase Secrets에만 둡니다.
+- 민감 정보는 서버 환경 변수, **GCP Secret Manager**(Cloud Run 이 `--set-secrets` 로 주입), Supabase Secrets에만 둡니다.
 - Storage 정책은 파일 소유자/멤버십/관리자 조건을 명확히 둡니다.
 
 ## 날짜와 시간
@@ -88,7 +88,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 커밋 금지:
 
 - `.env.local`
-- Railway/Supabase 실제 키
+- GCP Secret Manager/Supabase 실제 키
 - 서비스 role key
 - VAPID private key
 - DB 접속 문자열

@@ -34,7 +34,10 @@ SELECT version, name, array_to_string(statements, E';\n') AS sql
  ORDER BY version;
 ```
 
-- 접속은 `railway run --service jdi-portal -- node <스크립트>` 로 하면 `DATABASE_URL` 이 주입되어 비밀번호를 파일·로그에 남기지 않습니다.
+- 접속은 아래처럼 하면 `DATABASE_URL` 이 환경변수로만 들어가 비밀번호를 파일·로그에 남기지 않습니다(운영 값은 GCP Secret Manager 에 있습니다). 예전에 쓰던 `railway run` 은 **Railway 배포를 중지해서 더 이상 동작하지 않습니다.**
+  ```bash
+  DATABASE_URL="$(gcloud secrets versions access latest --secret=DATABASE_URL --project jdi-portal-seoul)" node <스크립트>
+  ```
 - `supabase db dump` 는 Docker Desktop 이 필요하고, 로컬 `.env.local` 의 `DATABASE_URL` 은 비밀번호가 만료돼 있을 수 있습니다.
 - 복구 후 `migration list --linked` 로 Local/Remote 가 모두 채워졌는지 확인합니다.
 - **실제 사례**: `111`~`116`(인플루언서 시딩·후보 발굴 계열)이 이 방법으로 복구되었습니다. 단, 이 6개가 만든 테이블을 쓰는 **앱 코드는 master 에 없습니다**(병합되지 않은 작업). DB 구조만 운영에 남아 있는 상태이므로, 관련 작업을 할 때 이미 존재하는 테이블을 다시 만들지 않도록 주의합니다.
