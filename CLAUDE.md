@@ -10,8 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **운영 배포는 GCP Cloud Run 서울(`asia-northeast3`)입니다** (2026-07-30 Railway 싱가포르에서 이전). `jdiportal.com` 은 Cloudflare Worker `jdi-portal-seoul-proxy` 가 Cloud Run 으로 전달합니다. 구성·배포·롤백·비용은 **`jdi-portal/docs/operations/cloud-run-seoul.md`** 를 먼저 읽으세요. 관련 파일: 루트 `Dockerfile`, `cloudbuild.yaml`.
 
-- **서울 배포는 자동이 아닙니다.** 루트에서 `gcloud builds submit --config cloudbuild.yaml` 로 사람이 실행합니다(Cloud Build 트리거 없음). `master` 에 병합해도 운영에 반영되지 않습니다.
-- **배포 전 반드시 `master` 를 합치세요.** `gcloud builds submit` 은 git 브랜치가 아니라 **지금 폴더의 파일**을 올립니다. 작업 브랜치에서 그냥 배포하면 다른 브랜치가 이미 master 에 병합한 수정이 **조용히 되돌아갑니다**(2026-07-30 실제 발생). 배포 전 `git fetch origin master && git log --oneline HEAD..origin/master` 가 비어 있는지 확인합니다.
+- **서울 배포는 `master` 병합 시 자동입니다** (2026-07-30부터). Cloud Build 트리거 `deploy-master-to-seoul`(**global 리전** — 서울 아님, 저장소 연결이 global 에 있음)이 GitHub `master` 푸시를 감지해 `cloudbuild.yaml` 로 빌드·배포합니다. 즉 **PR 병합 = 운영 배포**입니다. 빌드 상태 확인: `gcloud builds list --project jdi-portal-seoul --region=global --limit=3`.
+- **수동 배포도 가능합니다**: 루트에서 `gcloud builds submit --config cloudbuild.yaml`. 이때는 **반드시 `master` 를 먼저 합치세요** — `gcloud builds submit` 은 git 브랜치가 아니라 **지금 폴더의 파일**을 올리므로, 작업 브랜치에서 그냥 배포하면 다른 브랜치가 이미 master 에 병합한 수정이 **조용히 되돌아갑니다**(2026-07-30 실제 발생). 배포 전 `git fetch origin master && git log --oneline HEAD..origin/master` 가 비어 있는지 확인합니다. (자동 트리거는 git master 를 그대로 빌드하므로 이 문제가 없습니다.)
 - **Railway 는 중지했지만 `master` 자동 배포 연결은 살아 있습니다.** 그래서 커밋을 올릴 때마다 Railway 에서 **실패한 배포가 하나씩 쌓입니다**(루트 `Dockerfile` 때문에 `railway.toml` 의 시작 명령이 안 먹힘). 사이트에는 영향이 없습니다 — 이유와 대응은 위 문서의 "Railway 는 이제 되살리기 어렵다" 절에 있습니다. `railway.toml` 은 그 시절 구성으로 남겨 둔 것입니다.
 - **거의 모든 작업(코드, 문서, Supabase, 테스트)은 `jdi-portal/` 안에서 진행합니다.**
 - 앱 작업 전 `jdi-portal/CLAUDE.md`와 `jdi-portal/AGENTS.md`를 먼저 읽습니다. 도메인/DB 작업은 아래 계층별 문서를 우선 확인합니다.
