@@ -23,13 +23,32 @@ DB(Supabase)는 서울에 있는데 앱은 Railway **싱가포르**에 있었습
 이 앱은 **항상 켜져 있는 Node 프로세스**를 전제로 성능을 맞춰 뒀습니다
 (`src/instrumentation.ts` 의 pg 풀 warm-up + 2분 주기 keepalive → 저장소 루트
 `CLAUDE.md` 의 성능 불변조건 2). 요청마다 새로 뜨는 함수형 호스팅에서는 이 장치가
-동작하지 않습니다. 그래서 컨테이너를 **최소 1대 상시 가동 + CPU 항상 할당**으로
-띄워 Railway 와 같은 실행 모델을 유지합니다.
+동작하지 않습니다. 그래서 컨테이너를 **최소 1대 상시 가동**(`--min-instances=1`)으로
+띄워 Railway 와 같은 실행 모델을 유지합니다. 이 값은 **줄이지 마세요.**
 
-`--min-instances=1`, `--no-cpu-throttling` 을 빼면 keepalive 가 멈춰 유휴 후 첫 요청이
-다시 수 초로 느려집니다. **줄이지 마세요.**
+## CPU 는 요청기반 과금 + 1분 heartbeat (비용 3분의 1)
 
-### CPU 는 2개 이상 (실측 근거)
+CPU 를 상시 할당(`--no-cpu-throttling`)하면 서울 기준 **월 약 $124**, 요청을 처리할
+때만 할당(`--cpu-throttling`)하면 **월 약 $38** 입니다. 실측에서 두 방식의 응답
+속도가 사실상 같았으므로 **요청기반**을 씁니다(단가는 아래 "비용" 절).
+
+대신 요청 사이에는 CPU 가 멈춰서 `instrumentation.ts` 의 keepalive 타이머가 스스로
+돌지 못합니다. 그래서 **Cloud Scheduler 작업이 1분마다 CPU 를 깨웁니다.**
+
+```bash
+gcloud scheduler jobs list --location=asia-northeast3 --project jdi-portal-seoul
+# jdi-portal-keepalive : "* * * * *" → GET https://<run.app>/api/health
+```
+
+> **이 스케줄러 작업을 지우거나 멈추면** 유휴 후 첫 요청이 다시 수 초로 느려질 수
+> 있습니다(죽은 소켓 재사용). 대상은 Cloudflare 를 거치지 않는 `*.run.app` 주소로
+> 두었습니다 — Worker 무료 한도를 쓰지 않기 위함입니다.
+
+안전망은 이중입니다. 스케줄러가 앱 타이머를 깨우고, 그와 별개로 pg 풀의
+`keepAlive: true`(`src/lib/db/postgres.ts`)가 **OS 수준 TCP keepalive** 이므로
+CPU 가 멈춰 있어도 커널이 연결을 유지합니다.
+
+## CPU 는 2개 이상 (실측 근거)
 
 처음 `--cpu=1` 로 띄웠더니 동시 요청이 몰릴 때 이벤트 루프가 밀려
 `[stage] middleware.getUser` 가 **2.6~3.7초**로 부풀고 업무 타임라인이 2.9초까지
@@ -51,8 +70,32 @@ DB(Supabase)는 서울에 있는데 앱은 Railway **싱가포르**에 있었습
 | 런타임 서비스 계정 | `jdi-run@jdi-portal-seoul.iam.gserviceaccount.com` |
 | 빌드 서비스 계정 | `jdi-build@jdi-portal-seoul.iam.gserviceaccount.com` |
 | 환경변수 | 전부 Secret Manager (`--set-secrets`) |
+| CPU 깨우기 | Cloud Scheduler 작업 `jdi-portal-keepalive` (1분마다 `/api/health`) |
 
 관련 파일: 저장소 루트의 `Dockerfile`, `cloudbuild.yaml`, `.dockerignore`, `.gcloudignore`.
+
+## 비용
+
+단가는 추측하지 말고 **GCP 공식 가격 API** 에서 확인합니다(Cloud Run 서비스 ID
+`152E-C115-5142`).
+
+```bash
+curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  "https://cloudbilling.googleapis.com/v1/services/152E-C115-5142/skus?pageSize=200" \
+  | grep -i asia-northeast3
+```
+
+2026-07-30 확인한 서울(asia-northeast3) 단가와 현재 구성(2 vCPU / 2 GiB / 상시 1대)
+기준 월 요금입니다.
+
+| 방식 | CPU 단가 | 메모리 단가 | 월 요금(24시간) |
+|---|---|---|---|
+| CPU 상시 할당 (`--no-cpu-throttling`) | $0.0000216 / vCPU·s | $0.0000024 / GiB·s | 약 **$124** |
+| CPU 요청기반 (`--cpu-throttling`, 대기 중 단가) | $0.0000035 / vCPU·s | $0.0000035 / GiB·s | 약 **$38** |
+
+요청기반은 위의 "대기 중" 요금에 실제 요청 처리 시간(활성 단가 CPU $0.0000336,
+메모리 $0.0000035)이 더해지는데, 사내 사용량(하루 수천 건 × 0.2초)에서는 월 $1~2
+수준입니다.
 
 `next.config.ts` 의 `output: "standalone"` 은 `NEXT_OUTPUT_STANDALONE=1` 일 때만 켜집니다.
 컨테이너 빌드에서만 켜고, Railway(`next start`)는 영향을 받지 않게 한 장치입니다.

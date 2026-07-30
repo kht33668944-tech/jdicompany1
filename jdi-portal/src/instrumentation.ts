@@ -40,8 +40,13 @@ async function pingSupabase(): Promise<void> {
 }
 
 /**
- * Railway 프로세스 시작 시 직접 PostgreSQL 연결을 준비하고(첫 사용자가 연결 생성
- * 비용을 부담하지 않게), 이후 주기적으로 가볍게 ping 하여 유휴 연결이 끊기지 않게 한다.
+ * 프로세스 시작 시 직접 PostgreSQL 연결을 준비하고(첫 사용자가 연결 생성 비용을
+ * 부담하지 않게), 이후 주기적으로 가볍게 ping 하여 유휴 연결이 끊기지 않게 한다.
+ *
+ * 운영(Cloud Run)은 CPU 를 요청 처리 중에만 할당하므로 요청 사이에는 아래 타이머가
+ * 스스로 돌지 못한다. Cloud Scheduler 작업 `jdi-portal-keepalive` 가 1분마다
+ * `/api/health` 를 두드려 CPU 를 깨우고, 그때 밀려 있던 타이머가 실행된다.
+ * (docs/operations/cloud-run-seoul.md)
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
