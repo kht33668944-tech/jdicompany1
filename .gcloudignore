@@ -1,0 +1,17 @@
+# Cloud Build 로 업로드할 소스 범위. (없으면 gcloud 가 .gitignore 를 대신 쓰므로 명시한다.)
+.git
+.gitignore
+.claude
+.omc
+.bkit
+.superpowers
+.gjc
+jdi-desktop
+**/node_modules
+**/.next
+**/out
+**/dist
+**/build
+**/.env
+**/.env.*
+**/*.log

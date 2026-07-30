@@ -113,6 +113,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 | `jdi-portal/docs/superpowers/{specs,plans}/` | 기능 설계·구현 계획 기록 |
 | `jdi-portal/docs/performance/production-baseline.md` | 운영 성능 기준선과 재현 확인 절차 |
 | `jdi-portal/docs/operations/backup-and-recovery.md` | 백업·복구 운영 절차 |
+| `jdi-portal/docs/operations/cloud-run-seoul.md` | 서울 리전 배포(Cloud Run) 구성·배포·롤백 |
 | `jdi-desktop/README.md` | Windows 데스크톱 앱(트레이·자동 업데이트·배포) |
 
 ## 사용자/커뮤니케이션

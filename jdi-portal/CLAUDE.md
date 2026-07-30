@@ -22,6 +22,7 @@
 | `docs/claude/user-profile.md` | 사용자와 커뮤니케이션 방식 |
 | `docs/performance/production-baseline.md` | 성능 기준선과 확인 절차 |
 | `docs/operations/backup-and-recovery.md` | 백업·복구 운영 절차 |
+| `docs/operations/cloud-run-seoul.md` | 서울 리전 배포(Cloud Run) 구성·배포·롤백 |
 | `supabase/CLAUDE.md` | DB, RLS, Edge Function 규칙 |
 | `src/components/dashboard/attendance/CLAUDE.md` | 근태 도메인 규칙 |
 | `src/components/dashboard/chat/CLAUDE.md` | 채팅 도메인 규칙 |

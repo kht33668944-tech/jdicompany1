@@ -150,6 +150,21 @@ test("client router cache keeps visited dashboard tabs for at least five minutes
   );
 });
 
+test("auth redirects stay host-agnostic (프록시/컨테이너 뒤에서도 올바른 주소로)", () => {
+  // 실측(2026-07): `new URL(request.url).origin` 은 서비스 도메인이 아니라 서버가
+  // listen 하는 내부 주소로 잡힌다 — Railway 에서 `https://localhost:8080`,
+  // 컨테이너에서 `https://0.0.0.0:8080`. 그 주소로 리다이렉트되면 비밀번호 재설정
+  // 메일 링크가 열리지 않는다. Location 을 상대 경로로 내보내야 브라우저가 자기가
+  // 접속한 도메인 기준으로 해석한다.
+  const callback = source("src/app/auth/callback/route.ts");
+
+  assert.doesNotMatch(callback, /NextResponse\.redirect\(/);
+  assert.doesNotMatch(callback, /\$\{origin\}/);
+  assert.match(callback, /headers:\s*\{\s*Location:\s*path\s*\}/);
+  // 열린 리다이렉트 방지(외부 주소로 튕기지 않게)는 그대로 유지한다.
+  assert.match(callback, /next\.startsWith\("\/"\) && !next\.startsWith\("\/\/"\)/);
+});
+
 test("reports list resolves attachment counts in the same round trip", () => {
   // 오류 접수 탭 RSC 가 1초를 넘던 원인 중 하나: 목록 조회 후 첨부 개수를 별도
   // 왕복으로 다시 조회(서울↔싱가포르 순차 2회). PostgREST 내장 집계로 1회에 합친다.
