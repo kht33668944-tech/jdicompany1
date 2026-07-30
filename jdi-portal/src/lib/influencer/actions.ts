@@ -52,6 +52,27 @@ function extractUsernameFromUrl(url: string): string | null {
   }
 }
 
+// 검색어는 PostgREST `or(...ilike...)` 문자열에 그대로 들어가므로,
+// 필터 문법을 깨뜨리는 문자(콤마·괄호·와일드카드 등)를 미리 제거한다.
+function sanitizeSearchTerm(raw: string): string {
+  return raw.replace(/[,()*%\\"']/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+
+// 검색은 이미 화면에 불러온 목록(1페이지 25명)만으로는 부족하므로 서버에서 전체를 찾는다.
+export async function searchInfluencers(query: string): Promise<InfluencerListItem[]> {
+  const term = sanitizeSearchTerm(query);
+  if (term.length < 2) return [];
+  await getSessionUserId();
+  return getInfluencers({
+    status: "active",
+    search: term,
+    sortBy: "engagement_rate",
+    sortOrder: "desc",
+    page: 1,
+    pageSize: 50,
+  });
+}
+
 export async function loadMoreInfluencers(page: number): Promise<InfluencerListItem[]> {
   if (!Number.isInteger(page) || page < 2) throw new Error("Invalid influencer page.");
   await getSessionUserId();

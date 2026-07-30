@@ -17,6 +17,7 @@ import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluence
 import Image from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { formatKRW } from "@/lib/influencer/format";
+import { APIFY_COST_PER_INFLUENCER_KRW } from "@/lib/influencer/constants";
 import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
 import type { InfluencerTier } from "@/lib/influencer/metrics";
@@ -403,7 +404,15 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       toast.info("재동기화할 활성 인플루언서가 없습니다.");
       return;
     }
-    if (!confirm(`활성 인플루언서 ${activeCount}명을 모두 재동기화합니다. 약 ${activeCount * 5}초 소요. 진행할까요?`)) {
+    const estimatedCost = activeCount * APIFY_COST_PER_INFLUENCER_KRW;
+    if (
+      !confirm(
+        `활성 인플루언서 ${activeCount}명을 모두 다시 긁어옵니다.\n\n` +
+          `· 예상 시간: 약 ${activeCount * 5}초\n` +
+          `· 예상 비용: 약 ${formatKRW(estimatedCost)} (Apify 크레딧 차감)\n\n` +
+          `진행할까요?`,
+      )
+    ) {
       return;
     }
     startResyncAll(async () => {
@@ -493,6 +502,14 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
 
   // 스크롤 컨테이너 안에서 전체 표시 — 페이지 자체는 늘어나지 않음.
   const displayed = sorted;
+
+  // 등록된 인플루언서가 아예 없는 경우와, 검색·필터 때문에 0건인 경우를 구분해서 안내.
+  const emptyMessage =
+    influencers.length === 0
+      ? "인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요."
+      : filters.search.trim().length > 0
+        ? `'${filters.search.trim()}' 검색 결과가 없습니다.`
+        : "조건에 맞는 인플루언서가 없습니다. 필터를 확인해 주세요.";
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -590,7 +607,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       <div className="sm:hidden">
         {displayed.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-slate-400">
-            인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요.
+            {emptyMessage}
           </div>
         ) : (
           displayed.map((inf) => {
@@ -784,7 +801,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
             {displayed.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400">
-                  인플루언서가 없습니다. URL을 입력해 첫 번째 인플루언서를 추가해 보세요.
+                  {emptyMessage}
                 </td>
               </tr>
             ) : (
