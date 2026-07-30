@@ -1,4 +1,5 @@
 import { getPool, hasPostgresUrl, markPostgresUnavailable } from "@/lib/db/postgres";
+import { pingPostgres, pingSupabase } from "@/lib/warmup";
 
 type InstrumentationGlobal = typeof globalThis & {
   __jdiPgWarmStarted?: boolean;
@@ -22,30 +23,14 @@ const PG_KEEPALIVE_INTERVAL_MS = 2 * 60_000;
  */
 const SUPABASE_KEEPALIVE_INTERVAL_MS = 60_000;
 
-async function pingSupabase(): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return;
-  const headers = { apikey: key, Authorization: `Bearer ${key}` };
-  await Promise.allSettled([
-    // 인증 서버(GoTrue) — 미들웨어의 auth.getUser 가 매 요청 거치는 경로
-    fetch(`${url}/auth/v1/health`, { headers, cache: "no-store" }),
-    // PostgREST — supabase-js 쿼리(프로필/할일 등)가 쓰는 경로 (RLS 로 행은 반환되지 않음)
-    fetch(`${url}/rest/v1/profiles?select=id&limit=1`, {
-      method: "HEAD",
-      headers,
-      cache: "no-store",
-    }),
-  ]);
-}
-
 /**
  * 프로세스 시작 시 직접 PostgreSQL 연결을 준비하고(첫 사용자가 연결 생성 비용을
  * 부담하지 않게), 이후 주기적으로 가볍게 ping 하여 유휴 연결이 끊기지 않게 한다.
  *
- * 운영(Cloud Run)은 CPU 를 요청 처리 중에만 할당하므로 요청 사이에는 아래 타이머가
- * 스스로 돌지 못한다. Cloud Scheduler 작업 `jdi-portal-keepalive` 가 1분마다
- * `/api/health` 를 두드려 CPU 를 깨우고, 그때 밀려 있던 타이머가 실행된다.
+ * 아래 타이머는 **CPU 가 상시 할당되는 실행 환경**(Railway, 로컬)에서 유효하다.
+ * 운영(Cloud Run)은 요청을 처리할 때만 CPU 를 주므로 타이머가 fetch 를 시작만 하고
+ * 끝내지 못한다 — 그래서 Cloud Scheduler 작업 `jdi-portal-keepalive` 가 1분마다
+ * `/api/keepalive` 를 불러 같은 데우기를 **요청 안에서 await** 로 완료시킨다.
  * (docs/operations/cloud-run-seoul.md)
  */
 export async function register() {
@@ -82,14 +67,9 @@ export async function register() {
     const timer = setInterval(() => {
       if (inFlight || !hasPostgresUrl()) return;
       inFlight = true;
-      getPool()
-        .query("select 1")
-        .catch((error) => {
-          console.warn("[keepalive] postgres ping failed (pool will recycle):", error);
-        })
-        .finally(() => {
-          inFlight = false;
-        });
+      void pingPostgres().finally(() => {
+        inFlight = false;
+      });
     }, PG_KEEPALIVE_INTERVAL_MS);
     // keepalive 타이머가 프로세스 종료를 막지 않도록 한다.
     timer.unref?.();

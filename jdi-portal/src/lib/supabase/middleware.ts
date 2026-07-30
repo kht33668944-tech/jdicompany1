@@ -66,7 +66,12 @@ function isTransientError(error: AuthError | null): boolean {
 }
 
 export async function updateSession(request: NextRequest) {
-  if (request.nextUrl.pathname === "/api/health") {
+  // 생존 확인과 데우기는 인증 왕복 없이 즉시 통과시킨다.
+  // (데우기는 1분마다 불리므로 여기서 getUser 를 태우면 그 자체가 비용이 된다.)
+  if (
+    request.nextUrl.pathname === "/api/health" ||
+    request.nextUrl.pathname === "/api/keepalive"
+  ) {
     return NextResponse.next({ request });
   }
   let supabaseResponse = NextResponse.next({ request });

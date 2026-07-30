@@ -33,20 +33,31 @@ CPU 를 상시 할당(`--no-cpu-throttling`)하면 서울 기준 **월 약 $124*
 속도가 사실상 같았으므로 **요청기반**을 씁니다(단가는 아래 "비용" 절).
 
 대신 요청 사이에는 CPU 가 멈춰서 `instrumentation.ts` 의 keepalive 타이머가 스스로
-돌지 못합니다. 그래서 **Cloud Scheduler 작업이 1분마다 CPU 를 깨웁니다.**
+돌지 못합니다. **타이머가 `fetch` 를 시작만 하고 끝내지 못하는 것**이 핵심입니다 —
+실측(2026-07-30)에서 11분 유휴 뒤 첫 요청의 `middleware.getUser` 가 **720ms** 로
+부풀었습니다(pg 는 멀쩡했고 Supabase HTTPS 연결만 식었습니다).
+
+그래서 **Cloud Scheduler 가 1분마다 `/api/keepalive` 를 부릅니다.** 이 경로는 같은
+데우기를 **요청 안에서 `await` 로 끝까지 완료**하므로 CPU 가 중간에 끊기지 않습니다.
 
 ```bash
 gcloud scheduler jobs list --location=asia-northeast3 --project jdi-portal-seoul
-# jdi-portal-keepalive : "* * * * *" → GET https://<run.app>/api/health
+# jdi-portal-keepalive : "* * * * *" → GET https://<run.app>/api/keepalive
 ```
 
-> **이 스케줄러 작업을 지우거나 멈추면** 유휴 후 첫 요청이 다시 수 초로 느려질 수
-> 있습니다(죽은 소켓 재사용). 대상은 Cloudflare 를 거치지 않는 `*.run.app` 주소로
-> 두었습니다 — Worker 무료 한도를 쓰지 않기 위함입니다.
+> **이 스케줄러 작업을 지우거나 멈추면** 유휴 후 첫 요청이 다시 1초 이상으로
+> 느려집니다. 대상은 Cloudflare 를 거치지 않는 `*.run.app` 주소로 두었습니다 —
+> Worker 무료 한도를 쓰지 않기 위함입니다.
 
-안전망은 이중입니다. 스케줄러가 앱 타이머를 깨우고, 그와 별개로 pg 풀의
+관련 파일: `src/lib/warmup.ts`(데우기 로직, `instrumentation.ts` 와 공용),
+`src/app/api/keepalive/route.ts`(경로 + 연타 방지),
+`src/lib/supabase/middleware.ts`(인증 우회).
+`/api/health` 는 **순수한 생존 확인**으로 남겨 둡니다 — 외부 헬스체크가 DB 상태에
+끌려가면 안 되고, 회귀 테스트도 그렇게 고정합니다.
+
+안전망은 이중입니다. 스케줄러가 데우기를 완료시키고, 그와 별개로 pg 풀의
 `keepAlive: true`(`src/lib/db/postgres.ts`)가 **OS 수준 TCP keepalive** 이므로
-CPU 가 멈춰 있어도 커널이 연결을 유지합니다.
+CPU 가 멈춰 있어도 커널이 DB 연결을 유지합니다.
 
 ## CPU 는 2개 이상 (실측 근거)
 
@@ -70,7 +81,7 @@ CPU 가 멈춰 있어도 커널이 연결을 유지합니다.
 | 런타임 서비스 계정 | `jdi-run@jdi-portal-seoul.iam.gserviceaccount.com` |
 | 빌드 서비스 계정 | `jdi-build@jdi-portal-seoul.iam.gserviceaccount.com` |
 | 환경변수 | 전부 Secret Manager (`--set-secrets`) |
-| CPU 깨우기 | Cloud Scheduler 작업 `jdi-portal-keepalive` (1분마다 `/api/health`) |
+| 데우기 | Cloud Scheduler 작업 `jdi-portal-keepalive` (1분마다 `/api/keepalive`) |
 
 관련 파일: 저장소 루트의 `Dockerfile`, `cloudbuild.yaml`, `.dockerignore`, `.gcloudignore`.
 
