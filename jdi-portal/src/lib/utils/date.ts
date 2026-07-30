@@ -124,6 +124,18 @@ export function toDateStringFromTimestamp(isoString: string): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** 최신순 목록에서 가장 최근 KST 날짜와 그 날짜의 항목만 골라낸다. 빈 목록이면 null. */
+export function pickLatestKstDayEntries<T extends { completed_at: string }>(
+  entries: T[],
+): { date: string; entries: T[] } | null {
+  if (entries.length === 0) return null;
+  const date = toDateStringFromTimestamp(entries[0].completed_at);
+  return {
+    date,
+    entries: entries.filter((entry) => toDateStringFromTimestamp(entry.completed_at) === date),
+  };
+}
+
 export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
