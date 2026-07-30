@@ -47,8 +47,9 @@ function hasUnsavedInput(): boolean {
 
 function recentlyAutoReloaded(): boolean {
   try {
-    const at = Number(sessionStorage.getItem(RELOAD_MARK_KEY) ?? 0);
-    return Number.isFinite(at) && Date.now() - at < RELOAD_COOLDOWN_MS;
+    // 값이 없으면 Number(null) === 0, 이상한 값이면 NaN — 둘 다 비교가 false 로
+    // 떨어지므로 별도 방어가 필요 없다.
+    return Date.now() - Number(sessionStorage.getItem(RELOAD_MARK_KEY)) < RELOAD_COOLDOWN_MS;
   } catch {
     return false;
   }

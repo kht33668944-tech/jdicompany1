@@ -36,8 +36,9 @@ ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 # 빌드 시점에 공개 환경변수가 비어 있으면 로그인 화면이 조용히 고장난 채로 배포된다.
 # 배포 후에 발견하기 어려우니 여기서 끊는다.
-RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" || (echo "NEXT_PUBLIC_SUPABASE_URL is empty" && exit 1)
-RUN test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || (echo "NEXT_PUBLIC_SUPABASE_ANON_KEY is empty" && exit 1)
+# (VAPID 키는 일부러 검사하지 않는다 — 없으면 웹 푸시만 꺼질 뿐 앱은 정상 동작한다.)
+RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" && test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  || (echo "NEXT_PUBLIC_SUPABASE_URL / ANON_KEY build arg is empty" && exit 1)
 
 RUN npm run build
 

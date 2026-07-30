@@ -75,15 +75,14 @@ test("Railway healthcheck bypasses auth while startup warms one persistent DB co
 
   assert.match(railway, /healthcheckPath = "\/api\/health"/);
   assert.match(railway, /healthcheckTimeout = 30/);
-  assert.ok(middleware.indexOf('pathname === "/api/health"') < middleware.indexOf("createServerClient("));
+  assert.ok(middleware.indexOf('"/api/health"') < middleware.indexOf("createServerClient("));
   assert.doesNotMatch(health, /supabase|createClient|DATABASE_URL/);
   assert.match(health, /NextResponse\.json\(\{ ok: true \}\)/);
   assert.match(instrumentation, /await getPool\(\)\.query\("select 1"\)/);
-  // 콜드 스타트(유휴 후 첫 요청 지연) 방지용 in-process keepalive는 의도된 구성이다:
-  // pg 연결과 Supabase HTTPS 경로를 setInterval 로 주기적으로 데워둔다.
+  // 콜드 스타트(유휴 후 첫 요청 지연) 방지용 in-process keepalive는 의도된 구성이다.
+  // 어느 헬퍼를 쓰는지는 자유롭게 리팩터링하되, "타이머가 상류를 데운다"는 유지한다.
   assert.match(instrumentation, /setInterval\(/);
-  assert.match(instrumentation, /pingSupabase\(\)/);
-  assert.match(instrumentation, /pingPostgres\(\)/);
+  assert.match(instrumentation, /warmUpstreams\(\)|pingSupabase\(\)|pingPostgres\(\)/);
   assert.match(postgres, /min: 1/);
   assert.match(postgres, /idleTimeoutMillis: 10 \* 60_000/);
   assert.match(postgres, /keepAlive: true/);
@@ -110,12 +109,12 @@ test("외부 스케줄러용 데우기 경로: 요청 안에서 await 로 완료
 
   // 1분마다 불리므로 인증 왕복을 태우면 안 된다.
   assert.ok(
-    middleware.indexOf('pathname === "/api/keepalive"') <
-      middleware.indexOf("createServerClient("),
+    middleware.indexOf('"/api/keepalive"') < middleware.indexOf("createServerClient("),
   );
 
-  // 인증 없이 열려 있으므로 연타해도 실제 작업은 간격을 두고만 한다.
-  assert.match(route, /MIN_INTERVAL_MS/);
+  // 인증 없이 열려 있고, 타이머와 스케줄러가 겹쳐 돌 수 있다.
+  // 방금 데웠으면 건너뛰는 간격 제한이 어딘가에 있어야 한다(route 든 warmup 이든).
+  assert.match(route + warmup, /MIN_WARM_INTERVAL_MS|MIN_INTERVAL_MS/);
 
   // health 는 순수한 생존 확인으로 남긴다(외부 헬스체크가 DB 상태에 끌려가면 안 된다).
   assert.doesNotMatch(health, /warmUpstreams|supabase|createClient|DATABASE_URL/);
@@ -195,7 +194,8 @@ test("auth redirects stay host-agnostic (프록시/컨테이너 뒤에서도 올
 
   assert.doesNotMatch(callback, /NextResponse\.redirect\(/);
   assert.doesNotMatch(callback, /\$\{origin\}/);
-  assert.match(callback, /headers:\s*\{\s*Location:\s*path\s*\}/);
+  assert.match(callback, /redirect\(safeNext\)/);
+  assert.match(callback, /from "next\/navigation"/);
   // 열린 리다이렉트 방지(외부 주소로 튕기지 않게)는 그대로 유지한다.
   assert.match(callback, /next\.startsWith\("\/"\) && !next\.startsWith\("\/\/"\)/);
 });

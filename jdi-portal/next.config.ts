@@ -21,27 +21,21 @@ const CONTENT_SECURITY_POLICY = [
   "object-src 'none'",
 ].join("; ");
 
-/**
- * Docker(Cloud Run) 이미지용 standalone 출력 스위치.
- * Railway 는 `next start` 로 실행하므로 기본값(끔)을 유지하고, 컨테이너 빌드에서만
- * NEXT_OUTPUT_STANDALONE=1 로 켠다. 이렇게 두면 배포 대상이 바뀌어도 한쪽이
- * 다른 쪽 실행 방식을 깨뜨리지 않는다(이전 중 Railway 는 롤백 경로로 살려둔다).
- */
-const STANDALONE = process.env.NEXT_OUTPUT_STANDALONE === "1";
-
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   turbopack: {
     root: __dirname,
   },
-  ...(STANDALONE
-    ? {
-        output: "standalone" as const,
-        // 저장소 루트(래퍼)가 아니라 이 앱을 추적 기준으로 삼아
-        // .next/standalone/server.js 가 항상 같은 위치에 생기게 한다.
-        outputFileTracingRoot: __dirname,
-      }
-    : {}),
+  /**
+   * Docker(Cloud Run) 이미지용 standalone 출력 스위치.
+   * `next start` 로 띄우는 환경(로컬 등)은 기본값(끔)을 쓰고, 컨테이너 빌드에서만
+   * NEXT_OUTPUT_STANDALONE=1 로 켠다. 배포 대상이 바뀌어도 한쪽이 다른 쪽 실행
+   * 방식을 깨뜨리지 않게 하는 장치다.
+   */
+  output: process.env.NEXT_OUTPUT_STANDALONE === "1" ? "standalone" : undefined,
+  // 저장소 루트(래퍼)가 아니라 이 앱을 추적 기준으로 삼아
+  // .next/standalone/server.js 가 항상 같은 위치에 생기게 한다.
+  outputFileTracingRoot: __dirname,
   experimental: {
     // 배럴 import 최적화 — phosphor-react(58MB)·recharts·dnd가 쓰는 아이콘/모듈만 골라 번들
     // → 모든 대시보드 페이지의 초기 JS 번들 수백 KB 절감

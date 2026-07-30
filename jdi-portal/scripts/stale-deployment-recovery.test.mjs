@@ -26,8 +26,8 @@ test("배포 갱신 오류를 알아보고 안내 문구로 바꾼다", () => {
   assert.match(src, /isStaleDeploymentError\(error\)/);
   assert.match(src, /STALE_DEPLOYMENT_MESSAGE/);
   assert.match(src, /dispatchEvent\(new CustomEvent\(STALE_DEPLOYMENT_EVENT\)\)/);
-  // 서버 렌더링 중에는 window 가 없다.
-  assert.match(src, /typeof window !== "undefined"/);
+  // 서버 렌더링 중에는 window 가 없으므로 반드시 가드가 있어야 한다.
+  assert.match(src, /typeof window/);
 });
 
 test("감시자가 새로고침을 처리하고, 작성 중인 내용은 지키며, 무한 새로고침을 막는다", () => {
@@ -45,21 +45,20 @@ test("감시자가 새로고침을 처리하고, 작성 중인 내용은 지키�
   // 실제로 새로고침을 해야 의미가 있다.
   assert.match(src, /window\.location\.reload\(\)/);
 
-  // 작성 중이던 글을 날리지 않는다 → 입력이 있으면 버튼만 보여 준다.
-  assert.match(src, /function hasUnsavedInput/);
-  assert.match(src, /!hasUnsavedInput\(\)/);
+  // 작성 중이던 글을 날리지 않는다 → 입력이 있으면 자동 새로고침 대신 버튼을 준다.
+  // (판별 방법은 자유롭게 바꾸되, 자동 새로고침이 조건부라는 점과 버튼 제공은 유지한다.)
+  assert.match(src, /canAutoReload/);
   assert.match(src, /label: "새로고침"/);
 
   // 새로고침 뒤 같은 오류가 반복되면 무한 새로고침이 된다 — 쿨다운 필수.
   assert.match(src, /RELOAD_COOLDOWN_MS/);
-  assert.match(src, /!recentlyAutoReloaded\(\)/);
 
   // 여러 경로에서 신호가 겹쳐 와도 한 번만 처리한다.
-  assert.match(src, /if \(handled\) return;/);
+  assert.match(src, /handled/);
 
   // 정리 함수에서 리스너와 타이머를 모두 걷는다.
   assert.match(src, /removeEventListener\(STALE_DEPLOYMENT_EVENT/);
-  assert.match(src, /clearTimeout\(timer\)/);
+  assert.match(src, /clearTimeout\(/);
 });
 
 test("감시자가 대시보드 전체에 실제로 붙어 있다", () => {

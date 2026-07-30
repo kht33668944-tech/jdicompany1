@@ -23,5 +23,7 @@ jdi-desktop
 **/*.log
 **/npm-debug.log*
 **/.DS_Store
-Dockerfile
-.dockerignore
+
+# next build 가 읽지 않는데 용량이 커서, 바뀔 때마다 COPY 레이어 캐시를 깨뜨린다.
+jdi-portal/docs
+jdi-portal/supabase
