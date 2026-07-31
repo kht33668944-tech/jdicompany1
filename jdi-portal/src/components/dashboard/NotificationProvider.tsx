@@ -42,6 +42,10 @@ export default function NotificationProvider({
         link: notification.link,
         tag: `notification:${notification.id}`,
       });
+
+      // 화면 쪽에도 방송 — 대시보드가 이 이벤트를 받아 서버 데이터를 즉시 다시 불러온다
+      // (검토 요청·업무지시가 로그아웃 전까지 안 보이던 문제의 해결 지점)
+      window.dispatchEvent(new CustomEvent("jdi:notification-received", { detail: notification }));
     },
     [onNewNotification]
   );
