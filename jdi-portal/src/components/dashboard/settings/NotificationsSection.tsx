@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useEffect, useState } from "react";
 import { AirplaneTilt, CalendarPlus, Timer, Megaphone, ChatCircle, BellRinging, Receipt } from "phosphor-react";
 import { updateNotificationSettings } from "@/lib/settings/actions";
@@ -137,7 +138,7 @@ export default function NotificationsSection({ userId, initialSettings }: Notifi
         await updateNotificationSettings({ push_enabled: true });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "푸시 설정 변경에 실패했습니다.");
+      setError(getErrorMessage(e, "푸시 설정 변경에 실패했습니다."));
     } finally {
       setBusy(false);
     }

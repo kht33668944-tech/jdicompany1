@@ -1,7 +1,8 @@
 "use client";
 
 import { FileArrowDown, X } from "phosphor-react";
-import { getAttachmentKind, formatFileSize } from "@/lib/work-timeline/fileKind";
+import { getAttachmentKind } from "@/lib/work-timeline/fileKind";
+import { formatFileSize } from "@/lib/utils/format";
 
 interface AttachmentFileCardProps {
   fileName: string;

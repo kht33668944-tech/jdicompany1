@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { getExpenseCategories, getExpensesByRange, getPaymentMethods, getRangeKrwTotal } from "@/lib/expenses/queries";
-import { getMonthRange } from "@/lib/utils/date";
+import { getMonthRange, kstNow } from "@/lib/utils/date";
 import type {
   ExpenseCategory,
   ExpenseWithMeta,
@@ -49,10 +49,10 @@ export default function ExpensesPageClient({
   canViewSensitive,
   initialPaymentMethods,
 }: ExpensesPageClientProps) {
-  const kstNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+  const now = kstNow();
   const [tab, setTab] = useState<"list" | "recurring">("list");
-  const [year, setYear] = useState(kstNow.getFullYear());
-  const [month, setMonth] = useState(kstNow.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
   const [expenses, setExpenses] = useState<ExpenseWithMeta[]>(initialExpenses);
   const [prevTotal, setPrevTotal] = useState(initialPrevTotal);
   const [loading, setLoading] = useState(false);

@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Corporation, VaultDocument, VaultDocumentVersion } from "@/lib/vault/types";
@@ -14,7 +15,7 @@ import {
 import { getVaultSignedUrl, getVaultSignedUrls } from "@/lib/vault/storage";
 import { CORP_COLORS } from "@/lib/vault/constants";
 import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
-import { formatFileSize } from "@/lib/chat/utils";
+import { formatFileSize } from "@/lib/utils/format";
 import Select from "@/components/shared/Select";
 import DocumentFormModal from "./DocumentFormModal";
 import ReplaceFileModal from "./ReplaceFileModal";
@@ -108,7 +109,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       toast.success("법인이 추가되었습니다.");
       onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "법인 추가 실패");
+      toast.error(getErrorMessage(err, "법인 추가 실패"));
     }
   };
 
@@ -122,7 +123,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       toast.success("이름이 변경되었습니다.");
       onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "이름 변경 실패");
+      toast.error(getErrorMessage(err, "이름 변경 실패"));
     }
   };
 
@@ -136,7 +137,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       setCorpId("all");
       onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "법인 삭제 실패");
+      toast.error(getErrorMessage(err, "법인 삭제 실패"));
     }
   };
 
@@ -149,7 +150,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       const url = await getVaultSignedUrl(doc.current_storage_path);
       if (url) triggerDownload(url, doc.file_name ?? undefined);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "다운로드 실패");
+      toast.error(getErrorMessage(err, "다운로드 실패"));
     }
   };
 
@@ -167,7 +168,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       toast.success(`${docs.length}개 다운로드를 시작했습니다.`);
       setSelected(new Set());
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "다운로드 실패");
+      toast.error(getErrorMessage(err, "다운로드 실패"));
     } finally {
       setBusy(false);
     }
@@ -180,7 +181,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       toast.success("서류가 삭제되었습니다.");
       onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "삭제 실패");
+      toast.error(getErrorMessage(err, "삭제 실패"));
     }
   };
 
@@ -195,7 +196,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       const list = await listDocumentVersions(doc.id);
       setVersions(list);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "이력 불러오기 실패");
+      toast.error(getErrorMessage(err, "이력 불러오기 실패"));
     }
   };
 
@@ -207,7 +208,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       setExpanded(null);
       onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "되돌리기 실패");
+      toast.error(getErrorMessage(err, "되돌리기 실패"));
     }
   };
 
@@ -216,7 +217,7 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
       const url = await getVaultSignedUrl(v.storage_path);
       if (url) triggerDownload(url, v.file_name ?? undefined);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "다운로드 실패");
+      toast.error(getErrorMessage(err, "다운로드 실패"));
     }
   };
 

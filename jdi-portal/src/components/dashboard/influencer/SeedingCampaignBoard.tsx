@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { updateCampaignStatus } from "@/lib/influencer/actions";
 import CampaignStatusDropdown from "./CampaignStatusDropdown";
 import { CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
+import { formatKRW } from "@/lib/influencer/format";
 import type { InfluencerCampaignWithInfluencer, CampaignStatus } from "@/lib/influencer/types";
 import {
   kstTodayStr,
@@ -45,12 +46,6 @@ function pickNextMilestone(
 function shortMD(dateStr: string): string {
   const [, m, d] = dateStr.split("-");
   return `${parseInt(m, 10)}/${parseInt(d, 10)}`;
-}
-
-function formatCostShort(n: number): string {
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억원`;
-  if (n >= 10_000) return `${Math.round(n / 10_000)}만원`;
-  return `${n.toLocaleString()}원`;
 }
 
 function cleanDisplayName(displayName: string | null | undefined): string | null {
@@ -133,7 +128,7 @@ function CampaignCard({
     );
   }
   if (campaign.cost !== null) {
-    metaParts.push(<span key="cost" className="tabular-nums">{formatCostShort(campaign.cost)}</span>);
+    metaParts.push(<span key="cost" className="tabular-nums">{formatKRW(campaign.cost, { withWon: true })}</span>);
   }
 
   return (

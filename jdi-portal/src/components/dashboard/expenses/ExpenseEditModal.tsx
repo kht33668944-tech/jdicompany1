@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { updateExpense, deleteExpense, setExpenseReceipt } from "@/lib/expenses/actions";
@@ -63,7 +64,7 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
       onChanged();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "수정에 실패했습니다.");
+      toast.error(getErrorMessage(err, "수정에 실패했습니다."));
     } finally {
       setBusy(false);
     }
@@ -79,7 +80,7 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
       onChanged();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+      toast.error(getErrorMessage(err, "삭제에 실패했습니다."));
     } finally {
       setBusy(false);
     }
@@ -96,7 +97,7 @@ export default function ExpenseEditModal({ expense, categories, paymentMethods, 
       const url = await getExpenseReceiptUrl(path);
       setReceiptUrl(url);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "업로드에 실패했습니다.");
+      toast.error(getErrorMessage(err, "업로드에 실패했습니다."));
     } finally {
       setBusy(false);
     }

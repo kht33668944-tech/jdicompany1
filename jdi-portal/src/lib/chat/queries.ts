@@ -27,19 +27,21 @@ export async function getChannelById(
   supabase: SupabaseClient,
   channelId: string
 ): Promise<ChannelWithDetails | null> {
-  const { data: channel, error } = await supabase
-    .from("channels")
-    .select("id, name, description, type, created_by, created_at, updated_at, dm_pair_key")
-    .eq("id", channelId)
-    .single();
+  // 채널 행과 멤버 목록은 둘 다 channelId 만 있으면 되므로 한 번에 보낸다(왕복 2회 → 1회).
+  const [{ data: channel, error }, { data: members }] = await Promise.all([
+    supabase
+      .from("channels")
+      .select("id, name, description, type, created_by, created_at, updated_at, dm_pair_key")
+      .eq("id", channelId)
+      .single(),
+    supabase
+      .from("channel_members")
+      .select("id, channel_id, user_id, role, last_read_at, joined_at")
+      .eq("channel_id", channelId)
+      .order("joined_at", { ascending: true }),
+  ]);
 
   if (error || !channel) return null;
-
-  const { data: members } = await supabase
-    .from("channel_members")
-    .select("id, channel_id, user_id, role, last_read_at, joined_at")
-    .eq("channel_id", channelId)
-    .order("joined_at", { ascending: true });
 
   // 프로필 별도 조회
   const memberUserIds = (members ?? []).map((m) => m.user_id);

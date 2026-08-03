@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import type { MemberPreview } from "@/lib/chat/types";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 
 interface MentionPickerProps {
   candidates: MemberPreview[];
@@ -16,17 +16,7 @@ export default function MentionPicker({
   onSelect,
   onClose,
 }: MentionPickerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  const containerRef = useClickOutside<HTMLDivElement>(onClose);
 
   if (candidates.length === 0) return null;
 

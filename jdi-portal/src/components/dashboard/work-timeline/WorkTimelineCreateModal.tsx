@@ -26,6 +26,8 @@ import {
   saveWorkTimelineDraft,
   type WorkTimelineDraftRecord,
 } from "@/lib/work-timeline/draftStore";
+import { fromKstDateTimeLocal, toKstDateTimeLocal } from "@/lib/utils/date";
+import { getErrorMessage } from "@/lib/utils/errors";
 import { createImageThumbnail, resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import AttachmentFileCard from "./AttachmentFileCard";
 import ProjectColorPicker from "./ProjectColorPicker";
@@ -49,22 +51,6 @@ interface SelectedAttachment {
   previewUrl: string | null; // 이미지에만 존재
 }
 
-function toKstDateTimeLocal(value: string | Date = new Date()): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
-}
-
 function getFileKey(file: File): string {
   return `${file.name}:${file.size}:${file.lastModified}`;
 }
@@ -84,7 +70,7 @@ export default function WorkTimelineCreateModal({
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [initialCompletedAtValue] = useState(() =>
-    toKstDateTimeLocal(initialCompletedAt ?? new Date()),
+    toKstDateTimeLocal(initialCompletedAt ?? new Date().toISOString()),
   );
   const [completedAt, setCompletedAt] = useState(initialCompletedAtValue);
   const [images, setImages] = useState<SelectedAttachment[]>([]);
@@ -262,7 +248,7 @@ export default function WorkTimelineCreateModal({
       try {
         validateWorkTimelineFile(file);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : `${file.name} 파일을 확인해주세요.`);
+        toast.error(getErrorMessage(error, `${file.name} 파일을 확인해주세요.`));
         continue;
       }
       const isImage = isWorkTimelineImage(file.type);
@@ -328,7 +314,7 @@ export default function WorkTimelineCreateModal({
       setAutosaveArmed(true);
       toast.success(`'${project.name}' 프로젝트를 만들었습니다.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "프로젝트를 만들지 못했습니다.");
+      toast.error(getErrorMessage(error, "프로젝트를 만들지 못했습니다."));
     } finally {
       setCreatingProject(false);
     }
@@ -377,7 +363,7 @@ export default function WorkTimelineCreateModal({
       const result = await createWorkTimelineEntry({
         title: title.trim(),
         description: description.trim() || null,
-        completedAt: new Date(`${completedAt}:00+09:00`).toISOString(),
+        completedAt: fromKstDateTimeLocal(completedAt, "완료 시간을 올바르게 입력해 주세요."),
         taskId,
         projectId: projectId || null,
       });
@@ -414,7 +400,7 @@ export default function WorkTimelineCreateModal({
           });
         }
       }
-      const message = error instanceof Error ? error.message : "업무를 공유하지 못했습니다. 잠시 후 다시 시도해주세요.";
+      const message = getErrorMessage(error, "업무를 공유하지 못했습니다. 잠시 후 다시 시도해주세요.");
       setErrorMessage(message);
       toast.error(message);
     } finally {

@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState } from "react";
 import { toast } from "sonner";
 import { createExpense } from "@/lib/expenses/actions";
@@ -61,7 +62,7 @@ export default function ExpenseQuickInput({ categories, paymentMethods, onMethod
       setSheetOpen(false);
       onCreated();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
+      toast.error(getErrorMessage(err, "저장에 실패했습니다."));
     } finally {
       setSaving(false);
     }

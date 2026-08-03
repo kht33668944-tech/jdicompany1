@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils/date";
@@ -194,7 +195,7 @@ function PendingExpenseRow({
       toast.success("금액이 확정되었습니다.");
       onConfirmed();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
+      toast.error(getErrorMessage(err, "저장에 실패했습니다."));
     } finally {
       setSaving(false);
     }

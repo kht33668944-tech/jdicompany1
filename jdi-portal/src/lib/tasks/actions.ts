@@ -227,22 +227,24 @@ export async function updateTask(
   if (statusChanged) {
     const nextPosition = await getNextPosition(supabase, params.status!);
     await moveTask(taskId, params.status!, nextPosition);
-    await logActivity(taskId, userId, "status_change", null, {
-      from: currentTask.status,
-      to: params.status,
-    });
-
-    // 알림: 할일 생성자에게 (변경자 ≠ 생성자일 때)
-    if (currentTask.created_by && currentTask.created_by !== userId) {
-      await createNotification({
-        userId: currentTask.created_by,
-        type: "task_status_changed",
-        title: `할일 상태가 "${params.status}"(으)로 변경되었습니다`,
-        body: currentTask.title,
-        link: `/dashboard/tasks/${taskId}`,
-        metadata: { task_id: taskId, from: currentTask.status, to: params.status },
-      });
-    }
+    // 활동 로그와 알림은 서로 의존하지 않으므로 함께 기다린다.
+    await Promise.all([
+      logActivity(taskId, userId, "status_change", null, {
+        from: currentTask.status,
+        to: params.status,
+      }),
+      // 알림: 할일 생성자에게 (변경자 ≠ 생성자일 때)
+      currentTask.created_by && currentTask.created_by !== userId
+        ? createNotification({
+          userId: currentTask.created_by,
+          type: "task_status_changed",
+          title: `할일 상태가 "${params.status}"(으)로 변경되었습니다`,
+          body: currentTask.title,
+          link: `/dashboard/tasks/${taskId}`,
+          metadata: { task_id: taskId, from: currentTask.status, to: params.status },
+        })
+        : null,
+    ]);
   }
 
   // 우선순위 변경 로그

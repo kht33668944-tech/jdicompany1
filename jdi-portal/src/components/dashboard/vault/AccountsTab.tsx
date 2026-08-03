@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { VaultAccount, AccountSecretHistoryItem } from "@/lib/vault/types";
@@ -43,7 +44,7 @@ export default function AccountsTab({ gateConfigured, initialUnlocked, isAdmin, 
       const list = await listAccounts();
       setAccounts(list);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "계정을 불러오지 못했습니다.");
+      toast.error(getErrorMessage(err, "계정을 불러오지 못했습니다."));
       setUnlocked(false);
     } finally {
       setLoading(false);
@@ -80,7 +81,7 @@ export default function AccountsTab({ gateConfigured, initialUnlocked, isAdmin, 
         toast.error("2차 비밀번호가 올바르지 않습니다.");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "잠금 해제 실패");
+      toast.error(getErrorMessage(err, "잠금 해제 실패"));
     } finally {
       setLoading(false);
     }
@@ -127,7 +128,7 @@ export default function AccountsTab({ gateConfigured, initialUnlocked, isAdmin, 
     try {
       setHistory(await getAccountHistory(accountId));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "이력 불러오기 실패");
+      toast.error(getErrorMessage(err, "이력 불러오기 실패"));
     }
   };
 
@@ -138,7 +139,7 @@ export default function AccountsTab({ gateConfigured, initialUnlocked, isAdmin, 
       toast.success("삭제되었습니다.");
       load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "삭제 실패");
+      toast.error(getErrorMessage(err, "삭제 실패"));
     }
   };
 

@@ -468,42 +468,19 @@ export async function getDrawerItems(
 ): Promise<DrawerItem[]> {
   const supabase = getSupabase();
 
-  if (tab === "links") {
-    // 텍스트 메시지 중 URL 포함된 것
-    const { data, error } = await supabase
-      .from("messages")
-      .select("id, content, type, created_at, user_id")
-      .eq("channel_id", channelId)
-      .eq("type", "text")
-      .eq("is_deleted", false)
-      .like("content", "%http%")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (error) throw error;
-    if (!data || data.length === 0) return [];
-
-    const profileMap = await fetchProfileMap([...new Set(data.map((m) => m.user_id))]);
-
-    return data.map((m) => ({
-      id: m.id,
-      content: m.content,
-      type: m.type,
-      created_at: m.created_at,
-      user_name: profileMap.get(m.user_id)?.full_name ?? "",
-    }));
-  }
-
-  // 이미지 또는 파일 메시지
-  const msgType = tab === "images" ? "image" : "file";
-  const { data, error } = await supabase
+  const base = supabase
     .from("messages")
     .select("id, content, type, created_at, user_id")
     .eq("channel_id", channelId)
-    .eq("type", msgType)
-    .eq("is_deleted", false)
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .eq("is_deleted", false);
+
+  const query =
+    tab === "links"
+      ? // 텍스트 메시지 중 URL 포함된 것
+        base.eq("type", "text").like("content", "%http%")
+      : base.eq("type", tab === "images" ? "image" : "file");
+
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(100);
 
   if (error) throw error;
   if (!data || data.length === 0) return [];
@@ -615,46 +592,43 @@ export async function getReactionsForMessages(
 }
 
 // ============================================
-// 즐겨찾기
+// 즐겨찾기 / 음소거
 // ============================================
 
-export async function toggleFavorite(channelId: string): Promise<boolean> {
-  const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("인증이 필요합니다.");
-  const { data: member } = await supabase.from("channel_members")
-    .select("is_favorite").eq("channel_id", channelId).eq("user_id", user.id).single();
-  const newFav = !(member?.is_favorite ?? false);
-  await supabase.from("channel_members").update({ is_favorite: newFav })
-    .eq("channel_id", channelId).eq("user_id", user.id);
-  return newFav;
-}
-
-// ============================================
-// 음소거
-// ============================================
-
-export async function toggleMute(channelId: string): Promise<boolean> {
+/** 내 멤버십 행의 boolean 열 하나를 뒤집고 바뀐 값을 돌려준다. */
+async function toggleMemberFlag(
+  channelId: string,
+  column: "is_favorite" | "is_muted"
+): Promise<boolean> {
   const supabase = getSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("인증이 필요합니다.");
 
   const { data: member } = await supabase
     .from("channel_members")
-    .select("is_muted")
+    .select(column)
     .eq("channel_id", channelId)
     .eq("user_id", user.id)
     .single();
 
-  const newMuted = !(member?.is_muted ?? false);
+  const current = (member as unknown as Record<string, boolean | null> | null)?.[column] ?? false;
+  const next = !current;
 
   await supabase
     .from("channel_members")
-    .update({ is_muted: newMuted })
+    .update({ [column]: next })
     .eq("channel_id", channelId)
     .eq("user_id", user.id);
 
-  return newMuted;
+  return next;
+}
+
+export async function toggleFavorite(channelId: string): Promise<boolean> {
+  return toggleMemberFlag(channelId, "is_favorite");
+}
+
+export async function toggleMute(channelId: string): Promise<boolean> {
+  return toggleMemberFlag(channelId, "is_muted");
 }
 
 // ============================================

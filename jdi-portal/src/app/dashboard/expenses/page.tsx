@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { getMonthRange } from "@/lib/utils/date";
+import { getMonthRange, kstNow } from "@/lib/utils/date";
 import {
   getExpenseCategories,
   getExpensesByRange,
@@ -16,10 +16,9 @@ export default async function ExpensesPage() {
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
 
-  const now = new Date();
-  const kstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-  const year = kstNow.getFullYear();
-  const month = kstNow.getMonth() + 1;
+  const now = kstNow();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
   const { start, end } = getMonthRange(year, month);
   const prevYear = month === 1 ? year - 1 : year;
   const prevMonth = month === 1 ? 12 : month - 1;

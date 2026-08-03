@@ -323,6 +323,18 @@ export default function MessageList({
     return map;
   }, [messages]);
 
+  // 날짜 분류(메시지당 toLocaleDateString 1회)와 연속 이미지 묶음을 메시지가 바뀔 때만 계산.
+  // 렌더마다 새로 만들면 typing 표시 같은 무관한 갱신에도 목록 전체가 다시 그려지고,
+  // chunk 배열 참조가 바뀌어 ImageGroupRenderer 의 useMemo 도 무효화된다.
+  const dateGroups = useMemo(
+    () =>
+      groupMessagesByDate(messages).map((group) => ({
+        date: group.date,
+        chunks: groupConsecutiveImages(group.messages),
+      })),
+    [messages]
+  );
+
   if (messages.length === 0) {
     if (loading) return <MessageSkeleton />;
     return (
@@ -331,8 +343,6 @@ export default function MessageList({
       </div>
     );
   }
-
-  const groups = groupMessagesByDate(messages);
 
   return (
     <div
@@ -345,7 +355,7 @@ export default function MessageList({
           <span className="text-[11px] text-slate-400">이전 메시지 불러오는 중...</span>
         </div>
       )}
-      {groups.map((group) => (
+      {dateGroups.map((group) => (
         <div key={group.date} className="space-y-3 sm:space-y-4">
           {/* Date divider */}
           <div className="flex items-center justify-center py-2 sm:py-4">
@@ -356,7 +366,7 @@ export default function MessageList({
             <div className="h-px flex-1 bg-slate-100" />
           </div>
 
-          {groupConsecutiveImages(group.messages).map((chunk) =>
+          {group.chunks.map((chunk) =>
             chunk.type === "image-group" ? (
               <ImageGroupRenderer
                 key={`img-group-${chunk.messages[0].id}`}
