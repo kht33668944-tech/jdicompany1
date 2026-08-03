@@ -22,7 +22,8 @@
 | `docs/claude/user-profile.md` | 사용자와 커뮤니케이션 방식 |
 | `docs/performance/production-baseline.md` | 성능 기준선과 확인 절차 |
 | `docs/operations/backup-and-recovery.md` | 백업·복구 운영 절차 |
-| `docs/operations/cloud-run-seoul.md` | 서울 리전 배포(Cloud Run) 구성·배포·롤백 |
+| `docs/operations/cloud-run-seoul.md` | 서울 리전 배포(Cloud Run) 구성·배포·롤백·비용 |
+| `docs/superpowers/specs/`, `docs/superpowers/plans/` | 기능별 설계·구현 계획 기록 (같은 기능을 다시 손볼 때 먼저 확인) |
 | `supabase/CLAUDE.md` | DB, RLS, Edge Function 규칙 |
 | `src/components/dashboard/attendance/CLAUDE.md` | 근태 도메인 규칙 |
 | `src/components/dashboard/chat/CLAUDE.md` | 채팅 도메인 규칙 |
@@ -72,8 +73,10 @@ npx supabase functions deploy <name> --no-verify-jwt
 
 ## 금지/주의
 
-- **성능 불변조건을 되돌리지 않습니다.** 미들웨어 인증 캐시(`src/lib/supabase/middleware.ts`), keepalive(`src/instrumentation.ts`), 빠른 경로+폴백(`src/lib/*/fast-queries.ts`), 대시보드 업무 요약 사전 필터 — 자세한 내용은 저장소 루트 `CLAUDE.md`. 코드 수정 후 `npm run test:performance`로 확인합니다.
+- **성능 불변조건을 되돌리지 않습니다.** 미들웨어 인증 캐시(`src/lib/supabase/middleware.ts`), keepalive(`src/lib/warmup.ts` + `src/instrumentation.ts` + `/api/keepalive`), 빠른 경로+폴백(`src/lib/*/fast-queries.ts`), 대시보드 업무 요약 사전 필터 — 자세한 내용은 저장소 루트 `CLAUDE.md`. 코드 수정 후 `npm run test:performance`로 확인합니다.
 - 대시보드 초기 데이터를 건드리면 **빠른 경로와 Supabase RPC 폴백 양쪽**을 함께 고칩니다. 한쪽만 고치면 운영에 반영되지 않거나 회귀 테스트가 실패합니다.
+- **`/api/keepalive` 를 지우거나 인증 뒤로 옮기지 않습니다.** 운영(Cloud Run)은 요청을 처리할 때만 CPU 를 주므로, 이 경로를 Cloud Scheduler 가 1분마다 불러야 유휴 뒤 첫 진입이 느려지지 않습니다. 인증을 거치지 않는 경로는 `/api/health` 와 이것 둘뿐입니다.
+- **오류 문구는 `src/lib/utils/errors.ts`의 `getErrorMessage()`를 지나게 둡니다.** 배포 직후 `Server Action ... was not found` 를 앱이 스스로 알아채고 새로고침하는 장치(`StaleDeploymentWatcher`)가 이 통로에 걸려 있습니다.
 - `tsconfig.json`의 `exclude`에서 `supabase/functions/**`를 제거하지 않습니다.
 - SQL에서 `CURRENT_DATE`, `NOW()`를 KST 변환 없이 직접 사용하지 않습니다.
 - 클라이언트 코드에 서버 전용 키를 노출하지 않습니다.

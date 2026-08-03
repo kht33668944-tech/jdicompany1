@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **서울 배포는 자동이 아닙니다.** 루트에서 `gcloud builds submit --config cloudbuild.yaml` 로 사람이 실행합니다(Cloud Build 트리거 없음). `master` 에 병합해도 운영에 반영되지 않습니다.
 - **배포 전 반드시 `master` 를 합치세요.** `gcloud builds submit` 은 git 브랜치가 아니라 **지금 폴더의 파일**을 올립니다. 작업 브랜치에서 그냥 배포하면 다른 브랜치가 이미 master 에 병합한 수정이 **조용히 되돌아갑니다**(2026-07-30 실제 발생). 배포 전 `git fetch origin master && git log --oneline HEAD..origin/master` 가 비어 있는지 확인합니다.
+- **빌드 컨텍스트에서 `jdi-portal/docs` 와 `jdi-portal/supabase` 는 빠집니다**(`.dockerignore`, `.gcloudignore` 가 `#!include` 로 공유). `next build` 가 읽지 않는데 바뀔 때마다 Docker 캐시를 깨뜨리기 때문입니다. 빌드 단계에서 마이그레이션 파일이나 문서를 읽는 작업을 추가하면 **컨테이너 안에 그 파일이 없습니다.** `.dockerignore` 에서 `Dockerfile` 을 제외하면 Cloud Build 가 업로드받지 못하니 그 줄도 되살리지 마세요.
 - **Railway 는 중지했지만 `master` 자동 배포 연결은 살아 있습니다.** 그래서 커밋을 올릴 때마다 Railway 에서 **실패한 배포가 하나씩 쌓입니다**(루트 `Dockerfile` 때문에 `railway.toml` 의 시작 명령이 안 먹힘). 사이트에는 영향이 없습니다 — 이유와 대응은 위 문서의 "Railway 는 이제 되살리기 어렵다" 절에 있습니다. `railway.toml` 은 그 시절 구성으로 남겨 둔 것입니다.
 - **거의 모든 작업(코드, 문서, Supabase, 테스트)은 `jdi-portal/` 안에서 진행합니다.**
 - 앱 작업 전 `jdi-portal/CLAUDE.md`와 `jdi-portal/AGENTS.md`를 먼저 읽습니다. 도메인/DB 작업은 아래 계층별 문서를 우선 확인합니다.
@@ -54,7 +55,7 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 - `src/lib/<domain>/{queries,actions,types,constants}.ts` — `queries.ts`(읽기), `actions.ts`(쓰기), `types.ts`(도메인 타입). 일부 도메인엔 `*Cache.ts`(예: `tasks/tasksCache.ts`).
 - `src/components/dashboard/<domain>/` — 도메인 UI. 여기 하위 `CLAUDE.md`가 있으면 우선.
 
-도메인 목록: `dashboard`(대시보드 홈), `attendance`(근태), `tasks`(업무), `chat`(채팅), `schedule`(일정), `reports`(리포트), `influencer`(인플루언서), `work-timeline`(업무 타임라인 + 업무보고 검토), `expenses`(지출관리), `projects`(프로젝트 분류), `directives`(업무지시), `vault`(보관함 — 서류·계정, 계정 비밀번호는 `ACCOUNT_VAULT_KEY`로 암호화 + 2차 비밀번호 게이트), `activity`(최근 활동 피드), `notifications`(알림), `push`(웹 푸시), `settings`(설정). (`src/lib/cache`, `src/lib/performance`, `src/lib/db`, `src/lib/supabase`, `src/lib/hooks`, `src/lib/utils`는 도메인이 아니라 공용 인프라 모듈입니다.)
+도메인 목록: `dashboard`(대시보드 홈), `attendance`(근태), `tasks`(업무), `chat`(채팅), `schedule`(일정), `reports`(리포트), `influencer`(인플루언서), `work-timeline`(업무 타임라인 + 업무보고 검토), `expenses`(지출관리), `projects`(프로젝트 분류), `directives`(업무지시), `vault`(보관함 — 서류·계정, 계정 비밀번호는 `ACCOUNT_VAULT_KEY`로 암호화 + 2차 비밀번호 게이트), `activity`(최근 활동 피드), `notifications`(알림), `push`(웹 푸시), `settings`(설정). (`src/lib/cache`, `src/lib/performance`, `src/lib/db`, `src/lib/supabase`, `src/lib/hooks`, `src/lib/utils`, `src/lib/warmup.ts`는 도메인이 아니라 공용 인프라 모듈입니다.)
 
 일부 도메인은 표준 4파일 형태와 조금 다릅니다.
 - `directives` — 읽기를 대시보드 빠른 경로에 통합해 `queries.ts` 없이 `actions/constants/types.ts`만 둡니다.
@@ -68,7 +69,9 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 - **Supabase (기본)**: `src/lib/supabase/`의 SSR 클라이언트. `server.ts`(서버 컴포넌트/Route Handler, 쿠키 기반), `client.ts`(브라우저, 캐시된 싱글턴), `middleware.ts`(세션 갱신), `auth.ts`(`getAuthUser()` 등). RLS + `public.is_approved_user()`로 접근 제어.
 - **직접 Postgres (`pg` Pool)**: `src/lib/db/postgres.ts`. 일부 성능 민감 서버 흐름에서 `DATABASE_URL`로 직접 연결. **fallback 설계가 핵심** — 연결 실패 시 `markPostgresUnavailable()`로 60초간 차단하고 Supabase 경로로 우회. `src/instrumentation.ts`가 서버 프로세스 시작 시 풀을 warm-up 합니다.
 
-**인증/세션 흐름**: Next.js 16이라 `middleware.ts`가 아니라 **`src/proxy.ts`** 가 진입점입니다(`src/lib/supabase/middleware.ts`의 `updateSession` 호출). 승인된 사용자만 대시보드 접근.
+**인증/세션 흐름**: Next.js 16이라 `middleware.ts`가 아니라 **`src/proxy.ts`** 가 진입점입니다(`src/lib/supabase/middleware.ts`의 `updateSession` 호출). 승인된 사용자만 대시보드 접근. 인증을 거치지 않는 경로는 **`/api/health`(생존 확인)와 `/api/keepalive`(데우기) 둘뿐**이며, 이 판별은 Supabase 클라이언트를 만들기 **전에** 있어야 합니다(회귀 테스트가 이 순서를 고정).
+
+**배포 후 화면 자가 복구** (`src/components/dashboard/StaleDeploymentWatcher.tsx` + `src/lib/utils/errors.ts`): 데스크톱 앱이 화면을 며칠씩 열어 두므로, 배포할 때마다 직원이 `Server Action ... was not found on the server` 영어 오류를 만납니다. `getErrorMessage()`가 이 오류를 알아보면 `notifyStaleDeployment()`로 이벤트를 쏘고, 감시자가 **입력 중인 글이 없을 때만** 3초 뒤 자동 새로고침합니다(입력이 있으면 버튼만 제공, 1분 쿨다운). 오류 문구를 이 공용 함수 밖에서 만들면 호출부 19곳의 `try/catch`가 오류를 삼켜 감시자가 못 봅니다 — 우회하지 마세요.
 
 **Edge Functions** (`supabase/functions/`, **Deno 런타임** — Node 전용 패키지 금지): `influencer-analyze`, `influencer-extract`(인플루언서 자동 분석), `push-dispatch`(웹 푸시). PWA/웹 푸시는 `src/lib/push/`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
 
@@ -90,10 +93,14 @@ TypeScript는 strict입니다. `@/*` → `jdi-portal/src/*`. Node ≥ 22.
 이 앱은 여러 차례 성능 최적화를 거쳤고, 아래 장치들이 사이트 속도를 유지합니다. **큰 작업 중 실수로 이것들을 지우거나 우회하면 사이트가 다시 3~7초로 느려집니다.** 관련 파일을 수정할 땐 아래를 깨지 않는지 확인하고, **작업 후 반드시 `cd jdi-portal && npm run test:performance`로 검증**합니다(회귀가 있으면 테스트가 실패). 자동 검증은 세션 종료 시 성능 회귀 방지 훅(`jdi-portal/scripts/perf-guard-hook.mjs`)이 코드 변경을 감지해 이 테스트를 돌립니다.
 
 1. **미들웨어 인증 캐시** (`jdi-portal/src/lib/supabase/middleware.ts`): 5분 내 검증된 로그인 쿠키는 `getUser()` 네트워크 왕복(서울 인증 서버, 평시 300~500ms)을 생략합니다. **최대 개선(전역 지연 제거)** 이므로 `getAuthVerifyCache`/`AUTH_CACHE_TTL_MS` 로직을 제거·우회하지 않습니다.
-2. **DB/HTTPS keepalive** (`jdi-portal/src/instrumentation.ts`): 2분 주기로 pg 풀과 Supabase 경로를 데워 콜드 스타트(유휴 후 첫 요청 3~7초)를 방지합니다. `setInterval`/keepalive와 pg 풀 설정(`min:1`, `keepAlive:true`, `idleTimeoutMillis: 10*60_000` — `src/lib/db/postgres.ts`)을 유지합니다. 운영(Cloud Run)은 CPU 요청기반 과금이라 요청 사이에 CPU 가 멈춰 이 타이머가 `fetch` 를 시작만 하고 끝내지 못합니다. 그래서 **Cloud Scheduler 작업 `jdi-portal-keepalive` 가 1분마다 `/api/keepalive` 를 불러 같은 데우기(`src/lib/warmup.ts`)를 요청 안에서 `await` 로 완료시킵니다** — 스케줄러도 이 경로도 지우면 안 됩니다(`jdi-portal/docs/operations/cloud-run-seoul.md`).
+2. **DB/HTTPS keepalive** (`jdi-portal/src/lib/warmup.ts`): 1분 주기로 pg 풀과 Supabase 경로를 데워 콜드 스타트(유휴 후 첫 요청 3~7초)를 방지합니다. 데우기 로직은 `warmup.ts` **한 곳**에 있고 두 경로가 함께 부릅니다.
+   - `src/instrumentation.ts` — 프로세스 시작 시 pg 풀 warm-up(여기서만 실패를 `markPostgresUnavailable()`로 승격) + `setInterval` 타이머 1개. CPU 가 상시 할당되는 환경(로컬)용입니다.
+   - `/api/keepalive` — 운영(Cloud Run)은 CPU 요청기반 과금이라 요청 사이에 CPU 가 멈춰 위 타이머가 `fetch` 를 시작만 하고 끝내지 못합니다. 그래서 **Cloud Scheduler 작업 `jdi-portal-keepalive` 가 1분마다 이 경로를 불러 요청 안에서 `await` 로 완료시킵니다.** 스케줄러도 이 경로도 지우면 안 됩니다(`jdi-portal/docs/operations/cloud-run-seoul.md`).
+
+   두 경로가 겹쳐 도는 것은 `warmUpstreams()` 안의 간격 제한(`MIN_WARM_INTERVAL_MS`)이 막습니다. **연타 방지를 route 쪽으로 되돌리지 마세요** — 그러면 스케줄러가 CPU 를 깨우는 순간 밀려 있던 타이머가 같이 실행돼 매 분 상류를 두 번씩 두드립니다(월 8만여 회). pg 풀 설정(`min:1`, `keepAlive:true`, `idleTimeoutMillis: 10*60_000` — `src/lib/db/postgres.ts`)도 유지합니다.
 3. **빠른 경로(직접 Postgres) + 폴백**: 대시보드·할일 초기 데이터는 단일 pg 왕복(`src/lib/dashboard/fast-queries.ts`, `src/lib/tasks/fast-queries.ts`). 성능 최적화 시 **빠른 경로와 Supabase RPC 폴백 양쪽**을 함께 고쳐야 운영에 반영됩니다(운영이 쓰는 경로는 로그 `source`로 확인).
 4. **대시보드 업무 요약 사전 필터** (마이그레이션 088 + `get_dashboard_task_summaries` RPC): `tasks` 전체 스캔 금지 — status/completed_at 사전 필터와 부분 인덱스를 유지합니다.
-5. **초기 JS 예산**: 무거운 라이브러리(xlsx 등)는 지연 로드, 라우트별 초기 JS 예산 준수(`npm run perf:audit`), 전역 prefetch 남용 금지, `/api/health`는 인증 우회 유지.
+5. **초기 JS 예산**: 무거운 라이브러리(xlsx 등)는 지연 로드, 라우트별 초기 JS 예산 준수(`npm run perf:audit`), 전역 prefetch 남용 금지, `/api/health`·`/api/keepalive`는 인증 우회 유지.
 
 기준선: `jdi-portal/docs/performance/production-baseline.md`. 회귀 방지 테스트는 `jdi-portal/scripts/performance-architecture.test.mjs` 등이며 `npm run test:performance`로 한 번에 돌립니다(검사 개수는 계속 늘어나므로 여기에 적지 않습니다 — 실행하면 마지막 줄에 `pass`/`fail`이 나옵니다). 새 기능이 대시보드 초기 데이터에 얹히면(예: 업무지시·검토 인박스·최근 활동) **빠른 경로와 RPC 폴백 양쪽에 싣는지 검사하는 테스트가 추가되어 있으므로**, 한쪽만 고치면 이 스위트가 실패합니다.
 

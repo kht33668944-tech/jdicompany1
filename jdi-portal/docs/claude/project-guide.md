@@ -59,9 +59,13 @@ npx supabase functions deploy <name> --no-verify-jwt
 - 클라이언트 컴포넌트는 필요한 경우 도메인 `actions.ts`에서 Supabase client를 사용합니다. 보안은 RLS가 최종 방어선입니다.
 - Postgres 직접 연결이 가능한 일부 서버 흐름은 `src/lib/db/postgres.ts`를 통해 fallback과 함께 동작합니다. 연결 실패 시 60초 동안 Supabase 경로로 우회합니다.
 - 대시보드와 할일 초기 데이터는 **빠른 경로**(`src/lib/dashboard/fast-queries.ts`, `src/lib/tasks/fast-queries.ts`)와 **Supabase RPC 폴백**이 짝을 이룹니다. 초기 데이터를 바꾸면 반드시 **양쪽 다** 고칩니다. 실제 운영이 어느 쪽을 썼는지는 로그의 `source`로 확인합니다.
-- `src/instrumentation.ts`가 서버 시작 시 pg 풀을 데우고 2분마다 keepalive를 보냅니다. 이게 없으면 유휴 후 첫 요청이 3~7초로 늘어납니다.
+- **상류 데우기(keepalive)** 로직은 `src/lib/warmup.ts` 한 곳에 있고, 두 경로가 이걸 부릅니다. 이게 없으면 유휴 후 첫 요청이 3~7초로 늘어납니다.
+  - `src/instrumentation.ts` — 서버 시작 시 pg 풀을 데우고, 1분마다 타이머로 다시 데웁니다. CPU 가 상시 할당되는 환경(로컬)에서 유효합니다.
+  - `src/app/api/keepalive/route.ts` — 운영(Cloud Run)은 요청 처리 중에만 CPU 를 주므로 위 타이머가 `fetch`를 끝내지 못합니다. Cloud Scheduler 작업 `jdi-portal-keepalive`가 1분마다 이 경로를 불러 요청 안에서 완료시킵니다.
+  - 두 경로가 겹쳐 도는 것은 `warmUpstreams()` 안의 간격 제한이 막습니다. 이 제한을 route 쪽으로 옮기면 매 분 상류를 두 번씩 두드립니다.
+- 배포로 화면이 낡으면(`Server Action ... was not found`) `src/lib/utils/errors.ts`의 `getErrorMessage()`가 이를 알아보고 이벤트를 쏘며, `StaleDeploymentWatcher`가 입력 중인 글이 없을 때만 자동 새로고침합니다. 오류 문구를 이 함수 밖에서 만들면 감시자가 신호를 못 받습니다.
 - 캐시가 있는 도메인은 stale 데이터가 UI를 덮어쓰지 않도록 로드 순서를 확인합니다.
-- 무거운 라이브러리(`xlsx` 등)는 지연 로드하고, 라우트별 초기 JS 예산은 `npm run perf:audit`으로 확인합니다. `/api/health`는 인증을 거치지 않습니다.
+- 무거운 라이브러리(`xlsx` 등)는 지연 로드하고, 라우트별 초기 JS 예산은 `npm run perf:audit`으로 확인합니다. 인증을 거치지 않는 경로는 `/api/health`(순수 생존 확인)와 `/api/keepalive`(데우기) 둘뿐입니다.
 
 ## 보안 기준
 
@@ -116,7 +120,8 @@ npx supabase functions deploy <name> --no-verify-jwt
 ## 자주 쓰는 유틸
 
 - 날짜: `src/lib/utils/date.ts`
-- 오류 메시지: `src/lib/utils/errors.ts`
+- 오류 메시지 + 낡은 배포 감지: `src/lib/utils/errors.ts`
+- 상류 데우기: `src/lib/warmup.ts`
 - 파일 검증: `src/lib/utils/upload.ts`
 - IP 처리: `src/lib/utils/ip.ts`
 - 휴가 계산: `src/lib/utils/vacation.ts`

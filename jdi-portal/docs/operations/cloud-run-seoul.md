@@ -36,7 +36,7 @@ DB(Supabase)는 서울에 있는데 앱은 Railway **싱가포르**에 있었습
 ## 왜 Cloud Run 인가 (서버리스 함수형은 안 되는 이유)
 
 이 앱은 **항상 켜져 있는 Node 프로세스**를 전제로 성능을 맞춰 뒀습니다
-(`src/instrumentation.ts` 의 pg 풀 warm-up + 2분 주기 keepalive → 저장소 루트
+(`src/instrumentation.ts` 의 pg 풀 warm-up + 1분 주기 keepalive → 저장소 루트
 `CLAUDE.md` 의 성능 불변조건 2). 요청마다 새로 뜨는 함수형 호스팅에서는 이 장치가
 동작하지 않습니다. 그래서 컨테이너를 **최소 1대 상시 가동**(`--min-instances=1`)으로
 띄워 Railway 와 같은 실행 모델을 유지합니다. 이 값은 **줄이지 마세요.**
@@ -64,11 +64,16 @@ gcloud scheduler jobs list --location=asia-northeast3 --project jdi-portal-seoul
 > 느려집니다. 대상은 Cloudflare 를 거치지 않는 `*.run.app` 주소로 두었습니다 —
 > Worker 무료 한도를 쓰지 않기 위함입니다.
 
-관련 파일: `src/lib/warmup.ts`(데우기 로직, `instrumentation.ts` 와 공용),
-`src/app/api/keepalive/route.ts`(경로 + 연타 방지),
+관련 파일: `src/lib/warmup.ts`(데우기 로직 + **연타 방지**, `instrumentation.ts` 와 공용),
+`src/app/api/keepalive/route.ts`(경로),
 `src/lib/supabase/middleware.ts`(인증 우회).
 `/api/health` 는 **순수한 생존 확인**으로 남겨 둡니다 — 외부 헬스체크가 DB 상태에
 끌려가면 안 되고, 회귀 테스트도 그렇게 고정합니다.
+
+> **연타 방지는 `warmUpstreams()` 안에 두세요(route 로 옮기지 말 것).** 스케줄러 요청이
+> CPU 를 깨우는 순간, 밀려 있던 `instrumentation.ts` 타이머도 같이 깨어나 같은 데우기를
+> 한 번 더 돌립니다. 공용 간격 제한이 없으면 매 분 상류를 두 번씩 두드립니다(월 8만여 회).
+> 운영 확인: 1회차 `warmed=true`(324ms), 곧바로 2회차 `warmed=false`(1ms).
 
 안전망은 이중입니다. 스케줄러가 데우기를 완료시키고, 그와 별개로 pg 풀의
 `keepAlive: true`(`src/lib/db/postgres.ts`)가 **OS 수준 TCP keepalive** 이므로
@@ -124,7 +129,9 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
 수준입니다.
 
 `next.config.ts` 의 `output: "standalone"` 은 `NEXT_OUTPUT_STANDALONE=1` 일 때만 켜집니다.
-컨테이너 빌드에서만 켜고, Railway(`next start`)는 영향을 받지 않게 한 장치입니다.
+컨테이너 빌드에서만 켜려고 둔 장치입니다(원래는 `next start` 로 돌던 Railway 를 깨뜨리지
+않기 위한 것이었고, 지금은 로컬 `npm run build && npm run start` 가 같은 이유로 영향을 받지
+않습니다).
 
 ## 배포
 
@@ -161,6 +168,29 @@ gcloud builds submit --config cloudbuild.yaml \
 gcloud run services describe jdi-portal --region=asia-northeast3 \
   --project jdi-portal-seoul --format="value(status.url)"
 ```
+
+### 빌드 캐시 (2026-07-30 추가)
+
+Cloud Build 워커는 **매번 새 머신**이라 로컬 이미지 캐시가 비어 있습니다. 그래서
+`Dockerfile` 이 의존성 설치 레이어를 따로 분리해 둬도 아무 소용이 없었고, 배포할 때마다
+`npm ci` 를 처음부터 다시 돌렸습니다. 지금은 `cloudbuild.yaml` 이 직전 이미지를 받아
+캐시로 씁니다.
+
+```bash
+docker pull "$IMAGE:latest" || true
+docker build --cache-from "$IMAGE:latest" --build-arg BUILDKIT_INLINE_CACHE=1 ...
+```
+
+빌드 컨텍스트도 함께 정리했습니다. **되돌리지 마세요.**
+
+- `.dockerignore` 가 `jdi-portal/docs` 와 `jdi-portal/supabase` 를 제외합니다. `next build` 가
+  읽지 않는데 바뀔 때마다 `COPY` 레이어 캐시를 깨뜨리기 때문입니다.
+  → **빌드 단계에서 마이그레이션 파일이나 문서를 읽는 작업을 추가하면 컨테이너 안에 그
+  파일이 없습니다.**
+- `.gcloudignore` 는 `#!include:.dockerignore` 로 같은 목록을 재사용합니다(두 벌로 관리하면
+  한쪽만 고쳐 어긋납니다).
+- 그래서 `.dockerignore` 는 **`Dockerfile` 자신을 제외하지 않습니다.** 제외하면 Cloud Build
+  업로드에서도 빠져 빌드가 `Dockerfile` 을 찾지 못합니다.
 
 ### 환경변수를 바꿀 때
 

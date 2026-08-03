@@ -29,6 +29,7 @@ JDICOMPANY 내부 포털입니다. 비개발자 운영자가 쓰는 업무 도�
 - 보관함: 서류(파일)와 계정(아이디/비밀번호). 계정 비밀번호는 `ACCOUNT_VAULT_KEY`로 암호화하고 2차 비밀번호 게이트를 통과해야 열람
 - 최근 활동: 대시보드 요약 카드 + `/dashboard/activity` 전체 보기. 기록은 DB 트리거가 쌓고 문장은 TS에서 조립하며, 개인 일정은 제외
 - 설정: 프로필, 계정, 알림, 앱 설치, Windows 데스크톱 앱 내려받기 카드, 관리자 섹션
+- 배포 후 자가 복구: 새 버전이 배포돼 화면이 낡으면(`Server Action ... was not found`) 안내 토스트를 띄우고 자동 새로고침. 입력 중인 글이 있으면 자동으로 하지 않고 버튼만 제공 (`StaleDeploymentWatcher`)
 
 ## 경로 규칙
 
@@ -41,7 +42,8 @@ JDICOMPANY 내부 포털입니다. 비개발자 운영자가 쓰는 업무 도�
 | Supabase 클라이언트 | `src/lib/supabase/` |
 | 공용 유틸 | `src/lib/utils/`, `src/lib/hooks/` |
 | 세션 갱신 진입점 | `src/proxy.ts` (Next 16 — `middleware.ts` 아님) |
-| 서버 시작 훅(풀 warm-up) | `src/instrumentation.ts` |
+| 서버 시작 훅(풀 warm-up + 타이머) | `src/instrumentation.ts` |
+| 상류 데우기 공용 로직 | `src/lib/warmup.ts` (`instrumentation.ts` 와 `/api/keepalive` 가 함께 사용) |
 | Route Handler | `src/app/api/<name>/route.ts` |
 | DB 마이그레이션 | `supabase/migrations/NNN_*.sql` |
 | Edge Function | `supabase/functions/<name>/index.ts` |
@@ -115,7 +117,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 - 비개발자 사용자를 전제로, 화면 문구는 쉬운 한국어로 씁니다.
 - 기능 수정은 해당 도메인의 `queries.ts`, `actions.ts`, `types.ts`, 컴포넌트 구조를 먼저 확인합니다.
 - 파일 업로드는 `src/lib/utils/upload.ts`의 검증 흐름을 따릅니다.
-- 오류 메시지는 `src/lib/utils/errors.ts`의 패턴을 우선 사용합니다.
+- 오류 메시지는 `src/lib/utils/errors.ts`의 `getErrorMessage()`를 지나게 합니다. 여기서 배포로 낡은 화면을 감지해 자동 새로고침 신호를 보내므로, 호출부에서 문구를 직접 조립하면 그 기능이 죽습니다.
 - 날짜 포맷과 KST 처리는 `src/lib/utils/date.ts`를 우선 사용합니다.
 - `any`와 넓은 타입 단언은 피하고, 필요한 타입은 도메인 `types.ts`에 둡니다.
 
