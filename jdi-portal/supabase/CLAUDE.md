@@ -40,7 +40,25 @@ SELECT version, name, array_to_string(statements, E';\n') AS sql
   ```
 - `supabase db dump` 는 Docker Desktop 이 필요하고, 로컬 `.env.local` 의 `DATABASE_URL` 은 비밀번호가 만료돼 있을 수 있습니다.
 - 복구 후 `migration list --linked` 로 Local/Remote 가 모두 채워졌는지 확인합니다.
-- **실제 사례**: `111`~`116`(인플루언서 시딩·후보 발굴 계열)이 이 방법으로 복구되었습니다. 단, 이 6개가 만든 테이블을 쓰는 **앱 코드는 master 에 없습니다**(병합되지 않은 작업). DB 구조만 운영에 남아 있는 상태이므로, 관련 작업을 할 때 이미 존재하는 테이블을 다시 만들지 않도록 주의합니다.
+- **실제 사례**: `111`~`116`(인플루언서 시딩·후보 발굴 계열)이 이 방법으로 복구되었습니다. 단, 이 6개가 만든 테이블을 쓰는 **앱 코드는 master 에 없습니다**(병합되지 않은 작업).
+
+> **⚠️ `111`~`116` 은 "기록만 있고 테이블은 없을" 수 있습니다 — 쓰기 전에 반드시 확인하세요.**
+>
+> `migration list --linked` 에는 `111`~`116` 이 Remote 로 찍혀 있지만, 2026-07-30 실측에서
+> `relation "public.influencer_candidates" does not exist` 가 나왔습니다
+> (`docs/superpowers/specs/2026-07-30-influencer-discovery-relatedprofiles-design.md`).
+> 마이그레이션 **기록만 복구되고 실제 DDL 은 실행되지 않았거나, 이후 지워진** 상태로 보입니다.
+>
+> 그래서 이 계열 작업을 할 때는 **"테이블이 이미 있다"고도, "없다"고도 가정하지 말고**
+> 아래로 직접 확인한 뒤 시작합니다.
+>
+> ```sql
+> SELECT table_name FROM information_schema.tables
+>  WHERE table_schema = 'public' AND table_name LIKE 'influencer_candidate%';
+> ```
+>
+> 없다면 `114`~`116` 은 이미 Remote 에 기록돼 있어 `db push` 가 **조용히 건너뜁니다.**
+> 새 번호로 다시 작성하거나 SQL 을 직접 실행해야 합니다.
 
 ## RLS
 

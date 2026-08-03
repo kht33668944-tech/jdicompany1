@@ -72,7 +72,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 |---|---|
 | `src/app/` | Next.js App Router 페이지와 Route Handler |
 | `src/proxy.ts` | 로그인 세션 갱신 진입점 (Next 16이라 `middleware.ts` 아님) |
-| `src/instrumentation.ts` | 서버 시작 시 DB 풀 warm-up과 keepalive |
+| `src/instrumentation.ts` · `src/lib/warmup.ts` | 서버 시작 시 DB 풀 warm-up과 1분 주기 keepalive (운영은 `/api/keepalive` 를 외부 스케줄러가 호출) |
 | `src/components/dashboard/` | 대시보드 UI |
 | `src/lib/` | 도메인별 쿼리, 액션, 타입, 유틸 |
 | `src/lib/supabase/` | Supabase SSR 클라이언트와 인증 헬퍼 |
@@ -104,6 +104,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 - 최근 활동 피드(대시보드 카드 + 전체 보기 `/dashboard/activity`)
 - PWA와 웹 푸시 알림
 - Windows 데스크톱 앱(트레이 상주, 자동 업데이트) — 설정 → 계정에서 내려받기
+- 배포 후 화면 자동 새로고침(며칠씩 열어 둔 화면이 새 버전과 어긋날 때, 입력 중인 글이 없으면 알아서 복구)
 
 ## 개발 메모
 
