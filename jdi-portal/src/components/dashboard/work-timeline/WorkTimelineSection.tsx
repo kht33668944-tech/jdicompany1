@@ -9,7 +9,7 @@ import Select from "@/components/shared/Select";
 import { useProjects } from "@/lib/projects/useProjects";
 import { normalizeProjectParam, toProjectFilterOptions } from "@/lib/projects/utils";
 import { createClient } from "@/lib/supabase/client";
-import { addDays, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
+import { addDays, formatDateFull, formatTime, toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { WORK_TIMELINE_PAGE_SIZE } from "@/lib/work-timeline/constants";
 import { retryPendingWorkTimelineStorageCleanup } from "@/lib/work-timeline/actions";
 import { getWorkTimelineEntries } from "@/lib/work-timeline/queries";
@@ -75,23 +75,8 @@ function normalizeDateFilter(value: string | null): string {
 }
 
 function formatGroupDate(date: string): string {
-  const label = new Date(`${date}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  });
+  const label = formatDateFull(date);
   return date === toDateString() ? `오늘 · ${label}` : label;
-}
-
-function formatCompletedTime(timestamp: string): string {
-  return new Date(timestamp).toLocaleTimeString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
 }
 
 function AttachmentPreview({ entry }: { entry: WorkTimelineEntryWithProfile }) {
@@ -198,13 +183,17 @@ export default function WorkTimelineSection({
     });
   }, []);
 
-  const loadEntries = useCallback(async (
-    reset: boolean,
-    employeeFilter = employeeId,
-    dateFilter = date,
-    queryFilter = query,
-    projectFilter = projectId,
-  ) => {
+  // 검색어가 바뀌는 중이거나 조건이 유효하지 않을 때, 진행 중인 요청을 버리고 목록을 비운다.
+  const resetFeed = useCallback(() => {
+    requestVersionRef.current += 1;
+    loadingRef.current = false;
+    setIsLoading(false);
+    setEntries([]);
+    setHasMore(false);
+    setErrorMessage(null);
+  }, []);
+
+  const loadEntries = useCallback(async (reset: boolean) => {
     if (!reset && loadingRef.current) return;
     const requestVersion = reset
       ? ++requestVersionRef.current
@@ -222,10 +211,10 @@ export default function WorkTimelineSection({
       const pageSize = WORK_TIMELINE_PAGE_SIZE;
       const nextEntries = await getWorkTimelineEntries(createClient(), {
         limit: pageSize,
-        employeeId: employeeFilter || null,
-        date: dateFilter || null,
-        query: queryFilter.length >= 2 ? queryFilter : null,
-        projectId: projectFilter || null,
+        employeeId: employeeId || null,
+        date: date || null,
+        query: query.length >= 2 ? query : null,
+        projectId: projectId || null,
         cursor: lastEntry
           ? { completedAt: lastEntry.completed_at, id: lastEntry.id }
           : null,
@@ -250,15 +239,10 @@ export default function WorkTimelineSection({
   useEffect(() => {
     if (compact || trimmedSearchInput === query) return;
 
-    requestVersionRef.current += 1;
-    loadingRef.current = false;
-    setIsLoading(false);
-    setEntries([]);
-    setHasMore(false);
-    setErrorMessage(null);
+    resetFeed();
     const timer = window.setTimeout(() => setQuery(trimmedSearchInput), 300);
     return () => window.clearTimeout(timer);
-  }, [compact, query, trimmedSearchInput]);
+  }, [compact, query, resetFeed, trimmedSearchInput]);
 
   useEffect(() => {
     if (!didMountRef.current) {
@@ -266,15 +250,10 @@ export default function WorkTimelineSection({
       return;
     }
     if (searchPending || query.length === 1) {
-      requestVersionRef.current += 1;
-      loadingRef.current = false;
-      setIsLoading(false);
-      setEntries([]);
-      setHasMore(false);
-      setErrorMessage(null);
+      resetFeed();
       return;
     }
-    void loadEntries(true, employeeId, date, query, projectId);
+    void loadEntries(true);
   }, [date, employeeId, query, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -329,7 +308,7 @@ export default function WorkTimelineSection({
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !loadingRef.current) {
-          void loadEntries(false, employeeId, date, query, projectId);
+          void loadEntries(false);
         }
       },
       { root, rootMargin: "120px 0px", threshold: 0.01 },
@@ -340,7 +319,7 @@ export default function WorkTimelineSection({
 
   const handleCreated = () => {
     setCreateOpen(false);
-    void loadEntries(true, employeeId, date, query, projectId);
+    void loadEntries(true);
     router.refresh();
   };
 
@@ -507,7 +486,7 @@ export default function WorkTimelineSection({
             <p className="text-sm font-semibold text-red-600">업무 타임라인을 불러오지 못했습니다</p>
             <button
               type="button"
-              onClick={() => void loadEntries(true, employeeId, date, query)}
+              onClick={() => void loadEntries(true)}
               className="mt-3 rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50"
             >
               다시 시도
@@ -558,7 +537,7 @@ export default function WorkTimelineSection({
                             dateTime={entry.completed_at}
                             className="text-xs font-semibold tabular-nums text-slate-500 sm:pt-1 sm:text-right sm:text-slate-400"
                           >
-                            {formatCompletedTime(entry.completed_at)}
+                            {formatTime(entry.completed_at)}
                           </time>
                           <div className="flex items-center sm:min-h-full sm:flex-col sm:items-center">
                             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-600 ring-4 ring-indigo-50 sm:mt-1.5" />

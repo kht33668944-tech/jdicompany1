@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -105,121 +106,121 @@ function formatPct(n: number | null): string {
   return `${n.toFixed(2)}%`;
 }
 
-// ── 캠페인 추가 폼 ──────────────────────────────────────────────
-interface AddCampaignFormProps {
-  influencerId: string;
-  onSaved: (c: InfluencerCampaign) => void;
-  onCancel: () => void;
+// ── 캠페인 폼 ──────────────────────────────────────────────────
+// 추가와 수정은 입력 항목이 같다. 다른 것은 초기값, 상태 Select 유무, 저장 동작뿐이라
+// 아래 CampaignForm 하나를 쓰고 AddCampaignForm/EditCampaignForm 이 저장 동작만 얹는다.
+
+interface CampaignFormValues {
+  name: string;
+  product: string;
+  cost: string;
+  status: CampaignStatus;
+  contactDate: string;
+  contractDate: string;
+  shipDate: string;
+  contentDeadline: string;
+  postDate: string;
 }
 
-function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormProps) {
-  const [name, setName] = useState("");
-  const [product, setProduct] = useState("");
-  const [cost, setCost] = useState("");
-  const [contactDate, setContactDate] = useState("");
-  const [contractDate, setContractDate] = useState("");
-  const [shipDate, setShipDate] = useState("");
-  const [contentDeadline, setContentDeadline] = useState("");
-  const [postDate, setPostDate] = useState("");
+const EMPTY_CAMPAIGN_FORM: CampaignFormValues = {
+  name: "",
+  product: "",
+  cost: "",
+  status: "planned",
+  contactDate: "",
+  contractDate: "",
+  shipDate: "",
+  contentDeadline: "",
+  postDate: "",
+};
+
+const TEXT_INPUT_CLASS =
+  "text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30";
+const DATE_INPUT_CLASS =
+  "w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600";
+
+function CampaignForm({
+  initial,
+  formClassName,
+  showStatus = false,
+  onSubmit,
+  onCancel,
+}: {
+  initial: CampaignFormValues;
+  formClassName: string;
+  showStatus?: boolean;
+  onSubmit: (values: CampaignFormValues) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [values, setValues] = useState(initial);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { toast.error("캠페인 이름을 입력하세요."); return; }
+    if (!values.name.trim()) { toast.error("캠페인 이름을 입력하세요."); return; }
     setSaving(true);
     try {
-      const saved = await addCampaign({
-        influencer_id: influencerId,
-        campaign_name: name.trim(),
-        product_name: product.trim() || undefined,
-        cost: cost ? Number(cost) : undefined,
-        contact_date: contactDate || undefined,
-        contract_date: contractDate || undefined,
-        ship_date: shipDate || undefined,
-        content_deadline: contentDeadline || undefined,
-        expected_post_date: postDate || undefined,
-      });
-      toast.success("캠페인이 추가되었습니다.");
-      onSaved(saved);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "캠페인 추가 실패");
+      await onSubmit(values);
     } finally {
       setSaving(false);
     }
   }
 
+  // 날짜 5개 — 시딩 캘린더 막대 시각화용
+  const dateFields: { label: string; value: string; onChange: (v: string) => void }[] = [
+    { label: "연락일 (DM)", value: values.contactDate, onChange: (v) => setValues((p) => ({ ...p, contactDate: v })) },
+    { label: "계약 진행", value: values.contractDate, onChange: (v) => setValues((p) => ({ ...p, contractDate: v })) },
+    { label: "발송일", value: values.shipDate, onChange: (v) => setValues((p) => ({ ...p, shipDate: v })) },
+    { label: "콘텐츠 마감", value: values.contentDeadline, onChange: (v) => setValues((p) => ({ ...p, contentDeadline: v })) },
+    { label: "포스팅 예정", value: values.postDate, onChange: (v) => setValues((p) => ({ ...p, postDate: v })) },
+  ];
+
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-200">
+    <form onSubmit={handleSubmit} className={formClassName}>
       <input
         type="text"
         placeholder="캠페인 이름 *"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        value={values.name}
+        onChange={(e) => setValues((p) => ({ ...p, name: e.target.value }))}
+        className={`w-full ${TEXT_INPUT_CLASS}`}
       />
       <div className="grid grid-cols-2 gap-2">
         <input
           type="text"
           placeholder="제품명"
-          value={product}
-          onChange={(e) => setProduct(e.target.value)}
-          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          value={values.product}
+          onChange={(e) => setValues((p) => ({ ...p, product: e.target.value }))}
+          className={TEXT_INPUT_CLASS}
         />
         <input
           type="number"
           placeholder="비용 (원)"
-          value={cost}
-          onChange={(e) => setCost(e.target.value)}
-          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          value={values.cost}
+          onChange={(e) => setValues((p) => ({ ...p, cost: e.target.value }))}
+          className={TEXT_INPUT_CLASS}
         />
       </div>
-      {/* 날짜 5개 — 시딩 캘린더 막대 시각화용 */}
+      {showStatus && (
+        <Select
+          options={CAMPAIGN_STATUS_SELECT_OPTIONS}
+          value={values.status}
+          onChange={(v) => setValues((p) => ({ ...p, status: v as CampaignStatus }))}
+          className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+          ariaLabel="캠페인 상태"
+        />
+      )}
       <div className="grid grid-cols-3 gap-2">
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">연락일 (DM)</label>
-          <input
-            type="date"
-            value={contactDate}
-            onChange={(e) => setContactDate(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">계약 진행</label>
-          <input
-            type="date"
-            value={contractDate}
-            onChange={(e) => setContractDate(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">발송일</label>
-          <input
-            type="date"
-            value={shipDate}
-            onChange={(e) => setShipDate(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">콘텐츠 마감</label>
-          <input
-            type="date"
-            value={contentDeadline}
-            onChange={(e) => setContentDeadline(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">포스팅 예정</label>
-          <input
-            type="date"
-            value={postDate}
-            onChange={(e) => setPostDate(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
+        {dateFields.map(({ label, value, onChange }) => (
+          <div key={label}>
+            <label className="block text-[10px] text-slate-500 mb-0.5">{label}</label>
+            <input
+              type="date"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              className={DATE_INPUT_CLASS}
+            />
+          </div>
+        ))}
       </div>
       <div className="flex gap-2 justify-end">
         <button
@@ -241,6 +242,42 @@ function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormPro
   );
 }
 
+// ── 캠페인 추가 폼 ──────────────────────────────────────────────
+interface AddCampaignFormProps {
+  influencerId: string;
+  onSaved: (c: InfluencerCampaign) => void;
+  onCancel: () => void;
+}
+
+function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormProps) {
+  return (
+    <CampaignForm
+      initial={EMPTY_CAMPAIGN_FORM}
+      formClassName="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-200"
+      onCancel={onCancel}
+      onSubmit={async (v) => {
+        try {
+          const saved = await addCampaign({
+            influencer_id: influencerId,
+            campaign_name: v.name.trim(),
+            product_name: v.product.trim() || undefined,
+            cost: v.cost ? Number(v.cost) : undefined,
+            contact_date: v.contactDate || undefined,
+            contract_date: v.contractDate || undefined,
+            ship_date: v.shipDate || undefined,
+            content_deadline: v.contentDeadline || undefined,
+            expected_post_date: v.postDate || undefined,
+          });
+          toast.success("캠페인이 추가되었습니다.");
+          onSaved(saved);
+        } catch (err) {
+          toast.error(getErrorMessage(err, "캠페인 추가 실패"));
+        }
+      }}
+    />
+  );
+}
+
 // ── 캠페인 수정 폼 (인라인 편집) ──────────────────────────────
 interface EditCampaignFormProps {
   campaign: InfluencerCampaign;
@@ -249,139 +286,43 @@ interface EditCampaignFormProps {
 }
 
 function EditCampaignForm({ campaign, onSaved, onCancel }: EditCampaignFormProps) {
-  const [name, setName] = useState(campaign.campaign_name);
-  const [product, setProduct] = useState(campaign.product_name ?? "");
-  const [cost, setCost] = useState(campaign.cost !== null ? String(campaign.cost) : "");
-  const [status, setStatus] = useState<CampaignStatus>(campaign.status);
-  const [contactDate, setContactDate] = useState(campaign.contact_date ?? "");
-  const [contractDate, setContractDate] = useState(campaign.contract_date ?? "");
-  const [shipDate, setShipDate] = useState(campaign.ship_date ?? "");
-  const [contentDeadline, setContentDeadline] = useState(campaign.content_deadline ?? "");
-  const [postDate, setPostDate] = useState(campaign.expected_post_date ?? "");
-  const [saving, setSaving] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) { toast.error("캠페인 이름을 입력하세요."); return; }
-    setSaving(true);
-    try {
-      const patch = {
-        campaign_name: name.trim(),
-        product_name: product.trim() || null,
-        cost: cost ? Number(cost) : null,
-        status,
-        contact_date: contactDate || null,
-        contract_date: contractDate || null,
-        ship_date: shipDate || null,
-        content_deadline: contentDeadline || null,
-        expected_post_date: postDate || null,
-      };
-      await updateCampaign(campaign.id, patch);
-      toast.success("캠페인이 수정되었습니다.");
-      onSaved({ ...campaign, ...patch });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "캠페인 수정 실패");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="bg-blue-50/40 rounded-xl p-3 space-y-2 ring-1 ring-blue-200">
-      <input
-        type="text"
-        placeholder="캠페인 이름 *"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          type="text"
-          placeholder="제품명"
-          value={product}
-          onChange={(e) => setProduct(e.target.value)}
-          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-        />
-        <input
-          type="number"
-          placeholder="비용 (원)"
-          value={cost}
-          onChange={(e) => setCost(e.target.value)}
-          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-        />
-      </div>
-      <Select
-        options={CAMPAIGN_STATUS_SELECT_OPTIONS}
-        value={status}
-        onChange={(v) => setStatus(v as CampaignStatus)}
-        className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
-        ariaLabel="캠페인 상태"
-      />
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">연락일 (DM)</label>
-          <input
-            type="date"
-            value={contactDate}
-            onChange={(e) => setContactDate(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">계약 진행</label>
-          <input
-            type="date"
-            value={contractDate}
-            onChange={(e) => setContractDate(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">발송일</label>
-          <input
-            type="date"
-            value={shipDate}
-            onChange={(e) => setShipDate(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">콘텐츠 마감</label>
-          <input
-            type="date"
-            value={contentDeadline}
-            onChange={(e) => setContentDeadline(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-0.5">포스팅 예정</label>
-          <input
-            type="date"
-            value={postDate}
-            onChange={(e) => setPostDate(e.target.value)}
-            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-600"
-          />
-        </div>
-      </div>
-      <div className="flex gap-2 justify-end">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-xs px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-200 transition-colors"
-        >
-          취소
-        </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {saving ? "저장 중…" : "저장"}
-        </button>
-      </div>
-    </form>
+    <CampaignForm
+      initial={{
+        name: campaign.campaign_name,
+        product: campaign.product_name ?? "",
+        cost: campaign.cost !== null ? String(campaign.cost) : "",
+        status: campaign.status,
+        contactDate: campaign.contact_date ?? "",
+        contractDate: campaign.contract_date ?? "",
+        shipDate: campaign.ship_date ?? "",
+        contentDeadline: campaign.content_deadline ?? "",
+        postDate: campaign.expected_post_date ?? "",
+      }}
+      formClassName="bg-blue-50/40 rounded-xl p-3 space-y-2 ring-1 ring-blue-200"
+      showStatus
+      onCancel={onCancel}
+      onSubmit={async (v) => {
+        try {
+          const patch = {
+            campaign_name: v.name.trim(),
+            product_name: v.product.trim() || null,
+            cost: v.cost ? Number(v.cost) : null,
+            status: v.status,
+            contact_date: v.contactDate || null,
+            contract_date: v.contractDate || null,
+            ship_date: v.shipDate || null,
+            content_deadline: v.contentDeadline || null,
+            expected_post_date: v.postDate || null,
+          };
+          await updateCampaign(campaign.id, patch);
+          toast.success("캠페인이 수정되었습니다.");
+          onSaved({ ...campaign, ...patch });
+        } catch (err) {
+          toast.error(getErrorMessage(err, "캠페인 수정 실패"));
+        }
+      }}
+    />
   );
 }
 
@@ -486,7 +427,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "데이터 로드 실패");
+        setError(getErrorMessage(err, "데이터 로드 실패"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -577,7 +518,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       await resyncInfluencer(influencerId);
       toast.success("재동기화가 시작되었습니다.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "재동기화 실패");
+      toast.error(getErrorMessage(err, "재동기화 실패"));
     } finally {
       setActionLoading(null);
     }
@@ -590,7 +531,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       await analyzeInfluencer(influencerId);
       toast.success("AI 재분석이 시작되었습니다.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "AI 분석 실패");
+      toast.error(getErrorMessage(err, "AI 분석 실패"));
     } finally {
       setActionLoading(null);
     }
@@ -604,7 +545,7 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       toast.success("보관되었습니다.");
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "보관 처리 실패");
+      toast.error(getErrorMessage(err, "보관 처리 실패"));
       setActionLoading(null);
     }
   }, [influencerId, onClose]);

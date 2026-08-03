@@ -326,39 +326,33 @@ export function getDashboardTaskSummaryWindow(now: Date = new Date()): Dashboard
     nextDayStart: `${addDays(today, 1)}T00:00:00+09:00`,
   };
 }
+/**
+ * 호출부가 없다. scripts/dashboard-summary-selector.test.mjs 가 이 파일의 date 임포트 줄을
+ * 문자열 그대로 치환해 모듈을 컴파일하므로, 이 함수를 지우면 그 줄이 바뀌어 테스트가 깨진다.
+ */
 export function getDashboardTaskSummaryKstDate(timestamp: string): string {
   return toDateStringFromTimestamp(timestamp);
 }
 
-
+/**
+ * 정렬 구간 번호(0~5). 값과 판정 순서는 마이그레이션 102 의 RPC 와 1:1 로 맞춰야 하며
+ * scripts/dashboard-summary-parity.test.mjs 가 두 구현을 대조한다.
+ */
 export function getDashboardTaskSummaryClass(
   task: DashboardTaskSummary,
   window: DashboardTaskSummaryWindow
 ): number | null {
-  if ((task.status === "대기" || task.status === "진행중")
-    && task.due_date !== null
-    && task.due_date < window.today) {
-    return 0;
+  const isOpen = task.status === "대기" || task.status === "진행중";
+
+  if (isOpen) {
+    if (task.due_date !== null && task.due_date < window.today) return 0;
+    if (task.due_date === window.today) return 1;
+    if (task.due_date !== null && task.due_date > window.today) return 2;
+    if (task.start_date !== null && task.start_date < addDays(window.today, 1)) return 3;
+    if (task.due_date === null && task.start_date === null) return 4;
+    return null;
   }
-  if ((task.status === "대기" || task.status === "진행중")
-    && task.due_date === window.today) {
-    return 1;
-  }
-  if ((task.status === "대기" || task.status === "진행중")
-    && task.due_date !== null
-    && task.due_date > window.today) {
-    return 2;
-  }
-  if ((task.status === "대기" || task.status === "진행중")
-    && task.start_date !== null
-    && task.start_date < addDays(window.today, 1)) {
-    return 3;
-  }
-  if ((task.status === "대기" || task.status === "진행중")
-    && task.due_date === null
-    && task.start_date === null) {
-    return 4;
-  }
+
   if (task.status === "완료"
     && task.completed_at !== null
     && compareCanonicalTimestamps(task.completed_at, window.dayStart) >= 0

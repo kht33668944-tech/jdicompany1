@@ -8,18 +8,13 @@ import {
   REVIEW_REMEDIATION_MAX_LENGTH,
 } from "./constants";
 import type { ReviewRemediationAttachmentInput } from "./types";
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { assertUuid } from "./utils";
 
 async function getAuth() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) throw new Error("로그인이 필요합니다.");
   return { supabase, userId: data.user.id };
-}
-function assertUuid(v: string, label: string) {
-  if (!UUID_PATTERN.test(v)) throw new Error(`${label} 값이 올바르지 않습니다.`);
 }
 
 export async function requestReview(entryId: string, comment: string): Promise<void> {

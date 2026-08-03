@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState } from "react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
@@ -39,7 +40,7 @@ export default function LinkPostToCampaignDialog({
       toast.success("캠페인에 게시물이 연결되었습니다.");
       onSuccess(updated);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "연결 실패");
+      toast.error(getErrorMessage(err, "연결 실패"));
     } finally {
       setSaving(false);
     }

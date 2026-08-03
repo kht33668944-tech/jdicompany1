@@ -11,13 +11,13 @@
 - 로직: `src/lib/tasks/` (빠른 경로는 `fast-queries.ts`)
 - 캐시: `src/lib/tasks/tasksCache.ts`
 
-> **주의 — 죽은 파일**: `src/components/dashboard/tasks/views/` 안의 `ListView.tsx`, `ListRow.tsx`, `TimelineView.tsx`, `CalendarView.tsx`는 **어디에서도 import되지 않습니다.** 목록/타임라인/캘린더 표시를 고치려면 `TasksPageClient.tsx`를 고쳐야 합니다. 이름만 보고 `views/`를 고치면 화면이 바뀌지 않습니다. (같은 이름의 `src/components/dashboard/schedule/ListView.tsx`는 실제로 쓰입니다 — 혼동 주의.)
+목록/타임라인/캘린더 표시는 모두 `TasksPageClient.tsx` 안에 있습니다. (`src/components/dashboard/schedule/ListView.tsx`는 일정 도메인의 별개 파일입니다 — 이름이 비슷하니 혼동 주의.)
 
 ## 캐시
 
-- IndexedDB 캐시는 오프라인/빠른 표시를 위한 보조 수단입니다.
-- 서버 fetch가 완료된 뒤 stale 캐시가 화면을 덮지 않도록 순서를 확인합니다.
-- 캐시 키와 필터 조건이 어긋나면 다른 목록이 섞일 수 있습니다.
+- IndexedDB 캐시는 현재 **쓰기 전용**입니다. 목록을 불러온 뒤 저장(`cacheTasks`)하고 로그아웃 때 지우기만(`clearTasksCache`) 합니다.
+- 초기 목록은 서버 빠른 경로(`src/lib/tasks/fast-queries.ts`)가 내려주므로 캐시를 먼저 그리는 경로는 없습니다.
+- 캐시를 화면에 다시 쓰게 만든다면, 서버 fetch가 끝난 뒤 stale 캐시가 화면을 덮지 않도록 순서를 확인합니다.
 
 ## Position
 

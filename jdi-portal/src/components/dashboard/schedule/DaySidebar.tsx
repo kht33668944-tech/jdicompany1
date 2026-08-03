@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { MapPin, Monitor, CalendarBlank, Lock, Clock } from "phosphor-react";
-import { formatTime, toDateStringFromTimestamp } from "@/lib/utils/date";
+import { formatDateShort, formatTime, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { getCategoryStyle } from "@/lib/schedule/constants";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 
@@ -10,15 +10,6 @@ interface DaySidebarProps {
   schedules: ScheduleWithProfile[];
   selectedDate: string;
   onEventClick: (schedule: ScheduleWithProfile) => void;
-}
-
-function formatDateHeader(dateStr: string): string {
-  const date = new Date(`${dateStr}T12:00:00+09:00`);
-  return date.toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "long",
-    day: "numeric",
-  });
 }
 
 function getDurationMinutes(startTime: string, endTime: string): number {
@@ -51,7 +42,7 @@ export default function DaySidebar({ schedules, selectedDate, onEventClick }: Da
     <div className="glass-card rounded-2xl p-6">
       {/* 헤더 */}
       <div className="mb-6">
-        <h3 className="text-xl font-bold text-slate-900">{formatDateHeader(selectedDate)} 일정</h3>
+        <h3 className="text-xl font-bold text-slate-900">{formatDateShort(selectedDate)} 일정</h3>
         <p className="text-sm text-slate-400 mt-1">
           {daySchedules.length > 0
             ? `오늘 등록된 일정이 ${daySchedules.length}개 있습니다.`

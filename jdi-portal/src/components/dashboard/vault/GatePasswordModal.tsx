@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState } from "react";
 import { toast } from "sonner";
 import { setGatePassword } from "@/lib/vault/actions";
@@ -34,7 +35,7 @@ export default function GatePasswordModal({ isInitial, onClose, onSaved }: Props
       toast.success(isInitial ? "2차 비밀번호가 설정되었습니다." : "2차 비밀번호가 변경되었습니다.");
       onSaved();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "설정에 실패했습니다.");
+      toast.error(getErrorMessage(err, "설정에 실패했습니다."));
     } finally {
       setBusy(false);
     }

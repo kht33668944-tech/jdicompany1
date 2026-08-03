@@ -14,7 +14,7 @@
 | 데우기 | Cloud Scheduler `jdi-portal-keepalive` (1분마다 `/api/keepalive`) |
 | DB | Supabase 서울 (변경 없음) |
 | 비용 | 월 약 $38 |
-| 배포 방식 | **수동** `gcloud builds submit --config cloudbuild.yaml` (자동 트리거 없음) |
+| 배포 방식 | **자동**: `master` 푸시/병합 → Cloud Build 트리거 `deploy-master-to-seoul` (**global** 리전). 수동도 가능: `gcloud builds submit --config cloudbuild.yaml` |
 | Railway | **중지됨 + 새 배포는 실패함** (아래 "Railway 는 이제 되살리기 어렵다") |
 | 데스크톱 앱 | `jdi-desktop` 은 `https://jdiportal.com` 을 띄우므로 자동 반영, 수정 불필요 |
 
@@ -134,6 +134,29 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
 않습니다).
 
 ## 배포
+
+### 자동 배포 (기본, 2026-07-30부터)
+
+GitHub `master` 에 커밋이 올라가면(보통 PR 병합) Cloud Build 트리거
+**`deploy-master-to-seoul`** 이 `cloudbuild.yaml` 로 빌드 → 이미지 푸시 → Cloud Run
+배포까지 자동으로 진행합니다. **PR 병합 버튼이 곧 배포 버튼입니다.**
+
+- 트리거 리전은 **global** 입니다(서울 아님). GitHub 앱(1세대) 저장소 연결이 global 에
+  등록되어 있어서인데, `cloudbuild.yaml` 의 `_REGION: asia-northeast3` 가 배포 대상을
+  서울로 못 박고 있으므로 **배포 결과는 동일**합니다.
+- 연결을 다시 만들 일이 있으면 주의: 콘솔의 "저장소 연결" 이 asia-northeast3 화면에서
+  성공했다고 떠도 실제 매핑이 그 리전에 안 생길 수 있습니다(2026-07-30 실제 겪음).
+  트리거 만들기 화면에서 리전을 global 로 두고 연결하면 됩니다.
+- 빌드 상태 확인:
+  ```bash
+  gcloud builds list --project jdi-portal-seoul --region=global --limit=5
+  ```
+- 트리거를 수동으로 다시 돌리기(재배포):
+  ```bash
+  gcloud builds triggers run deploy-master-to-seoul --region=global --branch=master --project=jdi-portal-seoul
+  ```
+
+### 수동 배포 (필요할 때만)
 
 > ### ⚠️ 반드시 `master` 를 배포하세요
 >
@@ -259,24 +282,22 @@ Host 가 바뀌므로 두 가지를 코드에서 미리 맞춰 두었습니다. 
 이전이 안정화된 뒤 **Railway 배포를 중지했습니다**(Deployments → 활성 배포 → Remove).
 그런데 그 뒤 두 가지가 겹쳐서, Railway 는 "누르면 살아나는 예비 서버" 가 아닙니다.
 
-1. **Railway 는 GitHub `master` 에 자동 배포가 켜져 있습니다.** (Cloud Build 에는
-   트리거가 없지만 Railway 에는 있습니다 — 헷갈리기 쉬우니 주의.)
+1. **Railway 의 GitHub `master` 자동 배포는 2026-07-30 에 껐습니다.** 끄기 전에는
+   커밋마다 실패한 배포가 하나씩 쌓였습니다(아래 2번 이유). 지금 `master` 병합에
+   반응하는 것은 **Cloud Build 트리거 하나뿐**이고, Railway 는 아무 것도 하지 않습니다.
+   되살리려면 Railway 서비스 Settings 에서 GitHub 연결부터 다시 켜야 합니다.
 2. **저장소 루트에 `Dockerfile` 이 생기면서 Railway 의 빌드 방식이 바뀝니다.**
    `railway.toml` 의 시작 명령 `cd jdi-portal && node ...` 이 그 안에서 실행되지 않아
    `The executable "cd" could not be found` 로 **배포가 실패**합니다.
    (PR #10 병합 때 실제로 이렇게 실패했습니다.)
-
-즉 **`master` 에 커밋을 올릴 때마다 Railway 에서 실패한 배포가 하나씩 쌓입니다.**
-사이트에는 영향이 없지만(트래픽은 Cloudflare Worker 가 전부 Cloud Run 으로 보냄)
-알림이 오고 보기에 지저분합니다.
 
 **정말로 Railway 로 돌아가야 한다면**, Deployments 이력에서 **`Dockerfile` 이 생기기
 전의 배포**(= PR #9 병합분)를 찾아 **Redeploy** 해야 합니다. 최신 배포를 Redeploy 하면
 같은 이유로 또 실패합니다. 그리고 Workers 라우트는 **Railway 가 살아난 것을 확인한
 뒤에** 지워야 합니다 — 순서를 바꾸면 그동안 사이트가 404 를 냅니다.
 
-**정리할 때**: Railway 플랜을 해지하거나, 그 전까지 실패 알림이 거슬리면 Railway
-서비스 Settings 에서 GitHub 자동 배포 연결을 끄면 됩니다.
+**정리할 때**: GitHub 자동 배포 연결은 이미 껐으므로(2026-07-30), 남은 정리는
+Railway 플랜 해지뿐입니다.
 
 ## 더 빠르게 (후속 최적화)
 

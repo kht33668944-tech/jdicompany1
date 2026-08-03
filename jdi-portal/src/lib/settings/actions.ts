@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireAdminUser } from "@/lib/supabase/auth";
 import { NotificationSettings } from "@/lib/settings/types";
-import { createNotification } from "@/lib/notifications/internal";
+import { createNotification, createNotificationForMany } from "@/lib/notifications/internal";
 import { validateAvatarFile } from "@/lib/utils/upload";
 
 async function getSessionUser() {
@@ -10,19 +11,6 @@ async function getSessionUser() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) throw new Error("Not authenticated");
   return { supabase, user: session.user };
-}
-
-async function requireAdmin() {
-  const { supabase, user } = await getSessionUser();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (profile?.role !== "admin") {
-    throw new Error("권한이 없습니다: 관리자만 가능합니다.");
-  }
-  return { supabase, user };
 }
 
 export async function updateProfile(params: {
@@ -101,16 +89,14 @@ export async function submitHireDateChangeRequest(params: {
     .select("id")
     .eq("role", "admin");
   if (admins) {
-    await Promise.all(
-      admins.map((a: { id: string }) =>
-        createNotification({
-          userId: a.id,
-          type: "hire_date_change_requested",
-          title: "입사일 변경 요청",
-          body: `요청 입사일: ${params.hireDate}`,
-          link: "/dashboard/attendance",
-        })
-      )
+    await createNotificationForMany(
+      admins.map((a: { id: string }) => a.id),
+      {
+        type: "hire_date_change_requested",
+        title: "입사일 변경 요청",
+        body: `요청 입사일: ${params.hireDate}`,
+        link: "/dashboard/attendance",
+      }
     );
   }
   return data;
@@ -130,7 +116,7 @@ export async function cancelMyHireDateChangeRequest(requestId: string) {
 
 /** 변경 요청 승인 (관리자) */
 export async function approveHireDateChangeRequest(requestId: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireAdminUser();
   const { error } = await supabase.rpc("approve_hire_date_change_request", {
     p_request_id: requestId,
   });
@@ -157,7 +143,7 @@ export async function rejectHireDateChangeRequest(
   requestId: string,
   rejectReason: string
 ) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireAdminUser();
   const { data: req } = await supabase
     .from("hire_date_change_requests")
     .select("user_id, requested_hire_date")
@@ -186,8 +172,7 @@ export async function adminSetHireDate(params: {
   userId: string;
   hireDate: string;
 }) {
-  await requireAdmin();
-  const supabase = await createClient();
+  const { supabase } = await requireAdminUser();
   const { data, error } = await supabase.rpc("admin_set_hire_date", {
     p_user_id: params.userId,
     p_hire_date: params.hireDate,
@@ -218,15 +203,13 @@ export async function updateNotificationSettings(
 }
 
 export async function addDepartment(name: string) {
-  await requireAdmin();
-  const supabase = await createClient();
+  const { supabase } = await requireAdminUser();
   const { error } = await supabase.from("departments").insert({ name });
   if (error) throw error;
 }
 
 export async function deleteDepartment(id: string) {
-  await requireAdmin();
-  const supabase = await createClient();
+  const { supabase } = await requireAdminUser();
   const { error } = await supabase.from("departments").delete().eq("id", id);
   if (error) throw error;
 }
@@ -259,16 +242,14 @@ export async function submitIpChangeRequest(params: {
     .select("id")
     .eq("role", "admin");
   if (admins) {
-    await Promise.all(
-      admins.map((a: { id: string }) =>
-        createNotification({
-          userId: a.id,
-          type: "ip_change_requested",
-          title: "출퇴근 IP 변경 요청",
-          body: `요청 IP: ${params.ip}`,
-          link: "/dashboard/attendance",
-        })
-      )
+    await createNotificationForMany(
+      admins.map((a: { id: string }) => a.id),
+      {
+        type: "ip_change_requested",
+        title: "출퇴근 IP 변경 요청",
+        body: `요청 IP: ${params.ip}`,
+        link: "/dashboard/attendance",
+      }
     );
   }
   return data;
@@ -288,7 +269,7 @@ export async function cancelMyIpChangeRequest(requestId: string) {
 
 /** IP 변경 요청 승인 (관리자) */
 export async function approveIpChangeRequest(requestId: string) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireAdminUser();
   const { error } = await supabase.rpc("approve_ip_change_request", {
     p_request_id: requestId,
   });
@@ -315,7 +296,7 @@ export async function rejectIpChangeRequest(
   requestId: string,
   rejectReason: string
 ) {
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireAdminUser();
   const { data: req } = await supabase
     .from("ip_change_requests")
     .select("user_id, requested_ip")
@@ -343,8 +324,7 @@ export async function updateUserRole(
   userId: string,
   role: "employee" | "admin" | "developer"
 ) {
-  await requireAdmin();
-  const supabase = await createClient();
+  const { supabase } = await requireAdminUser();
   const { error } = await supabase.rpc("admin_update_user_role", {
     target_user_id: userId,
     new_role: role,
@@ -353,8 +333,7 @@ export async function updateUserRole(
 }
 
 export async function setSensitiveExpenseAccess(userId: string, allowed: boolean) {
-  await requireAdmin();
-  const supabase = await createClient();
+  const { supabase } = await requireAdminUser();
   const { error } = await supabase.rpc("admin_set_expense_sensitive_access", {
     target_user_id: userId,
     allowed,
@@ -363,8 +342,7 @@ export async function setSensitiveExpenseAccess(userId: string, allowed: boolean
 }
 
 export async function approveUser(userId: string) {
-  await requireAdmin();
-  const supabase = await createClient();
+  const { supabase } = await requireAdminUser();
   const { error } = await supabase.rpc("admin_approve_user", {
     p_target_user_id: userId,
   });
@@ -372,8 +350,7 @@ export async function approveUser(userId: string) {
 }
 
 export async function rejectUser(userId: string) {
-  await requireAdmin();
-  const supabase = await createClient();
+  const { supabase } = await requireAdminUser();
   const { error } = await supabase.rpc("admin_reject_user", {
     p_target_user_id: userId,
   });

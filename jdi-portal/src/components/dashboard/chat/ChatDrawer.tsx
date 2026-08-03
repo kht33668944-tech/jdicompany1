@@ -17,7 +17,8 @@ import { toast } from "sonner";
 import { getDrawerItems, type DrawerItem } from "@/lib/chat/actions";
 import { triggerDownload } from "@/lib/utils/download";
 import { buildItemUrlMap, collectFileUrlRequests } from "@/lib/chat/fileUrlBatch";
-import { formatFileSize, parseFileContent } from "@/lib/chat/utils";
+import { parseFileContent } from "@/lib/chat/utils";
+import { formatFileSize } from "@/lib/utils/format";
 import { useChatFileUrls } from "./ChatFileUrlsContext";
 
 type Tab = "images" | "files" | "links";

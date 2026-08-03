@@ -38,7 +38,7 @@
 - 스타일: Tailwind CSS 4
 - 백엔드: Supabase Auth, Postgres, RLS, Storage, Realtime, Edge Functions
 - 데이터 접근: Supabase SSR 클라이언트가 기본, 일부 성능 민감 경로는 `pg` 직접 연결 + 폴백 (`src/lib/db/postgres.ts`)
-- 배포: **GCP Cloud Run 서울(`asia-northeast3`)** — 프로젝트 `jdi-portal-seoul`, 서비스 `jdi-portal`. 루트에서 `gcloud builds submit --config cloudbuild.yaml` 로 **수동** 배포(자동 트리거 없음). `jdiportal.com` 은 Cloudflare Worker 가 전달. 절차·롤백·비용은 `docs/operations/cloud-run-seoul.md`. (2026-07-30 Railway 싱가포르에서 이전, Railway 배포는 중지)
+- 배포: **GCP Cloud Run 서울(`asia-northeast3`)** — 프로젝트 `jdi-portal-seoul`, 서비스 `jdi-portal`. **`master` 병합 시 Cloud Build 트리거 `deploy-master-to-seoul`(global 리전)이 자동 배포**(2026-07-30부터). 수동 배포는 루트에서 `gcloud builds submit --config cloudbuild.yaml`(master 먼저 합칠 것). `jdiportal.com` 은 Cloudflare Worker 가 전달. 절차·롤백·비용은 `docs/operations/cloud-run-seoul.md`. (2026-07-30 Railway 싱가포르에서 이전, Railway 배포는 중지)
 - 데스크톱: `jdi-desktop/` Electron 껍데기 — 웹만 고치면 자동 반영
 - UI 언어와 날짜 기준: 한국어, Asia/Seoul
 

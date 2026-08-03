@@ -28,9 +28,11 @@ import {
   type DashboardTaskSummaryResult,
 } from "@/lib/dashboard/dashboard-task-summary";
 import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
+import { formatDueWithWeekday } from "@/lib/tasks/format";
 import { formatDueDate } from "@/lib/tasks/utils";
 import { deleteTask, updateTask } from "@/lib/tasks/actions";
 import { formatTime } from "@/lib/utils/date";
+import { getErrorMessage } from "@/lib/utils/errors";
 import UserAvatar from "@/components/shared/UserAvatar";
 import Select from "@/components/shared/Select";
 import type { DirectivePendingCount } from "@/lib/directives/types";
@@ -80,10 +82,6 @@ function getAttendanceTone(attendance: TodayAttendanceStatus | undefined): strin
   return "bg-indigo-50 text-indigo-700";
 }
 
-function scheduleBelongsToProfile(schedule: ScheduleWithProfile, profileId: string): boolean {
-  if (schedule.schedule_participants?.some((participant) => participant.user_id === profileId)) return true;
-  return schedule.created_by === profileId;
-}
 export function canUpdateDashboardTask(
   task: DashboardTaskSummary,
   userId: string,
@@ -123,17 +121,6 @@ function getNextTaskStatus(status: TaskStatus): TaskStatus {
   if (status === "대기") return "진행중";
   if (status === "진행중") return "완료";
   return "대기";
-}
-
-function formatDueWithWeekday(dueDate: string | null, fallbackText: string, today: string): string {
-  if (!dueDate) return fallbackText;
-  const [, month, day] = dueDate.split("-");
-  const weekday = new Date(`${dueDate}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    weekday: "short",
-  });
-  if (dueDate === today) return `오늘 (${weekday})`;
-  return `${month}.${day} (${weekday})`;
 }
 
 function getTaskOwnerLabel(task: DashboardTaskSummary): string {
@@ -178,7 +165,7 @@ function CompletedTaskTimelineAction({
         toast.error("이 업무는 타임라인에 공유할 수 없습니다.");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "공유 상태를 확인하지 못했습니다.");
+      toast.error(getErrorMessage(error, "공유 상태를 확인하지 못했습니다."));
     } finally {
       setChecking(false);
     }
@@ -280,7 +267,7 @@ function CompletedTaskTimelineSnackbar({
         onClose();
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "공유 상태를 확인하지 못했습니다.");
+      toast.error(getErrorMessage(error, "공유 상태를 확인하지 못했습니다."));
     } finally {
       setLoading(false);
     }
@@ -410,8 +397,52 @@ export default function TodayWorkBoardWidget({
 
   const today = taskSummary.today;
   const approvedProfiles = profiles;
-  const attendanceByUser = new Map(attendanceStatuses.map((attendance) => [attendance.user_id, attendance]));
+  const attendanceByUser = useMemo(
+    () => new Map(attendanceStatuses.map((attendance) => [attendance.user_id, attendance])),
+    [attendanceStatuses],
+  );
   const todayBoardTasks = localTasks;
+  // 직원 표는 직원마다 전체 업무·일정 목록을 다시 훑는 대신 이 집계를 읽는다.
+  const memberStats = useMemo(() => {
+    const stats = new Map<string, {
+      tasks: DashboardTaskSummary[];
+      대기: number;
+      진행중: number;
+      완료: number;
+      scheduleCount: number;
+    }>();
+    const statsOf = (profileId: string) => {
+      let entry = stats.get(profileId);
+      if (!entry) {
+        entry = { tasks: [], 대기: 0, 진행중: 0, 완료: 0, scheduleCount: 0 };
+        stats.set(profileId, entry);
+      }
+      return entry;
+    };
+
+    for (const profile of approvedProfiles) statsOf(profile.id);
+
+    for (const task of todayBoardTasks) {
+      const counted = new Set<string>();
+      for (const assignee of task.assignees) {
+        if (counted.has(assignee.user_id)) continue;
+        counted.add(assignee.user_id);
+        const entry = statsOf(assignee.user_id);
+        entry.tasks.push(task);
+        entry[task.status] += 1;
+      }
+    }
+
+    for (const schedule of schedules) {
+      const owners = new Set<string>(
+        (schedule.schedule_participants ?? []).map((participant) => participant.user_id),
+      );
+      owners.add(schedule.created_by);
+      for (const profileId of owners) statsOf(profileId).scheduleCount += 1;
+    }
+
+    return stats;
+  }, [approvedProfiles, schedules, todayBoardTasks]);
   const dashboardTaskWindow = useMemo(
     () => getDashboardTaskSummaryWindow(new Date(`${taskSummary.today}T12:00:00+09:00`)),
     [taskSummary.today],
@@ -471,9 +502,8 @@ export default function TodayWorkBoardWidget({
   const checkedInCount = approvedProfiles.filter((profile) => hasCheckedIn(attendanceByUser.get(profile.id))).length;
   const unregisteredCount = approvedProfiles.filter((profile) => {
     const profileHasCheckedIn = hasCheckedIn(attendanceByUser.get(profile.id));
-    const hasTodayTask = todayBoardTasks.some(
-      (task) => task.status !== "완료" && taskBelongsToProfile(task, profile.id),
-    );
+    const stats = memberStats.get(profile.id);
+    const hasTodayTask = stats !== undefined && stats.대기 + stats.진행중 > 0;
     return profileHasCheckedIn && !hasTodayTask;
   }).length;
   const visibleSchedules = schedules.slice(0, 5);
@@ -597,11 +627,12 @@ export default function TodayWorkBoardWidget({
 
             {approvedProfiles.map((profile) => {
               const attendance = attendanceByUser.get(profile.id);
-              const profileTasks = todayBoardTasks.filter((task) => taskBelongsToProfile(task, profile.id));
-              const profileSchedules = schedules.filter((schedule) => scheduleBelongsToProfile(schedule, profile.id));
-              const pendingCount = profileTasks.filter((task) => task.status === "대기").length;
-              const progressCount = profileTasks.filter((task) => task.status === "진행중").length;
-              const doneCount = profileTasks.filter((task) => task.status === "완료").length;
+              const stats = memberStats.get(profile.id);
+              const taskCount = stats?.tasks.length ?? 0;
+              const scheduleCount = stats?.scheduleCount ?? 0;
+              const pendingCount = stats?.대기 ?? 0;
+              const progressCount = stats?.진행중 ?? 0;
+              const doneCount = stats?.완료 ?? 0;
 
               return (
                 <div
@@ -623,7 +654,7 @@ export default function TodayWorkBoardWidget({
                       <div className="min-w-0">
                         {renderMemberName(profile)}
                         <p className="mt-0.5 text-xs text-slate-400">
-                          {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
+                          {taskCount > 0 ? `오늘 할 일 ${doneCount}/${taskCount}` : "오늘 등록된 업무 없음"}
                         </p>
                       </div>
                       <span className={`inline-flex shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${getAttendanceTone(attendance)}`}>
@@ -634,7 +665,7 @@ export default function TodayWorkBoardWidget({
                       <span>대기 <span className="ml-0.5 text-slate-700">{pendingCount}</span></span>
                       <span>진행중 <span className="ml-0.5 text-amber-600">{progressCount}</span></span>
                       <span>완료 <span className="ml-0.5 text-emerald-600">{doneCount}</span></span>
-                      <span>일정 <span className="ml-0.5 text-slate-800">{profileSchedules.length}</span></span>
+                      <span>일정 <span className="ml-0.5 text-slate-800">{scheduleCount}</span></span>
                     </div>
                   </div>
 
@@ -645,7 +676,7 @@ export default function TodayWorkBoardWidget({
                       <div className="min-w-0">
                         {renderMemberName(profile)}
                         <p className="mt-0.5 text-xs text-slate-400">
-                          {profileTasks.length > 0 ? `오늘 할 일 ${doneCount}/${profileTasks.length}` : "오늘 등록된 업무 없음"}
+                          {taskCount > 0 ? `오늘 할 일 ${doneCount}/${taskCount}` : "오늘 등록된 업무 없음"}
                         </p>
                       </div>
                     </div>
@@ -664,7 +695,7 @@ export default function TodayWorkBoardWidget({
                       <p className="text-sm font-bold text-emerald-600">{doneCount}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-slate-800">{profileSchedules.length}</p>
+                      <p className="text-sm font-bold text-slate-800">{scheduleCount}</p>
                     </div>
                   </div>
                 </div>

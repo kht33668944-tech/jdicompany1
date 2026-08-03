@@ -21,7 +21,8 @@ function parseDateString(dateStr: string) {
   return { year, month, day };
 }
 
-function getWeekdayIndex(dateStr: string): number {
+/** KST 기준 요일 인덱스(0=일 ~ 6=토). 브라우저 시간대와 무관하게 KST로 계산한다. */
+export function getWeekdayIndex(dateStr: string): number {
   const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone: APP_TIME_ZONE,
     weekday: "short",
@@ -101,6 +102,15 @@ export function formatDateFull(dateStr: string): string {
   });
 }
 
+/** formatDate 에서 요일만 뺀 형태: "7월 30일" */
+export function formatDateShort(dateStr: string): string {
+  return new Date(`${dateStr}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
+    timeZone: APP_TIME_ZONE,
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export function getKoreanWeekday(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
     timeZone: APP_TIME_ZONE,
@@ -124,6 +134,18 @@ export function toDateStringFromTimestamp(isoString: string): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** 최신순 목록에서 가장 최근 KST 날짜와 그 날짜의 항목만 골라낸다. 빈 목록이면 null. */
+export function pickLatestKstDayEntries<T extends { completed_at: string }>(
+  entries: T[],
+): { date: string; entries: T[] } | null {
+  if (entries.length === 0) return null;
+  const date = toDateStringFromTimestamp(entries[0].completed_at);
+  return {
+    date,
+    entries: entries.filter((entry) => toDateStringFromTimestamp(entry.completed_at) === date),
+  };
+}
+
 export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
@@ -131,6 +153,34 @@ export function getDaysInMonth(year: number, month: number): number {
 /** 현재 시각을 KST(Asia/Seoul) 벽시계 기준 Date로 반환 (getFullYear/getMonth/getDate가 KST값). */
 export function kstNow(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: APP_TIME_ZONE }));
+}
+
+/** 타임스탬프를 KST 기준 `datetime-local` 입력값("YYYY-MM-DDTHH:mm")으로 변환 */
+export function toKstDateTimeLocal(timestamp: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(timestamp));
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+/** `datetime-local` 입력값을 KST 로 해석해 ISO 타임스탬프로 변환. 잘못된 값이면 throw. */
+export function fromKstDateTimeLocal(
+  value: string,
+  errorMessage = "시간을 올바르게 입력해 주세요.",
+): string {
+  const parsed = new Date(`${value}:00+09:00`);
+  if (!value || Number.isNaN(parsed.getTime())) {
+    throw new Error(errorMessage);
+  }
+  return parsed.toISOString();
 }
 
 export function getHourFromTimestamp(isoString: string): number {

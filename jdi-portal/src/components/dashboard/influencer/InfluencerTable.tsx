@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState, useTransition, useRef, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -213,7 +214,7 @@ function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
         toast.success("재동기화 완료", { id });
         onRefresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "재동기화 실패", { id });
+        toast.error(getErrorMessage(err, "재동기화 실패"), { id });
       }
     });
   }
@@ -227,7 +228,7 @@ function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
         toast.success("보관되었습니다", { id });
         onRefresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "보관 실패", { id });
+        toast.error(getErrorMessage(err, "보관 실패"), { id });
       }
     });
   }
@@ -242,7 +243,7 @@ function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
         toast.success("삭제되었습니다", { id });
         onRefresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "삭제 실패", { id });
+        toast.error(getErrorMessage(err, "삭제 실패"), { id });
       }
     });
   }
@@ -323,7 +324,7 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onO
               onRefresh();
               onOpenDetail(influencerId);
             } catch (err) {
-              toast.error(err instanceof Error ? err.message : "시딩 등록 실패");
+              toast.error(getErrorMessage(err, "시딩 등록 실패"));
             }
           });
         }}
@@ -341,7 +342,7 @@ function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onO
         await updateCampaignStatus(campaign!.id, next);
         onRefresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "상태 변경 실패");
+        toast.error(getErrorMessage(err, "상태 변경 실패"));
       }
     });
   }
@@ -426,7 +427,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
         }
         onRefresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "전체 재동기화 실패", { id });
+        toast.error(getErrorMessage(err, "전체 재동기화 실패"), { id });
       }
     });
   }

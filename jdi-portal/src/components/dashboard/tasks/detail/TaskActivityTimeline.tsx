@@ -10,24 +10,14 @@ import {
 } from "phosphor-react";
 import type { TaskActivity } from "@/lib/tasks/types";
 import { deleteActivity, getAttachmentUrls } from "@/lib/tasks/actions";
+import { formatTimeAgo } from "@/lib/utils/date";
+import { formatFileSize } from "@/lib/utils/format";
 import { useRouter } from "next/navigation";
 import UserAvatar from "@/components/shared/UserAvatar";
 
 interface Props {
   activities: TaskActivity[];
   userId: string;
-}
-
-function formatTimeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "방금 전";
-  if (minutes < 60) return `${minutes}분 전`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}일 전`;
-  return new Date(isoString).toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
 }
 
 function getActivityDescription(activity: TaskActivity): string {
@@ -217,9 +207,7 @@ function FileChip({ attachment, url }: { attachment: AttachmentMeta; url: string
     }
   };
 
-  const sizeLabel = attachment.file_size < 1024 * 1024
-    ? `${Math.round(attachment.file_size / 1024)}KB`
-    : `${(attachment.file_size / (1024 * 1024)).toFixed(1)}MB`;
+  const sizeLabel = formatFileSize(attachment.file_size);
 
   return (
     <button

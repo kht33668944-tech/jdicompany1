@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState } from "react";
 import { toast } from "sonner";
 import { createPaymentMethod, deletePaymentMethod } from "@/lib/expenses/actions";
@@ -45,7 +46,7 @@ export default function PaymentMethodField({
       onMethodsChanged();
       onChange(name);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "추가에 실패했습니다.");
+      toast.error(getErrorMessage(err, "추가에 실패했습니다."));
     } finally {
       setBusy(false);
     }
@@ -60,7 +61,7 @@ export default function PaymentMethodField({
       toast.success("삭제되었습니다.");
       onMethodsChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+      toast.error(getErrorMessage(err, "삭제에 실패했습니다."));
     } finally {
       setBusy(false);
     }

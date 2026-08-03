@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle } from "phosphor-react";
@@ -37,7 +38,7 @@ export default function ProfileSection({ profile, onUpdated }: ProfileSectionPro
       setFeedback({ type: "success", message: "프로필 사진이 업데이트되었습니다." });
       onUpdated();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "사진 업로드에 실패했습니다.";
+      const msg = getErrorMessage(err, "사진 업로드에 실패했습니다.");
       setFeedback({ type: "error", message: msg });
     } finally {
       setLoading(false);

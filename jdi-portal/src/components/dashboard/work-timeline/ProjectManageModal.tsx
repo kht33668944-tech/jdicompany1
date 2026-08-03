@@ -8,6 +8,7 @@ import { createProject, deleteProject, updateProject } from "@/lib/projects/acti
 import { PROJECT_COLORS, PROJECT_NAME_MAX_LENGTH } from "@/lib/projects/constants";
 import { notifyProjectsChanged, useProjects } from "@/lib/projects/useProjects";
 import type { Project } from "@/lib/projects/types";
+import { getErrorMessage } from "@/lib/utils/errors";
 import ProjectColorPicker from "./ProjectColorPicker";
 
 interface ProjectManageModalProps {
@@ -28,7 +29,7 @@ function ProjectRow({ project, isAdmin }: { project: Project; isAdmin: boolean }
       notifyProjectsChanged();
       toast.success(successMessage);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "처리하지 못했습니다.");
+      toast.error(getErrorMessage(error, "처리하지 못했습니다."));
     } finally {
       setBusy(false);
     }
@@ -139,7 +140,7 @@ export default function ProjectManageModal({ currentUserRole, onClose }: Project
       setNewColor(PROJECT_COLORS[0]);
       toast.success(`'${project.name}' 프로젝트를 만들었습니다.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "프로젝트를 만들지 못했습니다.");
+      toast.error(getErrorMessage(error, "프로젝트를 만들지 못했습니다."));
     } finally {
       setCreating(false);
     }

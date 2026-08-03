@@ -56,3 +56,15 @@ export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
 
   return { user, profile, supabase };
 });
+
+/**
+ * 관리자 전용 서버 액션 진입부.
+ * `getAuthUser()` 가 이미 요청 단위로 캐싱한 프로필의 role 만 확인하므로
+ * 별도의 profiles 재조회(네트워크 왕복)가 없다.
+ */
+export async function requireAdminUser(): Promise<AuthUser> {
+  const auth = await getAuthUser();
+  if (!auth) throw new Error("로그인이 필요합니다.");
+  if (auth.profile.role !== "admin") throw new Error("관리자 권한이 필요합니다.");
+  return auth;
+}

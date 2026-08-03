@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createRecurringExpense, updateRecurringExpense, deleteRecurringExpense } from "@/lib/expenses/actions";
@@ -94,7 +95,7 @@ export default function RecurringFormModal({
       onChanged();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
+      toast.error(getErrorMessage(err, "저장에 실패했습니다."));
     } finally {
       setBusy(false);
     }
@@ -110,7 +111,7 @@ export default function RecurringFormModal({
       onChanged();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+      toast.error(getErrorMessage(err, "삭제에 실패했습니다."));
     } finally {
       setBusy(false);
     }

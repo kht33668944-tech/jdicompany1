@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { VaultDocument } from "@/lib/vault/types";
@@ -37,7 +38,7 @@ export default function ReplaceFileModal({ doc, onClose, onSaved }: Props) {
       toast.success("최신 파일로 교체했습니다. 이전 파일은 ‘지난 버전’에 보관됩니다.");
       onSaved();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "최신화에 실패했습니다.");
+      toast.error(getErrorMessage(err, "최신화에 실패했습니다."));
     } finally {
       setBusy(false);
     }

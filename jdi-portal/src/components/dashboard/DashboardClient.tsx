@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, type ReactNode } from "react";
 import type { DashboardData } from "@/lib/dashboard/queries";
+import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 import DirectiveInboxWidget from "./widgets/DirectiveInboxWidget";
 import ReviewInboxWidget from "./widgets/ReviewInboxWidget";
 import TodayWorkBoardWidget from "./widgets/TodayWorkBoardWidget";
@@ -24,10 +24,10 @@ export default function DashboardClient({
   initialLoadedAt,
   defaultTaskAssigneeFilter,
 }: Props) {
-  const router = useRouter();
   const data = initialData;
-  const loadedAtRef = useRef(initialLoadedAt);
-  const inFlightRef = useRef(false);
+  // 알림 도착·포커스 복귀·주기 검사 때 서버 데이터를 다시 불러와
+  // 열어 둔 대시보드가 로그아웃 없이 최신을 유지한다
+  useLiveRefresh(initialLoadedAt);
   // 시간 기반 문자열은 서버(싱가포르)와 브라우저(한국)의 시각 차이로
   // hydration mismatch를 일으켜 전체 재렌더링을 유발 → 마운트 후에만 계산
   const [timeInfo, setTimeInfo] = useState<{ dateStr: string; greeting: string } | null>(null);
@@ -52,29 +52,6 @@ export default function DashboardClient({
     });
     return () => cancelAnimationFrame(frame);
   }, []);
-
-  useEffect(() => {
-    loadedAtRef.current = initialLoadedAt;
-    inFlightRef.current = false;
-  }, [initialLoadedAt]);
-
-  useEffect(() => {
-    const refreshIfStale = () => {
-      if (Date.now() - loadedAtRef.current < 60_000 || inFlightRef.current) return;
-      inFlightRef.current = true;
-      router.refresh();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") refreshIfStale();
-    };
-
-    window.addEventListener("focus", refreshIfStale);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.removeEventListener("focus", refreshIfStale);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [router]);
 
   return (
     <div className="space-y-8">

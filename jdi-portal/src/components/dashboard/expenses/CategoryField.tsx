@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState } from "react";
 import { toast } from "sonner";
 import { createExpenseCategory, deleteExpenseCategory } from "@/lib/expenses/actions";
@@ -47,7 +48,7 @@ export default function CategoryField({
       setNewName("");
       onCategoriesChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "추가에 실패했습니다.");
+      toast.error(getErrorMessage(err, "추가에 실패했습니다."));
     } finally {
       setBusy(false);
     }
@@ -63,7 +64,7 @@ export default function CategoryField({
       if (value === cat.id) onChange("");
       onCategoriesChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+      toast.error(getErrorMessage(err, "삭제에 실패했습니다."));
     } finally {
       setBusy(false);
     }

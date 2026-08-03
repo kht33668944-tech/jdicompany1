@@ -1,9 +1,11 @@
 /**
- * IndexedDB 기반 할일 목록 로컬 캐시.
+ * IndexedDB 기반 할일 목록 로컬 캐시 (쓰기 전용).
  *
- * 목적: 할일 페이지 두 번째 진입부터 즉시 목록 표시 (네트워크 round-trip 0).
- *  - 캐시는 표시용일 뿐 권한 검증은 항상 서버 RLS 가 담당
- *  - 캐시 hit → 즉시 표시 → 백그라운드 fetch → 최신 데이터로 교체
+ * 현재 동작:
+ *  - `cacheTasks` — 할일 목록을 불러온 뒤 `TasksPageClient` 가 저장
+ *  - `clearTasksCache` — 로그아웃 시 삭제
+ *  - 저장된 값을 화면에 먼저 보여주는 읽기 경로는 없다. 초기 목록은 서버 컴포넌트가
+ *    빠른 경로로 내려주므로(`src/lib/tasks/fast-queries.ts`) 캐시 hit 표시가 필요 없다.
  *  - IndexedDB 미지원/실패 시 모든 함수가 graceful no-op
  *  - 페이지네이션 없음 — 전체 배열을 단일 키("all")로 저장
  */
@@ -43,24 +45,6 @@ function getDB(): Promise<IDBPDatabase> | null {
   });
 
   return dbPromise;
-}
-
-/**
- * 캐시된 전체 할일 배열을 반환.
- * - 캐시가 없거나 IndexedDB 미지원이면 null
- */
-export async function getCachedTasks(): Promise<TaskWithDetails[] | null> {
-  const dbp = getDB();
-  if (!dbp) return null;
-  try {
-    const db = await dbp;
-    const rec = (await db.get(TASKS_STORE, ALL_KEY)) as CachedTasksRecord | undefined;
-    if (!rec || !Array.isArray(rec.tasks)) return null;
-    return rec.tasks;
-  } catch (err) {
-    console.warn("[tasksCache] getCachedTasks failed:", err);
-    return null;
-  }
 }
 
 /**

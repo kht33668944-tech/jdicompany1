@@ -1,5 +1,11 @@
 import type { NotificationType } from "./types";
 
+/**
+ * 본인 알림이 Realtime 으로 도착했을 때 NotificationProvider 가 window 에 방송하는 이벤트.
+ * 서버 렌더 데이터를 쓰는 화면(대시보드 등)이 이 이벤트를 받아 즉시 다시 불러온다.
+ */
+export const NOTIFICATION_RECEIVED_EVENT = "jdi:notification-received";
+
 export const NOTIFICATION_TYPE_CONFIG: Record<
   NotificationType,
   { label: string; icon: string; color: string }

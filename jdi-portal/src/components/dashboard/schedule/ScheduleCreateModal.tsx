@@ -8,6 +8,7 @@ import type { ScheduleVisibility } from "@/lib/schedule/types";
 import type { Profile } from "@/lib/attendance/types";
 import { createSchedule } from "@/lib/schedule/actions";
 import { SCHEDULE_CATEGORIES, SCHEDULE_CATEGORY_CONFIG } from "@/lib/schedule/constants";
+import { getErrorMessage } from "@/lib/utils/errors";
 
 interface ScheduleCreateModalProps {
   userId: string;
@@ -78,7 +79,7 @@ export default function ScheduleCreateModal({
       });
       onCreated();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "일정 생성에 실패했습니다.");
+      setFeedback(getErrorMessage(error, "일정 생성에 실패했습니다."));
     } finally {
       setLoading(false);
     }
