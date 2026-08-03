@@ -254,13 +254,9 @@ export default function TaskDetailClient({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [
-    task.description,
-    task.due_date,
-    task.id,
-    task.status,
-    task.title,
-  ]);
+    // task.id 만 구독 대상이다. 다른 필드를 넣으면 저장할 때마다 재구독하면서
+    // 그 사이 들어온 INSERT 를 놓친다.
+  }, [task.id]);
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -275,8 +271,9 @@ export default function TaskDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  // 다른 할일로 라우팅되거나 외부 변경이 prop 으로 들어왔을 때 편집 폼 재동기화
-  // (task.id 가 같으면 사용자가 편집 중일 수 있어 덮어쓰지 않음)
+  // 다른 할일로 라우팅되거나 외부 변경이 prop 으로 들어왔을 때 편집 폼 재동기화.
+  // task.id 가 같아도 아래 필드 중 하나라도 바뀌면 폼을 prop 값으로 덮어쓴다
+  // (저장 후 부모가 새 task 를 내려주는 흐름을 따라가기 위함).
   useEffect(() => {
     setTitle(task.title);
     setDescription(task.description ?? "");

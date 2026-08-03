@@ -1,11 +1,9 @@
 import type {
   ActivityType,
   TaskFilterState,
-  TaskGroupBy,
   TaskPriority,
   TaskSortBy,
   TaskStatus,
-  TaskViewId,
 } from "./types";
 
 export const TASK_STATUS_CONFIG: Record<TaskStatus, { bg: string; text: string; dot: string; icon: string }> = {
@@ -25,18 +23,6 @@ export const CATEGORIES = ["상품 운영", "주문/배송", "CS", "마케팅", 
 
 export const TASK_STATUSES: TaskStatus[] = ["대기", "진행중", "완료"];
 export const TASK_PRIORITIES: TaskPriority[] = ["긴급", "높음", "보통", "낮음"];
-
-export const TASK_VIEWS: Record<TaskViewId, { label: string; icon: string }> = {
-  list: { label: "리스트", icon: "ph-list-dashes" },
-  calendar: { label: "캘린더", icon: "ph-calendar-blank" },
-  timeline: { label: "타임라인", icon: "ph-chart-bar-horizontal" },
-};
-
-export const GROUP_BY_OPTIONS: Record<TaskGroupBy, string> = {
-  status: "상태별",
-  assignee: "담당자별",
-  category: "업무 묶음별",
-};
 
 export const SORT_BY_OPTIONS: Record<TaskSortBy, string> = {
   due_date: "마감일",

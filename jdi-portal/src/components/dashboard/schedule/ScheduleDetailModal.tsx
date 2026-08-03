@@ -6,7 +6,8 @@ import ModalContainer from "@/components/shared/ModalContainer";
 import Select from "@/components/shared/Select";
 import { updateScheduleWithParticipants, deleteSchedule } from "@/lib/schedule/actions";
 import { SCHEDULE_CATEGORIES, SCHEDULE_CATEGORY_CONFIG, getCategoryStyle } from "@/lib/schedule/constants";
-import { formatTime } from "@/lib/utils/date";
+import { formatTime, toKstDateTimeLocal } from "@/lib/utils/date";
+import { getErrorMessage } from "@/lib/utils/errors";
 import type { ScheduleVisibility, ScheduleWithProfile } from "@/lib/schedule/types";
 import type { Profile } from "@/lib/attendance/types";
 
@@ -20,22 +21,8 @@ interface ScheduleDetailModalProps {
 }
 
 function toLocalDatetime(isoString: string) {
-  const date = new Date(isoString);
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
-  return {
-    date: `${get("year")}-${get("month")}-${get("day")}`,
-    time: `${get("hour")}:${get("minute")}`,
-  };
+  const [date, time] = toKstDateTimeLocal(isoString).split("T");
+  return { date, time };
 }
 
 export default function ScheduleDetailModal({
@@ -119,7 +106,7 @@ export default function ScheduleDetailModal({
       );
       onUpdated();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "일정 수정에 실패했습니다.");
+      setFeedback(getErrorMessage(error, "일정 수정에 실패했습니다."));
     } finally {
       setSaving(false);
     }
@@ -131,7 +118,7 @@ export default function ScheduleDetailModal({
       await deleteSchedule(schedule.id);
       onUpdated();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "일정 삭제에 실패했습니다.");
+      setFeedback(getErrorMessage(error, "일정 삭제에 실패했습니다."));
       setDeleting(false);
     }
   };

@@ -194,11 +194,6 @@ export async function getInitialTasksWithDetails(supabase: SupabaseClient): Prom
   return enrichRawTasks(supabase, [...activeTasks, ...completedTasks]);
 }
 
-/** @deprecated Use getInitialTasksWithDetails for bounded dashboard data. */
-export async function getTasksWithDetails(supabase: SupabaseClient): Promise<TaskWithDetails[]> {
-  return getInitialTasksWithDetails(supabase);
-}
-
 /**
  * Fetch one history page. All filters are evaluated by Supabase before the
  * thirty-item page is returned; no client-side full-table history fetch occurs.
@@ -254,41 +249,6 @@ export async function getTaskHistoryWithDetails(
     tasks: await enrichRawTasks(supabase, pageRows),
     nextCursor,
   };
-}
-
-export async function getTaskById(supabase: SupabaseClient, id: string): Promise<TaskWithDetails | null> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(TASK_BASE_SELECT)
-    .eq("id", id)
-    .single();
-
-  if (error) return null;
-
-  const [assigneeMap, counts] = await Promise.all([
-    fetchAssigneesForTasks(supabase, [id]),
-    fetchCountsForTasks(supabase, [id]),
-  ]);
-
-  return enrichTasks([data], assigneeMap, counts)[0];
-}
-
-export async function getSubtasks(supabase: SupabaseClient, parentId: string): Promise<TaskWithDetails[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(TASK_BASE_SELECT)
-    .eq("parent_id", parentId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  const taskIds = (data ?? []).map((t) => t.id as string);
-
-  const [assigneeMap, counts] = await Promise.all([
-    fetchAssigneesForTasks(supabase, taskIds),
-    fetchCountsForTasks(supabase, taskIds),
-  ]);
-
-  return enrichTasks(data ?? [], assigneeMap, counts);
 }
 
 export async function getChecklistItems(
@@ -370,57 +330,4 @@ export async function getTaskBasic(supabase: SupabaseClient, id: string): Promis
   };
 }
 
-/** 상세 페이지용 — 카운트 쿼리 없이 서브태스크 + 담당자만 조회 */
-export async function getSubtasksBasic(supabase: SupabaseClient, parentId: string): Promise<TaskWithDetails[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(TASK_BASE_SELECT)
-    .eq("parent_id", parentId)
-    .order("position", { ascending: true });
 
-  if (error) throw error;
-  if (!data || data.length === 0) return [];
-
-  const taskIds = data.map((t) => t.id as string);
-  const assigneeMap = await fetchAssigneesForTasks(supabase, taskIds);
-
-  return data.map((raw) => {
-    const tid = raw.id as string;
-    return {
-      ...(raw as unknown as TaskWithDetails),
-      assignees: assigneeMap.get(tid) ?? [],
-      checklist_total: 0,
-      checklist_completed: 0,
-      subtask_count: 0,
-      comment_count: 0,
-      attachment_count: 0,
-    };
-  });
-}
-
-export async function getMaxPosition(supabase: SupabaseClient, status: string): Promise<number> {
-  const { data } = await supabase
-    .from("tasks")
-    .select("position")
-    .eq("status", status)
-    .order("position", { ascending: false })
-    .limit(1)
-    .single();
-  return data?.position ?? 0;
-}
-
-/** 특정 사용자의 할일만 RPC로 직접 조회 — 전체 목록 fetch 후 필터링 불필요 */
-export async function getMyTasksWithDetails(
-  supabase: SupabaseClient,
-  userId: string,
-  includeCompleted: boolean = true,
-  completedDays: number = 7
-): Promise<TaskWithDetails[]> {
-  const { data, error } = await supabase.rpc("get_my_tasks_with_details", {
-    p_user_id: userId,
-    p_include_completed: includeCompleted,
-    p_completed_days: completedDays,
-  });
-  if (error) throw error;
-  return Array.isArray(data) ? (data as TaskWithDetails[]) : [];
-}

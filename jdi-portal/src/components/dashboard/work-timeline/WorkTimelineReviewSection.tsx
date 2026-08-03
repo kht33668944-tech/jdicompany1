@@ -17,6 +17,8 @@ import {
 import { toast } from "sonner";
 import UserAvatar from "@/components/shared/UserAvatar";
 import { triggerDownload } from "@/lib/utils/download";
+import { getErrorMessage } from "@/lib/utils/errors";
+import { formatFileSize } from "@/lib/utils/format";
 import {
   approveReview,
   cancelReview,
@@ -79,12 +81,6 @@ function eventLabel(kind: ReviewEventKind): string {
     default:
       return "";
   }
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
-  return `${bytes}B`;
 }
 
 export default function WorkTimelineReviewSection({
@@ -189,7 +185,7 @@ function ReviewCard({
       toast.success("검토를 승인했습니다.");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "승인하지 못했습니다.");
+      toast.error(getErrorMessage(error, "승인하지 못했습니다."));
     } finally {
       setApproving(false);
     }
@@ -208,7 +204,7 @@ function ReviewCard({
       setRejectNote("");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "반려하지 못했습니다.");
+      toast.error(getErrorMessage(error, "반려하지 못했습니다."));
     } finally {
       setSubmittingReject(false);
     }
@@ -221,7 +217,7 @@ function ReviewCard({
       toast.success("검토 요청을 취소했습니다.");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "취소하지 못했습니다.");
+      toast.error(getErrorMessage(error, "취소하지 못했습니다."));
     } finally {
       setCancelling(false);
     }
@@ -379,7 +375,7 @@ function RemediationForm({
         validateWorkTimelineFile(file);
         accepted.push(file);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "첨부할 수 없는 파일입니다.");
+        toast.error(getErrorMessage(error, "첨부할 수 없는 파일입니다."));
       }
     }
     if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
@@ -414,7 +410,7 @@ function RemediationForm({
       setFiles([]);
       onDone();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "보완을 제출하지 못했습니다.");
+      toast.error(getErrorMessage(error, "보완을 제출하지 못했습니다."));
     } finally {
       setSubmitting(false);
     }
@@ -604,7 +600,7 @@ function ReviewRequestForm({
       setOpen(false);
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "검토 요청을 보내지 못했습니다.");
+      toast.error(getErrorMessage(error, "검토 요청을 보내지 못했습니다."));
     } finally {
       setSubmitting(false);
     }

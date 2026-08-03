@@ -14,6 +14,7 @@ import {
 } from "phosphor-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { getErrorMessage } from "@/lib/utils/errors";
 import {
   updateChannel,
   deleteChannel,
@@ -218,7 +219,7 @@ export default function ChannelSettingsDrawer({
       toast.success("채널이 삭제되었습니다.");
       onChannelDeleted();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "삭제에 실패했습니다.";
+      const message = getErrorMessage(err, "삭제에 실패했습니다.");
       console.error("[deleteChannel]", err);
       toast.error(message);
     }

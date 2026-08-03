@@ -21,6 +21,7 @@ import {
   sortTasks,
 } from "@/lib/tasks/utils";
 import { TASK_STATUS_CONFIG } from "@/lib/tasks/constants";
+import { formatDueWithWeekday } from "@/lib/tasks/format";
 import { addDays, formatDateFull, toDateString } from "@/lib/utils/date";
 import { getInitialTasksWithDetails, getTaskHistoryWithDetails } from "@/lib/tasks/queries";
 import { cacheTasks } from "@/lib/tasks/tasksCache";
@@ -47,17 +48,6 @@ function isTodayTask(task: TaskWithDetails, today: string): boolean {
 }
 
 type HistoryStatusFilter = "all" | TaskStatus;
-
-function formatDueWithWeekday(dueDate: string | null, fallbackText: string, today: string): string {
-  if (!dueDate) return fallbackText;
-  const [, month, day] = dueDate.split("-");
-  const weekday = new Date(`${dueDate}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    weekday: "short",
-  });
-  if (dueDate === today) return `오늘 (${weekday})`;
-  return `${month}.${day} (${weekday})`;
-}
 
 export default function TasksPageClient({ profiles, userId, initialTasks }: Props) {
   const [showCreate, setShowCreate] = useState(false);

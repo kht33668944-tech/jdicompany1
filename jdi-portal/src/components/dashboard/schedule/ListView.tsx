@@ -2,22 +2,13 @@
 
 import { useMemo } from "react";
 import { MapPin, Monitor, CalendarBlank, Lock } from "phosphor-react";
-import { formatTime, toDateStringFromTimestamp } from "@/lib/utils/date";
+import { formatDate, formatTime, toDateStringFromTimestamp } from "@/lib/utils/date";
 import { getCategoryStyle } from "@/lib/schedule/constants";
 import type { ScheduleWithProfile } from "@/lib/schedule/types";
 
 interface ListViewProps {
   schedules: ScheduleWithProfile[];
   onEventClick: (schedule: ScheduleWithProfile) => void;
-}
-
-function formatGroupDate(dateStr: string): string {
-  return new Date(`${dateStr}T12:00:00+09:00`).toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  });
 }
 
 interface DateGroup {
@@ -43,7 +34,7 @@ export default function ListView({ schedules, onEventClick }: ListViewProps) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, events]) => ({
         date,
-        label: formatGroupDate(date),
+        label: formatDate(date),
         events: events.sort((a, b) => a.start_time.localeCompare(b.start_time)),
       }));
 

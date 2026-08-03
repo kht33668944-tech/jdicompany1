@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { X, PushPin } from "phosphor-react";
 import type { Message } from "@/lib/chat/types";
 import { formatMessageTime } from "@/lib/chat/utils";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 
 interface PinnedMessagesPanelProps {
   open: boolean;
@@ -13,22 +14,7 @@ interface PinnedMessagesPanelProps {
 }
 
 export default function PinnedMessagesPanel({ open, messages, onClose, onUnpin }: PinnedMessagesPanelProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [open, onClose]);
+  const panelRef = useClickOutside<HTMLDivElement>(onClose, { touch: true, enabled: open });
 
   useEffect(() => {
     if (!open) return;

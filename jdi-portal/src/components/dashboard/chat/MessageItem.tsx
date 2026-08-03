@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import Image from "next/image";
 import { Pencil, Trash, File as FileIcon, DownloadSimple, Copy, ArrowBendUpLeft, Smiley, PushPin } from "phosphor-react";
 import { toast } from "sonner";
 import type { Message, MessageReaction } from "@/lib/chat/types";
-import { formatMessageTime, formatFileSize, getFilePreviewPath, parseFileContent } from "@/lib/chat/utils";
+import { formatMessageTime, getFilePreviewPath, parseFileContent } from "@/lib/chat/utils";
+import { formatFileSize } from "@/lib/utils/format";
 import { toggleReaction, getReactions } from "@/lib/chat/actions";
 import { parseMessageContent } from "@/lib/chat/mentions";
 import { triggerDownload } from "@/lib/utils/download";
@@ -109,7 +111,7 @@ function MessageContextMenu({
   onPin?: (message: Message) => void;
   onClose: () => void;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useClickOutside<HTMLDivElement>(onClose, { touch: true });
   const isTextMessage = message.type === "text" && !message.is_deleted;
 
   // 뷰포트 경계 체크 후 위치 조정
@@ -130,22 +132,7 @@ function MessageContextMenu({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPos({ x: adjustedX, y: adjustedY });
     }
-  }, [x, y]);
-
-  // 외부 클릭 시 닫기
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [onClose]);
+  }, [x, y, menuRef]);
 
   // ESC 키로 닫기
   useEffect(() => {

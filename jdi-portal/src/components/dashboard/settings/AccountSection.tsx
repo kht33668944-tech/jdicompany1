@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EnvelopeSimple, CalendarCheck, Key, Lock, FloppyDisk, PaperPlaneTilt, X, WifiHigh } from "phosphor-react";
@@ -93,7 +94,7 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
       setIpRequestReason("");
       router.refresh();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "변경 요청 제출에 실패했습니다.";
+      const msg = getErrorMessage(e, "변경 요청 제출에 실패했습니다.");
       setFeedback({ type: "error", message: msg });
     } finally {
       setIpRequestSaving(false);
@@ -159,7 +160,7 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
       setRequestReason("");
       router.refresh();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "변경 요청 제출에 실패했습니다.";
+      const msg = getErrorMessage(e, "변경 요청 제출에 실패했습니다.");
       setFeedback({ type: "error", message: msg });
     } finally {
       setRequestSaving(false);
@@ -267,15 +268,11 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
 
           {/* 입사일 카드 */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400">
-                <CalendarCheck size={20} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">입사일</p>
-                <p className="text-[11px] text-slate-500">연차 계산의 기준이 됩니다</p>
-              </div>
-            </div>
+            <FieldCardHeader
+              icon={<CalendarCheck size={20} />}
+              title="입사일"
+              description="연차 계산의 기준이 됩니다"
+            />
 
             {/* Mode 1 & 3: 직접 입력 (미잠금 직원 or 관리자) */}
             {!isLocked && (
@@ -286,15 +283,10 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
                   onChange={(e) => setHireDateInput(e.target.value)}
                   className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700"
                 />
-                <button
-                  type="button"
+                <SaveButton
                   onClick={handleHireDateSave}
                   disabled={hireDateSaving || !hireDateInput || hireDateInput === profile.hire_date}
-                  className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
-                >
-                  <FloppyDisk size={14} />
-                  저장
-                </button>
+                />
               </div>
             )}
 
@@ -302,28 +294,14 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
             {isLocked && (
               <div className="space-y-3">
                 {/* 현재 입사일 읽기 전용 */}
-                <div className="px-3 py-2 rounded-xl bg-white border border-slate-100 text-sm text-slate-700">
-                  {profile.hire_date ?? "미설정"}
-                </div>
+                <LockedValueBox value={profile.hire_date ?? "미설정"} />
 
                 {/* 대기중 요청이 있을 때 */}
                 {pendingRequest ? (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-bold text-amber-700">승인 대기 중</p>
-                        <p className="text-xs text-amber-600 mt-0.5">요청 입사일: {pendingRequest.requested_hire_date}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCancelRequest(pendingRequest.id)}
-                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium"
-                      >
-                        <X size={12} />
-                        요청 취소
-                      </button>
-                    </div>
-                  </div>
+                  <PendingRequestBanner
+                    description={`요청 입사일: ${pendingRequest.requested_hire_date}`}
+                    onCancel={() => handleCancelRequest(pendingRequest.id)}
+                  />
                 ) : showRequestForm ? (
                   /* 변경 요청 폼 */
                   <div className="space-y-2">
@@ -333,56 +311,27 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
                       onChange={(e) => setRequestDate(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700"
                     />
-                    <textarea
-                      value={requestReason}
-                      onChange={(e) => setRequestReason(e.target.value)}
-                      placeholder="변경 사유 (선택)"
-                      rows={2}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 resize-none"
+                    <ChangeReasonTextarea value={requestReason} onChange={setRequestReason} />
+                    <RequestFormActions
+                      onSubmit={handleSubmitRequest}
+                      submitDisabled={requestSaving || !requestDate}
+                      onCancel={() => { setShowRequestForm(false); setRequestReason(""); }}
                     />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSubmitRequest}
-                        disabled={requestSaving || !requestDate}
-                        className="flex-1 py-2 rounded-xl bg-indigo-500 text-white font-bold text-xs hover:bg-indigo-600 transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
-                      >
-                        <PaperPlaneTilt size={13} />
-                        제출
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowRequestForm(false); setRequestReason(""); }}
-                        className="px-3 py-2 rounded-xl bg-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-300 transition-colors"
-                      >
-                        취소
-                      </button>
-                    </div>
                   </div>
                 ) : (
                   /* 변경 요청 버튼 */
-                  <button
-                    type="button"
-                    onClick={() => setShowRequestForm(true)}
-                    className="w-full py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors"
-                  >
-                    변경 요청
-                  </button>
+                  <ChangeRequestButton onClick={() => setShowRequestForm(true)} />
                 )}
               </div>
             )}
           </div>
           {/* 출퇴근 허용 IP 카드 */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400">
-                <WifiHigh size={20} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">출퇴근 허용 IP</p>
-                <p className="text-[11px] text-slate-500">등록된 IP에서만 출퇴근이 가능합니다</p>
-              </div>
-            </div>
+            <FieldCardHeader
+              icon={<WifiHigh size={20} />}
+              title="출퇴근 허용 IP"
+              description="등록된 IP에서만 출퇴근이 가능합니다"
+            />
 
             {currentIp && (
               <div className="mb-2 flex items-center gap-2">
@@ -402,15 +351,7 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
                     placeholder="예: 220.117.30.202"
                     className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 font-mono"
                   />
-                  <button
-                    type="button"
-                    onClick={handleIpSave}
-                    disabled={ipSaving || !allowedIp.trim()}
-                    className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
-                  >
-                    <FloppyDisk size={14} />
-                    저장
-                  </button>
+                  <SaveButton onClick={handleIpSave} disabled={ipSaving || !allowedIp.trim()} />
                 </div>
                 {currentIp && (
                   <button
@@ -430,27 +371,14 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
             {/* 모드 2: 잠금 (변경 요청 필요) */}
             {isIpLocked && (
               <div className="space-y-3">
-                <div className="px-3 py-2 rounded-xl bg-white border border-slate-100 text-sm text-slate-700 font-mono">
-                  {profile.allowed_ip ?? "미설정"}
-                </div>
+                <LockedValueBox value={profile.allowed_ip ?? "미설정"} className="font-mono" />
 
                 {pendingIpRequest ? (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-bold text-amber-700">승인 대기 중</p>
-                        <p className="text-xs text-amber-600 mt-0.5 font-mono">요청 IP: {pendingIpRequest.requested_ip}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCancelIpRequest(pendingIpRequest.id)}
-                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium"
-                      >
-                        <X size={12} />
-                        요청 취소
-                      </button>
-                    </div>
-                  </div>
+                  <PendingRequestBanner
+                    description={`요청 IP: ${pendingIpRequest.requested_ip}`}
+                    descriptionClassName="font-mono"
+                    onCancel={() => handleCancelIpRequest(pendingIpRequest.id)}
+                  />
                 ) : showIpRequestForm ? (
                   <div className="space-y-2">
                     <div>
@@ -471,40 +399,15 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
                         </button>
                       )}
                     </div>
-                    <textarea
-                      value={ipRequestReason}
-                      onChange={(e) => setIpRequestReason(e.target.value)}
-                      placeholder="변경 사유 (선택)"
-                      rows={2}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 resize-none"
+                    <ChangeReasonTextarea value={ipRequestReason} onChange={setIpRequestReason} />
+                    <RequestFormActions
+                      onSubmit={handleSubmitIpRequest}
+                      submitDisabled={ipRequestSaving || !ipRequestIp.trim()}
+                      onCancel={() => { setShowIpRequestForm(false); setIpRequestReason(""); setIpRequestIp(""); }}
                     />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSubmitIpRequest}
-                        disabled={ipRequestSaving || !ipRequestIp.trim()}
-                        className="flex-1 py-2 rounded-xl bg-indigo-500 text-white font-bold text-xs hover:bg-indigo-600 transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
-                      >
-                        <PaperPlaneTilt size={13} />
-                        제출
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowIpRequestForm(false); setIpRequestReason(""); setIpRequestIp(""); }}
-                        className="px-3 py-2 rounded-xl bg-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-300 transition-colors"
-                      >
-                        취소
-                      </button>
-                    </div>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowIpRequestForm(true)}
-                    className="w-full py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors"
-                  >
-                    변경 요청
-                  </button>
+                  <ChangeRequestButton onClick={() => setShowIpRequestForm(true)} />
                 )}
               </div>
             )}
@@ -543,5 +446,154 @@ export default function AccountSection({ profile, isAdmin, myHireDateChangeReque
         </form>
       </div>
     </section>
+  );
+}
+
+// ── 보조 컴포넌트 ──────────────────────────────────────────────
+// 입사일 카드와 출퇴근 IP 카드는 "잠기면 변경 요청" 흐름이 똑같다.
+// 두 카드에서 글자 하나까지 같던 조각만 아래로 뽑아 한 곳에서 관리한다.
+
+function FieldCardHeader({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400">
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{title}</p>
+        <p className="text-[11px] text-slate-500">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function SaveButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="px-3 py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors disabled:opacity-40 flex items-center gap-1"
+    >
+      <FloppyDisk size={14} />
+      저장
+    </button>
+  );
+}
+
+/** 잠긴 값(현재 입사일 / 현재 허용 IP)을 읽기 전용으로 보여준다. */
+function LockedValueBox({ value, className }: { value: string; className?: string }) {
+  return (
+    <div
+      className={`px-3 py-2 rounded-xl bg-white border border-slate-100 text-sm text-slate-700${
+        className ? ` ${className}` : ""
+      }`}
+    >
+      {value}
+    </div>
+  );
+}
+
+function PendingRequestBanner({
+  description,
+  descriptionClassName,
+  onCancel,
+}: {
+  description: string;
+  descriptionClassName?: string;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-bold text-amber-700">승인 대기 중</p>
+          <p
+            className={`text-xs text-amber-600 mt-0.5${
+              descriptionClassName ? ` ${descriptionClassName}` : ""
+            }`}
+          >
+            {description}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium"
+        >
+          <X size={12} />
+          요청 취소
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ChangeReasonTextarea({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="변경 사유 (선택)"
+      rows={2}
+      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-100 focus:outline-none focus:border-indigo-400 text-sm text-slate-700 resize-none"
+    />
+  );
+}
+
+function RequestFormActions({
+  onSubmit,
+  submitDisabled,
+  onCancel,
+}: {
+  onSubmit: () => void;
+  submitDisabled: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={submitDisabled}
+        className="flex-1 py-2 rounded-xl bg-indigo-500 text-white font-bold text-xs hover:bg-indigo-600 transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+      >
+        <PaperPlaneTilt size={13} />
+        제출
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="px-3 py-2 rounded-xl bg-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-300 transition-colors"
+      >
+        취소
+      </button>
+    </div>
+  );
+}
+
+function ChangeRequestButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full py-2 rounded-xl border border-indigo-400 text-indigo-500 font-bold text-xs hover:bg-indigo-50 transition-colors"
+    >
+      변경 요청
+    </button>
   );
 }

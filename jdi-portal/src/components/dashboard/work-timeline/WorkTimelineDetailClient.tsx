@@ -24,6 +24,8 @@ import {
 } from "@/lib/work-timeline/constants";
 import type { WorkTimelineEntryWithProfile, WorkTimelineReviewWithEvents } from "@/lib/work-timeline/types";
 import { isWorkTimelineImage, validateWorkTimelineFile } from "@/lib/work-timeline/utils";
+import { fromKstDateTimeLocal, toKstDateTimeLocal } from "@/lib/utils/date";
+import { getErrorMessage } from "@/lib/utils/errors";
 import { createImageThumbnail, resizeImageIfNeeded } from "@/lib/utils/imageResize";
 import { triggerDownload, triggerDownloadAll } from "@/lib/utils/download";
 import AttachmentFileCard from "./AttachmentFileCard";
@@ -47,29 +49,6 @@ function formatCompletedAt(timestamp: string): string {
     minute: "2-digit",
     hour12: false,
   });
-}
-
-function toKstDateTimeLocal(timestamp: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(timestamp));
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
-}
-
-function fromKstDateTimeLocal(value: string): string {
-  const parsed = new Date(`${value}:00+09:00`);
-  if (!value || Number.isNaN(parsed.getTime())) {
-    throw new Error("완료 시간을 올바르게 입력해 주세요.");
-  }
-  return parsed.toISOString();
 }
 
 export default function WorkTimelineDetailClient({
@@ -164,7 +143,7 @@ export default function WorkTimelineDetailClient({
       const updated = await updateWorkTimelineEntry(entry.id, {
         title,
         description,
-        completedAt: fromKstDateTimeLocal(completedAt),
+        completedAt: fromKstDateTimeLocal(completedAt, "완료 시간을 올바르게 입력해 주세요."),
         projectId: projectId || null,
       });
       const resolveNextProject = () => {
@@ -184,7 +163,7 @@ export default function WorkTimelineDetailClient({
       toast.success("업무 기록을 수정했습니다.");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "수정하지 못했습니다.");
+      toast.error(getErrorMessage(error, "수정하지 못했습니다."));
     } finally {
       setSaving(false);
     }
@@ -202,7 +181,7 @@ export default function WorkTimelineDetailClient({
       router.replace("/dashboard/work-timeline");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "삭제하지 못했습니다.");
+      toast.error(getErrorMessage(error, "삭제하지 못했습니다."));
       setDeleting(false);
     }
   };
@@ -222,7 +201,7 @@ export default function WorkTimelineDetailClient({
       }
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "첨부 파일을 삭제하지 못했습니다.");
+      toast.error(getErrorMessage(error, "첨부 파일을 삭제하지 못했습니다."));
     } finally {
       setDeletingAttachmentId(null);
     }
@@ -282,7 +261,7 @@ export default function WorkTimelineDetailClient({
       toast.success("첨부 파일을 추가했습니다.");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "파일을 추가하지 못했습니다.");
+      toast.error(getErrorMessage(error, "파일을 추가하지 못했습니다."));
     } finally {
       setUploadingImages(false);
       if (imageInputRef.current) imageInputRef.current.value = "";

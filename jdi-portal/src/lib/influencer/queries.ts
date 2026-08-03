@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { calcDeltaPct, mapKpiRpcResult, type KpiRpcResult } from "./kpi";
 import type {
-  CampaignBasic,
   CampaignStatus,
   Influencer,
   InfluencerListItem,
@@ -11,6 +10,9 @@ import type {
   InfluencerFilterOpts,
   KpiCards,
 } from "./types";
+
+const CAMPAIGN_WITH_INFLUENCER_SELECT =
+  "*, influencer:influencers(username, display_name, profile_image_url, profile_image_path)";
 
 export async function getInfluencers(opts: InfluencerFilterOpts = {}): Promise<InfluencerListItem[]> {
   const supabase = await createClient();
@@ -93,7 +95,7 @@ export async function getActiveCampaigns(): Promise<InfluencerCampaignWithInflue
 
   const { data, error } = await supabase
     .from("influencer_campaigns")
-    .select("*, influencer:influencers(username, display_name, profile_image_url, profile_image_path)")
+    .select(CAMPAIGN_WITH_INFLUENCER_SELECT)
     .neq("status", "done")
     .order("ship_date", { ascending: true, nullsFirst: false });
 
@@ -101,17 +103,21 @@ export async function getActiveCampaigns(): Promise<InfluencerCampaignWithInflue
   return (data as unknown as InfluencerCampaignWithInfluencer[]) ?? [];
 }
 
-export async function getAllCampaignsBasic(): Promise<CampaignBasic[]> {
+/**
+ * 캠페인 전체(종료 포함) 한 번에 조회.
+ * 인플루언서 메인 화면은 진행 중 목록도 필요한데, 이 결과에서 걸러 쓰면
+ * 같은 행을 두 번 가져오지 않는다(예전엔 getActiveCampaigns 와 중복 조회).
+ */
+export async function getAllCampaigns(): Promise<InfluencerCampaignWithInfluencer[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("influencer_campaigns")
-    .select(
-      "id, influencer_id, status, cost, contact_date, contract_date, ship_date, content_deadline, expected_post_date",
-    );
+    .select(CAMPAIGN_WITH_INFLUENCER_SELECT)
+    .order("ship_date", { ascending: true, nullsFirst: false });
 
   if (error) throw error;
-  return (data as CampaignBasic[]) ?? [];
+  return (data as unknown as InfluencerCampaignWithInfluencer[]) ?? [];
 }
 
 export async function getKpiCards(): Promise<KpiCards> {

@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { VaultAccount } from "@/lib/vault/types";
@@ -51,7 +52,7 @@ export default function AccountFormModal({ editAccount, onClose, onSaved }: Prop
       }
       onSaved();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다.");
+      toast.error(getErrorMessage(err, "저장에 실패했습니다."));
     } finally {
       setBusy(false);
     }

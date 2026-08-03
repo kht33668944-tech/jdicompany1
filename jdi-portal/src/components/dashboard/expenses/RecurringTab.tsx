@@ -1,5 +1,6 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/utils/errors";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -142,7 +143,7 @@ export default function RecurringTab({ recurring: initial, categories, profiles,
       toast.success(row.is_active ? "중지되었습니다." : "다시 활성화되었습니다.");
       refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "변경에 실패했습니다.");
+      toast.error(getErrorMessage(err, "변경에 실패했습니다."));
     }
   };
 

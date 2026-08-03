@@ -138,12 +138,3 @@ export function formatChannelTime(dateStr: string): string {
 export function isImageFile(fileType: string): boolean {
   return fileType.startsWith("image/");
 }
-
-/**
- * 파일 크기 포맷: "2.4 MB", "340 KB"
- */
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}

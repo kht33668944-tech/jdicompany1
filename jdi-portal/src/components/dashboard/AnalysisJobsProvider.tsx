@@ -15,6 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { addInfluencer } from "@/lib/influencer/actions";
+import { getErrorMessage } from "@/lib/utils/errors";
 
 export type AnalysisJobStatus = "pending" | "running" | "success" | "failed" | "skipped";
 
@@ -109,7 +110,7 @@ export default function AnalysisJobsProvider({ children }: { children: React.Rea
           );
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+        const msg = getErrorMessage(err, "알 수 없는 오류");
         setJobs((prev) =>
           prev.map((j) => (j.id === next.id ? { ...j, status: "failed", errorMsg: msg } : j)),
         );

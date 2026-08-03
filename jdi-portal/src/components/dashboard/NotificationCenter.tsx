@@ -24,6 +24,7 @@ import ClipboardText from "phosphor-react/dist/icons/ClipboardText.esm.js";
 import { createClient } from "@/lib/supabase/client";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import { markAsRead, markAllAsRead } from "@/lib/notifications/actions";
+import { getNotifications, getUnreadCount } from "@/lib/notifications/queries";
 import {
   getDesktopPermission,
   requestDesktopPermission,
@@ -137,17 +138,9 @@ export default function NotificationCenter({
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(30);
-
-      if (!error && data) {
-        setNotifications(data as Notification[]);
-      }
+      setNotifications(await getNotifications(createClient(), userId, { limit: 30 }));
+    } catch {
+      // 조회 실패 시 이전 목록을 그대로 둔다
     } finally {
       setLoading(false);
     }
@@ -157,14 +150,14 @@ export default function NotificationCenter({
   useEffect(() => {
     let cancelled = false;
     async function fetchCount() {
-      const supabase = createClient();
-      const { count } = await supabase
-        .from("notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("is_read", false);
+      let count = 0;
+      try {
+        count = await getUnreadCount(createClient(), userId);
+      } catch {
+        // 조회 실패 시 0 으로 둔다
+      }
       if (cancelled) return;
-      onUnreadCountChange(count ?? 0);
+      onUnreadCountChange(count);
     }
     const timer = window.setTimeout(fetchCount, INITIAL_COUNT_DELAY_MS);
     return () => {

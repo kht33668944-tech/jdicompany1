@@ -4,8 +4,7 @@ import InfluencerPageClient from "@/components/dashboard/influencer/InfluencerPa
 import {
   getKpiCards,
   getInfluencers,
-  getActiveCampaigns,
-  getAllCampaignsBasic,
+  getAllCampaigns,
   getCategories,
 } from "@/lib/influencer/queries";
 
@@ -15,13 +14,13 @@ export default async function InfluencerPage() {
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
 
-  const [kpi, influencers, activeCampaigns, allCampaigns, categories] = await Promise.all([
+  const [kpi, influencers, allCampaigns, categories] = await Promise.all([
     getKpiCards(),
     getInfluencers({ status: "active", sortBy: "engagement_rate", sortOrder: "desc", pageSize: 25 }),
-    getActiveCampaigns(),
-    getAllCampaignsBasic(),
+    getAllCampaigns(),
     getCategories(),
   ]);
+  const activeCampaigns = allCampaigns.filter((c) => c.status !== "done");
 
   return (
     <InfluencerPageClient
