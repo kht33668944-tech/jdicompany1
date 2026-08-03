@@ -42,23 +42,27 @@ SELECT version, name, array_to_string(statements, E';\n') AS sql
 - 복구 후 `migration list --linked` 로 Local/Remote 가 모두 채워졌는지 확인합니다.
 - **실제 사례**: `111`~`116`(인플루언서 시딩·후보 발굴 계열)이 이 방법으로 복구되었습니다. 단, 이 6개가 만든 테이블을 쓰는 **앱 코드는 master 에 없습니다**(병합되지 않은 작업).
 
-> **⚠️ `111`~`116` 은 "기록만 있고 테이블은 없을" 수 있습니다 — 쓰기 전에 반드시 확인하세요.**
+> **⚠️ `114`~`116` 은 기록만 있고 테이블은 없습니다 (2026-08-03 확인).**
 >
-> `migration list --linked` 에는 `111`~`116` 이 Remote 로 찍혀 있지만, 2026-07-30 실측에서
-> `relation "public.influencer_candidates" does not exist` 가 나왔습니다
-> (`docs/superpowers/specs/2026-07-30-influencer-discovery-relatedprofiles-design.md`).
-> 마이그레이션 **기록만 복구되고 실제 DDL 은 실행되지 않았거나, 이후 지워진** 상태로 보입니다.
->
-> 그래서 이 계열 작업을 할 때는 **"테이블이 이미 있다"고도, "없다"고도 가정하지 말고**
-> 아래로 직접 확인한 뒤 시작합니다.
+> `migration list --linked` 에는 `114`~`116` 이 Remote 로 찍혀 있지만, 운영 DB 에
+> **후보 발굴 테이블이 하나도 없습니다.** 아래 쿼리가 0건을 반환하는 것을 확인했습니다.
 >
 > ```sql
 > SELECT table_name FROM information_schema.tables
 >  WHERE table_schema = 'public' AND table_name LIKE 'influencer_candidate%';
 > ```
 >
-> 없다면 `114`~`116` 은 이미 Remote 에 기록돼 있어 `db push` 가 **조용히 건너뜁니다.**
-> 새 번호로 다시 작성하거나 SQL 을 직접 실행해야 합니다.
+> 즉 마이그레이션 **기록만 복구되고 실제 DDL 은 실행되지 않은** 상태입니다
+> (`influencer_candidates`, `influencer_candidate_cursors`, `influencer_discovery_runs`,
+> `influencer_candidate_seeds` 모두 없음).
+>
+> **이게 왜 함정인가**: 번호가 이미 Remote 에 기록돼 있으므로 `db push` 는 `114`~`116`
+> 파일을 **오류 없이 조용히 건너뜁니다.** 파일을 고쳐서 다시 밀어도 아무 일도 일어나지
+> 않습니다. 이 테이블이 필요해지면 **새 번호로 다시 작성**하세요(기존 파일 내용을 그대로
+> 복사해도 됩니다). 그때 `CREATE TABLE IF NOT EXISTS` 로 멱등하게 쓰면 더 안전합니다.
+>
+> 현재 발굴 파일럿(`scripts/influencer-discovery/`)은 DB 가 아니라 **로컬 파일**에 상태를
+> 쌓으므로 이 사실에 영향받지 않습니다.
 
 ## RLS
 
