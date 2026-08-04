@@ -299,6 +299,35 @@ test("118 마이그레이션: 취소 권한이 '요청한 사람' 기준으로 �
   assert.match(body, /v_rev\.state NOT IN \('open', 'submitted'\)/);
 });
 
+test("대시보드 검토함: 항상 펼침(접기 가능) + 3건 남짓 스크롤 + 항목이 상세로 연결", () => {
+  const widget = read("src/components/dashboard/widgets/ReviewInboxWidget.tsx");
+
+  assert.match(widget, /^"use client";/);
+  // 0건이면 칸 자체를 그리지 않는다
+  assert.match(widget, /if \(total === 0\) return null;/);
+  // 출근해야 펼쳐지던 게이트를 되살리지 않는다 — 놓치면 안 되는 인박스다
+  assert.doesNotMatch(
+    widget,
+    /hasCheckedIn|attendanceStatuses/,
+    "검토함은 출근 여부와 무관하게 펼쳐져 있어야 합니다",
+  );
+  // 기본값은 펼침, 사용자가 원하면 접을 수 있다
+  assert.match(widget, /useState\(false\)/);
+  assert.match(widget, /setCollapsed\(\(value\) => !value\)/);
+  assert.match(widget, /aria-expanded=\{!collapsed\}/);
+  // 목록이 길어져도 대시보드가 늘어나지 않도록 칸 안에서만 스크롤
+  assert.match(widget, /max-h-\[29rem\][^"]*overflow-y-auto/);
+  // 항목을 누르면 업무보고 상세로 간다
+  assert.match(widget, /href=\{`\/dashboard\/work-timeline\/\$\{item\.entryId\}`\}/);
+  // 승인/반려는 링크 밖에 있어야 한다 (버튼 눌렀는데 페이지가 넘어가면 안 됨)
+  const linkComponent = widget.slice(widget.indexOf("function ReviewItemLink"));
+  assert.doesNotMatch(
+    linkComponent,
+    /approveReview|rejectReview|onClick/,
+    "링크 컴포넌트 안에 처리 버튼이 들어가면 안 됩니다",
+  );
+});
+
 test("118: 화면이 요청자 기준으로 취소 버튼을 노출한다", () => {
   const section = read("src/components/dashboard/work-timeline/WorkTimelineReviewSection.tsx");
 
