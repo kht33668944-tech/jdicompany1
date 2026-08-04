@@ -295,7 +295,7 @@ const DASHBOARD_SNAPSHOT_QUERY = `
           'comment', r.comment,
           'counterpart_name', rp.full_name,
           'created_at', r.created_at,
-          'direction', case when r.requested_by = r.author_id then 'requested' else 'assigned' end
+          'direction', (case when r.requested_by = r.author_id then 'requested' else 'assigned' end)::text
         )
         order by r.created_at desc
       ),
@@ -318,7 +318,7 @@ const DASHBOARD_SNAPSHOT_QUERY = `
           'comment', r.comment,
           'counterpart_name', ap.full_name,
           'created_at', r.created_at,
-          'direction', case when r.requested_by = r.author_id then 'requested' else 'assigned' end
+          'direction', (case when r.requested_by = r.author_id then 'requested' else 'assigned' end)::text
         )
         order by r.created_at desc
       ),

@@ -23,8 +23,9 @@ test("대시보드: 검토 인박스를 빠른 경로와 폴백 양쪽에 싣는
   assert.match(fast, /'toFix'/);
   assert.match(fast, /'toConfirm'/);
   // 방향(마이그레이션 118): requested_by = author_id 면 작성자가 보낸 확인 요청
+  // ::text 는 필수다 — jsonb_build_object(VARIADIC "any") 는 타입이 unknown 인 인자를 거부한다
   const fastDirection = fast.match(
-    /'direction', case when r\.requested_by = r\.author_id then 'requested' else 'assigned' end/g,
+    /'direction', \(case when r\.requested_by = r\.author_id then 'requested' else 'assigned' end\)::text/g,
   );
   assert.equal(
     fastDirection?.length,
