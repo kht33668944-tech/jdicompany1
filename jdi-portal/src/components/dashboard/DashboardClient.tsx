@@ -73,11 +73,10 @@ export default function DashboardClient({
         attendanceStatuses={data.todayAttendanceStatuses}
       />
 
+      {/* 검토함은 출근 여부와 무관하게 항상 펼쳐 둔다 — 놓치면 안 되는 인박스라서 */}
       <ReviewInboxWidget
         toFix={data.pendingReviews.toFix}
         toConfirm={data.pendingReviews.toConfirm}
-        attendanceStatuses={data.todayAttendanceStatuses}
-        currentUserId={userId}
       />
 
       <TodayWorkBoardWidget
