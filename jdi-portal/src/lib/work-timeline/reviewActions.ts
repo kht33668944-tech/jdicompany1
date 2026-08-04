@@ -17,16 +17,29 @@ async function getAuth() {
   return { supabase, userId: data.user.id };
 }
 
-export async function requestReview(entryId: string, comment: string): Promise<void> {
+/**
+ * 검토를 요청한다. 방향(지시형/확인요청형)은 서버(RPC)가 auth.uid() 와 업무보고 작성자를
+ * 비교해 스스로 판정한다 — 클라이언트가 모드를 고르지 않는다 (마이그레이션 118).
+ *
+ * @param reviewerId 내 업무보고를 남에게 확인 요청할 때 지정하는 검토자.
+ *                   관리자가 남의 업무보고에 보완을 지시할 때는 null.
+ */
+export async function requestReview(
+  entryId: string,
+  comment: string,
+  reviewerId?: string | null,
+): Promise<void> {
   assertUuid(entryId, "업무보고");
+  if (reviewerId) assertUuid(reviewerId, "검토받을 사람");
   const trimmed = comment.trim();
-  if (!trimmed) throw new Error("검토 의견을 입력해 주세요.");
   if (trimmed.length > REVIEW_COMMENT_MAX_LENGTH) {
     throw new Error(`검토 의견은 ${REVIEW_COMMENT_MAX_LENGTH}자 이하로 입력해 주세요.`);
   }
+  // 지시형은 의견이 필수다. 확인요청형(검토자 지정)은 비워 두면 RPC 가 기본 문구를 채운다.
+  if (!reviewerId && !trimmed) throw new Error("검토 의견을 입력해 주세요.");
   const { supabase } = await getAuth();
   const { error } = await supabase.rpc("request_timeline_review", {
-    p_entry_id: entryId, p_comment: trimmed,
+    p_entry_id: entryId, p_comment: trimmed, p_reviewer_id: reviewerId ?? null,
   });
   if (error) throw error;
   revalidatePath(`/dashboard/work-timeline/${entryId}`);

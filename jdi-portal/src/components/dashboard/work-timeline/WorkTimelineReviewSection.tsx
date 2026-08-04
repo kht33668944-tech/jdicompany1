@@ -36,6 +36,7 @@ import {
 import { isWorkTimelineImage, validateWorkTimelineFile } from "@/lib/work-timeline/utils";
 import type {
   ReviewEventKind,
+  WorkTimelineProfile,
   WorkTimelineReviewAttachment,
   WorkTimelineReviewWithEvents,
 } from "@/lib/work-timeline/types";
@@ -46,6 +47,7 @@ interface WorkTimelineReviewSectionProps {
   currentUserId: string;
   currentUserRole: string;
   initialReview: WorkTimelineReviewWithEvents | null;
+  reviewerCandidates: WorkTimelineProfile[];
 }
 
 const STATE_BADGE_TONE_CLASSES: Record<string, string> = {
@@ -89,9 +91,12 @@ export default function WorkTimelineReviewSection({
   currentUserId,
   currentUserRole,
   initialReview,
+  reviewerCandidates,
 }: WorkTimelineReviewSectionProps) {
   const review = initialReview;
-  const canRequest = currentUserRole === "admin" || entryOwnerId === currentUserId;
+  // 내 업무보고면 "검토받을 사람을 골라 확인 요청", 관리자가 남의 것을 보면 "보완 지시" (마이그레이션 118)
+  const isOwnEntry = entryOwnerId === currentUserId;
+  const canRequest = currentUserRole === "admin" || isOwnEntry;
   const isReviewer = review !== null
     && (review.reviewer_id === currentUserId || currentUserRole === "admin");
   const isAuthor = review !== null && review.author_id === currentUserId;
@@ -129,7 +134,12 @@ export default function WorkTimelineReviewSection({
         )}
 
         {showRequestForm && (
-          <ReviewRequestForm entryId={entryId} hasPriorReview={review !== null} />
+          <ReviewRequestForm
+            entryId={entryId}
+            hasPriorReview={review !== null}
+            isOwnEntry={isOwnEntry}
+            reviewerCandidates={reviewerCandidates}
+          />
         )}
       </div>
     </section>
@@ -224,13 +234,22 @@ function ReviewCard({
   };
 
   const showRemediationForm = isAuthor && review.state === "open";
+  // 작성자가 스스로 요청한 검토(확인요청형)면 머리글의 주인공은 요청자다 (마이그레이션 118)
+  const selfRequested = review.requested_by === review.author_id;
+  const headerName = selfRequested
+    ? review.author_name ?? "알 수 없음"
+    : review.reviewer_name ?? "알 수 없음";
 
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3.5">
         <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-500">
-          <UserAvatar name={review.reviewer_name ?? "알 수 없음"} size="xs" />
-          {review.reviewer_name ?? "알 수 없음"} 검토 의견 · {formatEventAt(review.created_at)}
+          <UserAvatar name={headerName} size="xs" />
+          {selfRequested
+            ? `${headerName}님의 검토 요청 (검토자 ${review.reviewer_name ?? "알 수 없음"})`
+            : `${headerName} 검토 의견`}
+          {" · "}
+          {formatEventAt(review.created_at)}
         </div>
         <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
           {review.comment}
@@ -264,7 +283,9 @@ function ReviewCard({
 
       {isAuthor && !isReviewer && review.state === "submitted" && (
         <p className="rounded-md border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-xs font-semibold text-indigo-700">
-          보완을 제출했습니다. 검토자의 확인을 기다리고 있어요.
+          {selfRequested && review.events.length <= 1
+            ? `${review.reviewer_name ?? "검토자"}님의 확인을 기다리고 있어요.`
+            : "보완을 제출했습니다. 검토자의 확인을 기다리고 있어요."}
         </p>
       )}
 
@@ -325,7 +346,10 @@ function ReviewCard({
         )
       )}
 
-      {isReviewer && review.state === "open" && (
+      {/* 취소는 요청한 사람의 권한이다. 확인요청형은 시작 상태가 submitted 라 open 조건으로는
+          요청자가 자기 요청을 지울 수 없다 (마이그레이션 118). */}
+      {review.requested_by === currentUserId
+        && (review.state === "open" || review.state === "submitted") && (
         <div className="flex justify-end">
           <button
             type="button"
@@ -575,28 +599,43 @@ function ReviewAttachmentList({ attachments }: { attachments: WorkTimelineReview
   );
 }
 
+/**
+ * 요청 폼은 방향에 따라 두 갈래다 (마이그레이션 118).
+ * - isOwnEntry: 내 업무보고를 남에게 확인 요청 — 검토받을 사람을 고른다, 메모는 선택
+ * - 그 외(관리자가 남의 보고서): 기존 보완 지시 — 대상은 작성자로 정해져 있고 의견은 필수
+ */
 function ReviewRequestForm({
   entryId,
   hasPriorReview,
+  isOwnEntry,
+  reviewerCandidates,
 }: {
   entryId: string;
   hasPriorReview: boolean;
+  isOwnEntry: boolean;
+  reviewerCandidates: WorkTimelineProfile[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(!hasPriorReview);
   const [comment, setComment] = useState("");
+  const [reviewerId, setReviewerId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!comment.trim()) {
+    if (isOwnEntry && !reviewerId) {
+      toast.error("검토받을 사람을 선택해 주세요.");
+      return;
+    }
+    if (!isOwnEntry && !comment.trim()) {
       toast.error("검토 의견을 입력해 주세요.");
       return;
     }
     setSubmitting(true);
     try {
-      await requestReview(entryId, comment);
+      await requestReview(entryId, comment, isOwnEntry ? reviewerId : null);
       toast.success("검토 요청을 보냈습니다.");
       setComment("");
+      setReviewerId("");
       setOpen(false);
       router.refresh();
     } catch (error) {
@@ -621,13 +660,45 @@ function ReviewRequestForm({
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-bold text-slate-500">검토 의견 (보완 요청 내용)</label>
+      {isOwnEntry && (
+        <div className="space-y-1.5">
+          <label htmlFor="review-reviewer" className="block text-xs font-bold text-slate-500">
+            검토받을 사람
+          </label>
+          {reviewerCandidates.length === 0 ? (
+            <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+              검토를 요청할 수 있는 동료가 아직 없습니다.
+            </p>
+          ) : (
+            <select
+              id="review-reviewer"
+              value={reviewerId}
+              onChange={(event) => setReviewerId(event.target.value)}
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 sm:w-64"
+            >
+              <option value="">선택해 주세요</option>
+              {reviewerCandidates.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.full_name ?? "이름 없음"}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      <label htmlFor="review-comment" className="block text-xs font-bold text-slate-500">
+        {isOwnEntry ? "요청 메모 (선택)" : "검토 의견 (보완 요청 내용)"}
+      </label>
       <textarea
+        id="review-comment"
         value={comment}
         onChange={(event) => setComment(event.target.value)}
         maxLength={REVIEW_COMMENT_MAX_LENGTH}
         rows={4}
-        placeholder="예) 세금계산서 처리 일정과 담당자를 표기해 주세요."
+        placeholder={isOwnEntry
+          ? "예) 견적서 금액이 맞는지 확인 부탁드립니다. 비워 두면 '검토 부탁드립니다.'로 보냅니다."
+          : "예) 세금계산서 처리 일정과 담당자를 표기해 주세요."}
         className="w-full resize-y rounded-md border border-slate-200 px-3 py-2 text-sm leading-6 text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
       />
       <div className="flex justify-end gap-2">
@@ -637,6 +708,7 @@ function ReviewRequestForm({
             onClick={() => {
               setOpen(false);
               setComment("");
+              setReviewerId("");
             }}
             disabled={submitting}
             className="rounded-md border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
@@ -647,7 +719,7 @@ function ReviewRequestForm({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={submitting}
+          disabled={submitting || (isOwnEntry && reviewerCandidates.length === 0)}
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
         >
           {submitting ? "보내는 중..." : "검토 요청 보내기"}

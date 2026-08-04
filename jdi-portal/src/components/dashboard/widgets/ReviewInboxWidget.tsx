@@ -159,8 +159,9 @@ export default function ReviewInboxWidget({
                   className="flex flex-col gap-3 border-t border-t-slate-100 border-l-[3px] border-l-indigo-400 px-5 py-4 sm:flex-row sm:items-start sm:gap-4"
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    {/* 작성자가 직접 보낸 확인 요청과, 지시에 대한 보완 응답을 구분한다 (마이그레이션 118) */}
                     <span className="self-start rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
-                      보완 완료됨
+                      {item.direction === "requested" ? "검토 요청" : "보완 완료됨"}
                     </span>
                     <p className="text-sm font-semibold text-slate-800">{item.entryTitle}</p>
                     <p className="whitespace-pre-line text-xs leading-relaxed text-slate-500">

@@ -22,7 +22,11 @@ import {
   WORK_TIMELINE_MAX_DESCRIPTION_LENGTH,
   WORK_TIMELINE_MAX_TITLE_LENGTH,
 } from "@/lib/work-timeline/constants";
-import type { WorkTimelineEntryWithProfile, WorkTimelineReviewWithEvents } from "@/lib/work-timeline/types";
+import type {
+  WorkTimelineEntryWithProfile,
+  WorkTimelineProfile,
+  WorkTimelineReviewWithEvents,
+} from "@/lib/work-timeline/types";
 import { isWorkTimelineImage, validateWorkTimelineFile } from "@/lib/work-timeline/utils";
 import { fromKstDateTimeLocal, toKstDateTimeLocal } from "@/lib/utils/date";
 import { getErrorMessage } from "@/lib/utils/errors";
@@ -36,6 +40,8 @@ interface WorkTimelineDetailClientProps {
   currentUserId: string;
   currentUserRole: string;
   initialReview: WorkTimelineReviewWithEvents | null;
+  /** 검토받을 사람 후보. 내 업무보고일 때만 채워져 온다(본인 제외). */
+  reviewerCandidates: WorkTimelineProfile[];
 }
 
 function formatCompletedAt(timestamp: string): string {
@@ -56,6 +62,7 @@ export default function WorkTimelineDetailClient({
   currentUserId,
   currentUserRole,
   initialReview,
+  reviewerCandidates,
 }: WorkTimelineDetailClientProps) {
   const router = useRouter();
   const [entry, setEntry] = useState(initialEntry);
@@ -525,6 +532,7 @@ export default function WorkTimelineDetailClient({
         currentUserId={currentUserId}
         currentUserRole={currentUserRole}
         initialReview={initialReview}
+        reviewerCandidates={reviewerCandidates}
       />
 
       {confirmDelete && (

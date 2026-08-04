@@ -100,11 +100,20 @@ export type ReviewState = "open" | "submitted" | "approved" | "cancelled";
 export type ReviewEventKind =
   | "requested" | "submitted" | "approved" | "rejected" | "cancelled";
 
+/**
+ * 검토가 어느 방향으로 시작됐는지 (마이그레이션 118).
+ * - "assigned"  : 관리자가 남의 업무보고에 보완을 지시 (requested_by = reviewer_id)
+ * - "requested" : 작성자가 검토자를 지정해 확인을 요청 (requested_by = author_id)
+ */
+export type ReviewDirection = "assigned" | "requested";
+
 export interface WorkTimelineReview {
   id: string;
   entry_id: string;
   reviewer_id: string;
   author_id: string;
+  /** 검토를 요청한 사람. author_id 와 같으면 확인요청형이다. */
+  requested_by: string;
   comment: string;
   state: ReviewState;
   created_at: string;
@@ -156,4 +165,6 @@ export interface PendingReviewItem {
   comment: string;
   counterpartName: string | null;
   createdAt: string;
+  /** 인박스 배지 문구를 나누기 위한 방향 (마이그레이션 118) */
+  direction: ReviewDirection;
 }

@@ -22,6 +22,16 @@ test("대시보드: 검토 인박스를 빠른 경로와 폴백 양쪽에 싣는
   assert.match(fast, /'pendingReviews'/);
   assert.match(fast, /'toFix'/);
   assert.match(fast, /'toConfirm'/);
+  // 방향(마이그레이션 118): requested_by = author_id 면 작성자가 보낸 확인 요청
+  // ::text 는 필수다 — jsonb_build_object(VARIADIC "any") 는 타입이 unknown 인 인자를 거부한다
+  const fastDirection = fast.match(
+    /'direction', \(case when r\.requested_by = r\.author_id then 'requested' else 'assigned' end\)::text/g,
+  );
+  assert.equal(
+    fastDirection?.length,
+    2,
+    "빠른 경로의 toFix / toConfirm 두 CTE 모두 direction 을 실어야 합니다",
+  );
 
   const fallback = read("src/lib/dashboard/queries.ts");
 
@@ -36,6 +46,17 @@ test("대시보드: 검토 인박스를 빠른 경로와 폴백 양쪽에 싣는
   // Supabase error 무시 금지
   assert.match(fallback, /if \(toFixResult\.error\) throw toFixResult\.error;/);
   assert.match(fallback, /if \(toConfirmResult\.error\) throw toConfirmResult\.error;/);
+  // 방향(마이그레이션 118): 빠른 경로의 case 식과 같은 규칙으로 계산해야 한다
+  const fallbackSelects = fallback.match(/author_id, requested_by, work_timeline_entries\(title\)/g);
+  assert.equal(
+    fallbackSelects?.length,
+    2,
+    "폴백의 toFix / toConfirm 두 쿼리 모두 author_id · requested_by 를 읽어야 합니다",
+  );
+  assert.match(
+    fallback,
+    /direction: row\.requested_by === row\.author_id \? "requested" : "assigned"/,
+  );
 });
 
 // 아래 두 테스트는 work-directives.test.mjs 의
@@ -185,4 +206,109 @@ test("109 마이그레이션: 검토 첨부 테이블 RLS 활성 + SELECT 정책
     /ON public\.work_timeline_review_attachments FOR (INSERT|UPDATE|DELETE)/,
     "검토 첨부 테이블에는 쓰기 정책이 있으면 안 됩니다 (RPC 전용)",
   );
+});
+
+// ---- v3 (마이그레이션 118): 검토 요청 방향 추가 ----
+// 작성자가 검토자를 지정해 "확인해 주세요"라고 요청하는 반대 방향과 동료 간 상호 검토.
+// 설계: docs/superpowers/specs/2026-08-04-work-timeline-review-request-direction-design.md
+
+const MIGRATION_118 = "supabase/migrations/118_work_timeline_review_request_direction.sql";
+
+test("118 마이그레이션: requested_by 컬럼 추가 + 기존 행 백필 + NOT NULL", () => {
+  const sql = read(MIGRATION_118);
+
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS requested_by UUID/);
+  assert.match(sql, /REFERENCES public\.profiles\(id\) ON DELETE CASCADE/);
+  // v1/v2 는 "요청자 = 검토자" 였으므로 reviewer_id 로 백필해야 의미가 보존된다
+  assert.match(sql, /SET requested_by = reviewer_id\s*\n\s*WHERE requested_by IS NULL/);
+  assert.match(sql, /ALTER COLUMN requested_by SET NOT NULL/);
+});
+
+test("118 마이그레이션: 구 2인자 request_timeline_review 를 지우고 3인자로 교체", () => {
+  const sql = read(MIGRATION_118);
+
+  // DEFAULT 로 얹으면 오버로드가 공존해 2인자 호출이 모호해진다 — 반드시 DROP
+  assert.match(sql, /DROP FUNCTION IF EXISTS public\.request_timeline_review\(UUID, TEXT\);/);
+  assert.match(
+    sql,
+    /CREATE OR REPLACE FUNCTION public\.request_timeline_review\(\s*\n\s*p_entry_id UUID,\s*\n\s*p_comment TEXT,\s*\n\s*p_reviewer_id UUID\s*\n\s*\)/,
+  );
+  assert.match(
+    sql,
+    /REVOKE ALL ON FUNCTION public\.request_timeline_review\(UUID, TEXT, UUID\) FROM PUBLIC;/,
+  );
+  assert.match(
+    sql,
+    /GRANT EXECUTE ON FUNCTION public\.request_timeline_review\(UUID, TEXT, UUID\) TO authenticated;/,
+  );
+
+  // 서버 액션도 3인자로 부른다 (한쪽만 바뀌면 운영에서 함수를 못 찾는다)
+  const actions = read("src/lib/work-timeline/reviewActions.ts");
+  assert.match(actions, /p_entry_id: entryId, p_comment: trimmed, p_reviewer_id: reviewerId \?\? null/);
+});
+
+test("118 마이그레이션: 검토 요청 RPC 의 권한·방향 판정", () => {
+  const sql = read(MIGRATION_118);
+
+  const start = sql.indexOf("CREATE OR REPLACE FUNCTION public.request_timeline_review(");
+  const end = sql.indexOf("REVOKE ALL ON FUNCTION public.request_timeline_review(UUID, TEXT, UUID)");
+  assert.ok(start >= 0 && end > start, "request_timeline_review 정의를 찾지 못했습니다");
+  const body = sql.slice(start, end);
+
+  assert.match(body, /SECURITY DEFINER/);
+  assert.match(body, /SET search_path = public/);
+  // 세션 사용자를 믿지 않고 auth.uid() 로 재검증
+  assert.match(body, /v_uid := auth\.uid\(\)/);
+  assert.match(body, /p\.is_approved = true/);
+
+  // 방향은 서버가 판정한다 — 클라이언트가 모드를 고르지 않는다
+  assert.match(body, /v_is_self_request := \(v_entry\.user_id = v_uid\)/);
+  // 확인요청형: 검토자 필수 · 본인 지정 금지 · 승인 사용자 확인 · submitted 로 시작
+  assert.match(body, /IF p_reviewer_id IS NULL THEN/);
+  assert.match(body, /IF p_reviewer_id = v_uid THEN/, "자기 자신을 검토자로 지정하지 못하게 막아야 합니다");
+  assert.match(body, /WHERE p\.id = p_reviewer_id AND p\.is_approved = true/);
+  assert.match(body, /v_state := 'submitted'/);
+  // 지시형: 관리자만
+  assert.match(body, /IF NOT v_is_admin THEN\s*\n\s*RAISE EXCEPTION '검토를 요청할 권한이 없습니다\.'/);
+  assert.match(body, /v_state := 'open'/);
+
+  // 진행 중 1건 제한 유지
+  assert.match(body, /r\.state IN \('open', 'submitted'\)[\s\S]{0,120}이미 진행 중인 검토가 있습니다/);
+  // 요청자를 반드시 기록
+  assert.match(body, /\(entry_id, reviewer_id, author_id, requested_by, comment, state\)/);
+});
+
+test("118 마이그레이션: 취소 권한이 '요청한 사람' 기준으로 바뀐다", () => {
+  const sql = read(MIGRATION_118);
+
+  const start = sql.indexOf("CREATE OR REPLACE FUNCTION public.cancel_timeline_review(");
+  const end = sql.indexOf("REVOKE ALL ON FUNCTION public.cancel_timeline_review(UUID) FROM PUBLIC;");
+  assert.ok(start >= 0 && end > start, "cancel_timeline_review 정의를 찾지 못했습니다");
+  const body = sql.slice(start, end);
+
+  assert.match(body, /SECURITY DEFINER/);
+  assert.match(body, /SET search_path = public/);
+  // 확인요청형은 요청자가 검토자가 아니므로 검토자 기준 헬퍼로는 자기 요청을 못 지운다
+  assert.doesNotMatch(
+    body,
+    /assert_can_resolve_review/,
+    "취소는 검토자 기준 헬퍼가 아니라 requested_by 로 판정해야 합니다",
+  );
+  assert.match(body, /v_rev\.requested_by <> v_uid/);
+  assert.match(body, /p\.role = 'admin'/);
+  assert.match(body, /v_rev\.state NOT IN \('open', 'submitted'\)/);
+});
+
+test("118: 화면이 요청자 기준으로 취소 버튼을 노출한다", () => {
+  const section = read("src/components/dashboard/work-timeline/WorkTimelineReviewSection.tsx");
+
+  // 기존 조건(isReviewer && open)이면 확인요청형(submitted 로 시작)은 취소가 아예 불가능하다
+  assert.match(
+    section,
+    /review\.requested_by === currentUserId\s*\n?\s*&& \(review\.state === "open" \|\| review\.state === "submitted"\)/,
+  );
+  // 검토자 선택 드롭다운은 내 업무보고일 때만
+  assert.match(section, /isOwnEntry && \(/);
+  assert.match(section, /검토받을 사람/);
+  assert.match(section, /requestReview\(entryId, comment, isOwnEntry \? reviewerId : null\)/);
 });
