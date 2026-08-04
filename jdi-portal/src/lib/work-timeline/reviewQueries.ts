@@ -13,7 +13,7 @@ export async function getEntryReview(
   const { data, error } = await supabase
     .from("work_timeline_reviews")
     .select(
-      `id, entry_id, reviewer_id, author_id, comment, state,
+      `id, entry_id, reviewer_id, author_id, requested_by, comment, state,
        created_at, resolved_at, updated_at,
        reviewer:profiles!work_timeline_reviews_reviewer_id_fkey(full_name),
        author:profiles!work_timeline_reviews_author_id_fkey(full_name),
@@ -36,6 +36,7 @@ export async function getEntryReview(
 
   const row = data as unknown as {
     id: string; entry_id: string; reviewer_id: string; author_id: string;
+    requested_by: string;
     comment: string; state: WorkTimelineReviewWithEvents["state"];
     created_at: string; resolved_at: string | null; updated_at: string;
     reviewer: { full_name: string | null } | null;
@@ -67,6 +68,7 @@ export async function getEntryReview(
 
   return {
     id: row.id, entry_id: row.entry_id, reviewer_id: row.reviewer_id, author_id: row.author_id,
+    requested_by: row.requested_by,
     comment: row.comment, state: row.state,
     created_at: row.created_at, resolved_at: row.resolved_at, updated_at: row.updated_at,
     reviewer_name: row.reviewer?.full_name ?? null,

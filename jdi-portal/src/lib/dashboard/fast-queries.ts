@@ -20,6 +20,7 @@ import {
   type PendingReviews,
 } from "./dashboard-snapshot";
 import { getDashboardData, type DashboardData } from "./queries";
+import type { PendingReviewItem, ReviewDirection } from "@/lib/work-timeline/types";
 
 const DASHBOARD_SNAPSHOT_QUERY = `
   with parameters as (
@@ -282,6 +283,8 @@ const DASHBOARD_SNAPSHOT_QUERY = `
   ),
   -- 검토 인박스: 내가 보완해야 할(open, author=나) 검토와 내가 확인해야 할(submitted, reviewer=나) 검토.
   -- 부분 인덱스 work_timeline_reviews_author_open / _reviewer_submitted 를 탄다 (마이그레이션 107).
+  -- direction(마이그레이션 118): requested_by = author_id 면 작성자가 확인을 요청한 것('requested'),
+  -- 아니면 관리자 지시형('assigned'). 폴백 경로(queries.ts)와 반드시 같은 규칙이어야 한다.
   pending_reviews_to_fix as (
     select coalesce(
       jsonb_agg(
@@ -291,7 +294,8 @@ const DASHBOARD_SNAPSHOT_QUERY = `
           'entry_title', e.title,
           'comment', r.comment,
           'counterpart_name', rp.full_name,
-          'created_at', r.created_at
+          'created_at', r.created_at,
+          'direction', case when r.requested_by = r.author_id then 'requested' else 'assigned' end
         )
         order by r.created_at desc
       ),
@@ -313,7 +317,8 @@ const DASHBOARD_SNAPSHOT_QUERY = `
           'entry_title', e.title,
           'comment', r.comment,
           'counterpart_name', ap.full_name,
-          'created_at', r.created_at
+          'created_at', r.created_at,
+          'direction', case when r.requested_by = r.author_id then 'requested' else 'assigned' end
         )
         order by r.created_at desc
       ),
@@ -392,6 +397,7 @@ interface PendingReviewItemWire {
   comment: string;
   counterpart_name: string | null;
   created_at: string;
+  direction: ReviewDirection;
 }
 
 interface PendingReviewsWire {
@@ -483,7 +489,7 @@ export function mapFastDashboardTaskSummaryRows(
   return normalizeDashboardTaskSummaryResult(rows, profiles, window);
 }
 
-function mapPendingReviewItemWire(row: PendingReviewItemWire) {
+function mapPendingReviewItemWire(row: PendingReviewItemWire): PendingReviewItem {
   return {
     reviewId: row.review_id,
     entryId: row.entry_id,
@@ -491,6 +497,7 @@ function mapPendingReviewItemWire(row: PendingReviewItemWire) {
     comment: row.comment,
     counterpartName: row.counterpart_name,
     createdAt: row.created_at,
+    direction: row.direction === "requested" ? "requested" : "assigned",
   };
 }
 

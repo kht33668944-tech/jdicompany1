@@ -126,6 +126,8 @@ interface PendingReviewRow {
   entry_id: string;
   comment: string;
   created_at: string;
+  author_id: string;
+  requested_by: string;
   work_timeline_entries: { title: string } | null;
   counterpart: { full_name: string | null } | null;
 }
@@ -140,6 +142,8 @@ function mapPendingReviewRows(rows: PendingReviewRow[]): PendingReviewItem[] {
       comment: row.comment,
       counterpartName: row.counterpart?.full_name ?? null,
       createdAt: row.created_at,
+      // 빠른 경로(fast-queries.ts)의 case 식과 반드시 같은 규칙이어야 한다 (마이그레이션 118).
+      direction: row.requested_by === row.author_id ? "requested" : "assigned",
     }));
 }
 
@@ -156,7 +160,7 @@ async function getPendingReviews(
     supabase
       .from("work_timeline_reviews")
       .select(
-        "id, entry_id, comment, created_at, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_reviewer_id_fkey(full_name)"
+        "id, entry_id, comment, created_at, author_id, requested_by, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_reviewer_id_fkey(full_name)"
       )
       .eq("author_id", userId)
       .eq("state", "open")
@@ -164,7 +168,7 @@ async function getPendingReviews(
     supabase
       .from("work_timeline_reviews")
       .select(
-        "id, entry_id, comment, created_at, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_author_id_fkey(full_name)"
+        "id, entry_id, comment, created_at, author_id, requested_by, work_timeline_entries(title), counterpart:profiles!work_timeline_reviews_author_id_fkey(full_name)"
       )
       .eq("reviewer_id", userId)
       .eq("state", "submitted")
