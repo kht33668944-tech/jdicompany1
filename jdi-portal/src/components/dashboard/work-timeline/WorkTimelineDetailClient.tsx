@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CalendarBlank, CaretLeft, CaretRight, DownloadSimple, FileArrowUp, LinkSimple, PencilSimple, TrashSimple, X } from "phosphor-react";
 import { toast } from "sonner";
+import LinkifiedText from "@/components/shared/LinkifiedText";
 import Select from "@/components/shared/Select";
 import UserAvatar from "@/components/shared/UserAvatar";
 import { useProjects } from "@/lib/projects/useProjects";
@@ -434,9 +435,10 @@ export default function WorkTimelineDetailClient({
         {!editing && (
           <div className="px-5 py-6 sm:px-7">
             {entry.description ? (
-              <p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">
-                {entry.description}
-              </p>
+              <LinkifiedText
+                text={entry.description}
+                className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700"
+              />
             ) : (
               <p className="text-sm text-slate-400">작성된 설명이 없습니다.</p>
             )}

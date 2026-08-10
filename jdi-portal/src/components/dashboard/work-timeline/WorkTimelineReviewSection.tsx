@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "phosphor-react";
 import { toast } from "sonner";
+import LinkifiedText from "@/components/shared/LinkifiedText";
 import UserAvatar from "@/components/shared/UserAvatar";
 import { triggerDownload } from "@/lib/utils/download";
 import { getErrorMessage } from "@/lib/utils/errors";
@@ -251,9 +252,10 @@ function ReviewCard({
           {" · "}
           {formatEventAt(review.created_at)}
         </div>
-        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
-          {review.comment}
-        </p>
+        <LinkifiedText
+          text={review.comment}
+          className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-800"
+        />
       </div>
 
       {review.events.length > 0 && (
@@ -536,9 +538,10 @@ function ReviewTimeline({ events }: { events: WorkTimelineReviewWithEvents["even
               님이 {eventLabel(event.kind)}
             </p>
             {event.note && event.kind !== "requested" && (
-              <p className="mt-1.5 rounded-r border-l-2 border-rose-300 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-600">
-                {event.note}
-              </p>
+              <LinkifiedText
+                text={event.note}
+                className="mt-1.5 whitespace-pre-wrap break-words rounded-r border-l-2 border-rose-300 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-600"
+              />
             )}
             {event.attachments.length > 0 && (
               <ReviewAttachmentList attachments={event.attachments} />
