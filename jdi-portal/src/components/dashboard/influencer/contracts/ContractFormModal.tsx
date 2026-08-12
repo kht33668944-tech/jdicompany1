@@ -3,15 +3,15 @@
 // 계약 추가/수정 폼 — 협업 유형·2차 활용·원본 제공 선택에 따라 필요한 칸만 보여준다.
 // 정산 정보(개인정보)는 이 폼이 아니라 상세 패널의 잠금 섹션에서 따로 입력한다.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
 import Select from "@/components/shared/Select";
 import { getErrorMessage } from "@/lib/utils/errors";
 import { MODAL_INPUT_CLS, MODAL_LABEL_CLS } from "@/lib/vault/constants";
-import { searchInfluencers } from "@/lib/influencer/actions";
 import type { InfluencerListItem } from "@/lib/influencer/types";
 import { createContract, updateContract } from "@/lib/influencer/contracts/actions";
+import { useInfluencerSuggestions } from "@/lib/influencer/contracts/useInfluencerSuggestions";
 import {
   COLLAB_TYPE_OPTIONS,
   CONTRACT_STATUS_DOT_CLASSES,
@@ -132,9 +132,8 @@ export default function ContractFormModal({ contract, prefill = null, onClose, o
   const [influencerId, setInfluencerId] = useState<string | null>(
     contract?.influencer_id ?? prefill?.influencerId ?? null,
   );
-  const [suggestions, setSuggestions] = useState<InfluencerListItem[]>([]);
-  const [suggestOpen, setSuggestOpen] = useState(false);
-  const skipNextSearch = useRef(false);
+  const [suggestOpen, setSuggestOpen] = useState(true);
+  const suggestions = useInfluencerSuggestions(name, suggestOpen && !influencerId);
   const [collabType, setCollabType] = useState<CollabType>(contract?.collab_type ?? "seeding");
   const [contractStatus, setContractStatus] = useState<ContractStatus>(contract?.contract_status ?? "candidate");
 
@@ -175,43 +174,10 @@ export default function ContractFormModal({ contract, prefill = null, onClose, o
 
   const retentionEnd = useMemo(() => getRetentionEnd(postActualDate || null), [postActualDate]);
 
-  // 이름 입력 → 기존 리스트에서 자동완성 검색 (300ms 디바운스, 이미 연결됐으면 안 함)
-  useEffect(() => {
-    if (influencerId) return;
-    if (skipNextSearch.current) {
-      skipNextSearch.current = false;
-      return;
-    }
-    const term = name.trim();
-    if (term.length < 2) {
-      setSuggestions([]);
-      setSuggestOpen(false);
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const rows = await searchInfluencers(term);
-        if (!cancelled) {
-          setSuggestions(rows.slice(0, 6));
-          setSuggestOpen(rows.length > 0);
-        }
-      } catch {
-        // 검색 실패는 조용히 무시 — 직접 입력으로 계속 진행 가능
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [name, influencerId]);
-
   const pickInfluencer = (inf: InfluencerListItem) => {
-    skipNextSearch.current = true;
     setName(inf.display_name?.trim() || inf.username);
     setInstagramHandle(inf.username);
     setInfluencerId(inf.id);
-    setSuggestions([]);
     setSuggestOpen(false);
   };
 
@@ -306,7 +272,11 @@ export default function ContractFormModal({ contract, prefill = null, onClose, o
                 id="contract-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setSuggestOpen(true);
+                }}
+                onFocus={() => setSuggestOpen(true)}
                 onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
                 placeholder="입력하면 리스트에서 자동으로 찾아요"
                 autoComplete="off"

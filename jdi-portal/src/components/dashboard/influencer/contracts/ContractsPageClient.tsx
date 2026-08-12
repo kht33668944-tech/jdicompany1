@@ -31,6 +31,8 @@ import {
 } from "@/lib/influencer/contracts/labels";
 import { formatPostMonth, getPostMonth, getRetentionEnd } from "@/lib/influencer/contracts/dates";
 import { URGENT_SOON_DAYS } from "@/lib/influencer/contracts/constants";
+import { useInfluencerSuggestions } from "@/lib/influencer/contracts/useInfluencerSuggestions";
+import type { InfluencerListItem } from "@/lib/influencer/types";
 import { formatKrw } from "@/lib/expenses/format";
 import type {
   ContractSettlement,
@@ -73,6 +75,7 @@ export default function ContractsPageClient({
   const [, startTransition] = useTransition();
 
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [productFilter, setProductFilter] = useState("");
@@ -238,6 +241,40 @@ export default function ContractsPageClient({
   const openFormFromSearch = () =>
     setFormState({ contract: null, prefill: { name: search.trim() } });
 
+  // 검색창 자동완성 — 리스트(influencers)에서 찾아 드랍다운으로 보여준다
+  const listSuggestions = useInfluencerSuggestions(search, searchFocused);
+  const contractByInfluencer = useMemo(() => {
+    const byId = new Map<string, InfluencerContract>();
+    const byHandle = new Map<string, InfluencerContract>();
+    for (const c of contracts) {
+      if (c.influencer_id) byId.set(c.influencer_id, c);
+      if (c.instagram_handle) byHandle.set(c.instagram_handle.toLowerCase(), c);
+    }
+    return { byId, byHandle };
+  }, [contracts]);
+
+  const findContractFor = (inf: InfluencerListItem) =>
+    contractByInfluencer.byId.get(inf.id) ??
+    contractByInfluencer.byHandle.get(inf.username.toLowerCase());
+
+  /** 드랍다운에서 선택 — 계약이 있으면 상세를 열고, 없으면 연결된 새 계약 폼을 연다 */
+  const pickSuggestion = (inf: InfluencerListItem) => {
+    setSearchFocused(false);
+    const existing = findContractFor(inf);
+    if (existing) {
+      setSelectedId(existing.id);
+      return;
+    }
+    setFormState({
+      contract: null,
+      prefill: {
+        influencerId: inf.id,
+        name: inf.display_name?.trim() || inf.username,
+        handle: inf.username,
+      },
+    });
+  };
+
   return (
     <div className="flex flex-col gap-3 sm:gap-4 px-0 py-3 sm:p-6 min-h-0">
       <InfluencerTabs />
@@ -327,30 +364,80 @@ export default function ContractsPageClient({
 
         {/* 검색 + 필터 */}
         <div className="grid grid-cols-2 gap-2 px-5 py-3.5 lg:grid-cols-[minmax(0,1fr)_repeat(5,150px)]">
-          <label className="relative col-span-2 lg:col-span-1">
-            <span className="sr-only">검색</span>
-            <MagnifyingGlass
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="이름·채널명·인스타 계정 검색"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-sm text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
-                aria-label="검색어 지우기"
+          <div className="relative col-span-2 lg:col-span-1">
+            <label className="relative block">
+              <span className="sr-only">검색</span>
+              <MagnifyingGlass
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setSearchFocused(true); // 타이핑 중에는 항상 드랍다운을 연다(블러 타이머와의 경합 방지)
+                }}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+                placeholder="이름·채널명·인스타 계정 검색"
+                autoComplete="off"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-sm text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
+                  aria-label="검색어 지우기"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </label>
+            {/* 리스트 자동완성 드랍다운 — 계약이 있으면 열고, 없으면 바로 만든다 */}
+            {searchFocused && listSuggestions.length > 0 && (
+              <ul
+                className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-xl border border-slate-100 bg-white p-1 shadow-xl shadow-slate-900/10"
+                role="listbox"
+                aria-label="리스트에서 찾은 인플루언서"
               >
-                <X size={14} />
-              </button>
+                {listSuggestions.map((inf) => {
+                  const existing = findContractFor(inf);
+                  return (
+                    <li key={inf.id}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => pickSuggestion(inf)}
+                        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left hover:bg-blue-50"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-slate-700">
+                            {inf.display_name?.trim() || inf.username}
+                          </span>
+                          <span className="block text-xs text-slate-400">
+                            @{inf.username}
+                            {typeof inf.follower_count === "number" &&
+                              ` · 팔로워 ${inf.follower_count.toLocaleString("ko-KR")}`}
+                          </span>
+                        </span>
+                        {existing ? (
+                          <span className="shrink-0 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                            계약 보기
+                          </span>
+                        ) : (
+                          <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                            ＋ 새 계약
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-          </label>
+          </div>
           <Select
             options={[
               { value: "", label: "상태: 전체" },
