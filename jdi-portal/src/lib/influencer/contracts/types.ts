@@ -80,11 +80,12 @@ export interface ContractSaveResult {
   expenseAmount: number;
 }
 
-/** 정산 자료 내보내기 1행 — 잠금 해제 후 서버 액션이 복호화해 반환 */
-export interface SettlementExportRow extends ContractSettlement {
-  /** 신분증 열람용 임시 링크(짧은 만료) — ZIP 생성 시 바로 내려받는다 */
-  id_card_url: string | null;
-}
+/**
+ * 정산 자료 내보내기 1행 — 잠금 해제 후 서버 액션이 복호화해 반환.
+ * 신분증 임시 링크는 만료(2분)가 짧아 미리 발급하지 않고,
+ * ZIP 다운로드 시점에 getIdCardUrlsForExport 로 따로 받는다.
+ */
+export type SettlementExportRow = ContractSettlement;
 
 /**
  * 정산 정보 — 서버 액션이 2차 비밀번호 잠금 확인 후 복호화해서 반환하는 평문.
@@ -102,12 +103,4 @@ export interface ContractSettlement {
 }
 
 /** 정산 정보 입력 (신분증 파일은 업로드 후 경로/이름으로 전달) */
-export interface SettlementInput {
-  phone: string;
-  address: string;
-  bank_name: string;
-  bank_account: string;
-  account_holder: string;
-  id_card_path: string | null;
-  id_card_name: string | null;
-}
+export type SettlementInput = Omit<ContractSettlement, "contract_id">;

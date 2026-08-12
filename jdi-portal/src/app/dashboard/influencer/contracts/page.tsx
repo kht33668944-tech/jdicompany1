@@ -6,10 +6,9 @@ import { isGateConfigured } from "@/lib/vault/queries";
 import { verifyUnlockToken } from "@/lib/vault/crypto";
 import { VAULT_UNLOCK_COOKIE } from "@/lib/vault/constants";
 import ContractsPageClient from "@/components/dashboard/influencer/contracts/ContractsPageClient";
+import { UUID_RE } from "@/lib/influencer/contracts/constants";
 
 export const metadata = { title: "TMA 계약 관리 | JDI" };
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function ContractsPage({
   searchParams,

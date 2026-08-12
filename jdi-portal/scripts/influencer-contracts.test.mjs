@@ -74,12 +74,18 @@ test("목록 쿼리: 암호문 컬럼을 조회하지 않고, is_deleted 필터�
 });
 
 test("정산 액션: 열람/수정/파일 링크 발급/내보내기 전부 잠금 게이트를 지난다", () => {
-  for (const fn of ["getSettlement", "upsertSettlement", "getIdCardSignedUrl", "getSettlementsForExport"]) {
+  for (const fn of [
+    "getSettlement",
+    "upsertSettlement",
+    "getIdCardSignedUrl",
+    "getSettlementsForExport",
+    "getIdCardUrlsForExport",
+  ]) {
     const start = actions.indexOf(`export async function ${fn}`);
     assert.ok(start >= 0, `${fn} 액션이 없습니다`);
     const nextExport = actions.indexOf("export async function", start + 1);
     const body = actions.slice(start, nextExport === -1 ? undefined : nextExport);
-    assert.match(body, /requireUnlock\(/, `${fn} 이 requireUnlock 없이 개인정보를 다룹니다`);
+    assert.match(body, /requireVaultUnlock\(/, `${fn} 이 잠금 확인 없이 개인정보를 다룹니다`);
   }
   assert.match(actions, /encryptSecret\(/);
   assert.match(actions, /decryptSecret\(/);
@@ -116,8 +122,19 @@ test("연동: 생성/수정/상태변경/삭제가 전부 시딩 캠페인을 �
     assert.ok(start >= 0, `${fn} 액션이 없습니다`);
     const nextExport = actions.indexOf("export async function", start + 1);
     const body = actions.slice(start, nextExport === -1 ? undefined : nextExport);
-    assert.match(body, /syncCampaign\(/, `${fn} 이 시딩 캠페인 동기화를 빠뜨렸습니다`);
+    assert.match(
+      body,
+      /finishContractSave\(|syncCampaign\(/,
+      `${fn} 이 시딩 캠페인 동기화를 빠뜨렸습니다`,
+    );
   }
+  // 공통 후처리 헬퍼가 동기화 + 지출 기록을 모두 품고, 독립 작업은 병렬로 돈다
+  const start = actions.indexOf("async function finishContractSave");
+  assert.ok(start >= 0, "finishContractSave 헬퍼가 없습니다");
+  const body = actions.slice(start, actions.indexOf("export async function", start));
+  assert.match(body, /syncCampaign\(/);
+  assert.match(body, /recordSettlementExpense\(/);
+  assert.match(body, /Promise\.all/);
 });
 
 test("연동: 취소/삭제 시 캠페인을 스케줄에서 내린다", () => {
@@ -152,6 +169,30 @@ test("마이그 121: expense_id 멱등 추가 + 알림 함수/크론 등록", ()
 
 test("알림 타입이 push-dispatch 에 등록되어 있다", () => {
   assert.match(pushDispatch, /influencer_contract_reminder/, "타입 미등록이면 푸시가 나가지 않습니다");
+});
+
+test("알림 SQL의 임박 기준·단계 억제 규칙이 화면 상수와 일치한다", () => {
+  // 임박 일수: constants.ts 의 URGENT_SOON_DAYS == SQL 의 `+ N`
+  const constants = read("src/lib/influencer/contracts/constants.ts");
+  const soonDays = Number(constants.match(/URGENT_SOON_DAYS = (\d+)/)?.[1]);
+  assert.ok(Number.isFinite(soonDays), "URGENT_SOON_DAYS 를 찾지 못했습니다");
+  assert.match(
+    migration121,
+    new RegExp(`::DATE \\+ ${soonDays};`),
+    "SQL 임박 기준(v_soon)이 URGENT_SOON_DAYS 와 다릅니다",
+  );
+
+  // 단계 억제: SQL 의 IN-리스트 3개 == CONTRACT_STATUS_ORDER 에서 해당 단계 이전까지
+  const orderMatch = labels.match(/CONTRACT_STATUS_ORDER[^=]*=\s*\[([\s\S]*?)\]/);
+  const order = [...orderMatch[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  const before = (stage) => order.slice(0, order.indexOf(stage));
+  const inLists = [...migration121.matchAll(/contract_status IN \(([^)]+)\)/g)].map((m) =>
+    [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]),
+  );
+  assert.equal(inLists.length, 3, "알림 SQL 의 상태 IN-리스트는 발송/초안/게시 3개여야 합니다");
+  assert.deepEqual(inLists[0], before("product_shipped"), "발송 알림의 억제 단계가 화면과 다릅니다");
+  assert.deepEqual(inLists[1], before("draft_received"), "초안 알림의 억제 단계가 화면과 다릅니다");
+  assert.deepEqual(inLists[2], before("posted"), "게시 알림의 억제 단계가 화면과 다릅니다");
 });
 
 test("지출 자동 기록: 중복 방지 + 실패해도 상태 변경 유지(try/catch)", () => {

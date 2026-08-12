@@ -3,8 +3,9 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { encryptSecret, decryptSecret, signUnlock, verifyUnlockToken } from "./crypto";
+import { encryptSecret, decryptSecret, signUnlock } from "./crypto";
 import { VAULT_BUCKET, VAULT_UNLOCK_COOKIE, VAULT_UNLOCK_TTL_SEC } from "./constants";
+import { requireVaultUnlock } from "./unlock";
 import { getDocumentVersions, getProfileNameMap } from "./queries";
 import type {
   AccountInput,
@@ -25,13 +26,9 @@ function requireAdmin(role: string) {
   if (role !== "admin") throw new Error("관리자만 할 수 있는 작업입니다.");
 }
 
-/** 계정 탭 잠금 해제 상태 확인. 미해제면 throw. */
+/** 계정 탭 잠금 해제 상태 확인. 미해제면 throw. (공용 구현: vault/unlock.ts) */
 async function requireUnlock(userId: string) {
-  const store = await cookies();
-  const token = store.get(VAULT_UNLOCK_COOKIE)?.value;
-  if (!verifyUnlockToken(token, userId)) {
-    throw new Error("잠금이 필요합니다. 2차 비밀번호를 입력해주세요.");
-  }
+  await requireVaultUnlock(userId);
 }
 
 // ============================================================

@@ -5,10 +5,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import X from "phosphor-react/dist/icons/X.esm.js";
-import LockSimple from "phosphor-react/dist/icons/LockSimple.esm.js";
 import ContractStatusDropdown from "./ContractStatusDropdown";
+import VaultUnlockGate from "@/components/shared/VaultUnlockGate";
 import { getErrorMessage } from "@/lib/utils/errors";
-import { unlockVault, lockVault } from "@/lib/vault/actions";
+import { lockVault } from "@/lib/vault/actions";
 import {
   deleteContract,
   getIdCardSignedUrl,
@@ -35,6 +35,8 @@ interface Props {
   contract: InfluencerContract | null;
   gateConfigured: boolean;
   unlocked: boolean;
+  /** 정산 정보가 밖(폼 모달)에서 저장될 때마다 +1 — 패널이 다시 불러온다 */
+  settlementVersion: number;
   onUnlockedChange: (unlocked: boolean) => void;
   onClose: () => void;
   onEdit: (contract: InfluencerContract) => void;
@@ -81,6 +83,7 @@ export default function ContractDetailPanel({
   contract,
   gateConfigured,
   unlocked,
+  settlementVersion,
   onUnlockedChange,
   onClose,
   onEdit,
@@ -90,7 +93,6 @@ export default function ContractDetailPanel({
 }: Props) {
   const [settlement, setSettlement] = useState<ContractSettlement | null>(null);
   const [settlementLoading, setSettlementLoading] = useState(false);
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   const contractId = contract?.id ?? null;
@@ -110,7 +112,7 @@ export default function ContractDetailPanel({
   useEffect(() => {
     setSettlement(null);
     if (contractId && unlocked) loadSettlement(contractId);
-  }, [contractId, unlocked, loadSettlement]);
+  }, [contractId, unlocked, settlementVersion, loadSettlement]);
 
   useEffect(() => {
     if (!contract) return;
@@ -124,25 +126,6 @@ export default function ContractDetailPanel({
   if (!contract) return null;
 
   const retentionEnd = getRetentionEnd(contract.post_actual_date);
-
-  const handleUnlock = async () => {
-    if (!password.trim() || busy) return;
-    setBusy(true);
-    try {
-      const res = await unlockVault(password);
-      if (res.ok) {
-        setPassword("");
-        onUnlockedChange(true);
-        toast.success("잠금이 해제되었습니다. (20분 유지)");
-      } else {
-        toast.error("2차 비밀번호가 올바르지 않습니다.");
-      }
-    } catch (err) {
-      toast.error(getErrorMessage(err, "잠금 해제 실패"));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const handleLock = async () => {
     await lockVault().catch(() => {});
@@ -311,38 +294,16 @@ export default function ContractDetailPanel({
           </Section>
 
           <Section title="정산 정보 (개인정보)">
-            {!gateConfigured ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3.5 text-sm text-slate-500">
-                2차 비밀번호가 아직 설정되지 않았어요. 보관함 → 계정 탭에서 관리자가 설정하면 사용할 수 있어요.
-              </p>
-            ) : !unlocked ? (
-              <div className="flex flex-col gap-2.5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3.5">
-                <p className="flex items-center gap-1.5 text-sm text-slate-600">
-                  <LockSimple size={15} weight="fill" className="text-slate-400" />
-                  개인정보 보호를 위해 <b>2차 비밀번호</b>로 잠겨 있어요.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleUnlock();
-                    }}
-                    placeholder="2차 비밀번호"
-                    aria-label="2차 비밀번호"
-                    className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleUnlock}
-                    disabled={busy}
-                    className="rounded-lg bg-[#2563eb] px-3.5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    잠금 해제
-                  </button>
-                </div>
-              </div>
+            {!unlocked ? (
+              <VaultUnlockGate
+                gateConfigured={gateConfigured}
+                notice={
+                  <>
+                    개인정보 보호를 위해 <b>2차 비밀번호</b>로 잠겨 있어요.
+                  </>
+                }
+                onUnlocked={() => onUnlockedChange(true)}
+              />
             ) : settlementLoading ? (
               <p className="text-sm text-slate-400">정산 정보를 불러오는 중…</p>
             ) : (

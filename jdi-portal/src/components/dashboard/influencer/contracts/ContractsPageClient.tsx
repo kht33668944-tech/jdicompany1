@@ -30,6 +30,7 @@ import {
   SETTLEMENT_TYPE_LABEL,
 } from "@/lib/influencer/contracts/labels";
 import { formatPostMonth, getPostMonth, getRetentionEnd } from "@/lib/influencer/contracts/dates";
+import { URGENT_SOON_DAYS } from "@/lib/influencer/contracts/constants";
 import { formatKrw } from "@/lib/expenses/format";
 import type {
   ContractSettlement,
@@ -90,6 +91,8 @@ export default function ContractsPageClient({
     settlement: ContractSettlement | null;
   } | null>(null);
   const [unlocked, setUnlocked] = useState(initialUnlocked);
+  // 정산 정보가 저장될 때마다 +1 → 상세 패널이 다시 불러온다
+  const [settlementVersion, setSettlementVersion] = useState(0);
 
   const settlementIds = useMemo(() => new Set(settlementContractIds), [settlementContractIds]);
   const today = useMemo(() => toDateString(kstNow()), []);
@@ -410,7 +413,8 @@ export default function ContractsPageClient({
         {/* 날짜 강조 안내 */}
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 px-5 py-2.5 text-[11px] text-slate-400">
           <span>
-            <span className="rounded bg-amber-50 px-1 py-0.5 font-semibold text-amber-700">노란색</span> 3일 이내 임박
+            <span className="rounded bg-amber-50 px-1 py-0.5 font-semibold text-amber-700">노란색</span>{" "}
+            {URGENT_SOON_DAYS}일 이내 임박
           </span>
           <span>
             <span className="font-semibold text-red-600">빨간색</span> 날짜 지남
@@ -424,6 +428,7 @@ export default function ContractsPageClient({
         contract={selectedContract}
         gateConfigured={gateConfigured}
         unlocked={unlocked}
+        settlementVersion={settlementVersion}
         onUnlockedChange={setUnlocked}
         onClose={() => setSelectedId(null)}
         onEdit={openEditForm}
@@ -467,14 +472,8 @@ export default function ContractsPageClient({
           onClose={() => setSettlementTarget(null)}
           onSaved={() => {
             setSettlementTarget(null);
-            // 상세 패널이 잠금 해제 상태면 정산 정보를 다시 불러오도록 갱신
+            setSettlementVersion((v) => v + 1); // 상세 패널이 최신 정산 정보를 다시 불러온다
             handleRefresh();
-            if (selectedId) {
-              const id = selectedId;
-              setSelectedId(null);
-              // 패널 재마운트로 최신 정산 정보 로드
-              setTimeout(() => setSelectedId(id), 0);
-            }
           }}
         />
       )}

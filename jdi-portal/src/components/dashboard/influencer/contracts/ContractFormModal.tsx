@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
 import Select from "@/components/shared/Select";
 import { getErrorMessage } from "@/lib/utils/errors";
+import { MODAL_INPUT_CLS, MODAL_LABEL_CLS } from "@/lib/vault/constants";
 import { searchInfluencers } from "@/lib/influencer/actions";
 import type { InfluencerListItem } from "@/lib/influencer/types";
 import { createContract, updateContract } from "@/lib/influencer/contracts/actions";
@@ -46,9 +47,9 @@ interface Props {
   onSaved: () => void;
 }
 
-const inputCls =
-  "w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
-const labelCls = "text-sm font-bold text-slate-700 ml-1 block mb-1.5";
+// 모달 폼 공용 클래스 — 보관함 모달과 동일 스타일(단일 소스)
+const inputCls = MODAL_INPUT_CLS;
+const labelCls = MODAL_LABEL_CLS;
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h3 className="mb-3 text-xs font-extrabold text-blue-600">{children}</h3>;

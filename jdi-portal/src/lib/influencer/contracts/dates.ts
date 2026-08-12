@@ -29,10 +29,14 @@ export function addMonthsClamped(dateStr: string, months: number): string {
   return `${ny}-${String(nm + 1).padStart(2, "0")}-${String(nd).padStart(2, "0")}`;
 }
 
-/** 게시 유지 종료일 = 실제 게시일 + 6개월. 게시 전이면 null. */
-export function getRetentionEnd(postActualDate: string | null, months = 6): string | null {
+/**
+ * 게시 유지 종료일 = 실제 게시일 + 6개월. 게시 전이면 null.
+ * "6개월" 규칙의 단일 소스 — 정적 테스트가 이 파일을 값 import 없이 직접 실행하므로
+ * 상수 파일로 빼지 않고 여기에 둔다.
+ */
+export function getRetentionEnd(postActualDate: string | null): string | null {
   if (!postActualDate) return null;
-  return addMonthsClamped(postActualDate, months);
+  return addMonthsClamped(postActualDate, 6);
 }
 
 /** 날짜 임박/지남 판정. 지났으면 overdue, soonDays 이내면 soon. */

@@ -5,16 +5,32 @@
 // - 정산 정보(개인정보)는 보관함(106)과 같은 2차 비밀번호 잠금 쿠키를 확인한 뒤에만
 //   복호화해 반환한다. DB에는 암호문만 저장된다.
 
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { decryptSecret, encryptSecret, verifyUnlockToken } from "@/lib/vault/crypto";
-import { VAULT_UNLOCK_COOKIE } from "@/lib/vault/constants";
+import { decryptSecret, encryptSecret } from "@/lib/vault/crypto";
+import { requireVaultUnlock } from "@/lib/vault/unlock";
 import { addInfluencer } from "@/lib/influencer/actions";
+import type { CampaignStatus } from "@/lib/influencer/types";
 import { kstNow, toDateString } from "@/lib/utils/date";
-import { CONTRACT_DOCS_BUCKET, CONTRACTS_SEASON, TMA_CAMPAIGN_NAME } from "./constants";
-import { CONTRACT_STATUS_ORDER, PRODUCT_LABEL } from "./labels";
+import {
+  CONTRACT_DOCS_BUCKET,
+  CONTRACTS_SEASON,
+  EXPENSE_CATEGORY_NAME,
+  EXPENSE_PAYMENT_METHOD,
+  TMA_CAMPAIGN_NAME,
+  UUID_RE,
+} from "./constants";
+import {
+  COLLAB_TYPE_ORDER,
+  CONTRACT_STATUS_ORDER,
+  PRODUCT_LABEL,
+  PRODUCT_ORDER,
+  RAW_FOOTAGE_ORDER,
+  REQUIRED_FILES_ORDER,
+  SECONDARY_USAGE_ORDER,
+  SETTLEMENT_TYPE_ORDER,
+} from "./labels";
 import { getContractPayout } from "./payout";
 import type {
   ContractInput,
@@ -27,11 +43,15 @@ import type {
 
 const CONTRACTS_PATH = "/dashboard/influencer/contracts";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HANDLE_RE = /^[a-zA-Z0-9._]{1,30}$/;
 
+/** 인스타 계정 정규화 — 공백/@ 제거 (검증·연동이 같은 형태를 쓴다) */
+function normalizeHandle(handle: string): string {
+  return handle.trim().replace(/^@/, "");
+}
+
 /** 계약 상태 → 시딩 캠페인 상태 매핑 (취소는 캠페인 제거로 처리) */
-const CONTRACT_TO_CAMPAIGN_STATUS: Record<Exclude<ContractStatus, "canceled">, string> = {
+const CONTRACT_TO_CAMPAIGN_STATUS: Record<Exclude<ContractStatus, "canceled">, CampaignStatus> = {
   candidate: "planned",
   dm_sent: "dm_sent",
   negotiating: "replied",
@@ -88,18 +108,11 @@ async function resolveInfluencerLink(
   pickedId: string | null,
 ): Promise<{ influencerId: string | null; addedToList: boolean }> {
   if (pickedId) return { influencerId: pickedId, addedToList: false };
-  const handle = instagramHandle.trim().replace(/^@/, "");
+  const handle = normalizeHandle(instagramHandle);
   if (!handle || !HANDLE_RE.test(handle)) return { influencerId: null, addedToList: false };
 
-  const { data: existing } = await supabase
-    .from("influencers")
-    .select("id")
-    .eq("platform", "instagram")
-    .eq("username", handle)
-    .maybeSingle();
-  if (existing) return { influencerId: existing.id as string, addedToList: false };
-
   try {
+    // addInfluencer 가 기존 등록 여부를 스스로 확인한다(있으면 Apify 호출 없이 기존 id 반환).
     const added = await addInfluencer(`https://www.instagram.com/${handle}/`);
     return { influencerId: added.influencer_id, addedToList: !added.alreadyExisted };
   } catch (error) {
@@ -163,9 +176,7 @@ async function syncCampaign(
   }
 }
 
-/** 지출 자동 기록에 쓸 분류 이름 — 없으면 만들고, 숨겨져 있으면 되살린다 */
-const EXPENSE_CATEGORY_NAME = "인플루언서 광고비";
-
+/** 지출 자동 기록에 쓸 분류 확보 — 없으면 만들고, 숨겨져 있으면 되살린다 */
 async function ensureExpenseCategory(supabase: SupabaseClient, userId: string): Promise<string> {
   const { data: existing, error: findErr } = await supabase
     .from("expense_categories")
@@ -213,7 +224,7 @@ async function recordSettlementExpense(
         amount_krw: payout,
         currency: "KRW",
         amount_foreign: null,
-        payment_method: "계좌이체",
+        payment_method: EXPENSE_PAYMENT_METHOD,
         category_id: categoryId,
         source: "manual",
         created_by: userId,
@@ -248,6 +259,26 @@ async function saveCampaignId(
     .eq("id", contractId);
 }
 
+/**
+ * 저장 공통 후처리(생성/수정/상태변경이 공유) — 캠페인 동기화와 지출 자동 기록은
+ * 서로 독립이라 병렬로 돌리고, 마지막에 연동 화면 3곳을 갱신한다.
+ */
+async function finishContractSave(
+  supabase: SupabaseClient,
+  userId: string,
+  row: ContractLinkRow,
+): Promise<{ scheduled: boolean; expenseAmount: number }> {
+  const [campaignId, expenseAmount] = await Promise.all([
+    syncCampaign(supabase, userId, row).then(async (id) => {
+      await saveCampaignId(supabase, row.id, row.campaign_id, id);
+      return id;
+    }),
+    recordSettlementExpense(supabase, userId, row),
+  ]);
+  revalidateLinkedPaths();
+  return { scheduled: Boolean(campaignId), expenseAmount };
+}
+
 async function getSessionUser() {
   const supabase = await createClient();
   const {
@@ -257,14 +288,7 @@ async function getSessionUser() {
   return { supabase, userId: session.user.id };
 }
 
-/** 정산 정보 열람/수정 전 2차 비밀번호 잠금 확인(보관함과 같은 잠금을 공유). */
-async function requireUnlock(userId: string) {
-  const store = await cookies();
-  const token = store.get(VAULT_UNLOCK_COOKIE)?.value;
-  if (!verifyUnlockToken(token, userId)) {
-    throw new Error("잠금이 필요합니다. 2차 비밀번호를 입력해주세요.");
-  }
-}
+// 정산 정보 열람/수정 전 2차 비밀번호 잠금 확인 — 보관함과 같은 구현(vault/unlock.ts)을 공유한다.
 
 // ============================================================
 // 입력 검증
@@ -292,17 +316,18 @@ function validateContractInput(input: ContractInput): ContractInput {
   const name = input.name.trim();
   if (!name) throw new Error("이름/채널명을 입력해주세요.");
 
-  if (!includes(["paid", "seeding"] as const, input.collab_type))
+  // 열거값 검증은 labels.ts 의 *_ORDER 단일 소스를 그대로 쓴다(옵션 추가 시 자동 반영)
+  if (!includes(COLLAB_TYPE_ORDER, input.collab_type))
     throw new Error("협업 유형 값이 잘못되었습니다.");
-  if (!includes(["tree_150", "tree_180"] as const, input.product))
+  if (!includes(PRODUCT_ORDER, input.product))
     throw new Error("제공 제품 값이 잘못되었습니다.");
-  if (input.settlement_type !== null && !includes(["business", "individual"] as const, input.settlement_type))
+  if (input.settlement_type !== null && !includes(SETTLEMENT_TYPE_ORDER, input.settlement_type))
     throw new Error("정산 구분 값이 잘못되었습니다.");
-  if (!includes(["free", "paid", "not_allowed"] as const, input.secondary_usage))
+  if (!includes(SECONDARY_USAGE_ORDER, input.secondary_usage))
     throw new Error("2차 활용 값이 잘못되었습니다.");
-  if (!includes(["free", "paid", "not_provided"] as const, input.raw_footage))
+  if (!includes(RAW_FOOTAGE_ORDER, input.raw_footage))
     throw new Error("촬영 원본 값이 잘못되었습니다.");
-  if (!includes(["none", "partial", "complete"] as const, input.required_files_status))
+  if (!includes(REQUIRED_FILES_ORDER, input.required_files_status))
     throw new Error("필수 파일 상태 값이 잘못되었습니다.");
   if (!includes(CONTRACT_STATUS_ORDER, input.contract_status))
     throw new Error("계약 상태 값이 잘못되었습니다.");
@@ -325,7 +350,7 @@ function validateContractInput(input: ContractInput): ContractInput {
   return {
     ...input,
     name,
-    instagram_handle: input.instagram_handle.trim().replace(/^@/, ""),
+    instagram_handle: normalizeHandle(input.instagram_handle),
     product_detail: input.product_detail?.trim() || null,
     business_reg_no: input.business_reg_no?.trim() || null,
     raw_footage_scope: input.raw_footage_scope?.trim() || null,
@@ -363,11 +388,8 @@ export async function createContract(input: ContractInput): Promise<ContractSave
   if (error) throw new Error(`계약 추가에 실패했습니다: ${error.message}`);
 
   const row = data as unknown as ContractLinkRow;
-  const campaignId = await syncCampaign(supabase, userId, row);
-  await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
-  const expenseAmount = await recordSettlementExpense(supabase, userId, row);
-  revalidateLinkedPaths();
-  return { id: row.id, scheduled: Boolean(campaignId), addedToList: link.addedToList, expenseAmount };
+  const finish = await finishContractSave(supabase, userId, row);
+  return { id: row.id, addedToList: link.addedToList, ...finish };
 }
 
 export async function updateContract(id: string, input: ContractInput): Promise<ContractSaveResult> {
@@ -399,11 +421,8 @@ export async function updateContract(id: string, input: ContractInput): Promise<
   if (error) throw new Error(`계약 수정에 실패했습니다: ${error.message}`);
 
   const row = data as unknown as ContractLinkRow;
-  const campaignId = await syncCampaign(supabase, userId, row);
-  await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
-  const expenseAmount = await recordSettlementExpense(supabase, userId, row);
-  revalidateLinkedPaths();
-  return { id: row.id, scheduled: Boolean(campaignId), addedToList: link.addedToList, expenseAmount };
+  const finish = await finishContractSave(supabase, userId, row);
+  return { id: row.id, addedToList: link.addedToList, ...finish };
 }
 
 /**
@@ -426,10 +445,7 @@ export async function updateContractStatus(
   if (error) throw new Error(`상태 변경에 실패했습니다: ${error.message}`);
 
   const row = data as unknown as ContractLinkRow;
-  const campaignId = await syncCampaign(supabase, userId, row);
-  await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
-  const expenseAmount = await recordSettlementExpense(supabase, userId, row);
-  revalidateLinkedPaths();
+  const { expenseAmount } = await finishContractSave(supabase, userId, row);
   return { expenseAmount };
 }
 
@@ -458,7 +474,7 @@ export async function deleteContract(id: string): Promise<void> {
 // ============================================================
 export async function getSettlement(contractId: string): Promise<ContractSettlement | null> {
   const { supabase, userId } = await getSessionUser();
-  await requireUnlock(userId);
+  await requireVaultUnlock(userId);
 
   const { data, error } = await supabase
     .from("influencer_contract_settlements")
@@ -482,7 +498,7 @@ export async function getSettlement(contractId: string): Promise<ContractSettlem
 
 export async function upsertSettlement(contractId: string, input: SettlementInput): Promise<void> {
   const { supabase, userId } = await getSessionUser();
-  await requireUnlock(userId);
+  await requireVaultUnlock(userId);
 
   const phone = input.phone.trim();
   if (phone && !/^[\d\s+-]{7,20}$/.test(phone)) {
@@ -530,20 +546,24 @@ export async function upsertSettlement(contractId: string, input: SettlementInpu
   revalidatePath(CONTRACTS_PATH);
 }
 
+/** 내보내기 선택 검증 — 잠금 확인 뒤에만 쓴다 */
+function validateExportIds(contractIds: string[]): void {
+  if (contractIds.length > 200) throw new Error("한 번에 200명까지만 내보낼 수 있습니다.");
+  if (!contractIds.every((id) => UUID_RE.test(id))) throw new Error("선택 정보가 잘못되었습니다.");
+}
+
 /**
- * 정산 자료 내보내기용 일괄 조회 — 잠금 해제 상태에서만.
- * 선택한 계약들의 정산 정보를 복호화하고, 신분증은 짧은 임시 링크(2분)로 함께 준다.
- * ZIP 은 브라우저에서 조립한다(서버 메모리에 개인정보 파일을 쌓지 않기 위함).
+ * 정산 자료 내보내기용 일괄 조회 — 잠금 해제 상태에서만 복호화해 반환.
+ * 신분증 임시 링크는 만료가 짧아 여기서 미리 발급하지 않는다
+ * (미리보기 표는 id_card_path 유무만 쓰고, 링크는 다운로드 시점에 getIdCardUrlsForExport 로).
  */
 export async function getSettlementsForExport(
   contractIds: string[],
 ): Promise<SettlementExportRow[]> {
   const { supabase, userId } = await getSessionUser();
-  await requireUnlock(userId);
-
+  await requireVaultUnlock(userId);
   if (!Array.isArray(contractIds) || contractIds.length === 0) return [];
-  if (contractIds.length > 200) throw new Error("한 번에 200명까지만 내보낼 수 있습니다.");
-  if (!contractIds.every((id) => UUID_RE.test(id))) throw new Error("선택 정보가 잘못되었습니다.");
+  validateExportIds(contractIds);
 
   const { data, error } = await supabase
     .from("influencer_contract_settlements")
@@ -551,22 +571,7 @@ export async function getSettlementsForExport(
     .in("contract_id", contractIds);
   if (error) throw new Error(`정산 정보를 불러오지 못했습니다: ${error.message}`);
 
-  const rows = data ?? [];
-  const paths = rows
-    .map((r) => r.id_card_path as string | null)
-    .filter((p): p is string => Boolean(p));
-  const urlByPath = new Map<string, string>();
-  if (paths.length > 0) {
-    const { data: signed, error: signErr } = await supabase.storage
-      .from(CONTRACT_DOCS_BUCKET)
-      .createSignedUrls(paths, 120);
-    if (signErr) throw new Error(`신분증 파일 주소를 만들지 못했습니다: ${signErr.message}`);
-    for (const s of signed ?? []) {
-      if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
-    }
-  }
-
-  return rows.map((r) => ({
+  return (data ?? []).map((r) => ({
     contract_id: r.contract_id as string,
     phone: decryptSecret(r.phone_enc),
     address: decryptSecret(r.address_enc),
@@ -575,14 +580,49 @@ export async function getSettlementsForExport(
     account_holder: decryptSecret(r.account_holder_enc),
     id_card_path: (r.id_card_path as string | null) ?? null,
     id_card_name: (r.id_card_name as string | null) ?? null,
-    id_card_url: r.id_card_path ? (urlByPath.get(r.id_card_path as string) ?? null) : null,
   }));
+}
+
+/**
+ * 신분증 임시 링크(2분) 일괄 발급 — ZIP 다운로드 버튼을 누른 시점에만 부른다.
+ * 미리보기 단계에서 발급하면 표를 보는 동안 만료돼 다운로드가 조용히 빠질 수 있다.
+ */
+export async function getIdCardUrlsForExport(
+  contractIds: string[],
+): Promise<{ contract_id: string; url: string }[]> {
+  const { supabase, userId } = await getSessionUser();
+  await requireVaultUnlock(userId);
+  if (!Array.isArray(contractIds) || contractIds.length === 0) return [];
+  validateExportIds(contractIds);
+
+  const { data, error } = await supabase
+    .from("influencer_contract_settlements")
+    .select("contract_id, id_card_path")
+    .in("contract_id", contractIds)
+    .not("id_card_path", "is", null);
+  if (error) throw new Error(`신분증 파일을 확인하지 못했습니다: ${error.message}`);
+
+  const rows = (data ?? []) as { contract_id: string; id_card_path: string }[];
+  if (rows.length === 0) return [];
+
+  const { data: signed, error: signErr } = await supabase.storage
+    .from(CONTRACT_DOCS_BUCKET)
+    .createSignedUrls(rows.map((r) => r.id_card_path), 120);
+  if (signErr) throw new Error(`신분증 파일 주소를 만들지 못했습니다: ${signErr.message}`);
+
+  const urlByPath = new Map<string, string>();
+  for (const s of signed ?? []) {
+    if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
+  }
+  return rows
+    .map((r) => ({ contract_id: r.contract_id, url: urlByPath.get(r.id_card_path) ?? "" }))
+    .filter((r) => r.url);
 }
 
 /** 신분증 파일 열람용 임시 링크(60초). 잠금 해제 상태에서만 발급. */
 export async function getIdCardSignedUrl(contractId: string): Promise<string | null> {
   const { supabase, userId } = await getSessionUser();
-  await requireUnlock(userId);
+  await requireVaultUnlock(userId);
 
   const { data, error } = await supabase
     .from("influencer_contract_settlements")
