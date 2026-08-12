@@ -36,6 +36,7 @@ const titles: Record<string, string> = {
   "/dashboard/schedule": "스케줄",
   "/dashboard/influencer": "인플루언서",
   "/dashboard/influencer/schedule": "인플루언서",
+  "/dashboard/influencer/contracts": "인플루언서",
   "/dashboard/chat": "채팅",
   "/dashboard/reports": "오류 접수",
   "/dashboard/settings": "설정",

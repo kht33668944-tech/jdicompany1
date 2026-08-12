@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import UsersThree from "phosphor-react/dist/icons/UsersThree.esm.js";
 import CalendarBlank from "phosphor-react/dist/icons/CalendarBlank.esm.js";
+import FileText from "phosphor-react/dist/icons/FileText.esm.js";
 
 const tabs = [
   { href: "/dashboard/influencer", label: "리스트", icon: UsersThree, exact: true },
   { href: "/dashboard/influencer/schedule", label: "시딩 스케줄", icon: CalendarBlank, exact: false },
+  { href: "/dashboard/influencer/contracts", label: "TMA 계약", icon: FileText, exact: false },
 ];
 
 export default function InfluencerTabs() {

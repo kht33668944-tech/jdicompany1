@@ -134,6 +134,7 @@ const SETTING_KEY_BY_TYPE: Record<string, string> = {
   timeline_review_requested: "system_announce",
   timeline_review_submitted: "system_announce",
   timeline_review_resolved: "system_announce",
+  influencer_contract_reminder: "system_announce",
 };
 
 // ============================================================
