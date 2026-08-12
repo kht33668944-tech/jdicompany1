@@ -73,8 +73,8 @@ test("목록 쿼리: 암호문 컬럼을 조회하지 않고, is_deleted 필터�
   assert.match(queries, /\.select\("contract_id"\)/, "정산 등록 여부는 contract_id 만 조회해야 합니다");
 });
 
-test("정산 액션: 열람/수정/파일 링크 발급 전부 잠금 게이트를 지난다", () => {
-  for (const fn of ["getSettlement", "upsertSettlement", "getIdCardSignedUrl"]) {
+test("정산 액션: 열람/수정/파일 링크 발급/내보내기 전부 잠금 게이트를 지난다", () => {
+  for (const fn of ["getSettlement", "upsertSettlement", "getIdCardSignedUrl", "getSettlementsForExport"]) {
     const start = actions.indexOf(`export async function ${fn}`);
     assert.ok(start >= 0, `${fn} 액션이 없습니다`);
     const nextExport = actions.indexOf("export async function", start + 1);
@@ -133,6 +133,58 @@ test("연동: 리스트 자동 등록 실패가 계약 저장을 막지 않는�
   const body = actions.slice(start, actions.indexOf("async function syncCampaign"));
   assert.match(body, /addInfluencer\(/);
   assert.match(body, /catch/, "addInfluencer 실패를 잡아 계약 저장을 계속해야 합니다");
+});
+
+// ------------------------------------------------------------
+// 운영 편의 (마이그 121): 지출 자동 기록 + 아침 알림 + 정산 자료
+// ------------------------------------------------------------
+const migration121 = read("supabase/migrations/121_influencer_contracts_ops.sql");
+const pushDispatch = read("supabase/functions/push-dispatch/index.ts");
+
+test("마이그 121: expense_id 멱등 추가 + 알림 함수/크론 등록", () => {
+  assert.match(migration121, /ADD COLUMN IF NOT EXISTS expense_id[\s\S]*?ON DELETE SET NULL/);
+  assert.match(migration121, /remind_influencer_contracts/);
+  assert.match(migration121, /is_approved = TRUE/);
+  assert.match(migration121, /REVOKE ALL ON FUNCTION public\.remind_influencer_contracts/);
+  assert.match(migration121, /cron\.schedule\(\s*'influencer_contract_reminder'/);
+  assert.doesNotMatch(migration121, /CURRENT_DATE/);
+});
+
+test("알림 타입이 push-dispatch 에 등록되어 있다", () => {
+  assert.match(pushDispatch, /influencer_contract_reminder/, "타입 미등록이면 푸시가 나가지 않습니다");
+});
+
+test("지출 자동 기록: 중복 방지 + 실패해도 상태 변경 유지(try/catch)", () => {
+  const start = actions.indexOf("async function recordSettlementExpense");
+  assert.ok(start >= 0, "recordSettlementExpense 가 없습니다");
+  const body = actions.slice(start, actions.indexOf("/** 동기화 결과"));
+  assert.match(body, /row\.expense_id\) return 0/, "expense_id 중복 방지 조건이 없습니다");
+  assert.match(body, /catch/, "지출 기록 실패가 상태 변경을 되돌리면 안 됩니다");
+  assert.match(body, /getContractPayout\(/);
+});
+
+test("payout: 지급액·원천징수 3.3% 계산이 맞는다", () => {
+  const payoutUrl = pathToFileURL(path.join(root, "src/lib/influencer/contracts/payout.ts")).href;
+  const script = `
+    import { getContractPayout, getWithholding } from ${JSON.stringify(payoutUrl)};
+    const paid = { collab_type: "paid", ad_fee_total: 1500000, secondary_usage: "paid",
+      secondary_usage_fee: 300000, raw_footage: "not_provided", raw_footage_fee: null };
+    const seeding = { collab_type: "seeding", ad_fee_total: 999999, secondary_usage: "free",
+      secondary_usage_fee: null, raw_footage: "paid", raw_footage_fee: 200000 };
+    console.log(JSON.stringify([
+      getContractPayout(paid),                 // 1,500,000 + 300,000
+      getContractPayout(seeding),              // 협찬형은 광고비 제외 → 200,000
+      getWithholding(1800000, "individual"),   // 3.3% = 59,400
+      getWithholding(1800000, "business"),     // 사업자는 0
+      getWithholding(0, "individual"),
+    ]));
+  `;
+  const out = execFileSync(
+    process.execPath,
+    ["--experimental-strip-types", "--no-warnings", "--input-type=module", "-e", script],
+    { encoding: "utf8" },
+  ).trim();
+  assert.deepEqual(JSON.parse(out), [1800000, 200000, 59400, 0, 0]);
 });
 
 // ------------------------------------------------------------

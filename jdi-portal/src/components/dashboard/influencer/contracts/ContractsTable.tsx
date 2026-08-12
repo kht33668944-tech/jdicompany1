@@ -29,6 +29,9 @@ interface Props {
   today: string;
   hasSearch: boolean;
   hasActiveFilter: boolean;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string, on: boolean) => void;
+  onToggleAll: (on: boolean) => void;
   onSelect: (id: string) => void;
   onStatusChange: (id: string, status: ContractStatus) => void;
 }
@@ -81,9 +84,13 @@ export default function ContractsTable({
   today,
   hasSearch,
   hasActiveFilter,
+  selectedIds,
+  onToggleSelect,
+  onToggleAll,
   onSelect,
   onStatusChange,
 }: Props) {
+  const allSelected = contracts.length > 0 && contracts.every((c) => selectedIds.has(c.id));
   const emptyMessage =
     totalCount === 0
       ? "아직 등록된 계약이 없어요. ‘새 계약 추가’를 눌러 시작하세요."
@@ -101,6 +108,15 @@ export default function ContractsTable({
         <table className="w-full min-w-[1150px] border-collapse">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
             <tr>
+              <th className="w-9 border-b border-slate-100 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(e) => onToggleAll(e.target.checked)}
+                  aria-label="전체 선택"
+                  className="h-4 w-4 cursor-pointer accent-blue-600"
+                />
+              </th>
               {[
                 "이름 / 채널",
                 "협업 유형",
@@ -137,6 +153,15 @@ export default function ContractsTable({
                   onClick={() => onSelect(c.id)}
                   className={`cursor-pointer transition-colors hover:bg-slate-50/60 ${quiet ? "opacity-55" : ""}`}
                 >
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(c.id)}
+                      onChange={(e) => onToggleSelect(c.id, e.target.checked)}
+                      aria-label={`${c.name} 선택`}
+                      className="h-4 w-4 cursor-pointer accent-blue-600"
+                    />
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="font-bold text-slate-800">{c.name}</div>
                     {c.instagram_handle && (

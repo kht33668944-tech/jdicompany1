@@ -3,7 +3,7 @@
 // TMA 계약 관리 페이지 셸 — 탭 / 요약·상태 칩 / 검색·필터 / 테이블 / 상세 패널 / 폼 모달 조립.
 // 100건 규모라 서버에서 전량을 받아 클라이언트에서 즉시 필터링한다.
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -16,15 +16,21 @@ import ContractDetailPanel from "./ContractDetailPanel";
 import { getErrorMessage } from "@/lib/utils/errors";
 import { updateContractStatus } from "@/lib/influencer/contracts/actions";
 import {
+  COLLAB_TYPE_LABEL,
   COLLAB_TYPE_OPTIONS,
   CONTRACT_STATUS_DOT_CLASSES,
   CONTRACT_STATUS_LABEL,
   CONTRACT_STATUS_ORDER,
   CONTRACT_STATUS_OPTIONS,
+  PRODUCT_LABEL,
   PRODUCT_OPTIONS,
+  RAW_FOOTAGE_LABEL,
+  SECONDARY_USAGE_LABEL,
   SECONDARY_USAGE_OPTIONS,
+  SETTLEMENT_TYPE_LABEL,
 } from "@/lib/influencer/contracts/labels";
-import { formatPostMonth, getPostMonth } from "@/lib/influencer/contracts/dates";
+import { formatPostMonth, getPostMonth, getRetentionEnd } from "@/lib/influencer/contracts/dates";
+import { formatKrw } from "@/lib/expenses/format";
 import type {
   ContractSettlement,
   ContractStatus,
@@ -32,15 +38,24 @@ import type {
 } from "@/lib/influencer/contracts/types";
 import { kstNow, toDateString } from "@/lib/utils/date";
 
-// 폼 모달은 열 때만 로드(초기 JS 절약)
+// 폼/내보내기 모달은 열 때만 로드(초기 JS 절약)
 const ContractFormModal = dynamic(() => import("./ContractFormModal"), { ssr: false });
 const SettlementFormModal = dynamic(() => import("./SettlementFormModal"), { ssr: false });
+const SettlementExportModal = dynamic(() => import("./SettlementExportModal"), { ssr: false });
+
+/** 리스트 탭 "TMA 계약 만들기"에서 넘어온 미리 채움 정보 */
+export interface ContractPrefill {
+  influencerId: string;
+  name: string;
+  handle: string;
+}
 
 interface Props {
   contracts: InfluencerContract[];
   settlementContractIds: string[];
   gateConfigured: boolean;
   initialUnlocked: boolean;
+  prefill: ContractPrefill | null;
 }
 
 const filterSelectCls =
@@ -51,6 +66,7 @@ export default function ContractsPageClient({
   settlementContractIds,
   gateConfigured,
   initialUnlocked,
+  prefill,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -63,7 +79,11 @@ export default function ContractsPageClient({
   const [monthFilter, setMonthFilter] = useState("");
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [exportOpen, setExportOpen] = useState(false);
+  // 리스트 탭에서 넘어온 미리 채움이 있으면 폼을 바로 연다 (URL은 깨끗하게 정리)
+  const [formOpen, setFormOpen] = useState(Boolean(prefill));
+  const [formPrefill] = useState(prefill);
   const [formContract, setFormContract] = useState<InfluencerContract | null>(null);
   const [settlementTarget, setSettlementTarget] = useState<{
     contract: InfluencerContract;
@@ -79,6 +99,11 @@ export default function ContractsPageClient({
       router.refresh();
     });
   }, [router]);
+
+  // 미리 채움 파라미터는 폼을 연 뒤 주소창에서 지운다(새로고침 시 재실행 방지)
+  useEffect(() => {
+    if (prefill) router.replace("/dashboard/influencer/contracts");
+  }, [prefill, router]);
 
   // 게시월 옵션은 데이터에 실제로 있는 달만 보여준다
   const monthOptions = useMemo(() => {
@@ -124,8 +149,11 @@ export default function ContractsPageClient({
     (id: string, status: ContractStatus) => {
       const run = async () => {
         try {
-          await updateContractStatus(id, status);
+          const result = await updateContractStatus(id, status);
           toast.success(`상태가 '${CONTRACT_STATUS_LABEL[status]}'(으)로 변경되었습니다.`);
+          if (result.expenseAmount > 0) {
+            toast.success(`💰 지출관리에 ${formatKrw(result.expenseAmount)}을 자동 기록했어요.`);
+          }
           handleRefresh();
         } catch (err) {
           toast.error(getErrorMessage(err, "상태 변경 실패"));
@@ -135,6 +163,69 @@ export default function ContractsPageClient({
     },
     [handleRefresh],
   );
+
+  const toggleSelect = useCallback((id: string, on: boolean) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(
+    (on: boolean) => {
+      setCheckedIds(on ? new Set(filtered.map((c) => c.id)) : new Set());
+    },
+    [filtered],
+  );
+
+  const checkedContracts = useMemo(
+    () => contracts.filter((c) => checkedIds.has(c.id)),
+    [contracts, checkedIds],
+  );
+
+  /** 필터 걸린 목록 그대로 엑셀로 — xlsx 는 버튼을 눌렀을 때만 로드 */
+  const handleExcelExport = useCallback(async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const sheetRows = filtered.map((c) => ({
+        "이름/채널명": c.name,
+        "Instagram": c.instagram_handle ? `@${c.instagram_handle}` : "",
+        "협업 유형": COLLAB_TYPE_LABEL[c.collab_type],
+        "제공 제품": PRODUCT_LABEL[c.product],
+        "제품명·구성": c.product_detail ?? "",
+        "소비자가(원)": c.retail_price ?? "",
+        "약정가액(원)": c.agreed_value ?? "",
+        "광고비 총액(원)": c.ad_fee_total ?? "",
+        "부가세": c.collab_type === "paid" ? (c.ad_fee_vat_included ? "포함" : "별도") : "",
+        "정산 구분": c.settlement_type ? SETTLEMENT_TYPE_LABEL[c.settlement_type] : "",
+        "사업자등록번호": c.business_reg_no ?? "",
+        "2차 활용": SECONDARY_USAGE_LABEL[c.secondary_usage],
+        "2차 활용 비용(원)": c.secondary_usage_fee ?? "",
+        "2차 활용 기간":
+          c.secondary_usage === "not_allowed"
+            ? ""
+            : `${c.secondary_usage_start ?? ""} ~ ${c.secondary_usage_end ?? ""}`,
+        "촬영 원본": RAW_FOOTAGE_LABEL[c.raw_footage],
+        "제품 발송일": c.product_ship_date ?? "",
+        "초안 전달일": c.draft_due_date ?? "",
+        "게시 예정일": c.post_planned_date ?? "",
+        "실제 게시일": c.post_actual_date ?? "",
+        "게시 유지 종료일": getRetentionEnd(c.post_actual_date) ?? "",
+        "계약 상태": CONTRACT_STATUS_LABEL[c.contract_status],
+        "모두싸인 링크": c.modusign_url ?? "",
+        "메모": c.memo ?? "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(sheetRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "TMA 계약");
+      XLSX.writeFile(wb, `TMA-계약목록-${today}.xlsx`);
+      toast.success(`${filtered.length}건을 엑셀로 내려받았어요.`);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "엑셀 내보내기 실패"));
+    }
+  }, [filtered, today]);
 
   const openNewForm = () => {
     setFormContract(null);
@@ -158,14 +249,45 @@ export default function ContractsPageClient({
               {filtered.length}명 / 전체 {contracts.length}명
             </span>
           </h1>
-          <button
-            type="button"
-            onClick={openNewForm}
-            className="rounded-xl bg-[#2563eb] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 active:scale-95 transition-all"
-          >
-            ＋ 새 계약 추가
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExcelExport}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              ⬇ 엑셀
+            </button>
+            <button
+              type="button"
+              onClick={openNewForm}
+              className="rounded-xl bg-[#2563eb] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 active:scale-95 transition-all"
+            >
+              ＋ 새 계약 추가
+            </button>
+          </div>
         </div>
+
+        {/* 선택 모드 바 */}
+        {checkedIds.size > 0 && (
+          <div className="mx-5 mt-3 flex flex-wrap items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700">
+            <span>{checkedIds.size}명 선택됨</span>
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={() => setExportOpen(true)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              🔒 정산 자료 다운로드
+            </button>
+            <button
+              type="button"
+              onClick={() => setCheckedIds(new Set())}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              선택 해제
+            </button>
+          </div>
+        )}
 
         {/* 상태별 칩 */}
         <div className="flex flex-wrap gap-1.5 px-5 pt-3" aria-label="상태별 개수">
@@ -278,6 +400,9 @@ export default function ContractsPageClient({
           today={today}
           hasSearch={Boolean(searchTerm)}
           hasActiveFilter={hasActiveFilter}
+          selectedIds={checkedIds}
+          onToggleSelect={toggleSelect}
+          onToggleAll={toggleAll}
           onSelect={setSelectedId}
           onStatusChange={handleStatusChange}
         />
@@ -314,11 +439,23 @@ export default function ContractsPageClient({
       {formOpen && (
         <ContractFormModal
           contract={formContract}
+          prefill={formContract ? null : formPrefill}
           onClose={() => setFormOpen(false)}
           onSaved={() => {
             setFormOpen(false);
             handleRefresh();
           }}
+        />
+      )}
+
+      {/* 정산 자료 다운로드 (선택 인원) */}
+      {exportOpen && (
+        <SettlementExportModal
+          contracts={checkedContracts}
+          gateConfigured={gateConfigured}
+          unlocked={unlocked}
+          onUnlockedChange={setUnlocked}
+          onClose={() => setExportOpen(false)}
         />
       )}
 

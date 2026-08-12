@@ -62,6 +62,14 @@
 - 날짜/금액도 동기화: ship_date←제품 발송일, expected_post_date←게시 예정일, actual_post_date←실제 게시일, cost←광고비형은 광고비 총액·협찬형은 약정가액.
 - revalidate 는 계약/리스트/스케줄 3경로. 스케줄에서 직접 바꾼 내용은 계약으로 역동기화하지 않는다(계약 화면이 원본).
 
+## 6.6) 운영 편의 4종 + 정산 자료 내보내기 (마이그레이션 121, 같은 날 추가)
+
+- **지출 자동 기록**: 상태가 '정산 완료'가 되는 순간 지급액(광고비형 광고비 + 2차 활용/원본 추가비용, `payout.ts`)을 지출관리에 자동 생성. 분류 "인플루언서 광고비" 자동 생성/재활성, `expense_id` 로 중복 방지. 실패해도 상태 변경은 유지(후처리 try/catch).
+- **아침 임박 알림**: `remind_influencer_contracts()` + pg_cron `influencer_contract_reminder`(평일 00:00 UTC = 09:00 KST). 3일 이내 임박/지남(발송·초안·게시 예정, 화면과 같은 단계 억제 규칙) 요약 1건을 승인 직원 전원에게. push-dispatch 에 `influencer_contract_reminder` 타입 등록(system_announce 설정 따름).
+- **원클릭 계약**: 리스트 RowMenu "TMA 계약 만들기" → `/dashboard/influencer/contracts?prefillId=...` → 폼 미리 채움 후 URL 정리.
+- **엑셀 내보내기**: 필터 반영 목록 전체 컬럼 → `TMA-계약목록-날짜.xlsx` (xlsx 버튼 클릭 시 동적 로드).
+- **정산 자료 ZIP**: 체크박스 선택 → 잠금 해제 → `getSettlementsForExport`(복호화 + 신분증 2분 임시 링크) → 브라우저에서 jszip 으로 `정산명단.xlsx`(원천징수 3.3% 자동 계산, 개인만) + `신분증/` 조립. 서버에 개인정보 파일을 쌓지 않음.
+
 ## 7) 남은 TODO
 
 - 모두싸인 API 자동 연동(발송·서명 웹훅 → 상태 자동 전이)

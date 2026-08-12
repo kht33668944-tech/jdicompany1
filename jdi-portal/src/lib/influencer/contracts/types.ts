@@ -26,6 +26,8 @@ export interface InfluencerContract {
   influencer_id: string | null;
   /** 시딩 스케줄(influencer_campaigns) 연결 — 서버가 자동 생성·동기화, 폼 입력 아님 */
   campaign_id: string | null;
+  /** 정산 완료 시 자동 기록된 지출(expenses) 연결 — 중복 기록 방지 (마이그 121) */
+  expense_id: string | null;
   name: string;
   instagram_handle: string;
   collab_type: CollabType;
@@ -61,8 +63,11 @@ export interface InfluencerContract {
   updated_at: string;
 }
 
-/** 추가/수정 폼 입력 (서버가 채우는 필드 제외 — campaign_id 는 서버 전용) */
-export type ContractInput = Omit<InfluencerContract, "id" | "campaign_id" | "created_at" | "updated_at">;
+/** 추가/수정 폼 입력 (서버가 채우는 필드 제외 — campaign_id/expense_id 는 서버 전용) */
+export type ContractInput = Omit<
+  InfluencerContract,
+  "id" | "campaign_id" | "expense_id" | "created_at" | "updated_at"
+>;
 
 /** 계약 저장 결과 — 연동 상황을 화면 안내에 쓴다 */
 export interface ContractSaveResult {
@@ -71,6 +76,14 @@ export interface ContractSaveResult {
   scheduled: boolean;
   /** 이번 저장에서 리스트에 새로 자동 등록됐는가 */
   addedToList: boolean;
+  /** 이번 저장에서 지출관리에 자동 기록된 금액(원, 없으면 0) */
+  expenseAmount: number;
+}
+
+/** 정산 자료 내보내기 1행 — 잠금 해제 후 서버 액션이 복호화해 반환 */
+export interface SettlementExportRow extends ContractSettlement {
+  /** 신분증 열람용 임시 링크(짧은 만료) — ZIP 생성 시 바로 내려받는다 */
+  id_card_url: string | null;
 }
 
 /**

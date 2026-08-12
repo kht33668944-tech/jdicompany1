@@ -36,8 +36,12 @@ import type {
 import { parseKrwInput } from "@/lib/expenses/format";
 import { formatDate } from "@/lib/utils/date";
 
+import type { ContractPrefill } from "./ContractsPageClient";
+
 interface Props {
   contract: InfluencerContract | null; // null = 새 계약
+  /** 리스트 탭 "TMA 계약 만들기"에서 넘어온 미리 채움 (새 계약일 때만) */
+  prefill?: ContractPrefill | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -118,11 +122,15 @@ function moneyOrNull(value: string, label: string): number | null {
   return Math.round(parsed);
 }
 
-export default function ContractFormModal({ contract, onClose, onSaved }: Props) {
-  const [name, setName] = useState(contract?.name ?? "");
-  const [instagramHandle, setInstagramHandle] = useState(contract?.instagram_handle ?? "");
+export default function ContractFormModal({ contract, prefill = null, onClose, onSaved }: Props) {
+  const [name, setName] = useState(contract?.name ?? prefill?.name ?? "");
+  const [instagramHandle, setInstagramHandle] = useState(
+    contract?.instagram_handle ?? prefill?.handle ?? "",
+  );
   // 리스트(influencers) 연결 — 자동완성으로 고르면 채워지고, 없으면 저장 시 서버가 인스타 계정으로 매칭/자동 등록
-  const [influencerId, setInfluencerId] = useState<string | null>(contract?.influencer_id ?? null);
+  const [influencerId, setInfluencerId] = useState<string | null>(
+    contract?.influencer_id ?? prefill?.influencerId ?? null,
+  );
   const [suggestions, setSuggestions] = useState<InfluencerListItem[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const skipNextSearch = useRef(false);

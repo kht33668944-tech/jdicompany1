@@ -2,6 +2,7 @@
 
 import { getErrorMessage } from "@/lib/utils/errors";
 import { useState, useTransition, useRef, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import DotsThreeVertical from "phosphor-react/dist/icons/DotsThreeVertical.esm.js";
@@ -178,15 +179,29 @@ function ErTierEvaluation({ er, follower }: { er: number | null; follower: numbe
 
 interface RowMenuProps {
   influencerId: string;
+  username: string;
+  displayName: string | null;
   onViewDetail: () => void;
   onRefresh: () => void;
 }
 
-function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
+function RowMenu({ influencerId, username, displayName, onViewDetail, onRefresh }: RowMenuProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  /** TMA 계약 탭으로 이동해 이 인플루언서 정보가 미리 채워진 계약 폼을 연다 */
+  function handleCreateContract() {
+    setOpen(false);
+    const params = new URLSearchParams({
+      prefillId: influencerId,
+      prefillName: displayName?.trim() || username,
+      prefillHandle: username,
+    });
+    router.push(`/dashboard/influencer/contracts?${params.toString()}`);
+  }
 
   const MENU_WIDTH = 160;
   const MENU_HEIGHT = 180;
@@ -276,6 +291,12 @@ function RowMenu({ influencerId, onViewDetail, onRefresh }: RowMenuProps) {
               className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <ArrowsClockwise size={14} /> 재동기화
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCreateContract(); }}
+              className="w-full flex items-center gap-2 px-3 py-2 font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
+            >
+              🎄 TMA 계약 만들기
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); handleArchive(); }}
@@ -667,6 +688,8 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                       <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                         <RowMenu
                           influencerId={inf.id}
+                          username={inf.username}
+                          displayName={inf.display_name}
                           onViewDetail={() => onSelectInfluencer(inf.id)}
                           onRefresh={onRefresh}
                         />
@@ -911,6 +934,8 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                     <td className="col-start-2 row-start-1 px-0 py-0 sm:table-cell sm:px-4 sm:py-3">
                       <RowMenu
                         influencerId={inf.id}
+                        username={inf.username}
+                        displayName={inf.display_name}
                         onViewDetail={() => onSelectInfluencer(inf.id)}
                         onRefresh={onRefresh}
                       />

@@ -12,13 +12,16 @@ import { createClient } from "@/lib/supabase/server";
 import { decryptSecret, encryptSecret, verifyUnlockToken } from "@/lib/vault/crypto";
 import { VAULT_UNLOCK_COOKIE } from "@/lib/vault/constants";
 import { addInfluencer } from "@/lib/influencer/actions";
+import { kstNow, toDateString } from "@/lib/utils/date";
 import { CONTRACT_DOCS_BUCKET, CONTRACTS_SEASON, TMA_CAMPAIGN_NAME } from "./constants";
 import { CONTRACT_STATUS_ORDER, PRODUCT_LABEL } from "./labels";
+import { getContractPayout } from "./payout";
 import type {
   ContractInput,
   ContractSaveResult,
   ContractSettlement,
   ContractStatus,
+  SettlementExportRow,
   SettlementInput,
 } from "./types";
 
@@ -40,15 +43,22 @@ const CONTRACT_TO_CAMPAIGN_STATUS: Record<Exclude<ContractStatus, "canceled">, s
   settled: "done",
 };
 
-/** 리스트/스케줄 연동에 필요한 계약 행 최소 필드 */
+/** 리스트/스케줄/지출 연동에 필요한 계약 행 최소 필드 */
 interface ContractLinkRow {
   id: string;
   influencer_id: string | null;
   campaign_id: string | null;
+  expense_id: string | null;
+  name: string;
+  instagram_handle: string;
   collab_type: "paid" | "seeding";
   product: "tree_150" | "tree_180";
   agreed_value: number | null;
   ad_fee_total: number | null;
+  secondary_usage: "free" | "paid" | "not_allowed";
+  secondary_usage_fee: number | null;
+  raw_footage: "free" | "paid" | "not_provided";
+  raw_footage_fee: number | null;
   product_ship_date: string | null;
   post_planned_date: string | null;
   post_actual_date: string | null;
@@ -56,7 +66,8 @@ interface ContractLinkRow {
 }
 
 const LINK_COLUMNS =
-  "id, influencer_id, campaign_id, collab_type, product, agreed_value, ad_fee_total, " +
+  "id, influencer_id, campaign_id, expense_id, name, instagram_handle, collab_type, product, " +
+  "agreed_value, ad_fee_total, secondary_usage, secondary_usage_fee, raw_footage, raw_footage_fee, " +
   "product_ship_date, post_planned_date, post_actual_date, contract_status";
 
 /** 연동 화면 3곳(계약/리스트/시딩 스케줄)을 함께 갱신 */
@@ -149,6 +160,77 @@ async function syncCampaign(
   } catch (error) {
     console.error("[contracts] 시딩 스케줄 동기화 실패:", error);
     return row.contract_status === "canceled" ? row.campaign_id : null;
+  }
+}
+
+/** 지출 자동 기록에 쓸 분류 이름 — 없으면 만들고, 숨겨져 있으면 되살린다 */
+const EXPENSE_CATEGORY_NAME = "인플루언서 광고비";
+
+async function ensureExpenseCategory(supabase: SupabaseClient, userId: string): Promise<string> {
+  const { data: existing, error: findErr } = await supabase
+    .from("expense_categories")
+    .select("id, is_active")
+    .eq("name", EXPENSE_CATEGORY_NAME)
+    .maybeSingle();
+  if (findErr) throw findErr;
+  if (existing) {
+    if (!existing.is_active) {
+      await supabase.from("expense_categories").update({ is_active: true }).eq("id", existing.id);
+    }
+    return existing.id as string;
+  }
+  const { data, error } = await supabase
+    .from("expense_categories")
+    .insert({ name: EXPENSE_CATEGORY_NAME, is_sensitive: false, sort_order: 50, created_by: userId })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+/**
+ * 정산 완료 → 지출관리 자동 기록. 이미 기록됐으면(expense_id) 건너뛴다.
+ * 상태 변경 이후의 후처리라 실패해도 throw 하지 않는다(반환 금액 0 → 화면이 안내).
+ */
+async function recordSettlementExpense(
+  supabase: SupabaseClient,
+  userId: string,
+  row: ContractLinkRow,
+): Promise<number> {
+  try {
+    if (row.contract_status !== "settled" || row.expense_id) return 0;
+    const payout = getContractPayout(row);
+    if (payout <= 0) return 0;
+
+    const categoryId = await ensureExpenseCategory(supabase, userId);
+    const handle = row.instagram_handle ? ` (@${row.instagram_handle})` : "";
+    const { data, error } = await supabase
+      .from("expenses")
+      .insert({
+        expense_date: toDateString(kstNow()),
+        vendor: row.name,
+        description: `TMA 계약 정산 — ${row.name}${handle}`,
+        amount_krw: payout,
+        currency: "KRW",
+        amount_foreign: null,
+        payment_method: "계좌이체",
+        category_id: categoryId,
+        source: "manual",
+        created_by: userId,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    await supabase
+      .from("influencer_contracts")
+      .update({ expense_id: data.id })
+      .eq("id", row.id);
+    revalidatePath("/dashboard/expenses");
+    return payout;
+  } catch (error) {
+    console.error("[contracts] 지출 자동 기록 실패:", error);
+    return 0;
   }
 }
 
@@ -283,8 +365,9 @@ export async function createContract(input: ContractInput): Promise<ContractSave
   const row = data as unknown as ContractLinkRow;
   const campaignId = await syncCampaign(supabase, userId, row);
   await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
+  const expenseAmount = await recordSettlementExpense(supabase, userId, row);
   revalidateLinkedPaths();
-  return { id: row.id, scheduled: Boolean(campaignId), addedToList: link.addedToList };
+  return { id: row.id, scheduled: Boolean(campaignId), addedToList: link.addedToList, expenseAmount };
 }
 
 export async function updateContract(id: string, input: ContractInput): Promise<ContractSaveResult> {
@@ -318,12 +401,19 @@ export async function updateContract(id: string, input: ContractInput): Promise<
   const row = data as unknown as ContractLinkRow;
   const campaignId = await syncCampaign(supabase, userId, row);
   await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
+  const expenseAmount = await recordSettlementExpense(supabase, userId, row);
   revalidateLinkedPaths();
-  return { id: row.id, scheduled: Boolean(campaignId), addedToList: link.addedToList };
+  return { id: row.id, scheduled: Boolean(campaignId), addedToList: link.addedToList, expenseAmount };
 }
 
-/** 표에서 배지 클릭으로 상태만 바꾸는 경량 액션 — 시딩 캠페인 상태도 따라간다 */
-export async function updateContractStatus(id: string, status: ContractStatus): Promise<void> {
+/**
+ * 표에서 배지 클릭으로 상태만 바꾸는 경량 액션 — 시딩 캠페인 상태도 따라가고,
+ * '정산 완료'로 바뀌면 지출을 자동 기록한다(기록 금액 반환, 없으면 0).
+ */
+export async function updateContractStatus(
+  id: string,
+  status: ContractStatus,
+): Promise<{ expenseAmount: number }> {
   const { supabase, userId } = await getSessionUser();
   if (!includes(CONTRACT_STATUS_ORDER, status)) throw new Error("계약 상태 값이 잘못되었습니다.");
   const { data, error } = await supabase
@@ -338,7 +428,9 @@ export async function updateContractStatus(id: string, status: ContractStatus): 
   const row = data as unknown as ContractLinkRow;
   const campaignId = await syncCampaign(supabase, userId, row);
   await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
+  const expenseAmount = await recordSettlementExpense(supabase, userId, row);
   revalidateLinkedPaths();
+  return { expenseAmount };
 }
 
 /** 소프트 삭제 — DB에 DELETE 정책이 없어 실수로도 완전 삭제되지 않는다. 연동된 캠페인은 스케줄에서 제거. */
@@ -436,6 +528,55 @@ export async function upsertSettlement(contractId: string, input: SettlementInpu
     if (error) throw new Error(`정산 정보 저장에 실패했습니다: ${error.message}`);
   }
   revalidatePath(CONTRACTS_PATH);
+}
+
+/**
+ * 정산 자료 내보내기용 일괄 조회 — 잠금 해제 상태에서만.
+ * 선택한 계약들의 정산 정보를 복호화하고, 신분증은 짧은 임시 링크(2분)로 함께 준다.
+ * ZIP 은 브라우저에서 조립한다(서버 메모리에 개인정보 파일을 쌓지 않기 위함).
+ */
+export async function getSettlementsForExport(
+  contractIds: string[],
+): Promise<SettlementExportRow[]> {
+  const { supabase, userId } = await getSessionUser();
+  await requireUnlock(userId);
+
+  if (!Array.isArray(contractIds) || contractIds.length === 0) return [];
+  if (contractIds.length > 200) throw new Error("한 번에 200명까지만 내보낼 수 있습니다.");
+  if (!contractIds.every((id) => UUID_RE.test(id))) throw new Error("선택 정보가 잘못되었습니다.");
+
+  const { data, error } = await supabase
+    .from("influencer_contract_settlements")
+    .select("contract_id, phone_enc, address_enc, bank_name_enc, bank_account_enc, account_holder_enc, id_card_path, id_card_name")
+    .in("contract_id", contractIds);
+  if (error) throw new Error(`정산 정보를 불러오지 못했습니다: ${error.message}`);
+
+  const rows = data ?? [];
+  const paths = rows
+    .map((r) => r.id_card_path as string | null)
+    .filter((p): p is string => Boolean(p));
+  const urlByPath = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data: signed, error: signErr } = await supabase.storage
+      .from(CONTRACT_DOCS_BUCKET)
+      .createSignedUrls(paths, 120);
+    if (signErr) throw new Error(`신분증 파일 주소를 만들지 못했습니다: ${signErr.message}`);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
+    }
+  }
+
+  return rows.map((r) => ({
+    contract_id: r.contract_id as string,
+    phone: decryptSecret(r.phone_enc),
+    address: decryptSecret(r.address_enc),
+    bank_name: decryptSecret(r.bank_name_enc),
+    bank_account: decryptSecret(r.bank_account_enc),
+    account_holder: decryptSecret(r.account_holder_enc),
+    id_card_path: (r.id_card_path as string | null) ?? null,
+    id_card_name: (r.id_card_name as string | null) ?? null,
+    id_card_url: r.id_card_path ? (urlByPath.get(r.id_card_path as string) ?? null) : null,
+  }));
 }
 
 /** 신분증 파일 열람용 임시 링크(60초). 잠금 해제 상태에서만 발급. */

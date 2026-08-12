@@ -21,6 +21,7 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.110.2",
     "idb": "^8.0.3",
+    "jszip": "^3.10.1",
     "next": "16.2.11",
     "pg": "^8.20.0",
     "phosphor-react": "^1.4.1",

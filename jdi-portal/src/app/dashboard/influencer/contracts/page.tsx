@@ -9,9 +9,27 @@ import ContractsPageClient from "@/components/dashboard/influencer/contracts/Con
 
 export const metadata = { title: "TMA 계약 관리 | JDI" };
 
-export default async function ContractsPage() {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default async function ContractsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const auth = await getAuthUser();
   if (!auth) redirect("/login");
+
+  // 리스트 탭 "TMA 계약 만들기" → ?prefillId=...&prefillName=...&prefillHandle=...
+  const params = await searchParams;
+  const prefillId = typeof params.prefillId === "string" ? params.prefillId : "";
+  const prefill =
+    prefillId && UUID_RE.test(prefillId)
+      ? {
+          influencerId: prefillId,
+          name: typeof params.prefillName === "string" ? params.prefillName : "",
+          handle: typeof params.prefillHandle === "string" ? params.prefillHandle : "",
+        }
+      : null;
 
   try {
     const [contracts, settlementContractIds, gateConfigured] = await Promise.all([
@@ -31,6 +49,7 @@ export default async function ContractsPage() {
         settlementContractIds={settlementContractIds}
         gateConfigured={gateConfigured}
         initialUnlocked={initialUnlocked}
+        prefill={prefill}
       />
     );
   } catch (error) {
