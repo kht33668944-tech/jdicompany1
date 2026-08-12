@@ -162,6 +162,8 @@ export async function updateSession(request: NextRequest) {
   const allowTransientPassThrough = isTransientAuthError && isSafeToPassThrough;
 
   // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
+  // (/sign, /api/sign 은 인플루언서 전자서명 공개 경로 — 서명 토큰이 인가 수단이며,
+  //  서버가 service role 로 토큰을 검증한다. 로그인 화면으로 보내면 안 된다.)
   if (
     !user &&
     !allowTransientPassThrough &&
@@ -169,7 +171,9 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/signup") &&
     !request.nextUrl.pathname.startsWith("/forgot-password") &&
     !request.nextUrl.pathname.startsWith("/reset-password") &&
-    !request.nextUrl.pathname.startsWith("/auth")
+    !request.nextUrl.pathname.startsWith("/auth") &&
+    !request.nextUrl.pathname.startsWith("/sign/") &&
+    !request.nextUrl.pathname.startsWith("/api/sign/")
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

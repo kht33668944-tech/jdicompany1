@@ -36,6 +36,9 @@ const nextConfig: NextConfig = {
   // 저장소 루트(래퍼)가 아니라 이 앱을 추적 기준으로 삼아
   // .next/standalone/server.js 가 항상 같은 위치에 생기게 한다.
   outputFileTracingRoot: __dirname,
+  // pdfmake(내부 pdfkit)는 런타임에 폰트/AFM 파일을 fs 로 읽어 번들링하면 깨진다.
+  // 번들에 넣지 않고 node_modules 에서 그대로 require 하게 한다(standalone 추적은 자동).
+  serverExternalPackages: ["pdfmake"],
   experimental: {
     // 배럴 import 최적화 — phosphor-react(58MB)·recharts·dnd가 쓰는 아이콘/모듈만 골라 번들
     // → 모든 대시보드 페이지의 초기 JS 번들 수백 KB 절감

@@ -19,6 +19,8 @@ const read = (rel) => readFileSync(path.join(root, rel), "utf8");
 const migration = read("supabase/migrations/119_influencer_contracts.sql");
 const queries = read("src/lib/influencer/contracts/queries.ts");
 const actions = read("src/lib/influencer/contracts/actions.ts");
+// 저장 후처리(캠페인 동기화·지출 기록)는 전자서명 흐름과 공유하려고 linkSync.ts 로 분리됨
+const linkSync = read("src/lib/influencer/contracts/linkSync.ts");
 const labels = read("src/lib/influencer/contracts/labels.ts");
 
 // ------------------------------------------------------------
@@ -101,9 +103,9 @@ test("삭제 액션: 소프트 삭제(is_deleted)만 쓰고 .delete() 를 쓰지
 });
 
 test("액션: 화면 갱신이 계약/리스트/스케줄 세 경로를 함께 가리킨다", () => {
-  assert.match(actions, /CONTRACTS_PATH = "\/dashboard\/influencer\/contracts"/);
-  assert.match(actions, /revalidatePath\("\/dashboard\/influencer"\)/);
-  assert.match(actions, /revalidatePath\("\/dashboard\/influencer\/schedule"\)/);
+  assert.match(linkSync, /CONTRACTS_PATH = "\/dashboard\/influencer\/contracts"/);
+  assert.match(linkSync, /revalidatePath\("\/dashboard\/influencer"\)/);
+  assert.match(linkSync, /revalidatePath\("\/dashboard\/influencer\/schedule"\)/);
 });
 
 // ------------------------------------------------------------
@@ -129,25 +131,25 @@ test("연동: 생성/수정/상태변경/삭제가 전부 시딩 캠페인을 �
     );
   }
   // 공통 후처리 헬퍼가 동기화 + 지출 기록을 모두 품고, 독립 작업은 병렬로 돈다
-  const start = actions.indexOf("async function finishContractSave");
+  const start = linkSync.indexOf("export async function finishContractSave");
   assert.ok(start >= 0, "finishContractSave 헬퍼가 없습니다");
-  const body = actions.slice(start, actions.indexOf("export async function", start));
+  const body = linkSync.slice(start);
   assert.match(body, /syncCampaign\(/);
   assert.match(body, /recordSettlementExpense\(/);
   assert.match(body, /Promise\.all/);
 });
 
 test("연동: 취소/삭제 시 캠페인을 스케줄에서 내린다", () => {
-  const start = actions.indexOf("async function syncCampaign");
+  const start = linkSync.indexOf("export async function syncCampaign");
   assert.ok(start >= 0);
-  const body = actions.slice(start, actions.indexOf("export async function", start));
+  const body = linkSync.slice(start, linkSync.indexOf("async function ensureExpenseCategory"));
   assert.match(body, /"canceled"[\s\S]*?\.delete\(\)/, "취소된 계약의 캠페인 제거 분기가 없습니다");
 });
 
 test("연동: 리스트 자동 등록 실패가 계약 저장을 막지 않는다(try/catch)", () => {
   const start = actions.indexOf("async function resolveInfluencerLink");
   assert.ok(start >= 0);
-  const body = actions.slice(start, actions.indexOf("async function syncCampaign"));
+  const body = actions.slice(start, actions.indexOf("async function getSessionUser"));
   assert.match(body, /addInfluencer\(/);
   assert.match(body, /catch/, "addInfluencer 실패를 잡아 계약 저장을 계속해야 합니다");
 });
@@ -196,9 +198,9 @@ test("알림 SQL의 임박 기준·단계 억제 규칙이 화면 상수와 일�
 });
 
 test("지출 자동 기록: 중복 방지 + 실패해도 상태 변경 유지(try/catch)", () => {
-  const start = actions.indexOf("async function recordSettlementExpense");
+  const start = linkSync.indexOf("async function recordSettlementExpense");
   assert.ok(start >= 0, "recordSettlementExpense 가 없습니다");
-  const body = actions.slice(start, actions.indexOf("/** 동기화 결과"));
+  const body = linkSync.slice(start, linkSync.indexOf("/** 동기화 결과"));
   assert.match(body, /row\.expense_id\) return 0/, "expense_id 중복 방지 조건이 없습니다");
   assert.match(body, /catch/, "지출 기록 실패가 상태 변경을 되돌리면 안 됩니다");
   assert.match(body, /getContractPayout\(/);
