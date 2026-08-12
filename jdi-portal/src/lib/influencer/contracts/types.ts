@@ -22,6 +22,10 @@ export type RequiredFilesStatus = "none" | "partial" | "complete";
 /** 계약 1건 (목록/상세 공용 — created_by/season/is_deleted 는 화면에 안 쓰므로 조회하지 않음) */
 export interface InfluencerContract {
   id: string;
+  /** 리스트(influencers) 연결 — 자동완성으로 고르거나 인스타 계정으로 자동 매칭 (마이그 120) */
+  influencer_id: string | null;
+  /** 시딩 스케줄(influencer_campaigns) 연결 — 서버가 자동 생성·동기화, 폼 입력 아님 */
+  campaign_id: string | null;
   name: string;
   instagram_handle: string;
   collab_type: CollabType;
@@ -57,8 +61,17 @@ export interface InfluencerContract {
   updated_at: string;
 }
 
-/** 추가/수정 폼 입력 (서버가 채우는 필드 제외) */
-export type ContractInput = Omit<InfluencerContract, "id" | "created_at" | "updated_at">;
+/** 추가/수정 폼 입력 (서버가 채우는 필드 제외 — campaign_id 는 서버 전용) */
+export type ContractInput = Omit<InfluencerContract, "id" | "campaign_id" | "created_at" | "updated_at">;
+
+/** 계약 저장 결과 — 연동 상황을 화면 안내에 쓴다 */
+export interface ContractSaveResult {
+  id: string;
+  /** 시딩 스케줄에 캠페인이 연결되어 있는가 */
+  scheduled: boolean;
+  /** 이번 저장에서 리스트에 새로 자동 등록됐는가 */
+  addedToList: boolean;
+}
 
 /**
  * 정산 정보 — 서버 액션이 2차 비밀번호 잠금 확인 후 복호화해서 반환하는 평문.

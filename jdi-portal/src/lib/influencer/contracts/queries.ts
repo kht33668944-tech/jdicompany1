@@ -6,7 +6,7 @@ import type { InfluencerContract } from "./types";
 
 /** 목록 화면에 내려보내는 컬럼 — 정산 개인정보(*_enc)는 절대 포함하지 않는다. */
 const CONTRACT_COLUMNS =
-  "id, name, instagram_handle, collab_type, product, product_detail, retail_price, " +
+  "id, influencer_id, campaign_id, name, instagram_handle, collab_type, product, product_detail, retail_price, " +
   "agreed_value, ad_fee_total, ad_fee_vat_included, settlement_type, business_reg_no, " +
   "secondary_usage, secondary_usage_fee, secondary_usage_start, secondary_usage_end, " +
   "allow_jdi_sns, allow_meta_ads, allow_edit, partnership_ad_access, " +

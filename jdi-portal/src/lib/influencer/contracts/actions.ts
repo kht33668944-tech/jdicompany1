@@ -7,15 +7,164 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { decryptSecret, encryptSecret, verifyUnlockToken } from "@/lib/vault/crypto";
 import { VAULT_UNLOCK_COOKIE } from "@/lib/vault/constants";
-import { CONTRACT_DOCS_BUCKET, CONTRACTS_SEASON } from "./constants";
-import { CONTRACT_STATUS_ORDER } from "./labels";
-import type { ContractInput, ContractSettlement, ContractStatus, SettlementInput } from "./types";
+import { addInfluencer } from "@/lib/influencer/actions";
+import { CONTRACT_DOCS_BUCKET, CONTRACTS_SEASON, TMA_CAMPAIGN_NAME } from "./constants";
+import { CONTRACT_STATUS_ORDER, PRODUCT_LABEL } from "./labels";
+import type {
+  ContractInput,
+  ContractSaveResult,
+  ContractSettlement,
+  ContractStatus,
+  SettlementInput,
+} from "./types";
 
 const CONTRACTS_PATH = "/dashboard/influencer/contracts";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HANDLE_RE = /^[a-zA-Z0-9._]{1,30}$/;
+
+/** 계약 상태 → 시딩 캠페인 상태 매핑 (취소는 캠페인 제거로 처리) */
+const CONTRACT_TO_CAMPAIGN_STATUS: Record<Exclude<ContractStatus, "canceled">, string> = {
+  candidate: "planned",
+  dm_sent: "dm_sent",
+  negotiating: "replied",
+  contract_sent: "replied",
+  signed: "replied",
+  product_shipped: "shipped",
+  draft_received: "shipped",
+  posted: "posted",
+  settled: "done",
+};
+
+/** 리스트/스케줄 연동에 필요한 계약 행 최소 필드 */
+interface ContractLinkRow {
+  id: string;
+  influencer_id: string | null;
+  campaign_id: string | null;
+  collab_type: "paid" | "seeding";
+  product: "tree_150" | "tree_180";
+  agreed_value: number | null;
+  ad_fee_total: number | null;
+  product_ship_date: string | null;
+  post_planned_date: string | null;
+  post_actual_date: string | null;
+  contract_status: ContractStatus;
+}
+
+const LINK_COLUMNS =
+  "id, influencer_id, campaign_id, collab_type, product, agreed_value, ad_fee_total, " +
+  "product_ship_date, post_planned_date, post_actual_date, contract_status";
+
+/** 연동 화면 3곳(계약/리스트/시딩 스케줄)을 함께 갱신 */
+function revalidateLinkedPaths() {
+  revalidatePath(CONTRACTS_PATH);
+  revalidatePath("/dashboard/influencer");
+  revalidatePath("/dashboard/influencer/schedule");
+}
+
+/**
+ * 인플루언서 리스트 연결 확정.
+ * 자동완성으로 고른 id 가 있으면 그대로, 없으면 인스타 계정으로 기존 리스트를 찾고,
+ * 그래도 없으면 리스트에 자동 등록한다(분석 포함 — 실패해도 계약 저장은 막지 않는다).
+ */
+async function resolveInfluencerLink(
+  supabase: SupabaseClient,
+  instagramHandle: string,
+  pickedId: string | null,
+): Promise<{ influencerId: string | null; addedToList: boolean }> {
+  if (pickedId) return { influencerId: pickedId, addedToList: false };
+  const handle = instagramHandle.trim().replace(/^@/, "");
+  if (!handle || !HANDLE_RE.test(handle)) return { influencerId: null, addedToList: false };
+
+  const { data: existing } = await supabase
+    .from("influencers")
+    .select("id")
+    .eq("platform", "instagram")
+    .eq("username", handle)
+    .maybeSingle();
+  if (existing) return { influencerId: existing.id as string, addedToList: false };
+
+  try {
+    const added = await addInfluencer(`https://www.instagram.com/${handle}/`);
+    return { influencerId: added.influencer_id, addedToList: !added.alreadyExisted };
+  } catch (error) {
+    // 수집 실패(비공개 계정, 오타 등)여도 계약 저장은 계속한다 — 연동만 빠진다.
+    console.error("[contracts] 리스트 자동 등록 실패:", error);
+    return { influencerId: null, addedToList: false };
+  }
+}
+
+/**
+ * 계약 → 시딩 캠페인 단방향 동기화. 반환값은 최종 campaign_id(연동 없음/제거면 null).
+ * 계약 저장 이후에 도는 후처리라, 실패해도 throw 하지 않고 연동만 빠진 상태로 둔다
+ * (호출부가 scheduled=false 로 화면에 알린다).
+ */
+async function syncCampaign(
+  supabase: SupabaseClient,
+  userId: string,
+  row: ContractLinkRow,
+): Promise<string | null> {
+  try {
+    if (row.contract_status === "canceled" || !row.influencer_id) {
+      if (row.campaign_id) {
+        const { error } = await supabase
+          .from("influencer_campaigns")
+          .delete()
+          .eq("id", row.campaign_id);
+        if (error) throw error;
+      }
+      return null;
+    }
+
+    const payload = {
+      campaign_name: TMA_CAMPAIGN_NAME,
+      status: CONTRACT_TO_CAMPAIGN_STATUS[row.contract_status],
+      product_name: PRODUCT_LABEL[row.product],
+      cost: row.collab_type === "paid" ? row.ad_fee_total : row.agreed_value,
+      ship_date: row.product_ship_date,
+      expected_post_date: row.post_planned_date,
+      actual_post_date: row.post_actual_date,
+    };
+
+    if (row.campaign_id) {
+      const { error } = await supabase
+        .from("influencer_campaigns")
+        .update(payload)
+        .eq("id", row.campaign_id);
+      if (error) throw error;
+      return row.campaign_id;
+    }
+
+    const { data, error } = await supabase
+      .from("influencer_campaigns")
+      .insert({ influencer_id: row.influencer_id, created_by: userId, ...payload })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return data.id as string;
+  } catch (error) {
+    console.error("[contracts] 시딩 스케줄 동기화 실패:", error);
+    return row.contract_status === "canceled" ? row.campaign_id : null;
+  }
+}
+
+/** 동기화 결과(campaign_id)를 계약 행에 반영 */
+async function saveCampaignId(
+  supabase: SupabaseClient,
+  contractId: string,
+  before: string | null,
+  after: string | null,
+): Promise<void> {
+  if (before === after) return;
+  await supabase
+    .from("influencer_contracts")
+    .update({ campaign_id: after })
+    .eq("id", contractId);
+}
 
 async function getSessionUser() {
   const supabase = await createClient();
@@ -76,6 +225,10 @@ function validateContractInput(input: ContractInput): ContractInput {
   if (!includes(CONTRACT_STATUS_ORDER, input.contract_status))
     throw new Error("계약 상태 값이 잘못되었습니다.");
 
+  if (input.influencer_id !== null && !UUID_RE.test(input.influencer_id)) {
+    throw new Error("리스트 연결 정보가 잘못되었습니다.");
+  }
+
   const modusign_url = input.modusign_url?.trim() || null;
   if (modusign_url) {
     let parsed: URL;
@@ -114,53 +267,98 @@ function validateContractInput(input: ContractInput): ContractInput {
 // ============================================================
 // 계약 CRUD
 // ============================================================
-export async function createContract(input: ContractInput): Promise<string> {
+export async function createContract(input: ContractInput): Promise<ContractSaveResult> {
   const { supabase, userId } = await getSessionUser();
   const valid = validateContractInput(input);
+
+  // 리스트 연결(없으면 자동 등록) → 계약 저장 → 시딩 캠페인 생성
+  const link = await resolveInfluencerLink(supabase, valid.instagram_handle, valid.influencer_id);
   const { data, error } = await supabase
     .from("influencer_contracts")
-    .insert({ ...valid, season: CONTRACTS_SEASON, created_by: userId })
-    .select("id")
+    .insert({ ...valid, influencer_id: link.influencerId, season: CONTRACTS_SEASON, created_by: userId })
+    .select(LINK_COLUMNS)
     .single();
   if (error) throw new Error(`계약 추가에 실패했습니다: ${error.message}`);
-  revalidatePath(CONTRACTS_PATH);
-  return data.id as string;
+
+  const row = data as unknown as ContractLinkRow;
+  const campaignId = await syncCampaign(supabase, userId, row);
+  await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
+  revalidateLinkedPaths();
+  return { id: row.id, scheduled: Boolean(campaignId), addedToList: link.addedToList };
 }
 
-export async function updateContract(id: string, input: ContractInput): Promise<void> {
-  const { supabase } = await getSessionUser();
+export async function updateContract(id: string, input: ContractInput): Promise<ContractSaveResult> {
+  const { supabase, userId } = await getSessionUser();
   const valid = validateContractInput(input);
-  const { error } = await supabase
+
+  const { data: current, error: findErr } = await supabase
     .from("influencer_contracts")
-    .update(valid)
+    .select("influencer_id, campaign_id")
     .eq("id", id)
-    .eq("is_deleted", false);
+    .eq("is_deleted", false)
+    .maybeSingle();
+  if (findErr) throw new Error(`계약 확인에 실패했습니다: ${findErr.message}`);
+  if (!current) throw new Error("계약을 찾을 수 없습니다.");
+
+  // 이미 연결돼 있으면 유지, 없으면 이번 입력으로 연결 시도
+  const link = await resolveInfluencerLink(
+    supabase,
+    valid.instagram_handle,
+    valid.influencer_id ?? (current.influencer_id as string | null),
+  );
+  const { data, error } = await supabase
+    .from("influencer_contracts")
+    .update({ ...valid, influencer_id: link.influencerId })
+    .eq("id", id)
+    .eq("is_deleted", false)
+    .select(LINK_COLUMNS)
+    .single();
   if (error) throw new Error(`계약 수정에 실패했습니다: ${error.message}`);
-  revalidatePath(CONTRACTS_PATH);
+
+  const row = data as unknown as ContractLinkRow;
+  const campaignId = await syncCampaign(supabase, userId, row);
+  await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
+  revalidateLinkedPaths();
+  return { id: row.id, scheduled: Boolean(campaignId), addedToList: link.addedToList };
 }
 
-/** 표에서 배지 클릭으로 상태만 바꾸는 경량 액션 */
+/** 표에서 배지 클릭으로 상태만 바꾸는 경량 액션 — 시딩 캠페인 상태도 따라간다 */
 export async function updateContractStatus(id: string, status: ContractStatus): Promise<void> {
-  const { supabase } = await getSessionUser();
+  const { supabase, userId } = await getSessionUser();
   if (!includes(CONTRACT_STATUS_ORDER, status)) throw new Error("계약 상태 값이 잘못되었습니다.");
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("influencer_contracts")
     .update({ contract_status: status })
     .eq("id", id)
-    .eq("is_deleted", false);
+    .eq("is_deleted", false)
+    .select(LINK_COLUMNS)
+    .single();
   if (error) throw new Error(`상태 변경에 실패했습니다: ${error.message}`);
-  revalidatePath(CONTRACTS_PATH);
+
+  const row = data as unknown as ContractLinkRow;
+  const campaignId = await syncCampaign(supabase, userId, row);
+  await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
+  revalidateLinkedPaths();
 }
 
-/** 소프트 삭제 — DB에 DELETE 정책이 없어 실수로도 완전 삭제되지 않는다. */
+/** 소프트 삭제 — DB에 DELETE 정책이 없어 실수로도 완전 삭제되지 않는다. 연동된 캠페인은 스케줄에서 제거. */
 export async function deleteContract(id: string): Promise<void> {
-  const { supabase } = await getSessionUser();
-  const { error } = await supabase
+  const { supabase, userId } = await getSessionUser();
+  const { data, error } = await supabase
     .from("influencer_contracts")
     .update({ is_deleted: true })
-    .eq("id", id);
+    .eq("id", id)
+    .select(LINK_COLUMNS)
+    .single();
   if (error) throw new Error(`계약 삭제에 실패했습니다: ${error.message}`);
-  revalidatePath(CONTRACTS_PATH);
+
+  const row = data as unknown as ContractLinkRow;
+  if (row.campaign_id) {
+    // 계약이 사라지면 스케줄에서도 내린다 (취소와 동일 처리)
+    const campaignId = await syncCampaign(supabase, userId, { ...row, contract_status: "canceled" });
+    await saveCampaignId(supabase, row.id, row.campaign_id, campaignId);
+  }
+  revalidateLinkedPaths();
 }
 
 // ============================================================

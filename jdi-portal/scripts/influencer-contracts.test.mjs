@@ -94,9 +94,45 @@ test("삭제 액션: 소프트 삭제(is_deleted)만 쓰고 .delete() 를 쓰지
   assert.doesNotMatch(body, /\.delete\(/);
 });
 
-test("액션: 화면 갱신 경로가 계약 페이지를 가리킨다", () => {
-  assert.match(actions, /revalidatePath\(CONTRACTS_PATH\)/);
+test("액션: 화면 갱신이 계약/리스트/스케줄 세 경로를 함께 가리킨다", () => {
   assert.match(actions, /CONTRACTS_PATH = "\/dashboard\/influencer\/contracts"/);
+  assert.match(actions, /revalidatePath\("\/dashboard\/influencer"\)/);
+  assert.match(actions, /revalidatePath\("\/dashboard\/influencer\/schedule"\)/);
+});
+
+// ------------------------------------------------------------
+// 리스트/시딩 스케줄 연동 (마이그 120)
+// ------------------------------------------------------------
+const migration120 = read("supabase/migrations/120_influencer_contracts_link.sql");
+
+test("마이그 120: 연결 컬럼이 멱등으로 추가되고 SET NULL 로 끊긴다", () => {
+  assert.match(migration120, /ADD COLUMN IF NOT EXISTS influencer_id[\s\S]*?ON DELETE SET NULL/);
+  assert.match(migration120, /ADD COLUMN IF NOT EXISTS campaign_id[\s\S]*?ON DELETE SET NULL/);
+});
+
+test("연동: 생성/수정/상태변경/삭제가 전부 시딩 캠페인을 동기화한다", () => {
+  for (const fn of ["createContract", "updateContract", "updateContractStatus", "deleteContract"]) {
+    const start = actions.indexOf(`export async function ${fn}`);
+    assert.ok(start >= 0, `${fn} 액션이 없습니다`);
+    const nextExport = actions.indexOf("export async function", start + 1);
+    const body = actions.slice(start, nextExport === -1 ? undefined : nextExport);
+    assert.match(body, /syncCampaign\(/, `${fn} 이 시딩 캠페인 동기화를 빠뜨렸습니다`);
+  }
+});
+
+test("연동: 취소/삭제 시 캠페인을 스케줄에서 내린다", () => {
+  const start = actions.indexOf("async function syncCampaign");
+  assert.ok(start >= 0);
+  const body = actions.slice(start, actions.indexOf("export async function", start));
+  assert.match(body, /"canceled"[\s\S]*?\.delete\(\)/, "취소된 계약의 캠페인 제거 분기가 없습니다");
+});
+
+test("연동: 리스트 자동 등록 실패가 계약 저장을 막지 않는다(try/catch)", () => {
+  const start = actions.indexOf("async function resolveInfluencerLink");
+  assert.ok(start >= 0);
+  const body = actions.slice(start, actions.indexOf("async function syncCampaign"));
+  assert.match(body, /addInfluencer\(/);
+  assert.match(body, /catch/, "addInfluencer 실패를 잡아 계약 저장을 계속해야 합니다");
 });
 
 // ------------------------------------------------------------

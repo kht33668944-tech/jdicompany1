@@ -217,6 +217,17 @@ export default function ContractDetailPanel({
             <Row label="협업 유형" value={COLLAB_TYPE_LABEL[contract.collab_type]} />
             <Row label="제공 제품" value={PRODUCT_LABEL[contract.product]} />
             <Row label="제품명·구성" value={contract.product_detail ?? "—"} dim={!contract.product_detail} />
+            <Row
+              label="리스트·스케줄"
+              value={
+                contract.influencer_id
+                  ? contract.campaign_id
+                    ? "연동됨 (시딩 스케줄에 반영)"
+                    : "리스트만 연결됨"
+                  : "연동 안 됨 — 인스타 계정을 입력하면 자동 연동돼요"
+              }
+              dim={!contract.influencer_id}
+            />
           </Section>
 
           <Section title="금액 · 정산 구분">

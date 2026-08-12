@@ -6,6 +6,9 @@ export const CONTRACT_DOCS_BUCKET = "influencer-contract-docs";
 /** 현재 시즌 키. 내년 시즌 전환 시 여기만 바꾸면 된다(테이블에 season 컬럼 준비됨). */
 export const CONTRACTS_SEASON = "2026-tma";
 
+/** 시딩 스케줄에 자동 생성되는 캠페인 이름 */
+export const TMA_CAMPAIGN_NAME = "2026 TMA 트리 협업";
+
 /** 게시 유지 기간(개월) — 실제 게시일 기준 */
 export const POST_RETENTION_MONTHS = 6;
 

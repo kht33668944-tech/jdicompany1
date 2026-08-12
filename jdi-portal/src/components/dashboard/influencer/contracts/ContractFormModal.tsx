@@ -3,11 +3,13 @@
 // 계약 추가/수정 폼 — 협업 유형·2차 활용·원본 제공 선택에 따라 필요한 칸만 보여준다.
 // 정산 정보(개인정보)는 이 폼이 아니라 상세 패널의 잠금 섹션에서 따로 입력한다.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
 import Select from "@/components/shared/Select";
 import { getErrorMessage } from "@/lib/utils/errors";
+import { searchInfluencers } from "@/lib/influencer/actions";
+import type { InfluencerListItem } from "@/lib/influencer/types";
 import { createContract, updateContract } from "@/lib/influencer/contracts/actions";
 import {
   COLLAB_TYPE_OPTIONS,
@@ -119,6 +121,11 @@ function moneyOrNull(value: string, label: string): number | null {
 export default function ContractFormModal({ contract, onClose, onSaved }: Props) {
   const [name, setName] = useState(contract?.name ?? "");
   const [instagramHandle, setInstagramHandle] = useState(contract?.instagram_handle ?? "");
+  // 리스트(influencers) 연결 — 자동완성으로 고르면 채워지고, 없으면 저장 시 서버가 인스타 계정으로 매칭/자동 등록
+  const [influencerId, setInfluencerId] = useState<string | null>(contract?.influencer_id ?? null);
+  const [suggestions, setSuggestions] = useState<InfluencerListItem[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const skipNextSearch = useRef(false);
   const [collabType, setCollabType] = useState<CollabType>(contract?.collab_type ?? "seeding");
   const [contractStatus, setContractStatus] = useState<ContractStatus>(contract?.contract_status ?? "candidate");
 
@@ -159,6 +166,50 @@ export default function ContractFormModal({ contract, onClose, onSaved }: Props)
 
   const retentionEnd = useMemo(() => getRetentionEnd(postActualDate || null), [postActualDate]);
 
+  // 이름 입력 → 기존 리스트에서 자동완성 검색 (300ms 디바운스, 이미 연결됐으면 안 함)
+  useEffect(() => {
+    if (influencerId) return;
+    if (skipNextSearch.current) {
+      skipNextSearch.current = false;
+      return;
+    }
+    const term = name.trim();
+    if (term.length < 2) {
+      setSuggestions([]);
+      setSuggestOpen(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const rows = await searchInfluencers(term);
+        if (!cancelled) {
+          setSuggestions(rows.slice(0, 6));
+          setSuggestOpen(rows.length > 0);
+        }
+      } catch {
+        // 검색 실패는 조용히 무시 — 직접 입력으로 계속 진행 가능
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [name, influencerId]);
+
+  const pickInfluencer = (inf: InfluencerListItem) => {
+    skipNextSearch.current = true;
+    setName(inf.display_name?.trim() || inf.username);
+    setInstagramHandle(inf.username);
+    setInfluencerId(inf.id);
+    setSuggestions([]);
+    setSuggestOpen(false);
+  };
+
+  const unlinkInfluencer = () => {
+    setInfluencerId(null);
+  };
+
   const statusOptions = useMemo(
     () =>
       CONTRACT_STATUS_OPTIONS.map((opt) => ({
@@ -177,6 +228,7 @@ export default function ContractFormModal({ contract, onClose, onSaved }: Props)
     setBusy(true);
     try {
       const input: ContractInput = {
+        influencer_id: influencerId,
         name,
         instagram_handle: instagramHandle,
         collab_type: collabType,
@@ -210,12 +262,13 @@ export default function ContractFormModal({ contract, onClose, onSaved }: Props)
         modusign_url: modusignUrl || null,
         memo: memo || null,
       };
-      if (contract) {
-        await updateContract(contract.id, input);
-        toast.success("계약이 수정되었습니다.");
-      } else {
-        await createContract(input);
-        toast.success("새 계약이 추가되었습니다.");
+      const result = contract
+        ? await updateContract(contract.id, input)
+        : await createContract(input);
+      const base = contract ? "계약이 수정되었습니다." : "새 계약이 추가되었습니다.";
+      toast.success(result.scheduled ? `${base} 시딩 스케줄에도 반영했어요.` : base);
+      if (result.addedToList) {
+        toast.success("리스트에 새로 등록하고 분석을 시작했어요.");
       }
       onSaved();
     } catch (err) {
@@ -236,7 +289,7 @@ export default function ContractFormModal({ contract, onClose, onSaved }: Props)
         <section>
           <SectionTitle>① 기본 정보</SectionTitle>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
+            <div className="relative">
               <label htmlFor="contract-name" className={labelCls}>
                 이름 / 채널명 <span className="text-red-500">*</span>
               </label>
@@ -245,9 +298,54 @@ export default function ContractFormModal({ contract, onClose, onSaved }: Props)
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="예: 채널 이름"
+                onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
+                placeholder="입력하면 리스트에서 자동으로 찾아요"
+                autoComplete="off"
                 className={inputCls}
               />
+              {suggestOpen && suggestions.length > 0 && (
+                <ul
+                  className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-100 bg-white p-1 shadow-xl shadow-slate-900/10"
+                  role="listbox"
+                  aria-label="리스트에서 찾은 인플루언서"
+                >
+                  {suggestions.map((inf) => (
+                    <li key={inf.id}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => pickInfluencer(inf)}
+                        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left hover:bg-blue-50"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-slate-700">
+                            {inf.display_name?.trim() || inf.username}
+                          </span>
+                          <span className="block text-xs text-slate-400">@{inf.username}</span>
+                        </span>
+                        {typeof inf.follower_count === "number" && (
+                          <span className="shrink-0 text-xs text-slate-400 tabular-nums">
+                            팔로워 {inf.follower_count.toLocaleString("ko-KR")}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {influencerId && (
+                <p className="ml-1 mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                  ✓ 리스트 연결됨 {instagramHandle && `@${instagramHandle}`}
+                  <button
+                    type="button"
+                    onClick={unlinkInfluencer}
+                    className="text-emerald-500 hover:text-emerald-800"
+                    aria-label="리스트 연결 해제"
+                  >
+                    ×
+                  </button>
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="contract-handle" className={labelCls}>Instagram 계정</label>
@@ -259,6 +357,11 @@ export default function ContractFormModal({ contract, onClose, onSaved }: Props)
                 placeholder="@ 없이 입력"
                 className={inputCls}
               />
+              {!influencerId && (
+                <p className="ml-1 mt-1 text-xs text-slate-400">
+                  계정을 넣으면 저장할 때 리스트·시딩 스케줄에 자동으로 연동돼요.
+                </p>
+              )}
             </div>
             <div>
               <span className={labelCls}>협업 유형</span>
