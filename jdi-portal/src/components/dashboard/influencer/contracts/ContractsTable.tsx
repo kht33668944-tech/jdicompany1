@@ -34,6 +34,9 @@ interface Props {
   onToggleAll: (on: boolean) => void;
   onSelect: (id: string) => void;
   onStatusChange: (id: string, status: ContractStatus) => void;
+  searchTerm: string;
+  /** 검색 결과가 없을 때 "검색어로 새 계약 만들기" */
+  onCreateFromSearch: () => void;
 }
 
 const statusIndex = (s: ContractStatus) => CONTRACT_STATUS_ORDER.indexOf(s);
@@ -89,21 +92,34 @@ export default function ContractsTable({
   onToggleAll,
   onSelect,
   onStatusChange,
+  searchTerm,
+  onCreateFromSearch,
 }: Props) {
   const allSelected = contracts.length > 0 && contracts.every((c) => selectedIds.has(c.id));
-  const emptyMessage =
-    totalCount === 0
+  // 검색 중이면 "계약이 없다"보다 "이 이름으로 만들기"가 먼저다
+  const emptyMessage = hasSearch
+    ? "등록된 계약 중에는 검색 결과가 없어요."
+    : totalCount === 0
       ? "아직 등록된 계약이 없어요. ‘새 계약 추가’를 눌러 시작하세요."
-      : hasSearch
-        ? "검색 결과가 없어요."
-        : hasActiveFilter
-          ? "필터에 맞는 계약이 없어요."
-          : "표시할 계약이 없어요.";
+      : hasActiveFilter
+        ? "필터에 맞는 계약이 없어요."
+        : "표시할 계약이 없어요.";
 
   return (
     <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] min-h-[320px] border-t border-slate-100">
       {contracts.length === 0 ? (
-        <div className="py-16 text-center text-sm text-slate-400">{emptyMessage}</div>
+        <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-slate-400">
+          <p>{emptyMessage}</p>
+          {hasSearch && (
+            <button
+              type="button"
+              onClick={onCreateFromSearch}
+              className="rounded-xl bg-[#2563eb] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 active:scale-95 transition-all"
+            >
+              ＋ ‘{searchTerm}’(으)로 새 계약 만들기
+            </button>
+          )}
+        </div>
       ) : (
         <table className="w-full min-w-[1150px] border-collapse">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">

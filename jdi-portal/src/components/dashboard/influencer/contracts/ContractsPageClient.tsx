@@ -44,11 +44,11 @@ const ContractFormModal = dynamic(() => import("./ContractFormModal"), { ssr: fa
 const SettlementFormModal = dynamic(() => import("./SettlementFormModal"), { ssr: false });
 const SettlementExportModal = dynamic(() => import("./SettlementExportModal"), { ssr: false });
 
-/** 리스트 탭 "TMA 계약 만들기"에서 넘어온 미리 채움 정보 */
+/** 새 계약 폼 미리 채움 — 리스트 탭 "TMA 계약 만들기" 또는 검색어로 만들기에서 사용 */
 export interface ContractPrefill {
-  influencerId: string;
-  name: string;
-  handle: string;
+  influencerId?: string;
+  name?: string;
+  handle?: string;
 }
 
 interface Props {
@@ -82,10 +82,11 @@ export default function ContractsPageClient({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
-  // 리스트 탭에서 넘어온 미리 채움이 있으면 폼을 바로 연다 (URL은 깨끗하게 정리)
-  const [formOpen, setFormOpen] = useState(Boolean(prefill));
-  const [formPrefill] = useState(prefill);
-  const [formContract, setFormContract] = useState<InfluencerContract | null>(null);
+  // 폼 상태: null = 닫힘 / contract = 수정 / prefill = 미리 채움(리스트 원클릭·검색어로 만들기)
+  const [formState, setFormState] = useState<{
+    contract: InfluencerContract | null;
+    prefill: ContractPrefill | null;
+  } | null>(prefill ? { contract: null, prefill } : null);
   const [settlementTarget, setSettlementTarget] = useState<{
     contract: InfluencerContract;
     settlement: ContractSettlement | null;
@@ -230,14 +231,12 @@ export default function ContractsPageClient({
     }
   }, [filtered, today]);
 
-  const openNewForm = () => {
-    setFormContract(null);
-    setFormOpen(true);
-  };
-  const openEditForm = (contract: InfluencerContract) => {
-    setFormContract(contract);
-    setFormOpen(true);
-  };
+  const openNewForm = () => setFormState({ contract: null, prefill: null });
+  const openEditForm = (contract: InfluencerContract) =>
+    setFormState({ contract, prefill: null });
+  /** 검색 결과가 없을 때 검색어 그대로 새 계약 시작 (이름 칸 자동완성이 바로 뜬다) */
+  const openFormFromSearch = () =>
+    setFormState({ contract: null, prefill: { name: search.trim() } });
 
   return (
     <div className="flex flex-col gap-3 sm:gap-4 px-0 py-3 sm:p-6 min-h-0">
@@ -408,6 +407,8 @@ export default function ContractsPageClient({
           onToggleAll={toggleAll}
           onSelect={setSelectedId}
           onStatusChange={handleStatusChange}
+          searchTerm={search.trim()}
+          onCreateFromSearch={openFormFromSearch}
         />
 
         {/* 날짜 강조 안내 */}
@@ -441,13 +442,13 @@ export default function ContractsPageClient({
       />
 
       {/* 계약 폼 */}
-      {formOpen && (
+      {formState && (
         <ContractFormModal
-          contract={formContract}
-          prefill={formContract ? null : formPrefill}
-          onClose={() => setFormOpen(false)}
+          contract={formState.contract}
+          prefill={formState.prefill}
+          onClose={() => setFormState(null)}
           onSaved={() => {
-            setFormOpen(false);
+            setFormState(null);
             handleRefresh();
           }}
         />
