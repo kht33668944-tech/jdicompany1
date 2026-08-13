@@ -6,13 +6,13 @@ import { toast } from "sonner";
 import type { VaultAccount, AccountSecretHistoryItem } from "@/lib/vault/types";
 import {
   listAccounts,
-  unlockVault,
   lockVault,
   deleteAccount,
   getAccountHistory,
 } from "@/lib/vault/actions";
 import AccountFormModal from "./AccountFormModal";
 import GatePasswordModal from "./GatePasswordModal";
+import VaultLockCard from "./VaultLockCard";
 
 interface Props {
   gateConfigured: boolean;
@@ -29,7 +29,6 @@ export default function AccountsTab({ gateConfigured, initialUnlocked, isAdmin, 
   const [unlocked, setUnlocked] = useState(initialUnlocked);
   const [accounts, setAccounts] = useState<VaultAccount[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [password, setPassword] = useState("");
   const [search, setSearch] = useState("");
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
@@ -67,25 +66,6 @@ export default function AccountsTab({ gateConfigured, initialUnlocked, isAdmin, 
         a.tags.some((t) => t.toLowerCase().includes(q)),
     );
   }, [accounts, search]);
-
-  const handleUnlock = async () => {
-    if (!password.trim()) return;
-    setLoading(true);
-    try {
-      const res = await unlockVault(password);
-      if (res.ok) {
-        setPassword("");
-        setUnlocked(true);
-        toast.success("잠금이 해제되었습니다. (20분 유지)");
-      } else {
-        toast.error("2차 비밀번호가 올바르지 않습니다.");
-      }
-    } catch (err) {
-      toast.error(getErrorMessage(err, "잠금 해제 실패"));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLock = async () => {
     await lockVault().catch(() => {});
@@ -167,24 +147,11 @@ export default function AccountsTab({ gateConfigured, initialUnlocked, isAdmin, 
   // 2) 잠금 상태
   if (!unlocked) {
     return (
-      <div className="max-w-md mx-auto rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 grid place-items-center text-2xl mx-auto mb-3">🔒</div>
-        <h3 className="font-extrabold text-slate-800">계정 보관함 · 2차 비밀번호</h3>
-        <p className="text-sm text-slate-500 mt-2 mb-5">직원끼리만 공유하는 2차 비밀번호를 입력하세요.</p>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
-          placeholder="2차 비밀번호"
-          className="w-full text-center tracking-widest bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-          autoFocus
-        />
-        <button type="button" onClick={handleUnlock} disabled={loading} className="w-full px-5 py-3 rounded-xl bg-[#2563eb] text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50">
-          🔓 잠금 해제
-        </button>
-        <p className="text-xs text-slate-400 mt-4">20분 지나면 자동으로 다시 잠깁니다.</p>
-      </div>
+      <VaultLockCard
+        title="계정 보관함 · 2차 비밀번호"
+        description="직원끼리만 공유하는 2차 비밀번호를 입력하세요."
+        onUnlocked={() => setUnlocked(true)}
+      />
     );
   }
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Corporation, VaultDocument } from "@/lib/vault/types";
 import DocumentsTab from "./DocumentsTab";
 import AccountsTab from "./AccountsTab";
+import ContractsVaultTab from "./ContractsVaultTab";
 
 interface VaultPageClientProps {
   initialCorporations: Corporation[];
@@ -14,7 +15,7 @@ interface VaultPageClientProps {
   isAdmin: boolean;
 }
 
-type Tab = "docs" | "acct";
+type Tab = "docs" | "acct" | "contracts";
 
 export default function VaultPageClient({
   initialCorporations,
@@ -55,6 +56,16 @@ export default function VaultPageClient({
           🔑 계정 보관함
           {tab === "acct" && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-brand-600 rounded-full" />}
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("contracts")}
+          className={`relative px-4 py-2.5 text-sm font-bold rounded-t-lg transition-colors ${
+            tab === "contracts" ? "text-brand-600" : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          📝 계약서 보관함
+          {tab === "contracts" && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-brand-600 rounded-full" />}
+        </button>
       </div>
 
       {tab === "docs" ? (
@@ -64,13 +75,15 @@ export default function VaultPageClient({
           isAdmin={isAdmin}
           onChanged={refresh}
         />
-      ) : (
+      ) : tab === "acct" ? (
         <AccountsTab
           gateConfigured={gateConfigured}
           initialUnlocked={initialUnlocked}
           isAdmin={isAdmin}
           onGateChanged={refresh}
         />
+      ) : (
+        <ContractsVaultTab gateConfigured={gateConfigured} initialUnlocked={initialUnlocked} />
       )}
     </div>
   );

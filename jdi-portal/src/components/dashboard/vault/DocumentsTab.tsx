@@ -437,7 +437,18 @@ export default function DocumentsTab({ corporations, documents, isAdmin, onChang
           }}
         />
       )}
-      {previewDoc && <FilePreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {previewDoc && (
+        <FilePreviewModal
+          title={previewDoc.title}
+          fileName={previewDoc.file_name}
+          fetchUrl={async () =>
+            previewDoc.current_storage_path
+              ? getVaultSignedUrl(previewDoc.current_storage_path)
+              : null
+          }
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   );
 }
