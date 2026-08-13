@@ -50,11 +50,14 @@ interface EditorShared {
   fields: FieldDef[];
   terms: TermRow[];
   onTermsChange: (rows: TermRow[]) => void;
+  /** 조건표를 여기서 채우지 않고 "자리만" 잡는 경우(TMA 양식) — 안내만 보여준다 */
+  termsPlaceholder: boolean;
 }
 const SharedContext = createContext<EditorShared>({
   fields: [],
   terms: [],
   onTermsChange: () => {},
+  termsPlaceholder: false,
 });
 
 // ============================================================
@@ -120,10 +123,25 @@ const TERM_INPUT_CLS =
   "w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-[12.5px] text-slate-800 focus:border-blue-400 focus:outline-none";
 
 function TermsBlockView() {
-  const { terms, onTermsChange } = useContext(SharedContext);
+  const { terms, onTermsChange, termsPlaceholder } = useContext(SharedContext);
 
   const setRow = (index: number, patch: Partial<TermRow>) =>
     onTermsChange(terms.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+
+  // 양식 편집(TMA) — 내용은 계약서를 만들 때 채워지므로 자리만 표시한다
+  if (termsPlaceholder) {
+    return (
+      <NodeViewWrapper
+        contentEditable={false}
+        className="my-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3"
+      >
+        <p className="text-[12.5px] font-bold text-slate-500">▦ 개별 조건표 자리</p>
+        <p className="mt-0.5 text-[11.5px] text-slate-400">
+          계약서를 만들 때 이 자리에 조건표(표)가 자동으로 들어가요. 내용은 계약 건마다 채웁니다.
+        </p>
+      </NodeViewWrapper>
+    );
+  }
 
   return (
     <NodeViewWrapper
@@ -216,6 +234,13 @@ interface Props {
   /** 왼쪽 목록에서 칸을 눌렀을 때 문서에서 찾아 강조 */
   highlightFieldKey: string | null;
   onHighlightHandled: () => void;
+  /**
+   * 채움 칸을 쓰지 않는 곳(인플루언서 TMA 양식)에서는 false — 「＋ 칸 넣기」를 감춘다.
+   * TMA 계약서는 값을 조건표로 관리하고 본문에 칸을 심지 않는다.
+   */
+  allowFields?: boolean;
+  /** 조건표를 여기서 채우지 않고 자리만 잡는 경우(TMA 양식) */
+  termsPlaceholder?: boolean;
 }
 
 const TOOL_BTN =
@@ -245,6 +270,8 @@ export default function ContractRichEditor({
   onDeleteField,
   highlightFieldKey,
   onHighlightHandled,
+  allowFields = true,
+  termsPlaceholder = false,
 }: Props) {
   const [fieldMenuOpen, setFieldMenuOpen] = useState(false);
   const [popover, setPopover] = useState<{ key: string; left: number; top: number } | null>(null);
@@ -279,8 +306,8 @@ export default function ContractRichEditor({
   }, [popover]);
 
   const shared = useMemo<EditorShared>(
-    () => ({ fields, terms, onTermsChange }),
-    [fields, terms, onTermsChange],
+    () => ({ fields, terms, onTermsChange, termsPlaceholder }),
+    [fields, terms, onTermsChange, termsPlaceholder],
   );
 
   const emit = useCallback((e: Editor) => {
@@ -508,10 +535,10 @@ export default function ContractRichEditor({
             <b>가</b>
           </button>
 
-          <span className="mx-1 h-4 w-px bg-slate-200" />
+          {allowFields && <span className="mx-1 h-4 w-px bg-slate-200" />}
 
           {/* 칸 넣기 */}
-          <div className="relative" ref={fieldMenuRef}>
+          <div className={`relative ${allowFields ? "" : "hidden"}`} ref={fieldMenuRef}>
             <button
               type="button"
               onClick={() => setFieldMenuOpen((v) => !v)}
