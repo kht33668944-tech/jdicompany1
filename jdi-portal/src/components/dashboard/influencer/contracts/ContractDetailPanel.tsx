@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import X from "phosphor-react/dist/icons/X.esm.js";
 import ContractStatusDropdown from "./ContractStatusDropdown";
+import ContractDocsSection from "./ContractDocsSection";
 import VaultUnlockGate from "@/components/shared/VaultUnlockGate";
 import { getErrorMessage } from "@/lib/utils/errors";
 import { lockVault } from "@/lib/vault/actions";
@@ -291,6 +292,10 @@ export default function ContractDetailPanel({
               dim={!retentionEnd}
             />
             <Row label="필수 파일" value={REQUIRED_FILES_LABEL[contract.required_files_status]} />
+          </Section>
+
+          <Section title="계약서 · 전자서명">
+            <ContractDocsSection contractId={contract.id} />
           </Section>
 
           <Section title="정산 정보 (개인정보)">
