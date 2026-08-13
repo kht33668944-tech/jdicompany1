@@ -12,6 +12,13 @@ import {
   buildValueMap,
   nextFieldKey,
 } from "../src/lib/contracts/tokens.ts";
+import {
+  contentToDoc,
+  docToContent,
+  docHasTermsBlock,
+  renumberHeading,
+} from "../src/lib/contracts/richdoc.ts";
+import { TERMS_MARKER } from "../src/lib/contracts/constants.ts";
 
 // ---------- 붙여넣기 파서 ----------
 
@@ -124,4 +131,95 @@ test("nextFieldKey: 최댓값 + 1 (삭제 번호 재사용 없음)", () => {
     "f8",
   );
   assert.equal(nextFieldKey({ ...CONTENT, fields: [] }), "f1");
+});
+
+// ---------- 굵게 표기 ----------
+
+test("토크나이저: **굵게** 표기를 bold 런으로 분해한다", () => {
+  assert.deepEqual(tokenizeParagraph("보통 **강조** 끝"), [
+    { type: "text", text: "보통 " },
+    { type: "text", text: "강조", bold: true },
+    { type: "text", text: " 끝" },
+  ]);
+});
+
+test("토크나이저: 굵게가 없으면 bold 키를 아예 넣지 않는다", () => {
+  // 기존 deepEqual 테스트들이 여분 키에 엄격하므로 bold:false 를 내보내면 안 된다
+  const runs = tokenizeParagraph("그냥 글 {{f1}}");
+  assert.deepEqual(runs[0], { type: "text", text: "그냥 글 " });
+});
+
+test("토크나이저: 굵게와 필드 토큰이 섞여도 순서대로 분해된다", () => {
+  assert.deepEqual(tokenizeParagraph("금 {{f1}}원은 **부가세 별도**"), [
+    { type: "text", text: "금 " },
+    { type: "field", key: "f1" },
+    { type: "text", text: "원은 " },
+    { type: "text", text: "부가세 별도", bold: true },
+  ]);
+});
+
+// ---------- 편집기 문서 ↔ ContentV2 왕복 ----------
+
+const BASE = {
+  version: 2,
+  title: "",
+  intro: "",
+  clauses: [],
+  fields: [],
+  company: { name: "회사", ceo: "대표", address: "주소", manager: "", managerContact: "" },
+  closing: "맺음말",
+  footnote: "",
+};
+
+test("왕복: 제목·서문·조항·칩·굵게가 보존된다", () => {
+  const original = {
+    ...BASE,
+    title: "용역 계약서",
+    intro: "갑과 을은 다음과 같이 합의한다.",
+    clauses: [
+      { heading: "제1조 (목적)", body: "이 계약은 **중요한** 목적을 가진다." },
+      { heading: "제2조 (대금)", body: "금 {{f1}}원을 지급한다.\n계좌는 {{f2}} 로 한다." },
+    ],
+    fields: [
+      { key: "f1", kind: "staff", label: "금액", type: "text", required: true, value: "100" },
+      { key: "f2", kind: "party", label: "계좌", type: "account", required: true },
+    ],
+  };
+  const roundTripped = docToContent(contentToDoc(original), BASE);
+  assert.equal(roundTripped.title, original.title);
+  assert.equal(roundTripped.intro, original.intro);
+  assert.deepEqual(roundTripped.clauses, original.clauses);
+});
+
+test("왕복: 조건표 조항({{TERMS}})이 블록으로 갔다가 그대로 돌아온다", () => {
+  const original = {
+    ...BASE,
+    title: "계약서",
+    clauses: [
+      { heading: "제1조 (목적)", body: "본문." },
+      { heading: "제2조 (조건)", body: TERMS_MARKER },
+    ],
+    terms: [{ section: "기본", label: "금액", value: "100" }],
+  };
+  const doc = contentToDoc(original);
+  assert.equal(docHasTermsBlock(doc), true);
+  const back = docToContent(doc, BASE);
+  assert.equal(back.clauses.length, 2);
+  assert.equal(back.clauses[1].body, TERMS_MARKER);
+});
+
+test("왕복: 제목만 있고 조항이 없으면 서문이 조항으로 옮겨진다(검증 통과용)", () => {
+  const back = docToContent(contentToDoc({ ...BASE, title: "제목", intro: "본문만 있음" }), BASE);
+  assert.equal(back.clauses.length, 1);
+  assert.equal(back.clauses[0].body, "본문만 있음");
+  assert.equal(back.intro, "");
+});
+
+// ---------- 조항 번호 다시 매기기 ----------
+
+test("renumberHeading: 제N조로 시작하는 제목만 번호를 바꾼다", () => {
+  assert.equal(renumberHeading("제5조 (목적)", 1), "제1조 (목적)");
+  assert.equal(renumberHeading("제 7 조 (대금)", 2), "제2조 (대금)");
+  assert.equal(renumberHeading("부칙", 3), "부칙");
+  assert.equal(renumberHeading("", 4), "");
 });

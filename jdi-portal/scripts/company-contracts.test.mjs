@@ -12,12 +12,23 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(path.join(root, rel), "utf8");
+
+/** 디렉터리 하위 전체 파일 나열 (재귀) */
+function listFiles(dir) {
+  const out = [];
+  for (const name of readdirSync(dir)) {
+    const full = path.join(dir, name);
+    if (statSync(full).isDirectory()) out.push(...listFiles(full));
+    else out.push(full);
+  }
+  return out;
+}
 
 const migration = read("supabase/migrations/123_company_contracts.sql");
 const signService = read("src/lib/contracts/signService.ts");
@@ -153,4 +164,42 @@ test("공개 서명 페이지: 검색엔진 제외 + 서명 API 가 IP/기기 �
   const route = read("src/app/api/sign/c/[token]/route.ts");
   assert.match(route, /extractClientIp\(/);
   assert.match(route, /user-agent/);
+});
+
+// ------------------------------------------------------------
+// 7) 문서형 편집기(TipTap) 격리 — 초기 JS 예산 보호
+//    /dashboard 예산 여유가 1KB 미만이라 에디터가 공용 청크로 새면 즉시 실패한다.
+// ------------------------------------------------------------
+test("계약관리 lib 은 TipTap 을 import 하지 않는다(순수 모듈 유지)", () => {
+  const libFiles = listFiles(path.join(root, "src", "lib", "contracts")).filter((f) =>
+    /\.tsx?$/.test(f),
+  );
+  const offenders = libFiles.filter((f) => /@tiptap/.test(readFileSync(f, "utf8")));
+  assert.deepEqual(
+    offenders.map((f) => path.relative(root, f)),
+    [],
+    "src/lib/contracts/* 가 TipTap 을 끌어오면 서버·공용 번들로 새어 초기 JS 예산이 깨집니다",
+  );
+});
+
+test("편집기 컴포넌트는 dynamic 지연 로드로만 불린다(정적 import 금지)", () => {
+  const srcFiles = listFiles(path.join(root, "src")).filter((f) => /\.tsx?$/.test(f));
+  const editorFile = path.join("contracts", "ContractRichEditor.tsx");
+
+  const staticImporters = srcFiles.filter((f) => {
+    if (f.endsWith(editorFile)) return false;
+    const source = readFileSync(f, "utf8");
+    // import ... from "./ContractRichEditor" 형태(정적)만 잡는다. dynamic(() => import(...)) 는 허용.
+    return /^\s*import\s+[^;]*?from\s+["'][^"']*ContractRichEditor["']/m.test(source);
+  });
+  assert.deepEqual(
+    staticImporters.map((f) => path.relative(root, f)),
+    [],
+    "ContractRichEditor 는 next/dynamic(ssr:false) 로만 불러야 합니다",
+  );
+
+  // 실제 사용처는 dynamic 으로 부르고 있어야 한다
+  const screen = read("src/components/dashboard/contracts/ContractEditorScreen.tsx");
+  assert.match(screen, /dynamic\(\(\) => import\("\.\/ContractRichEditor"\)/);
+  assert.match(screen, /ssr:\s*false/);
 });

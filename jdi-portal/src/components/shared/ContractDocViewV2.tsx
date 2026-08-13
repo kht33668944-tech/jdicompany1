@@ -86,7 +86,13 @@ function Paragraphs({
         <p key={i} className={className ?? "mt-1.5"}>
           {runs.map((run, j) =>
             run.type === "text" ? (
-              <span key={j}>{run.text}</span>
+              run.bold ? (
+                <strong key={j} className="font-bold">
+                  {run.text}
+                </strong>
+              ) : (
+                <span key={j}>{run.text}</span>
+              )
             ) : (
               <FieldRun
                 key={j}

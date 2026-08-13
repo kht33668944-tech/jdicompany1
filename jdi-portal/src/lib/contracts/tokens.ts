@@ -1,30 +1,51 @@
-// 필드 토큰({{fN}}) 처리 — 순수 함수만. React 렌더러(ContractDocViewV2)와
-// PDF 렌더러(pdf.ts)가 같은 분해 결과를 쓰도록 한 곳에 둔다.
+// 본문 표기 처리 — 순수 함수만. React 렌더러(ContractDocViewV2)와
+// PDF 렌더러(pdf.ts), 그리고 문서형 편집기(richdoc.ts)가 같은 분해 결과를 쓰도록 한 곳에 둔다.
+//
+// 본문에 들어가는 표기는 두 가지뿐이다.
+//   {{fN}}     — 채움 칸(필드) 자리
+//   **굵게**    — 굵은 글씨 (편집기 툴바의 "굵게" 버튼이 넣는다)
+// 이 둘만 쓰는 이유: 본문을 평범한 문자열로 저장해야 PDF·HTML·편집기 세 곳이
+// 같은 데이터를 공유하고, 기존에 저장된 계약서와도 호환되기 때문이다.
 
 import type { ContentV2 } from "./types";
 
 export const FIELD_TOKEN_RE = /\{\{(f\d+)\}\}/g;
+export const BOLD_TOKEN_RE = /\*\*([^*]+)\*\*/g;
 
 export type TokenRun =
-  | { type: "text"; text: string }
+  | { type: "text"; text: string; bold?: boolean }
   | { type: "field"; key: string };
 
-/** 한 문단(개행 없는 문자열) → 런 배열. 토큰이 없으면 text 런 하나. */
+/** 굵게 표기만 분해 (필드 토큰이 없는 조각에 적용) */
+function splitBold(text: string): TokenRun[] {
+  const runs: TokenRun[] = [];
+  let last = 0;
+  for (const m of text.matchAll(BOLD_TOKEN_RE)) {
+    const idx = m.index ?? 0;
+    if (idx > last) runs.push({ type: "text", text: text.slice(last, idx) });
+    runs.push({ type: "text", text: m[1], bold: true });
+    last = idx + m[0].length;
+  }
+  if (last < text.length) runs.push({ type: "text", text: text.slice(last) });
+  return runs;
+}
+
+/** 한 문단(개행 없는 문자열) → 런 배열. 표기가 없으면 text 런 하나. */
 export function tokenizeParagraph(paragraph: string): TokenRun[] {
   const runs: TokenRun[] = [];
   let last = 0;
   for (const m of paragraph.matchAll(FIELD_TOKEN_RE)) {
     const idx = m.index ?? 0;
-    if (idx > last) runs.push({ type: "text", text: paragraph.slice(last, idx) });
+    if (idx > last) runs.push(...splitBold(paragraph.slice(last, idx)));
     runs.push({ type: "field", key: m[1] });
     last = idx + m[0].length;
   }
-  if (last < paragraph.length) runs.push({ type: "text", text: paragraph.slice(last) });
+  if (last < paragraph.length) runs.push(...splitBold(paragraph.slice(last)));
   if (runs.length === 0) runs.push({ type: "text", text: "" });
   return runs;
 }
 
-/** 본문 전체 → 문단별 런 배열 (\n 분리, 공백 문단 제거 — TMA clauseParagraphs 와 동일 규칙) */
+/** 본문 전체 → 문단별 런 배열 (\n 분리, 공백 문단 제거) */
 export function tokenizeBody(body: string): TokenRun[][] {
   return body
     .split("\n")

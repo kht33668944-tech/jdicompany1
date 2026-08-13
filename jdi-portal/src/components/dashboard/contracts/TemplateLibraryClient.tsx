@@ -4,31 +4,25 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils/errors";
 import { formatDate } from "@/lib/utils/date";
-import { createEmptyContent } from "@/lib/contracts/constants";
+import { COMPANY_CONTRACTS_PATH } from "@/lib/contracts/constants";
 import {
   deleteCompanyTemplate,
   duplicateCompanyTemplate,
   listCompanyTemplates,
 } from "@/lib/contracts/actions";
-import type { CompanyTemplateRow, ContentV2 } from "@/lib/contracts/types";
-import CompanyDocEditor from "./CompanyDocEditor";
+import type { CompanyTemplateRow } from "@/lib/contracts/types";
 
 interface Props {
   initialTemplates: CompanyTemplateRow[];
 }
 
-interface EditorState {
-  templateId: string | null;
-  title: string;
-  content: ContentV2;
-}
-
 export default function TemplateLibraryClient({ initialTemplates }: Props) {
+  const router = useRouter();
   const [templates, setTemplates] = useState(initialTemplates);
-  const [editor, setEditor] = useState<EditorState | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const refresh = async () => {
@@ -64,7 +58,7 @@ export default function TemplateLibraryClient({ initialTemplates }: Props) {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Link
-            href="/dashboard/contracts"
+            href={COMPANY_CONTRACTS_PATH}
             prefetch={false}
             className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
           >
@@ -72,9 +66,7 @@ export default function TemplateLibraryClient({ initialTemplates }: Props) {
           </Link>
           <button
             type="button"
-            onClick={() =>
-              setEditor({ templateId: null, title: "", content: createEmptyContent() })
-            }
+            onClick={() => router.push(`${COMPANY_CONTRACTS_PATH}/templates/new`)}
             className="rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700"
           >
             ＋ 새 양식
@@ -117,9 +109,7 @@ export default function TemplateLibraryClient({ initialTemplates }: Props) {
                 <div className="mt-3 flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() =>
-                      setEditor({ templateId: t.id, title: t.title, content: t.content })
-                    }
+                    onClick={() => router.push(`${COMPANY_CONTRACTS_PATH}/templates/${t.id}`)}
                     className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-600"
                   >
                     ✏️ 편집
@@ -147,18 +137,6 @@ export default function TemplateLibraryClient({ initialTemplates }: Props) {
         </div>
       )}
 
-      {editor && (
-        <CompanyDocEditor
-          target={{
-            mode: "template",
-            templateId: editor.templateId,
-            title: editor.title,
-            content: editor.content,
-          }}
-          onClose={() => setEditor(null)}
-          onChanged={refresh}
-        />
-      )}
     </div>
   );
 }

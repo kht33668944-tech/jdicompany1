@@ -4,16 +4,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ModalContainer from "@/components/shared/ModalContainer";
 import { getErrorMessage } from "@/lib/utils/errors";
 import { formatDate } from "@/lib/utils/date";
 import { MODAL_INPUT_CLS, MODAL_LABEL_CLS } from "@/lib/vault/constants";
+import { COMPANY_CONTRACTS_PATH } from "@/lib/contracts/constants";
 import {
   cancelCompanyDocument,
   createCompanyDocument,
   duplicateCompanyDocument,
-  getCompanyDocument,
   getCompanySignedPdfUrl,
   hideCompanyDocument,
   listCompanyDocuments,
@@ -24,7 +25,6 @@ import type {
   CompanyTemplateRow,
   CounterpartyKind,
 } from "@/lib/contracts/types";
-import CompanyDocEditor from "./CompanyDocEditor";
 
 interface Props {
   initialDocuments: CompanyContractDocument[];
@@ -182,11 +182,11 @@ function NewDocModal({
 }
 
 export default function ContractsGeneralPageClient({ initialDocuments, templates }: Props) {
+  const router = useRouter();
   const [docs, setDocs] = useState(initialDocuments);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [newOpen, setNewOpen] = useState(false);
-  const [editorDoc, setEditorDoc] = useState<CompanyContractDocument | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const refresh = async () => {
@@ -216,17 +216,7 @@ export default function ContractsGeneralPageClient({ initialDocuments, templates
     });
   }, [docs, statusFilter, search]);
 
-  const openEditor = async (docId: string) => {
-    if (busyId) return;
-    setBusyId(docId);
-    try {
-      setEditorDoc(await getCompanyDocument(docId));
-    } catch (err) {
-      toast.error(getErrorMessage(err, "계약서를 열지 못했습니다."));
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const openEditor = (docId: string) => router.push(`${COMPANY_CONTRACTS_PATH}/${docId}/edit`);
 
   const copyLink = async (doc: CompanyContractDocument) => {
     if (!doc.sign_token) return;
@@ -281,7 +271,7 @@ export default function ContractsGeneralPageClient({ initialDocuments, templates
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Link
-            href="/dashboard/contracts/templates"
+            href={`${COMPANY_CONTRACTS_PATH}/templates`}
             prefetch={false}
             className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
           >
@@ -451,17 +441,8 @@ export default function ContractsGeneralPageClient({ initialDocuments, templates
           onClose={() => setNewOpen(false)}
           onCreated={(doc) => {
             setNewOpen(false);
-            setEditorDoc(doc);
-            refresh();
+            router.push(`${COMPANY_CONTRACTS_PATH}/${doc.id}/edit`);
           }}
-        />
-      )}
-
-      {editorDoc && (
-        <CompanyDocEditor
-          target={{ mode: "doc", doc: editorDoc }}
-          onClose={() => setEditorDoc(null)}
-          onChanged={refresh}
         />
       )}
     </div>
