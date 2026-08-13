@@ -83,6 +83,8 @@ export default function ContractsPageClient({
   const [monthFilter, setMonthFilter] = useState("");
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 목록의 「📄 계약서」로 열었는지 — 패널이 계약서 영역으로 스스로 내려간다
+  const [focusDocs, setFocusDocs] = useState(false);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
   // 폼 상태: null = 닫힘 / contract = 수정 / prefill = 미리 채움(리스트 원클릭·검색어로 만들기)
@@ -221,7 +223,7 @@ export default function ContractsPageClient({
         "실제 게시일": c.post_actual_date ?? "",
         "게시 유지 종료일": getRetentionEnd(c.post_actual_date) ?? "",
         "계약 상태": CONTRACT_STATUS_LABEL[c.contract_status],
-        "모두싸인 링크": c.modusign_url ?? "",
+        "예전 서명 링크": c.modusign_url ?? "",
         "메모": c.memo ?? "",
       }));
       const ws = XLSX.utils.json_to_sheet(sheetRows);
@@ -499,7 +501,10 @@ export default function ContractsPageClient({
           selectedIds={checkedIds}
           onToggleSelect={toggleSelect}
           onToggleAll={toggleAll}
-          onSelect={setSelectedId}
+          onSelect={(id, focus) => {
+            setFocusDocs(focus === "docs");
+            setSelectedId(id);
+          }}
           onStatusChange={handleStatusChange}
           searchTerm={search.trim()}
           onCreateFromSearch={openFormFromSearch}
@@ -533,6 +538,7 @@ export default function ContractsPageClient({
           setSelectedId(null);
           handleRefresh();
         }}
+        focusDocs={focusDocs}
       />
 
       {/* 계약 폼 */}
