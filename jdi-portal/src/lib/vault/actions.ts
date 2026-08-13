@@ -207,6 +207,12 @@ export async function deleteDocument(documentId: string) {
 // ============================================================
 export async function unlockVault(password: string): Promise<{ ok: boolean }> {
   const { supabase, user } = await requireAuth();
+  // 로컬 개발 서버에 암호화 키가 없으면 어떤 비밀번호도 해제되지 않는다 — 원인을 정확히 안내
+  if (!process.env.ACCOUNT_VAULT_KEY) {
+    throw new Error(
+      "이 서버에는 암호화 키가 없어 잠금 해제를 할 수 없어요. 로컬 개발 서버라면 `npm run dev:keys`로 실행하거나, 운영 사이트(jdiportal.com)에서 이용해주세요.",
+    );
+  }
   const { data, error } = await supabase.rpc("verify_vault_gate", { p_password: password });
   if (error) throw new Error(`잠금 해제에 실패했습니다: ${error.message}`);
   if (data !== true) return { ok: false };

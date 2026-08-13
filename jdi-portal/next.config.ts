@@ -14,6 +14,9 @@ const CONTENT_SECURITY_POLICY = [
   "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
   "media-src 'self' blob: https://*.supabase.co",
+  // 보관함(서류·계약서) PDF 미리보기 — Supabase 서명 URL 을 iframe 으로 띄운다.
+  // frame-src 가 없으면 default-src 'self' 로 떨어져 미리보기가 "차단됨"으로 나온다.
+  "frame-src 'self' https://*.supabase.co",
   "worker-src 'self' blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
