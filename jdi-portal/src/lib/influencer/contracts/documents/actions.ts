@@ -6,6 +6,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireVaultUnlock } from "@/lib/vault/unlock";
 import { CONTRACT_DOCS_BUCKET, UUID_RE } from "@/lib/influencer/contracts/constants";
 import { CONTRACT_STATUS_ORDER } from "@/lib/influencer/contracts/labels";
 import {
@@ -331,6 +332,53 @@ export async function duplicateDocument(docId: string): Promise<ContractDocument
   if (error) throw new Error(`복제에 실패했습니다: ${error.message}`);
   revalidatePath(CONTRACTS_PATH);
   return data as unknown as ContractDocument;
+}
+
+/** 보관함 "계약서" 탭 1행 — 서명 완료된 계약서 목록(파일은 복사하지 않고 원본을 가리킨다) */
+export interface VaultContractRow {
+  doc_id: string;
+  name: string;
+  instagram_handle: string;
+  template_key: TemplateKey;
+  signer_name: string | null;
+  signed_at: string | null;
+  /** 계약 자체가 삭제(숨김)됐어도 서명 완료본은 증거로 남는다 — 표시용 */
+  contract_deleted: boolean;
+}
+
+/**
+ * 보관함 계약서 탭 목록 — 계정 보관함과 같은 2차 비밀번호 잠금을 지나야 한다.
+ * (계약서 PDF에는 주소·계좌 등 개인정보가 들어 있다.)
+ */
+export async function getSignedContractsForVault(): Promise<VaultContractRow[]> {
+  const { supabase, userId } = await getSessionUser();
+  await requireVaultUnlock(userId);
+
+  const { data, error } = await supabase
+    .from("influencer_contract_documents")
+    .select(
+      "id, template_key, signer_name, signed_at, contract:influencer_contracts(name, instagram_handle, is_deleted)",
+    )
+    .eq("status", "signed")
+    .order("signed_at", { ascending: false });
+  if (error) throw new Error(`계약서 목록을 불러오지 못했습니다: ${error.message}`);
+
+  return (data ?? []).map((row) => {
+    const contract = row.contract as unknown as {
+      name: string;
+      instagram_handle: string;
+      is_deleted: boolean;
+    } | null;
+    return {
+      doc_id: row.id as string,
+      name: contract?.name ?? "(삭제된 계약)",
+      instagram_handle: contract?.instagram_handle ?? "",
+      template_key: row.template_key as TemplateKey,
+      signer_name: (row.signer_name as string | null) ?? null,
+      signed_at: (row.signed_at as string | null) ?? null,
+      contract_deleted: contract?.is_deleted ?? true,
+    };
+  });
 }
 
 /** 서명 완료 PDF 열람용 임시 링크(120초) — 승인된 직원용 */

@@ -123,6 +123,13 @@ test("서명 제출: 정산 개인정보 5종 전부 encryptSecret 으로 저장
 // ------------------------------------------------------------
 // 5) 발송 후 수정 잠금
 // ------------------------------------------------------------
+test("보관함 계약서 탭 목록은 2차 비밀번호 잠금을 지난다", () => {
+  const start = docActions.indexOf("export async function getSignedContractsForVault");
+  assert.ok(start >= 0, "getSignedContractsForVault 액션이 없습니다");
+  const body = docActions.slice(start, docActions.indexOf("export async function", start + 1));
+  assert.match(body, /requireVaultUnlock\(/, "보관함 계약서 목록이 잠금 확인 없이 열립니다");
+});
+
 test("문서 편집은 draft 상태에서만 가능하다", () => {
   const start = docActions.indexOf("export async function updateDocumentContent");
   assert.ok(start >= 0);

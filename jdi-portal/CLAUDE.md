@@ -75,7 +75,7 @@ npx supabase functions deploy <name> --no-verify-jwt
 
 - **성능 불변조건을 되돌리지 않습니다.** 미들웨어 인증 캐시(`src/lib/supabase/middleware.ts`), keepalive(`src/lib/warmup.ts` + `src/instrumentation.ts` + `/api/keepalive`), 빠른 경로+폴백(`src/lib/*/fast-queries.ts`), 대시보드 업무 요약 사전 필터 — 자세한 내용은 저장소 루트 `CLAUDE.md`. 코드 수정 후 `npm run test:performance`로 확인합니다.
 - 대시보드 초기 데이터를 건드리면 **빠른 경로와 Supabase RPC 폴백 양쪽**을 함께 고칩니다. 한쪽만 고치면 운영에 반영되지 않거나 회귀 테스트가 실패합니다.
-- **`/api/keepalive` 를 지우거나 인증 뒤로 옮기지 않습니다.** 운영(Cloud Run)은 요청을 처리할 때만 CPU 를 주므로, 이 경로를 Cloud Scheduler 가 1분마다 불러야 유휴 뒤 첫 진입이 느려지지 않습니다. 인증을 거치지 않는 경로는 `/api/health` 와 이것 둘뿐입니다.
+- **`/api/keepalive` 를 지우거나 인증 뒤로 옮기지 않습니다.** 운영(Cloud Run)은 요청을 처리할 때만 CPU 를 주므로, 이 경로를 Cloud Scheduler 가 1분마다 불러야 유휴 뒤 첫 진입이 느려지지 않습니다. 미들웨어의 "인증 왕복 조기 생략" 경로는 `/api/health` 와 이것 둘뿐입니다. (`/sign`, `/api/sign` 은 로그인 리다이렉트만 제외되는 전자서명 공개 경로 — 인가는 서명 토큰 + service role 로 서버가 검증하며, `scripts/contract-esign.test.mjs` 가 경계를 고정합니다.)
 - **오류 문구는 `src/lib/utils/errors.ts`의 `getErrorMessage()`를 지나게 둡니다.** 배포 직후 `Server Action ... was not found` 를 앱이 스스로 알아채고 새로고침하는 장치(`StaleDeploymentWatcher`)가 이 통로에 걸려 있습니다.
 - `tsconfig.json`의 `exclude`에서 `supabase/functions/**`를 제거하지 않습니다.
 - SQL에서 `CURRENT_DATE`, `NOW()`를 KST 변환 없이 직접 사용하지 않습니다.
