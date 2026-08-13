@@ -16,7 +16,10 @@ export const PARTY_PRESETS: FieldPreset[] = [
   { label: "주소", type: "text", kind: "party", icon: "🏠" },
   { label: "연락처", type: "phone", kind: "party", icon: "📞" },
   { label: "이메일", type: "email", kind: "party", icon: "✉️" },
-  { label: "계좌번호", type: "account", kind: "party", icon: "🏦" },
+  // 은행·계좌번호·예금주는 셋을 같이 받아야 실제로 입금할 수 있다.
+  // (은행 칸이 없으면 서명자가 예금주 칸에 은행 이름을 적는 일이 생긴다 — 실제 발생)
+  { label: "은행", type: "bank", kind: "party", icon: "🏦" },
+  { label: "계좌번호", type: "account", kind: "party", icon: "💳" },
   { label: "예금주", type: "text", kind: "party", icon: "👤" },
   { label: "사업자등록번호", type: "text", kind: "party", icon: "🏢" },
 ];

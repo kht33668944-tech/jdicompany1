@@ -231,6 +231,7 @@ const FIELD_TYPE_LABEL: Record<FieldType, string> = {
   phone: "연락처",
   email: "이메일",
   account: "계좌번호",
+  bank: "은행",
 };
 
 export default function ContractRichEditor({
@@ -249,6 +250,33 @@ export default function ContractRichEditor({
   const [popover, setPopover] = useState<{ key: string; left: number; top: number } | null>(null);
   const onDocChangeRef = useRef(onDocChange);
   onDocChangeRef.current = onDocChange;
+  const fieldMenuRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // 칸 넣기 메뉴 바깥을 누르면 닫는다.
+  //
+  // 화면을 덮는 투명 레이어로 닫으면 안 된다 — 레이어가 클릭을 삼켜서
+  // "메뉴를 연 채 문서의 다른 자리를 눌러 커서를 옮기는" 동작이 먹히지 않는다.
+  // 그러면 커서가 직전 자리에 남아 다음 칸이 엉뚱한 곳에 들어간다(실제 발생).
+  useEffect(() => {
+    if (!fieldMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!fieldMenuRef.current?.contains(e.target as HTMLElement)) setFieldMenuOpen(false);
+    };
+    // 캡처 단계에서 듣되 이벤트를 막지 않아, 같은 클릭이 문서까지 그대로 전달된다
+    document.addEventListener("mousedown", close, true);
+    return () => document.removeEventListener("mousedown", close, true);
+  }, [fieldMenuOpen]);
+
+  // 칩 설정 팝오버도 같은 방식으로 닫는다(문서 클릭이 그대로 전달되어야 커서가 옮겨진다)
+  useEffect(() => {
+    if (!popover) return;
+    const close = (e: MouseEvent) => {
+      if (!popoverRef.current?.contains(e.target as HTMLElement)) setPopover(null);
+    };
+    document.addEventListener("mousedown", close, true);
+    return () => document.removeEventListener("mousedown", close, true);
+  }, [popover]);
 
   const shared = useMemo<EditorShared>(
     () => ({ fields, terms, onTermsChange }),
@@ -447,8 +475,15 @@ export default function ContractRichEditor({
   return (
     <SharedContext.Provider value={shared}>
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* 툴바 */}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-white px-4 py-2">
+        {/* 툴바 —
+            mousedown 의 기본 동작(포커스 이동)을 막아 편집기에서 포커스가 빠지지 않게 한다.
+            버튼을 눌러도 문서에 커서가 그대로 깜빡여, 어디에 칸이 들어갈지 보이고
+            누른 뒤 바로 이어서 타이핑할 수 있다.
+            ⚠️ 툴바 안에는 버튼만 둘 것 — 입력칸을 넣으면 이 처리 때문에 글자를 칠 수 없다. */}
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-white px-4 py-2"
+        >
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -476,7 +511,7 @@ export default function ContractRichEditor({
           <span className="mx-1 h-4 w-px bg-slate-200" />
 
           {/* 칸 넣기 */}
-          <div className="relative">
+          <div className="relative" ref={fieldMenuRef}>
             <button
               type="button"
               onClick={() => setFieldMenuOpen((v) => !v)}
@@ -486,12 +521,6 @@ export default function ContractRichEditor({
             </button>
             {fieldMenuOpen && (
               <>
-                <button
-                  type="button"
-                  aria-label="닫기"
-                  className="fixed inset-0 z-20 cursor-default"
-                  onClick={() => setFieldMenuOpen(false)}
-                />
                 <div className="absolute left-0 top-full z-30 mt-1 max-h-[60vh] w-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
                   <p className="px-2 py-1 text-[11px] font-bold text-amber-600">
                     🟡 상대방이 채우는 칸 — 자주 쓰는 것
@@ -634,16 +663,11 @@ export default function ContractRichEditor({
         </div>
       </div>
 
-      {/* 칩 설정 팝오버 */}
+      {/* 칩 설정 팝오버 — 닫기도 위 메뉴와 같은 이유로 덮개를 쓰지 않는다 */}
       {popover && popoverField && (
         <>
-          <button
-            type="button"
-            aria-label="닫기"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setPopover(null)}
-          />
           <div
+            ref={popoverRef}
             className="fixed z-50 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
             style={{ left: Math.min(popover.left, window.innerWidth - 280), top: popover.top }}
           >

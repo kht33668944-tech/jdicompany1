@@ -55,7 +55,9 @@ function inputProps(fieldDef: FieldDef): React.InputHTMLAttributes<HTMLInputElem
     case "number":
       return { inputMode: "numeric", placeholder: "숫자 입력" };
     case "account":
-      return { inputMode: "numeric", placeholder: "숫자와 - 만" };
+      return { inputMode: "numeric", placeholder: "예: 302-1234-5678-11" };
+    case "bank":
+      return { placeholder: "예: 농협은행" };
     case "date":
       return { type: "date" };
     default:

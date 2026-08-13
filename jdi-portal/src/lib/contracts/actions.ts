@@ -42,6 +42,7 @@ const FIELD_TYPES: FieldType[] = [
   "phone",
   "email",
   "account",
+  "bank",
 ];
 const FIELD_KEY_RE = /^f\d+$/;
 
