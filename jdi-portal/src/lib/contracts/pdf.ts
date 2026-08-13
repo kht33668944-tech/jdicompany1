@@ -56,12 +56,15 @@ const MUTED = "#64748b";
 const LINE = "#cbd5e1";
 const HEAD_FILL = "#f1f5f9";
 
-/** 조항 body → 문단 목록. {{fN}} 토큰 자리에 채움 칸 값을 굵게 인쇄한다. */
+/**
+ * 조항 body → 문단 목록.
+ * {{fN}} 자리에는 채움 칸 값을, **굵게** 표기에는 굵은 글씨를 적용한다.
+ */
 function clauseParagraphs(body: string, values: Map<string, string>): Content[] {
   return tokenizeBody(body).map((runs) => ({
     text: runs.map((run) =>
       run.type === "text"
-        ? { text: run.text }
+        ? { text: run.text, ...(run.bold ? { bold: true } : {}) }
         : { text: values.get(run.key) ?? "＿＿＿", bold: true },
     ),
     margin: [0, 2, 0, 2] as [number, number, number, number],

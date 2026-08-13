@@ -29,6 +29,13 @@ export interface FieldDef {
   value?: string; // staff 전용 — 계약서 만들 때 채운 값
 }
 
+/** 편집기 툴바에서 새 채움 칸을 만들 때 넘기는 값 */
+export interface CreateFieldInput {
+  kind: FieldKind;
+  label: string;
+  type: FieldType;
+}
+
 /** 개별 조건표 한 줄 — TMA TermRow 와 동일 모양 */
 export interface TermRow {
   section: string;
