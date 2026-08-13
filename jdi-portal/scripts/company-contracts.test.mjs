@@ -166,6 +166,25 @@ test("공개 서명 페이지: 검색엔진 제외 + 서명 API 가 IP/기기 �
   assert.match(route, /user-agent/);
 });
 
+test("서명 화면: 상대방 입력을 계약서 본문 안에서 받는다", () => {
+  const client = read("src/components/sign/CompanySignPageClient.tsx");
+  // 칸을 눌러 그 자리에서 입력하는 구조. 아래 폼으로 되돌리면 어느 칸을 채우는지 알 수 없어진다.
+  assert.match(
+    client,
+    /<ContractDocViewV2[\s\S]*?onFieldClick=/,
+    "서명 페이지가 계약서 본문의 칸을 눌러 입력받지 않습니다(입력을 아래 폼으로 되돌린 듯)",
+  );
+  assert.match(client, /SignFieldPrompt/, "칸 입력창(SignFieldPrompt)이 연결되어 있지 않습니다");
+});
+
+test("서명 화면 개편이 서버 검증을 대체하지 않는다", () => {
+  // 화면에서 필수 칸을 막더라도 최종 판단은 서버여야 한다.
+  const service = read("src/lib/contracts/signService.ts");
+  assert.match(service, /fieldDef\.required/, "signService 의 필수 입력 검증이 사라졌습니다");
+  assert.match(service, /계약 내용 동의에 체크해주세요/);
+  assert.match(service, /서명자 성명을 입력해주세요/);
+});
+
 // ------------------------------------------------------------
 // 7) 문서형 편집기(TipTap) 격리 — 초기 JS 예산 보호
 //    /dashboard 예산 여유가 1KB 미만이라 에디터가 공용 청크로 새면 즉시 실패한다.
