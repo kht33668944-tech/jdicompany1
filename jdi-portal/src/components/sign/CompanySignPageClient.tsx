@@ -1,13 +1,21 @@
 "use client";
 
 // 계약관리(범용) 전자서명 페이지(공개, 모바일 우선).
-// 계약서 전문 열람 → 문서에 정의된 상대방 입력 칸 채우기 → 서명(손서명 또는 법인 도장 업로드)
-// → 제출 → 완료(사본 다운로드). TMA SignPageClient 와 달리 입력 폼이 데이터 주도다.
+// 계약서 전문 열람 → 문서 안의 노란 칸을 눌러 그 자리에서 채우기 → 서명(손서명 또는 법인 도장)
+// → 제출 → 완료(사본 다운로드).
+//
+// 입력을 화면 아래 폼에 몰아 두지 않는 이유: 조항이 많은 계약서에서는 그 값이 계약서
+// 어디에 들어가는지 알 수 없다. 칸을 누르면 PC 는 그 자리 팝오버, 폰은 하단 시트로 받는다.
+// 성명·사업자등록번호만 서명란 옆에 둔다 — 본문 칸이 아니라 서명란에 인쇄되는 값이라서다.
+//
+// ⚠️ 화면에서 무엇을 막든 최종 검증은 서버(lib/contracts/signService.ts)다. 그쪽을 대체하지 않는다.
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import ContractDocViewV2 from "@/components/shared/ContractDocViewV2";
 import SignatureCanvas, { type SignatureCanvasHandle } from "./SignatureCanvas";
-import type { CompanySignPageData, FieldDef } from "@/lib/contracts/types";
+import SignFieldPrompt from "./SignFieldPrompt";
+import SignProgressBar from "./SignProgressBar";
+import type { CompanySignPageData } from "@/lib/contracts/types";
 
 const INPUT_CLS =
   "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[15px] text-slate-800 " +
@@ -45,28 +53,9 @@ function Notice({ title, body }: { title: string; body: string }) {
   );
 }
 
-/** 필드 종류별 입력 속성 */
-function inputProps(fieldDef: FieldDef): React.InputHTMLAttributes<HTMLInputElement> {
-  switch (fieldDef.type) {
-    case "phone":
-      return { inputMode: "tel", placeholder: "010-0000-0000" };
-    case "email":
-      return { inputMode: "email", placeholder: "you@example.com" };
-    case "number":
-      return { inputMode: "numeric", placeholder: "숫자 입력" };
-    case "account":
-      return { inputMode: "numeric", placeholder: "예: 302-1234-5678-11" };
-    case "bank":
-      return { placeholder: "예: 농협은행" };
-    case "date":
-      return { type: "date" };
-    default:
-      return {};
-  }
-}
-
 export default function CompanySignPageClient({ token, data }: Props) {
   const sigRef = useRef<SignatureCanvasHandle>(null);
+  const signBoxRef = useRef<HTMLDivElement>(null);
   const [drawn, setDrawn] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -81,6 +70,11 @@ export default function CompanySignPageClient({ token, data }: Props) {
   const [signerName, setSignerName] = useState("");
   const [businessRegNo, setBusinessRegNo] = useState("");
 
+  // 지금 입력 중인 칸 — 문서의 칸 요소를 기준으로 팝오버를 붙인다
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const activeField = partyFields.find((f) => f.key === activeKey) ?? null;
+
   const isCorp = data.counterpartyKind === "corp";
   const [signatureMode, setSignatureMode] = useState<"draw" | "stamp">("draw");
   const [stampFile, setStampFile] = useState<File | null>(null);
@@ -89,9 +83,47 @@ export default function CompanySignPageClient({ token, data }: Props) {
     [stampFile],
   );
 
-  const setValue = (key: string) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => setValues((v) => ({ ...v, [key]: e.target.value }));
+  // 필수 칸 진행 상황 — 서명 버튼을 열지 말지도 여기서 정한다(서버 검증과 별개의 안내용)
+  const requiredFields = partyFields.filter((f) => f.required);
+  const requiredLeft = requiredFields.filter((f) => !values[f.key]?.trim());
+
+  /** 문서에서 그 칸을 찾아 화면 가운데로 옮기고 입력창을 연다 */
+  const openField = useCallback((key: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-field-key="${key}"]`);
+    setActiveKey(key);
+    setAnchor(el);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("chip-flash");
+    window.setTimeout(() => el.classList.remove("chip-flash"), 2400);
+  }, []);
+
+  /**
+   * 「다음 칸」 — 아직 안 채운 필수 칸으로, 다 채웠으면 서명 영역으로.
+   *
+   * 순서는 반드시 **계약서에 보이는 순서**여야 한다. 칸이 만들어진 순서(content.fields)로
+   * 옮기면 위에서 아래로 읽던 사람이 갑자기 아래 칸으로 튄다 — 실제로 그렇게 만들었다가 고쳤다.
+   * 문서에 그려진 칸의 DOM 순서가 곧 읽는 순서다.
+   */
+  const goNext = useCallback(
+    (afterKey?: string) => {
+      const domOrder = [...document.querySelectorAll<HTMLElement>("[data-field-key]")]
+        .map((el) => el.dataset.fieldKey)
+        .filter((k): k is string => Boolean(k));
+      const requiredKeys = new Set(requiredFields.map((f) => f.key));
+      const nextKey = domOrder.find(
+        (k) => requiredKeys.has(k) && k !== afterKey && !values[k]?.trim(),
+      );
+      if (nextKey) {
+        openField(nextKey);
+        return;
+      }
+      setActiveKey(null);
+      signBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    // values 가 바뀌면 남은 칸도 바뀐다
+    [requiredFields, values, openField],
+  );
 
   // ── 상태별 안내 화면 ──────────────────────────────────
   if (data.status === "signed" || done) {
@@ -175,16 +207,32 @@ export default function CompanySignPageClient({ token, data }: Props) {
 
   return (
     <Shell>
-      {/* 계약서 전문 — 입력하면 노란 칸에 값이 실시간 반영된다 */}
+      {/* 진행 안내 — 남은 칸 수와 「다음 칸」 이동 */}
+      {partyFields.length > 0 && (
+        <SignProgressBar
+          requiredTotal={requiredFields.length}
+          requiredDone={requiredFields.length - requiredLeft.length}
+          onNext={() => goNext()}
+        />
+      )}
+
+      {/* 계약서 전문 — 노란 칸을 누르면 그 자리에서 입력한다 */}
       <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-8">
-        <ContractDocViewV2 content={data.content} mode="sign" partyB={partyB} partyValues={values} />
+        <ContractDocViewV2
+          content={data.content}
+          mode="sign"
+          partyB={partyB}
+          partyValues={values}
+          onFieldClick={openField}
+          activeFieldKey={activeKey}
+        />
       </div>
 
-      {/* 입력 + 서명 */}
-      <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm sm:p-8">
-        <h2 className="text-base font-bold text-slate-900">서명 정보 입력</h2>
+      {/* 서명 */}
+      <div ref={signBoxRef} className="mt-4 rounded-2xl bg-white p-5 shadow-sm sm:p-8">
+        <h2 className="text-base font-bold text-slate-900">서명</h2>
         <p className="mt-1 text-[13px] text-slate-500">
-          입력한 내용은 계약서의 노란 칸 자리에 그대로 들어가요. 모든 정보는 암호화되어 보관됩니다.
+          아래 이름은 계약서 서명란에 그대로 인쇄돼요. 모든 정보는 암호화되어 보관됩니다.
         </p>
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -208,32 +256,6 @@ export default function CompanySignPageClient({ token, data }: Props) {
                 inputMode="numeric"
               />
             </div>
-          )}
-          {partyFields.map((fieldDef) =>
-            fieldDef.type === "multiline" ? (
-              <div key={fieldDef.key} className="sm:col-span-2">
-                <label className={LABEL_CLS}>
-                  {fieldDef.label} {fieldDef.required && "*"}
-                </label>
-                <textarea
-                  className={`${INPUT_CLS} min-h-[84px] resize-y`}
-                  value={values[fieldDef.key] ?? ""}
-                  onChange={setValue(fieldDef.key)}
-                />
-              </div>
-            ) : (
-              <div key={fieldDef.key}>
-                <label className={LABEL_CLS}>
-                  {fieldDef.label} {fieldDef.required && "*"}
-                </label>
-                <input
-                  className={INPUT_CLS}
-                  value={values[fieldDef.key] ?? ""}
-                  onChange={setValue(fieldDef.key)}
-                  {...inputProps(fieldDef)}
-                />
-              </div>
-            ),
           )}
         </div>
 
@@ -317,15 +339,44 @@ export default function CompanySignPageClient({ token, data }: Props) {
           </p>
         )}
 
+        {/* 안 채운 필수 칸이 있으면 제출을 막고 그 자리로 데려간다(서버도 같은 값을 다시 검증한다) */}
+        {requiredLeft.length > 0 && (
+          <button
+            type="button"
+            onClick={() => openField(requiredLeft[0].key)}
+            className="mt-4 w-full rounded-xl bg-amber-50 px-3.5 py-3 text-left text-[13px] font-semibold text-amber-700 hover:bg-amber-100"
+          >
+            계약서에 아직 채우지 않은 칸이 {requiredLeft.length}개 있어요 —{" "}
+            <b>「{requiredLeft[0].label}」</b> 부터 채우러 가기 ↑
+          </button>
+        )}
+
         <button
           type="button"
           onClick={submit}
-          disabled={busy || !canSign || !agreed}
-          className="mt-5 w-full rounded-xl bg-[#2563eb] py-3.5 text-[15px] font-bold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={busy || !canSign || !agreed || requiredLeft.length > 0}
+          className="mt-4 w-full rounded-xl bg-[#2563eb] py-3.5 text-[15px] font-bold text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? "제출 중… (잠시만 기다려주세요)" : "동의하고 서명 완료하기"}
         </button>
       </div>
+
+      {/* 칸 입력창 — PC 는 그 자리 팝오버, 폰은 하단 시트 */}
+      {activeField && (
+        <SignFieldPrompt
+          key={activeField.key}
+          fieldDef={activeField}
+          value={values[activeField.key] ?? ""}
+          onChange={(v) => setValues((prev) => ({ ...prev, [activeField.key]: v }))}
+          onClose={() => setActiveKey(null)}
+          onNext={
+            requiredLeft.some((f) => f.key !== activeField.key)
+              ? () => goNext(activeField.key)
+              : null
+          }
+          anchor={anchor}
+        />
+      )}
     </Shell>
   );
 }

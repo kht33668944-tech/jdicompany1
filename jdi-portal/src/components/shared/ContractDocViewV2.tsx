@@ -19,6 +19,13 @@ interface Props {
   partyB: string;
   /** 상대방 입력값(필드 key → 값) — sign/resolved 모드에서 사용 */
   partyValues?: Record<string, string>;
+  /**
+   * sign 모드에서 노란 칸을 눌렀을 때 — 서명 페이지가 그 자리에 입력창을 연다.
+   * 넘기지 않으면 지금까지처럼 그냥 보여주기만 한다(편집기 미리보기·완성본은 그대로).
+   */
+  onFieldClick?: (key: string) => void;
+  /** 지금 입력 중인 칸(테두리 강조) */
+  activeFieldKey?: string | null;
 }
 
 const CHIP_BASE =
@@ -29,11 +36,15 @@ function FieldRun({
   token,
   mode,
   partyValue,
+  onFieldClick,
+  activeFieldKey,
 }: {
   fieldDef: FieldDef | undefined;
   token: string;
   mode: DocViewMode;
   partyValue: string | undefined;
+  onFieldClick?: (key: string) => void;
+  activeFieldKey?: string | null;
 }) {
   // 정의가 없는 토큰은 리터럴 그대로 (검증이 막지만 방어적으로)
   if (!fieldDef) return <>{token}</>;
@@ -60,10 +71,36 @@ function FieldRun({
 
   const value = partyValue?.trim();
   if (mode === "resolved" && value) return <strong className="font-bold">{value}</strong>;
+
+  const label = value || `${fieldDef.label} 입력`;
+
+  // 서명 페이지 — 칸을 눌러 그 자리에서 입력한다.
+  // 채운 칸은 값이 본문 글자처럼 보이되(테두리만 옅게) 다시 눌러 고칠 수 있다.
+  if (onFieldClick) {
+    const active = activeFieldKey === fieldDef.key;
+    return (
+      <button
+        type="button"
+        data-field-key={fieldDef.key}
+        onClick={() => onFieldClick(fieldDef.key)}
+        aria-label={`${fieldDef.label} ${value ? "고치기" : "입력하기"}`}
+        className={`${CHIP_BASE} cursor-pointer transition-colors ${
+          active
+            ? "border-solid border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200"
+            : value
+              ? "border-solid border-slate-200 bg-white font-bold text-slate-800 hover:border-blue-300"
+              : `border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 ${
+                  fieldDef.required ? "border-2" : ""
+                }`
+        }`}
+      >
+        {label}
+      </button>
+    );
+  }
+
   return (
-    <span className={`${CHIP_BASE} border-amber-300 bg-amber-50 text-amber-700`}>
-      {value || `${fieldDef.label} 입력`}
-    </span>
+    <span className={`${CHIP_BASE} border-amber-300 bg-amber-50 text-amber-700`}>{label}</span>
   );
 }
 
@@ -73,12 +110,16 @@ function Paragraphs({
   mode,
   partyValues,
   className,
+  onFieldClick,
+  activeFieldKey,
 }: {
   body: string;
   fieldMap: Map<string, FieldDef>;
   mode: DocViewMode;
   partyValues: Record<string, string>;
   className?: string;
+  onFieldClick?: (key: string) => void;
+  activeFieldKey?: string | null;
 }) {
   return (
     <>
@@ -100,6 +141,8 @@ function Paragraphs({
                 token={`{{${run.key}}}`}
                 mode={mode}
                 partyValue={partyValues[run.key]}
+                onFieldClick={onFieldClick}
+                activeFieldKey={activeFieldKey}
               />
             ),
           )}
@@ -149,8 +192,16 @@ function TermsTable({ terms }: { terms: TermRow[] }) {
   );
 }
 
-export default function ContractDocViewV2({ content, mode, partyB, partyValues = {} }: Props) {
+export default function ContractDocViewV2({
+  content,
+  mode,
+  partyB,
+  partyValues = {},
+  onFieldClick,
+  activeFieldKey,
+}: Props) {
   const fieldMap = new Map(content.fields.map((f) => [f.key, f]));
+  const runProps = { onFieldClick, activeFieldKey };
 
   return (
     <article className="text-[13.5px] leading-relaxed text-slate-800">
@@ -182,6 +233,7 @@ export default function ContractDocViewV2({ content, mode, partyB, partyValues =
             mode={mode}
             partyValues={partyValues}
             className="mt-1 whitespace-pre-wrap"
+            {...runProps}
           />
         </div>
       )}
@@ -197,6 +249,7 @@ export default function ContractDocViewV2({ content, mode, partyB, partyValues =
               fieldMap={fieldMap}
               mode={mode}
               partyValues={partyValues}
+              {...runProps}
             />
           )}
         </section>
