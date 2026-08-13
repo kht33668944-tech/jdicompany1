@@ -68,6 +68,7 @@ test("admin 클라이언트는 서명 흐름 서버 코드에서만 import 된�
   const allowed = [
     path.join("lib", "supabase", "admin.ts"), // 정의 자체
     path.join("lib", "influencer", "contracts", "documents", "signService.ts"),
+    path.join("lib", "contracts", "signService.ts"), // 계약관리(범용) 서명 흐름 — 마이그 123
   ];
   const offenders = srcFiles.filter((f) => {
     const source = readFileSync(f, "utf8");
@@ -168,9 +169,11 @@ test("pdfmake/pdf.ts 는 클라이언트 컴포넌트로 새지 않는다", () =
     const importsPdf =
       /from ["'](pdfmake|@\/lib\/influencer\/contracts\/documents\/pdf|\.\/pdf)["']/.test(source);
     if (!importsPdf) return false;
-    // 서버 전용 허용: pdf.ts 자신 + signService.ts
+    // 서버 전용 허용: pdf.ts 자신 + signService.ts (TMA + 계약관리 범용, 각 도메인별)
     if (f.endsWith(path.join("documents", "pdf.ts"))) return false;
     if (f.endsWith(path.join("documents", "signService.ts"))) return false;
+    if (f.endsWith(path.join("contracts", "pdf.ts"))) return false;
+    if (f.endsWith(path.join("contracts", "signService.ts"))) return false;
     return true;
   });
   assert.deepEqual(offenders.map((f) => path.relative(root, f)), []);

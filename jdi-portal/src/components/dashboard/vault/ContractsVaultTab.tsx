@@ -1,7 +1,7 @@
 "use client";
 
-// 보관함 "계약서 보관함" 탭 — 전자서명이 완료된 TMA 계약서를 한곳에서 보고 내려받는다.
-// 파일을 복사해 두는 게 아니라, 계약 관리의 원본(비공개 버킷)을 가리키는 "창"이다.
+// 보관함 "계약서 보관함" 탭 — 전자서명이 완료된 계약서(TMA + 일반)를 한곳에서 보고 내려받는다.
+// 파일을 복사해 두는 게 아니라, 각 계약 관리의 원본(비공개 버킷)을 가리키는 "창"이다.
 // 계약서 PDF에 주소·계좌 등 개인정보가 들어 있으므로 계정 보관함과 같은
 // 2차 비밀번호 잠금(VaultLockCard)을 지나야 목록이 보인다.
 
@@ -14,6 +14,10 @@ import {
   getSignedPdfUrl,
   type VaultContractRow,
 } from "@/lib/influencer/contracts/documents/actions";
+import {
+  getCompanySignedPdfUrl,
+  getSignedCompanyContractsForVault,
+} from "@/lib/contracts/actions";
 import { triggerDownload } from "@/lib/utils/download";
 import { formatDate } from "@/lib/utils/date";
 import VaultLockCard from "./VaultLockCard";
@@ -24,34 +28,85 @@ interface Props {
   initialUnlocked: boolean;
 }
 
-type TypeFilter = "all" | "paid" | "seeding";
+type TypeFilter = "all" | "paid" | "seeding" | "general";
+type RowType = "paid" | "seeding" | "general";
 
-const TYPE_LABEL: Record<"paid" | "seeding", string> = {
+/** TMA·일반 계약서를 한 목록으로 합치기 위한 공통 행 */
+interface Row {
+  source: "tma" | "general";
+  type: RowType;
+  doc_id: string;
+  /** 이름(TMA: 인플루언서 이름 / 일반: 계약서 제목) */
+  primary: string;
+  /** 부가 표기(TMA: @계정 / 일반: 상대방·회사) */
+  secondary: string;
+  signer_name: string | null;
+  signed_at: string | null;
+  /** 원본 계약이 삭제(숨김)됐어도 서명본은 증거로 남는다 — 표시용 (TMA 전용) */
+  deleted: boolean;
+}
+
+const TYPE_LABEL: Record<RowType, string> = {
   paid: "광고비형",
   seeding: "순수협찬형",
+  general: "일반계약",
 };
-const TYPE_BADGE: Record<"paid" | "seeding", string> = {
+const TYPE_BADGE: Record<RowType, string> = {
   paid: "bg-blue-50 text-blue-700",
   seeding: "bg-emerald-50 text-emerald-700",
+  general: "bg-violet-50 text-violet-700",
 };
 
-/** 저장 파일명: TMA계약서_이름_서명일.pdf */
-function downloadFileName(row: VaultContractRow): string {
+function toRow(tma: VaultContractRow): Row {
+  return {
+    source: "tma",
+    type: tma.template_key,
+    doc_id: tma.doc_id,
+    primary: tma.name,
+    secondary: tma.instagram_handle ? `@${tma.instagram_handle}` : "",
+    signer_name: tma.signer_name,
+    signed_at: tma.signed_at,
+    deleted: tma.contract_deleted,
+  };
+}
+
+/** 저장 파일명: (TMA계약서|계약서)_이름_서명일.pdf */
+function downloadFileName(row: Row): string {
   const date = row.signed_at ? row.signed_at.slice(0, 10) : "";
-  return `TMA계약서_${row.name}${date ? `_${date}` : ""}.pdf`;
+  const prefix = row.source === "tma" ? "TMA계약서" : "계약서";
+  return `${prefix}_${row.primary}${date ? `_${date}` : ""}.pdf`;
 }
 
 export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: Props) {
   const [unlocked, setUnlocked] = useState(initialUnlocked);
-  const [rows, setRows] = useState<VaultContractRow[] | null>(null);
+  const [rows, setRows] = useState<Row[] | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<VaultContractRow | null>(null);
+  const [preview, setPreview] = useState<Row | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setRows(await getSignedContractsForVault());
+      const [tma, general] = await Promise.all([
+        getSignedContractsForVault(),
+        getSignedCompanyContractsForVault(),
+      ]);
+      const merged: Row[] = [
+        ...tma.map(toRow),
+        ...general.map(
+          (g): Row => ({
+            source: "general",
+            type: "general",
+            doc_id: g.doc_id,
+            primary: g.title,
+            secondary: [g.counterparty_company, g.counterparty_name].filter(Boolean).join(" · "),
+            signer_name: g.signer_name,
+            signed_at: g.signed_at,
+            deleted: false,
+          }),
+        ),
+      ].sort((a, b) => (b.signed_at ?? "").localeCompare(a.signed_at ?? ""));
+      setRows(merged);
     } catch (err) {
       toast.error(getErrorMessage(err, "계약서 목록을 불러오지 못했습니다."));
       setUnlocked(false);
@@ -64,30 +119,34 @@ export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: P
   }, [unlocked, rows, load]);
 
   const counts = useMemo(() => {
-    const paid = rows?.filter((r) => r.template_key === "paid").length ?? 0;
-    const seeding = rows?.filter((r) => r.template_key === "seeding").length ?? 0;
-    return { all: paid + seeding, paid, seeding };
+    const paid = rows?.filter((r) => r.type === "paid").length ?? 0;
+    const seeding = rows?.filter((r) => r.type === "seeding").length ?? 0;
+    const general = rows?.filter((r) => r.type === "general").length ?? 0;
+    return { all: paid + seeding + general, paid, seeding, general };
   }, [rows]);
 
   const filtered = useMemo(() => {
     if (!rows) return [];
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      if (typeFilter !== "all" && r.template_key !== typeFilter) return false;
+      if (typeFilter !== "all" && r.type !== typeFilter) return false;
       if (!q) return true;
       return (
-        r.name.toLowerCase().includes(q) ||
-        r.instagram_handle.toLowerCase().includes(q) ||
+        r.primary.toLowerCase().includes(q) ||
+        r.secondary.toLowerCase().includes(q) ||
         (r.signer_name ?? "").toLowerCase().includes(q)
       );
     });
   }, [rows, search, typeFilter]);
 
-  const handleDownload = async (row: VaultContractRow) => {
+  const fetchPdfUrl = (row: Row) =>
+    row.source === "tma" ? getSignedPdfUrl(row.doc_id) : getCompanySignedPdfUrl(row.doc_id);
+
+  const handleDownload = async (row: Row) => {
     if (busyId) return;
     setBusyId(row.doc_id);
     try {
-      const url = await getSignedPdfUrl(row.doc_id);
+      const url = await fetchPdfUrl(row);
       if (!url) {
         toast.error("PDF 파일을 찾을 수 없습니다.");
         return;
@@ -142,7 +201,7 @@ export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: P
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="계약서 검색 — 이름·인스타 계정·서명자"
+            placeholder="계약서 검색 — 이름·상대방·서명자"
             className="w-full text-sm bg-transparent outline-none text-slate-800"
           />
         </div>
@@ -162,6 +221,7 @@ export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: P
             ["all", `전체 ${counts.all}`],
             ["paid", `광고비형 ${counts.paid}`],
             ["seeding", `순수협찬형 ${counts.seeding}`],
+            ["general", `일반계약 ${counts.general}`],
           ] as [TypeFilter, string][]
         ).map(([key, label]) => (
           <button
@@ -178,7 +238,7 @@ export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: P
           </button>
         ))}
         <span className="ml-auto text-xs text-slate-400">
-          인플루언서가 서명하면 자동으로 이곳에 쌓여요
+          상대방이 서명하면 자동으로 이곳에 쌓여요
         </span>
       </div>
 
@@ -197,7 +257,7 @@ export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: P
           </p>
           <p className="mt-1.5 text-xs text-slate-400">
             {rows.length === 0
-              ? "인플루언서 → TMA 계약에서 서명 링크를 보내고, 서명이 끝나면 여기 자동으로 나타나요."
+              ? "계약관리 또는 인플루언서 → TMA 계약에서 서명 링크를 보내고, 서명이 끝나면 여기 자동으로 나타나요."
               : "검색어나 유형 필터를 바꿔보세요."}
           </p>
         </div>
@@ -205,7 +265,7 @@ export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: P
         <div className="space-y-2">
           {filtered.map((row) => (
             <div
-              key={row.doc_id}
+              key={`${row.source}-${row.doc_id}`}
               className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm hover:border-slate-200 transition-colors"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-[11px] font-extrabold text-red-500">
@@ -213,16 +273,16 @@ export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: P
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="truncate text-sm font-bold text-slate-800">{row.name}</span>
-                  {row.instagram_handle && (
-                    <span className="text-xs text-slate-400">@{row.instagram_handle}</span>
+                  <span className="truncate text-sm font-bold text-slate-800">{row.primary}</span>
+                  {row.secondary && (
+                    <span className="text-xs text-slate-400">{row.secondary}</span>
                   )}
                   <span
-                    className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${TYPE_BADGE[row.template_key]}`}
+                    className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${TYPE_BADGE[row.type]}`}
                   >
-                    {TYPE_LABEL[row.template_key]}
+                    {TYPE_LABEL[row.type]}
                   </span>
-                  {row.contract_deleted && (
+                  {row.deleted && (
                     <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
                       계약 삭제됨 · 증거 보존
                     </span>
@@ -263,9 +323,9 @@ export default function ContractsVaultTab({ gateConfigured, initialUnlocked }: P
 
       {preview && (
         <FilePreviewModal
-          title={`${preview.name} — TMA 계약서`}
+          title={`${preview.primary} — ${preview.source === "tma" ? "TMA 계약서" : "계약서"}`}
           fileName={downloadFileName(preview)}
-          fetchUrl={() => getSignedPdfUrl(preview.doc_id)}
+          fetchUrl={() => fetchPdfUrl(preview)}
           onClose={() => setPreview(null)}
         />
       )}
