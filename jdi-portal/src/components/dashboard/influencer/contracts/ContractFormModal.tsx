@@ -640,8 +640,10 @@ export default function ContractFormModal({ contract, prefill = null, onClose, o
           <div className="space-y-3">
             <div>
               <label htmlFor="contract-modusign" className={labelCls}>
-                모두싸인 문서 링크{" "}
-                <span className="font-normal text-slate-400">(지금은 수동 관리 — 자동 연동은 추후)</span>
+                예전 서명 링크{" "}
+                <span className="font-normal text-slate-400">
+                  (모두싸인 등 외부 서비스로 체결한 옛 계약만 — 새 계약은 아래 「계약서」에서 보냅니다)
+                </span>
               </label>
               <input
                 id="contract-modusign"

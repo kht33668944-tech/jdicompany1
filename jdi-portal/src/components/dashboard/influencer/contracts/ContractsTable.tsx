@@ -32,7 +32,8 @@ interface Props {
   selectedIds: Set<string>;
   onToggleSelect: (id: string, on: boolean) => void;
   onToggleAll: (on: boolean) => void;
-  onSelect: (id: string) => void;
+  /** focus="docs" 면 상세 패널을 열면서 계약서 영역으로 스크롤 */
+  onSelect: (id: string, focus?: "docs") => void;
   onStatusChange: (id: string, status: ContractStatus) => void;
   searchTerm: string;
   /** 검색 결과가 없을 때 "검색어로 새 계약 만들기" */
@@ -144,6 +145,7 @@ export default function ContractsTable({
                 "실제 게시일",
                 "2차 활용",
                 "정산정보",
+                "계약서",
                 "링크·메모",
               ].map((h) => (
                 <th
@@ -248,6 +250,18 @@ export default function ContractsTable({
                       </span>
                     )}
                   </td>
+                  {/* 계약서 — 상세 패널의 계약서 영역으로 바로 데려간다
+                      (패널이 길어 "어디서 보내는지 모르겠다"는 피드백) */}
+                  <td className="px-4 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(c.id, "docs")}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-bold text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                      title="계약서 만들기 · 서명 링크 보내기"
+                    >
+                      📄 계약서
+                    </button>
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className="inline-flex items-center gap-1.5 text-slate-400">
                       {c.modusign_url && (
@@ -257,8 +271,8 @@ export default function ContractsTable({
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           className="text-blue-600 hover:text-blue-700"
-                          title="모두싸인 문서 열기"
-                          aria-label="모두싸인 문서 열기"
+                          title="예전 서명 링크(모두싸인) 열기"
+                          aria-label="예전 서명 링크(모두싸인) 열기"
                         >
                           <LinkSimple size={15} />
                         </a>

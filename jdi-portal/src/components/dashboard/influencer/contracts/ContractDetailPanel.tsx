@@ -2,7 +2,7 @@
 
 // 계약 상세 — 우측 슬라이드 패널. 정산 정보(개인정보)는 2차 비밀번호 잠금을 풀어야 보인다.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import X from "phosphor-react/dist/icons/X.esm.js";
 import ContractStatusDropdown from "./ContractStatusDropdown";
@@ -44,6 +44,8 @@ interface Props {
   onEditSettlement: (contract: InfluencerContract, settlement: ContractSettlement | null) => void;
   onStatusChange: (id: string, status: ContractStatus) => void;
   onDeleted: () => void;
+  /** 목록의 「계약서」 버튼으로 열었을 때 — 계약서 영역으로 바로 내려간다 */
+  focusDocs?: boolean;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -91,12 +93,33 @@ export default function ContractDetailPanel({
   onEditSettlement,
   onStatusChange,
   onDeleted,
+  focusDocs = false,
 }: Props) {
   const [settlement, setSettlement] = useState<ContractSettlement | null>(null);
   const [settlementLoading, setSettlementLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const docsRef = useRef<HTMLDivElement>(null);
 
   const contractId = contract?.id ?? null;
+
+  // 목록에서 「계약서」로 들어왔으면 그 자리까지 데려간다 — 패널이 길어 못 찾는다는 피드백.
+  //
+  // scrollIntoView 는 이 패널에서 원하는 만큼 내려가지 않는다(안쪽 스크롤 상자 + 계약서 목록이
+  // 나중에 도착해 높이가 변함). 스크롤 상자를 직접 잡아 위치를 계산하고, 목록이 도착한 뒤
+  // 한 번 더 맞춘다 — 그래야 「계약서 만들기」가 아래 버튼 바에 가리지 않는다.
+  useEffect(() => {
+    if (!focusDocs || !contractId) return;
+    const go = () => {
+      const target = docsRef.current;
+      const box = target?.closest<HTMLElement>(".overflow-y-auto");
+      if (!target || !box) return;
+      const top =
+        target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
+      box.scrollTo({ top, behavior: "smooth" });
+    };
+    const timers = [150, 800].map((ms) => window.setTimeout(go, ms));
+    return () => timers.forEach(window.clearTimeout);
+  }, [focusDocs, contractId]);
 
   const loadSettlement = useCallback(async (id: string) => {
     setSettlementLoading(true);
@@ -294,9 +317,11 @@ export default function ContractDetailPanel({
             <Row label="필수 파일" value={REQUIRED_FILES_LABEL[contract.required_files_status]} />
           </Section>
 
-          <Section title="계약서 · 전자서명">
-            <ContractDocsSection contractId={contract.id} />
-          </Section>
+          <div ref={docsRef}>
+            <Section title="계약서 · 전자서명">
+              <ContractDocsSection contractId={contract.id} />
+            </Section>
+          </div>
 
           <Section title="정산 정보 (개인정보)">
             {!unlocked ? (
@@ -363,24 +388,22 @@ export default function ContractDetailPanel({
           </Section>
 
           <Section title="계약 · 메모">
-            <Row
-              label="모두싸인"
-              value={
-                contract.modusign_url ? (
+            {/* 모두싸인은 더 쓰지 않는다(자체 전자서명으로 대체). 옛 계약에 링크가 남아 있을 때만 보여준다 */}
+            {contract.modusign_url && (
+              <Row
+                label="예전 서명 링크"
+                value={
                   <a
                     href={contract.modusign_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline"
                   >
-                    문서 열기 ↗
+                    모두싸인 문서 열기 ↗
                   </a>
-                ) : (
-                  "링크 없음"
-                )
-              }
-              dim={!contract.modusign_url}
-            />
+                }
+              />
+            )}
             <Row
               label="메모"
               value={<span className="whitespace-pre-wrap">{contract.memo ?? "—"}</span>}
