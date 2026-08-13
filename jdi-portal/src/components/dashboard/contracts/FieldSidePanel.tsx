@@ -17,6 +17,7 @@ const TYPE_LABEL: Record<FieldType, string> = {
   phone: "연락처",
   email: "이메일",
   account: "계좌번호",
+  bank: "은행",
 };
 
 interface Props {

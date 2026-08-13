@@ -17,7 +17,8 @@ export type FieldType =
   | "date"
   | "phone"
   | "email"
-  | "account";
+  | "account"
+  | "bank";
 
 /** 문서 안에 배치되는 채움 칸. 조항 본문의 {{key}} 자리에 값이 인쇄된다. */
 export interface FieldDef {
