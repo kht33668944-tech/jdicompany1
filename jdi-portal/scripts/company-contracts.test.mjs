@@ -254,6 +254,33 @@ test("PDF 미리보기 라우트: 초안만 허용 + 미리보기 표시를 반�
   assert.match(route, /signatureDataUrl:\s*null/, "미리보기에 서명 이미지가 들어갑니다");
 });
 
+test("양식 PDF 미리보기 라우트: 로그인 직원 전용 + service role 금지 + 미리보기 표시", () => {
+  const route = read("src/app/api/contracts/templates/[templateId]/preview-pdf/route.ts");
+  assert.match(route, /getAuthUser\(\)/, "양식 미리보기 라우트에 로그인 확인이 없습니다");
+  assert.match(route, /status:\s*401/, "로그인하지 않은 요청을 401 로 막지 않습니다");
+  assert.doesNotMatch(
+    route,
+    /createAdminClient|SERVICE_ROLE/,
+    "미리보기는 RLS 클라이언트로만 읽어야 합니다(service role 금지)",
+  );
+  assert.match(route, /preview:\s*true/, "워터마크 없는 PDF 가 나갑니다");
+  assert.match(route, /signatureDataUrl:\s*null/, "미리보기에 서명 이미지가 들어갑니다");
+});
+
+test("저장은 대상 id 를 돌려준다 — 새 양식도 곧바로 미리볼 수 있게", () => {
+  const screen = read("src/components/dashboard/contracts/ContractEditorScreen.tsx");
+  assert.match(
+    screen,
+    /const save = async \(\): Promise<string \| null>/,
+    "save() 가 id 를 돌려주지 않으면 새 양식 미리보기가 방금 만든 양식을 못 찾습니다",
+  );
+  assert.match(
+    screen,
+    /templates\/\$\{savedId\}\/preview-pdf/,
+    "양식 미리보기가 저장 직후의 id 를 쓰지 않습니다",
+  );
+});
+
 test("진짜 서명 완료본에는 미리보기 표시가 붙지 않는다", () => {
   assert.doesNotMatch(
     signService,
