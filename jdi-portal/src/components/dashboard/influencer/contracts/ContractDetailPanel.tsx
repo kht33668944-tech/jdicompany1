@@ -99,6 +99,7 @@ export default function ContractDetailPanel({
   const [settlementLoading, setSettlementLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const docsRef = useRef<HTMLDivElement>(null);
+  const scrollBoxRef = useRef<HTMLDivElement>(null);
 
   const contractId = contract?.id ?? null;
 
@@ -111,7 +112,7 @@ export default function ContractDetailPanel({
     if (!focusDocs || !contractId) return;
     const go = () => {
       const target = docsRef.current;
-      const box = target?.closest<HTMLElement>(".overflow-y-auto");
+      const box = scrollBoxRef.current;
       if (!target || !box) return;
       const top =
         target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
@@ -219,7 +220,7 @@ export default function ContractDetailPanel({
         </div>
 
         {/* 본문 */}
-        <div className="flex-1 overflow-y-auto px-5">
+        <div ref={scrollBoxRef} className="flex-1 overflow-y-auto px-5">
           <Section title="기본 정보">
             <Row label="협업 유형" value={COLLAB_TYPE_LABEL[contract.collab_type]} />
             <Row label="제공 제품" value={PRODUCT_LABEL[contract.product]} />

@@ -7,16 +7,16 @@
 interface Props {
   /** 꼭 입력해야 하는 칸 수 */
   requiredTotal: number;
-  /** 그중 채운 수 */
-  requiredDone: number;
+  /** 그중 아직 안 채운 수 */
+  requiredLeft: number;
   /** 남은 칸으로 이동 — 남은 게 없으면 서명 영역으로 */
   onNext: () => void;
 }
 
-export default function SignProgressBar({ requiredTotal, requiredDone, onNext }: Props) {
-  const left = Math.max(0, requiredTotal - requiredDone);
+export default function SignProgressBar({ requiredTotal, requiredLeft: left, onNext }: Props) {
   const done = left === 0;
-  const percent = requiredTotal === 0 ? 100 : Math.round((requiredDone / requiredTotal) * 100);
+  const filled = requiredTotal - left;
+  const percent = requiredTotal === 0 ? 100 : Math.round((filled / requiredTotal) * 100);
 
   return (
     <div className="sticky top-0 z-30 -mx-3 mb-3 border-b border-slate-200 bg-white/95 px-3 py-2.5 backdrop-blur sm:-mx-0 sm:mx-0 sm:rounded-xl sm:border sm:shadow-sm">
@@ -26,7 +26,7 @@ export default function SignProgressBar({ requiredTotal, requiredDone, onNext }:
             done ? "text-emerald-600" : "text-slate-700"
           }`}
         >
-          {requiredTotal === 0 ? "입력할 칸 없음" : `입력 ${requiredDone}/${requiredTotal}`}
+          {requiredTotal === 0 ? "입력할 칸 없음" : `입력 ${filled}/${requiredTotal}`}
         </span>
 
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
