@@ -13,6 +13,8 @@ export const FIELD_TYPE_LABEL: Record<FieldType, string> = {
   email: "이메일",
   account: "계좌번호",
   bank: "은행",
+  checkbox: "체크박스",
+  select: "드롭다운(고르기)",
 };
 
 export interface FieldPreset {
@@ -34,6 +36,9 @@ export const PARTY_PRESETS: FieldPreset[] = [
   { label: "계좌번호", type: "account", kind: "party", icon: "💳" },
   { label: "예금주", type: "text", kind: "party", icon: "👤" },
   { label: "사업자등록번호", type: "text", kind: "party", icon: "🏢" },
+  // 체크는 "동의합니다 ☑" 같은 자리에 쓴다. 보기를 고르는 칸은 보기 목록이 계약서마다
+  // 달라서 프리셋으로 두지 않고, 칸을 만든 뒤 종류를 「드롭다운」으로 바꿔 쓴다.
+  { label: "동의 체크", type: "checkbox", kind: "party", icon: "☑️" },
 ];
 
 /** 직원이 계약서를 만들 때 채우는 칸 (파란 칸) */

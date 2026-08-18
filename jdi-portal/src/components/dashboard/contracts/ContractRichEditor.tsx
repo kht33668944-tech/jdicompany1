@@ -730,6 +730,24 @@ export default function ContractRichEditor({
                 </option>
               ))}
             </select>
+            {popoverField.type === "select" && (
+              <>
+                <label className="mb-1 mt-2 block text-[11px] font-bold text-slate-400">
+                  고를 보기 (한 줄에 하나)
+                </label>
+                <textarea
+                  value={(popoverField.options ?? []).join("\n")}
+                  onChange={(e) =>
+                    onUpdateField(popoverField.key, {
+                      // 빈 줄은 저장할 때 서버가 걸러낸다(actions.ts validateOptions)
+                      options: e.target.value.split("\n"),
+                    })
+                  }
+                  placeholder={"CJ대한통운\n한진택배\n롯데택배"}
+                  className="min-h-[76px] w-full resize-y rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none"
+                />
+              </>
+            )}
             {popoverField.kind === "party" && (
               <label className="mt-2 flex items-center gap-1.5 text-[12px] font-semibold text-slate-600">
                 <input

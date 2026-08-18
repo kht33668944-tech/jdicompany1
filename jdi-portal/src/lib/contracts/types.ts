@@ -18,7 +18,11 @@ export type FieldType =
   | "phone"
   | "email"
   | "account"
-  | "bank";
+  | "bank"
+  // 아래 둘은 값이 자유 입력이 아니라 "고르는" 칸이다. 값은 여전히 문자열 하나로 저장한다
+  // (서명본은 Record<string,string> 로 통째 암호화되므로 이 전제를 깨면 파급이 크다).
+  | "checkbox" // 체크하면 CHECKBOX_ON("예"), 아니면 ""
+  | "select"; // options 중 하나
 
 /** 문서 안에 배치되는 채움 칸. 조항 본문의 {{key}} 자리에 값이 인쇄된다. */
 export interface FieldDef {
@@ -28,6 +32,8 @@ export interface FieldDef {
   type: FieldType;
   required: boolean; // party 필드의 서명 시 필수 여부(staff 는 발송 시 전부 필수)
   value?: string; // staff 전용 — 계약서 만들 때 채운 값
+  /** type "select" 전용 — 고를 수 있는 보기 목록 */
+  options?: string[];
 }
 
 /** 편집기 툴바에서 새 채움 칸을 만들 때 넘기는 값 */
@@ -35,6 +41,7 @@ export interface CreateFieldInput {
   kind: FieldKind;
   label: string;
   type: FieldType;
+  options?: string[];
 }
 
 /** 개별 조건표 한 줄 — TMA TermRow 와 동일 모양 */

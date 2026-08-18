@@ -11,6 +11,8 @@ import { requireVaultUnlock } from "@/lib/vault/unlock";
 import {
   COMPANY_CONTRACT_DOCS_BUCKET,
   COMPANY_CONTRACTS_PATH,
+  MAX_SELECT_OPTIONS,
+  MAX_SELECT_OPTION_LEN,
   SIGN_TOKEN_DAYS,
   TERMS_MARKER,
   UUID_RE,
@@ -34,6 +36,8 @@ const LIST_COLUMNS =
   "pdf_sha256, created_by, created_at, updated_at";
 const DOC_COLUMNS = `${LIST_COLUMNS}, content`;
 
+// ⚠️ 새 칸 종류를 types.ts 에 추가하면 **여기에도 반드시 넣어야 한다.**
+//    빠뜨리면 저장할 때마다 조용히 "text" 로 되돌아간다(아래 강등 로직).
 const FIELD_TYPES: FieldType[] = [
   "text",
   "multiline",
@@ -43,6 +47,8 @@ const FIELD_TYPES: FieldType[] = [
   "email",
   "account",
   "bank",
+  "checkbox",
+  "select",
 ];
 const FIELD_KEY_RE = /^f\d+$/;
 
@@ -62,6 +68,24 @@ function requireText(value: unknown, label: string, maxLen: number): string {
   if (typeof value !== "string") throw new Error(`${label} 형식이 잘못되었습니다.`);
   if (value.length > maxLen) throw new Error(`${label}이(가) 너무 깁니다.`);
   return value;
+}
+
+/** 드롭다운 보기 목록 — 빈 줄은 버리고, 중복·과다·과장을 막는다 */
+function validateOptions(raw: unknown, label: string): string[] {
+  if (!Array.isArray(raw)) throw new Error(`「${label}」의 고를 보기 목록이 없어요.`);
+  const options = raw
+    .map((o) => requireText(o, `「${label}」의 보기`, MAX_SELECT_OPTION_LEN).trim())
+    .filter(Boolean);
+  if (options.length === 0) {
+    throw new Error(`「${label}」은 고르는 칸이라 보기를 한 줄에 하나씩 적어주세요.`);
+  }
+  if (options.length > MAX_SELECT_OPTIONS) {
+    throw new Error(`「${label}」의 보기는 ${MAX_SELECT_OPTIONS}개까지 넣을 수 있어요.`);
+  }
+  if (new Set(options).size !== options.length) {
+    throw new Error(`「${label}」에 같은 보기가 두 번 들어 있어요.`);
+  }
+  return options;
 }
 
 function validateContentV2(raw: ContentV2): ContentV2 {
@@ -92,6 +116,8 @@ function validateContentV2(raw: ContentV2): ContentV2 {
       label,
       type,
       required: f?.required !== false,
+      // ⚠️ 여기는 필드를 "새로 조립"한다. 새 속성을 빠뜨리면 저장할 때 소리 없이 사라진다.
+      ...(type === "select" ? { options: validateOptions(f?.options, label) } : {}),
       // 상대방 입력값은 본문 스냅샷에 절대 저장하지 않는다(개인정보) — staff 값만 유지
       ...(kind === "staff"
         ? { value: requireText(f?.value ?? "", `채움 칸 「${label}」 값`, 1000) }

@@ -20,9 +20,9 @@ interface PdfKitDocLike {
 const PdfPrinter = pdfmakeModule as unknown as new (fonts: TFontDictionary) => {
   createPdfKitDocument(dd: TDocumentDefinitions): PdfKitDocLike;
 };
-import { TERMS_MARKER } from "./constants";
+import { PDF_CHECK_OFF, PDF_CHECK_ON, TERMS_MARKER } from "./constants";
 import { buildValueMap, tokenizeBody } from "./tokens";
-import type { ContentV2, CounterpartyKind, TermRow } from "./types";
+import type { ContentV2, CounterpartyKind, FieldDef, TermRow } from "./types";
 
 export interface CompanySignedPdfInput {
   content: ContentV2;
@@ -57,15 +57,32 @@ const LINE = "#cbd5e1";
 const HEAD_FILL = "#f1f5f9";
 
 /**
+ * 채움 칸 값을 종이에 찍을 글자로.
+ * 체크박스만 모양이 다르다 — 값이 있으면 [✓], 없으면 빈 네모.
+ * (☑ 글자는 Pretendard 에 없어서 못 쓴다 — constants.ts 주석 참고)
+ */
+function fieldText(def: FieldDef | undefined, value: string, blank: string): string {
+  if (def?.type === "checkbox") return value.trim() ? PDF_CHECK_ON : PDF_CHECK_OFF;
+  return value.trim() || blank;
+}
+
+/**
  * 조항 body → 문단 목록.
  * {{fN}} 자리에는 채움 칸 값을, **굵게** 표기에는 굵은 글씨를 적용한다.
  */
-function clauseParagraphs(body: string, values: Map<string, string>): Content[] {
+function clauseParagraphs(
+  body: string,
+  values: Map<string, string>,
+  fields: Map<string, FieldDef>,
+): Content[] {
   return tokenizeBody(body).map((runs) => ({
     text: runs.map((run) =>
       run.type === "text"
         ? { text: run.text, ...(run.bold ? { bold: true } : {}) }
-        : { text: values.get(run.key) ?? "＿＿＿", bold: true },
+        : {
+            text: fieldText(fields.get(run.key), values.get(run.key) ?? "", "＿＿＿"),
+            bold: true,
+          },
     ),
     margin: [0, 2, 0, 2] as [number, number, number, number],
   }));
@@ -143,7 +160,7 @@ function signatureSection(input: CompanySignedPdfInput): Content {
   // 상대방이 입력한 모든 채움 칸을 요약해 남긴다 — 본문 배치를 잊어도 입력값이 PDF에 남는다
   const partyFieldRows: Content[] = content.fields
     .filter((f) => f.kind === "party")
-    .map((f) => field(f.label, input.partyValues[f.key] ?? ""));
+    .map((f) => field(f.label, fieldText(f, input.partyValues[f.key] ?? "", "")));
 
   const signerCell: Content[] = [
     ...(isCorp ? [field("법인명", input.counterpartyCompany ?? input.counterpartyName)] : []),
@@ -254,6 +271,7 @@ export async function renderCompanySignedPdf(input: CompanySignedPdfInput): Prom
   });
 
   const values = buildValueMap(content, input.partyValues);
+  const fieldMap = new Map(content.fields.map((f) => [f.key, f]));
   const partyBDisplay =
     input.counterpartyKind === "corp"
       ? input.counterpartyCompany ?? input.counterpartyName
@@ -265,7 +283,7 @@ export async function renderCompanySignedPdf(input: CompanySignedPdfInput): Prom
       : []),
     ...(clause.body.trim() === TERMS_MARKER
       ? [termsTable(content.terms ?? [])]
-      : clauseParagraphs(clause.body, values)),
+      : clauseParagraphs(clause.body, values, fieldMap)),
   ]);
 
   const dd: TDocumentDefinitions = {
@@ -311,7 +329,7 @@ export async function renderCompanySignedPdf(input: CompanySignedPdfInput): Prom
         },
         margin: [0, 0, 0, 10],
       },
-      ...(content.intro.trim() ? clauseParagraphs(content.intro, values) : []),
+      ...(content.intro.trim() ? clauseParagraphs(content.intro, values, fieldMap) : []),
       ...clauseContents,
       { text: "서명 및 계약 정보", bold: true, fontSize: 13, alignment: "center", pageBreak: "before", margin: [0, 6, 0, 4] },
       ...(content.closing.trim()
