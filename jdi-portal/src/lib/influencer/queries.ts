@@ -8,6 +8,7 @@ import type {
   InfluencerCampaign,
   InfluencerCampaignWithInfluencer,
   InfluencerFilterOpts,
+  InfluencerStatsItem,
   KpiCards,
 } from "./types";
 
@@ -49,6 +50,23 @@ export async function getInfluencers(opts: InfluencerFilterOpts = {}): Promise<I
   const { data, error } = await query;
   if (error) throw error;
   return (data as unknown as InfluencerListItem[]) ?? [];
+}
+
+/**
+ * 계약 탭에서 쓸 리스트 지표 — 계약에 연결된 인플루언서만 골라 최소 컬럼으로 가져온다.
+ * (계약 표에 팔로워·ER·등급을 같이 보여주고, 리스트로 바로 건너뛰게 하려고)
+ */
+export async function getInfluencerStats(ids: string[]): Promise<InfluencerStatsItem[]> {
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("influencers")
+    .select("id, username, follower_count, engagement_rate, grade")
+    .in("id", ids);
+
+  if (error) throw error;
+  return (data ?? []) as InfluencerStatsItem[];
 }
 
 export async function getInfluencerById(id: string): Promise<InfluencerWithPosts | null> {

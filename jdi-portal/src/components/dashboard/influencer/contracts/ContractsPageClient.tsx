@@ -32,7 +32,7 @@ import {
 import { formatPostMonth, getPostMonth, getRetentionEnd } from "@/lib/influencer/contracts/dates";
 import { URGENT_SOON_DAYS } from "@/lib/influencer/contracts/constants";
 import { useInfluencerSuggestions } from "@/lib/influencer/contracts/useInfluencerSuggestions";
-import type { InfluencerListItem } from "@/lib/influencer/types";
+import type { InfluencerListItem, InfluencerStatsItem } from "@/lib/influencer/types";
 import { formatKrw } from "@/lib/expenses/format";
 import type {
   ContractSettlement,
@@ -59,6 +59,10 @@ interface Props {
   gateConfigured: boolean;
   initialUnlocked: boolean;
   prefill: ContractPrefill | null;
+  /** 계약에 연결된 인플루언서의 리스트 지표(팔로워·ER·등급) */
+  influencerStats: InfluencerStatsItem[];
+  /** 리스트 탭의 「📄 계약」 배지로 들어왔을 때 바로 열 계약 id */
+  initialOpenId: string | null;
 }
 
 const filterSelectCls =
@@ -70,6 +74,8 @@ export default function ContractsPageClient({
   gateConfigured,
   initialUnlocked,
   prefill,
+  influencerStats,
+  initialOpenId,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -82,7 +88,7 @@ export default function ContractsPageClient({
   const [secondaryFilter, setSecondaryFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialOpenId);
   // 목록의 「📄 계약서」로 열었는지 — 패널이 계약서 영역으로 스스로 내려간다
   const [focusDocs, setFocusDocs] = useState(false);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
@@ -109,10 +115,17 @@ export default function ContractsPageClient({
     });
   }, [router]);
 
-  // 미리 채움 파라미터는 폼을 연 뒤 주소창에서 지운다(새로고침 시 재실행 방지)
+  // 미리 채움·바로 열기 파라미터는 쓰고 나면 주소창에서 지운다(새로고침 시 재실행 방지)
   useEffect(() => {
-    if (prefill) router.replace("/dashboard/influencer/contracts");
-  }, [prefill, router]);
+    if (prefill || initialOpenId) router.replace("/dashboard/influencer/contracts");
+  }, [prefill, initialOpenId, router]);
+
+  // influencer_id → 리스트 지표. 표에서 팔로워·ER·등급을 함께 보여주는 데 쓴다.
+  const statsByInfluencer = useMemo(() => {
+    const map = new Map<string, InfluencerStatsItem>();
+    for (const stat of influencerStats) map.set(stat.id, stat);
+    return map;
+  }, [influencerStats]);
 
   // 게시월 옵션은 데이터에 실제로 있는 달만 보여준다
   const monthOptions = useMemo(() => {
@@ -494,6 +507,7 @@ export default function ContractsPageClient({
         <ContractsTable
           contracts={filtered}
           totalCount={contracts.length}
+          statsByInfluencer={statsByInfluencer}
           settlementIds={settlementIds}
           today={today}
           hasSearch={Boolean(searchTerm)}

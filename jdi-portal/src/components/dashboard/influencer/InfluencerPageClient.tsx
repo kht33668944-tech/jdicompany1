@@ -11,7 +11,8 @@ import SeedingSidebarCard from "./SeedingSidebarCard";
 import InfluencerDetailPanel from "./InfluencerDetailPanel";
 import InfluencerTabs from "./InfluencerTabs";
 import type { CampaignBasic, InfluencerListItem, InfluencerCampaignWithInfluencer, KpiCards as KpiCardsType } from "@/lib/influencer/types";
-import { loadMoreInfluencers, searchInfluencers } from "@/lib/influencer/actions";
+import type { ContractListSummary } from "@/lib/influencer/contracts/types";
+import { loadAllInfluencers, loadMoreInfluencers, searchInfluencers } from "@/lib/influencer/actions";
 import type { FilterState } from "./InfluencerFilters";
 
 interface Props {
@@ -20,9 +21,24 @@ interface Props {
   activeCampaigns: InfluencerCampaignWithInfluencer[];
   allCampaigns: CampaignBasic[];
   categories: string[];
+  /** 리스트에서도 계약 상태를 그대로 보여주기 위한 요약 (influencer_id 기준) */
+  contractSummaries: ContractListSummary[];
+  /** 전체 활성 인플루언서 수 — 화면에 불러온 25명과 구분해서 표시한다 */
+  totalInfluencerCount: number;
+  /** 계약 탭에서 「리스트에서 보기」로 들어왔을 때 바로 열 상세 */
+  initialSelectedInfluencerId: string | null;
 }
 
-export default function InfluencerPageClient({ kpi, influencers, activeCampaigns, allCampaigns, categories }: Props) {
+export default function InfluencerPageClient({
+  kpi,
+  influencers,
+  activeCampaigns,
+  allCampaigns,
+  categories,
+  contractSummaries,
+  totalInfluencerCount,
+  initialSelectedInfluencerId,
+}: Props) {
   const router = useRouter();
   // 1페이지(서버 prop)는 상태로 복사하지 않는다. 복사하면 분석 완료 후 router.refresh()로
   // 새 목록이 내려와도 화면이 첫 진입 때 값에 묶여 새 인플루언서가 안 보인다.
@@ -31,8 +47,9 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
   const [searchExtras, setSearchExtras] = useState<InfluencerListItem[]>([]);
   const [nextPage, setNextPage] = useState(2);
   const [lastPageFull, setLastPageFull] = useState(true);
+  const [fullListLoaded, setFullListLoaded] = useState(false);
   const [loadingMore, startLoadMore] = useTransition();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedInfluencerId);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [, startTransition] = useTransition();
@@ -42,6 +59,11 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
       router.refresh();
     });
   }, [router]);
+
+  // 상세를 연 뒤 주소창의 파라미터는 지운다(새로고침 때 다시 열리지 않도록)
+  useEffect(() => {
+    if (initialSelectedInfluencerId) router.replace("/dashboard/influencer");
+  }, [initialSelectedInfluencerId, router]);
 
   const handleLoadMore = useCallback(() => {
     startLoadMore(async () => {
@@ -78,6 +100,35 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
     };
   }, [searchTerm]);
 
+  // 필터를 켜면 전체를 받아 온다.
+  // 25명씩 끊어 불러온 상태에서 걸러 내면 아직 안 불러온 사람이 통째로 빠져서,
+  // "상태: 발송완료" 같은 필터가 실제보다 적게 나온다.
+  const needsFullList =
+    filters.grades.length > 0 ||
+    filters.categories.length > 0 ||
+    filters.tags.length > 0 ||
+    filters.followerTiers.length > 0 ||
+    filters.campaignStatuses.length > 0 ||
+    filters.noCampaign ||
+    filters.dateMilestone !== null;
+  useEffect(() => {
+    if (!needsFullList || fullListLoaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await loadAllInfluencers();
+        if (cancelled) return;
+        setExtraPages(rows);
+        setFullListLoaded(true);
+      } catch {
+        // 실패하면 이미 불러온 목록 안에서만 걸러진다(예전 동작).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [needsFullList, fullListLoaded]);
+
   // 화면에 쓸 목록 = 서버 1페이지 + 더 불러온 페이지 + 검색으로 찾아온 사람 (id 중복 제거)
   const loadedInfluencers = useMemo(() => {
     const merged: InfluencerListItem[] = [];
@@ -90,7 +141,14 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
     return merged;
   }, [influencers, extraPages, searchExtras]);
 
-  const hasMore = influencers.length === 25 && lastPageFull;
+  const hasMore = influencers.length === 25 && lastPageFull && !fullListLoaded;
+
+  // influencer_id → 계약 요약. 리스트 상태 배지·계약 표시가 함께 쓴다.
+  const contractByInfluencer = useMemo(() => {
+    const map = new Map<string, ContractListSummary>();
+    for (const summary of contractSummaries) map.set(summary.influencer_id, summary);
+    return map;
+  }, [contractSummaries]);
 
   return (
     <div className="flex flex-col gap-3 sm:gap-4 px-0 py-3 sm:p-6 min-h-0">
@@ -114,6 +172,7 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
           influencers={loadedInfluencers}
           activeCampaigns={activeCampaigns}
           allCampaigns={allCampaigns}
+          contractByInfluencer={contractByInfluencer}
           filters={filters}
           onFiltersChange={setFilters}
           onSelectInfluencer={(id) => setSelectedId(id)}
@@ -127,8 +186,9 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
         <div className="flex flex-col gap-3 sm:gap-4">
           <SeedingTimeline campaigns={activeCampaigns} />
           <SeedingSidebarCard
-            influencers={loadedInfluencers}
             activeCampaigns={activeCampaigns}
+            allCampaigns={allCampaigns}
+            totalInfluencerCount={totalInfluencerCount}
             filters={filters}
             onFiltersChange={setFilters}
             onInfluencerClick={(id) => setSelectedId(id)}
@@ -149,6 +209,7 @@ export default function InfluencerPageClient({ kpi, influencers, activeCampaigns
       {/* 상세 패널 (우측 슬라이드) */}
       <InfluencerDetailPanel
         influencerId={selectedId}
+        contract={selectedId ? contractByInfluencer.get(selectedId) : undefined}
         onClose={() => setSelectedId(null)}
       />
     </div>

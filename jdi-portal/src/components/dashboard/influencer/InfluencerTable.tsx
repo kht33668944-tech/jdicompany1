@@ -16,6 +16,11 @@ import X from "phosphor-react/dist/icons/X.esm.js";
 import GradeBadge from "./GradeBadge";
 import CampaignStatusDropdown from "./CampaignStatusDropdown";
 import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
+import ContractStatusDropdown from "./contracts/ContractStatusDropdown";
+import { updateContractStatus } from "@/lib/influencer/contracts/actions";
+import { CONTRACT_STATUS_LABEL } from "@/lib/influencer/contracts/labels";
+import type { ContractListSummary } from "@/lib/influencer/contracts/types";
+import type { ContractStatus } from "@/lib/influencer/contracts/types";
 import Image from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { formatKRW } from "@/lib/influencer/format";
@@ -319,16 +324,72 @@ function RowMenu({ influencerId, username, displayName, onViewDetail, onRefresh 
   );
 }
 
+/**
+ * 리스트 행에서 TMA 계약으로 바로 가는 표시.
+ * 예전에는 리스트만 봐서는 이 사람에게 계약이 있는지조차 알 수 없었다.
+ */
+function ContractLink({ contract }: { contract: ContractListSummary | undefined }) {
+  const router = useRouter();
+  if (!contract) return null;
+
+  const title =
+    `TMA 계약: ${CONTRACT_STATUS_LABEL[contract.contract_status]}` +
+    (contract.has_settlement ? " · 정산정보 등록됨" : " · 정산정보 미등록");
+
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        router.push(`/dashboard/influencer/contracts?openId=${contract.contract_id}`);
+      }}
+      className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600"
+    >
+      📄 계약
+      {contract.has_settlement && <span className="text-emerald-500" aria-hidden>✓</span>}
+    </button>
+  );
+}
+
 interface StatusCellProps {
   campaign: InfluencerCampaign | undefined;
+  /** TMA 계약이 있으면 계약 상태(10단계)가 이 사람의 진짜 상태다 */
+  contract: ContractListSummary | undefined;
   influencerId: string;
   influencerUsername: string;
   onRefresh: () => void;
   onOpenDetail: (id: string) => void;
 }
 
-function StatusCell({ campaign, influencerId, influencerUsername, onRefresh, onOpenDetail }: StatusCellProps) {
+function StatusCell({ campaign, contract, influencerId, influencerUsername, onRefresh, onOpenDetail }: StatusCellProps) {
   const [, startTransition] = useTransition();
+
+  // 계약이 있으면 계약 탭과 똑같은 10단계를 보여주고 계약을 직접 고친다.
+  // (예전에는 6단계로 뭉개진 캠페인 상태를 보여줘서 '서명 완료'가 '응답 받음'으로 보였고,
+  //  여기서 바꾼 값이 계약에 반영되지 않아 다음 계약 저장 때 되돌아갔다.)
+  if (contract) {
+    const contractId = contract.contract_id;
+    const handleContractStatusChange = (next: ContractStatus) => {
+      startTransition(async () => {
+        try {
+          const { expenseAmount } = await updateContractStatus(contractId, next);
+          if (expenseAmount > 0) {
+            toast.success(`정산 완료 — 지출관리에 ${formatKRW(expenseAmount)} 기록했습니다.`);
+          }
+          onRefresh();
+        } catch (err) {
+          toast.error(getErrorMessage(err, "계약 상태 변경 실패"));
+        }
+      });
+    };
+    return (
+      <div className="inline-flex" onClick={(e) => e.stopPropagation()}>
+        <ContractStatusDropdown status={contract.contract_status} onChange={handleContractStatusChange} />
+      </div>
+    );
+  }
 
   if (!campaign) {
     return (
@@ -379,6 +440,8 @@ interface Props {
   influencers: InfluencerListItem[];
   activeCampaigns: InfluencerCampaign[];
   allCampaigns: CampaignBasic[];
+  /** influencer_id → TMA 계약 요약 (있으면 상태·배지가 계약 기준으로 바뀐다) */
+  contractByInfluencer: Map<string, ContractListSummary>;
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;
   onSelectInfluencer: (id: string) => void;
@@ -388,7 +451,7 @@ interface Props {
   onLoadMore: () => void;
 }
 
-export default function InfluencerTable({ influencers, activeCampaigns, allCampaigns, filters, onFiltersChange, onSelectInfluencer, onRefresh, hasMore, loadingMore, onLoadMore }: Props) {
+export default function InfluencerTable({ influencers, activeCampaigns, allCampaigns, contractByInfluencer, filters, onFiltersChange, onSelectInfluencer, onRefresh, hasMore, loadingMore, onLoadMore }: Props) {
   const [resyncingAll, startResyncAll] = useTransition();
   const isMobile = useIsMobile();
 
@@ -727,16 +790,18 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                         </span>
                       )}
                     </div>
-                    {/* 4행: 상태 — 진행 중 캠페인이 있을 때만 표시(시딩 시작 버튼은 목록에서 숨김, 상세에서 진행) */}
-                    {campaignMap.get(inf.id) && (
-                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                    {/* 4행: 상태 — 진행 중 캠페인이나 계약이 있을 때만 표시(시딩 시작 버튼은 목록에서 숨김, 상세에서 진행) */}
+                    {(campaignMap.get(inf.id) || contractByInfluencer.get(inf.id)) && (
+                      <div className="mt-2 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <StatusCell
                           campaign={campaignMap.get(inf.id)}
+                          contract={contractByInfluencer.get(inf.id)}
                           influencerId={inf.id}
                           influencerUsername={inf.username}
                           onRefresh={onRefresh}
                           onOpenDetail={onSelectInfluencer}
                         />
+                        <ContractLink contract={contractByInfluencer.get(inf.id)} />
                       </div>
                     )}
                   </div>
@@ -921,13 +986,17 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
 
                     {/* 상태 */}
                     <td className="col-start-1 px-0 py-0 sm:table-cell sm:px-4 sm:py-3">
-                      <StatusCell
-                        campaign={campaignMap.get(inf.id)}
-                        influencerId={inf.id}
-                        influencerUsername={inf.username}
-                        onRefresh={onRefresh}
-                        onOpenDetail={onSelectInfluencer}
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <StatusCell
+                          campaign={campaignMap.get(inf.id)}
+                          contract={contractByInfluencer.get(inf.id)}
+                          influencerId={inf.id}
+                          influencerUsername={inf.username}
+                          onRefresh={onRefresh}
+                          onOpenDetail={onSelectInfluencer}
+                        />
+                        <ContractLink contract={contractByInfluencer.get(inf.id)} />
+                      </div>
                     </td>
 
                     {/* 메뉴 */}

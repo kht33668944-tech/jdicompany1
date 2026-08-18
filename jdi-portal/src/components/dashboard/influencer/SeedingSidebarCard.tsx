@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { InfluencerListItem, InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
+import type { CampaignBasic, InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 import { kstTodayStr } from "@/lib/influencer/calendar";
 import SeedingFunnel from "./SeedingFunnel";
 import StaleDmList from "./StaleDmList";
 
 interface Props {
-  influencers: InfluencerListItem[];
   activeCampaigns: InfluencerCampaignWithInfluencer[];
+  /** 완료까지 포함한 전체 캠페인 — 깔때기의 '완료' 칸을 세려면 필요하다 */
+  allCampaigns: CampaignBasic[];
+  /** 전체 활성 인플루언서 수(화면에 불러온 25명이 아니라) */
+  totalInfluencerCount: number;
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;
   onInfluencerClick: (influencerId: string) => void;
@@ -29,8 +32,9 @@ function tabClasses(active: boolean): string {
 }
 
 export default function SeedingSidebarCard({
-  influencers,
   activeCampaigns,
+  allCampaigns,
+  totalInfluencerCount,
   filters,
   onFiltersChange,
   onInfluencerClick,
@@ -76,15 +80,15 @@ export default function SeedingSidebarCard({
         {/* 우측 요약 (탭별로 다른 텍스트) */}
         <span className="text-[11px] text-slate-400 tabular-nums">
           {tab === "funnel"
-            ? `${influencers.length}명 · ${activeCampaigns.length}건`
+            ? `${totalInfluencerCount}명 · ${activeCampaigns.length}건`
             : `${staleDmTotal}건`}
         </span>
       </div>
       {/* 본문 */}
       {tab === "funnel" ? (
         <SeedingFunnel
-          influencers={influencers}
-          activeCampaigns={activeCampaigns}
+          allCampaigns={allCampaigns}
+          totalInfluencerCount={totalInfluencerCount}
           filters={filters}
           onFiltersChange={onFiltersChange}
         />

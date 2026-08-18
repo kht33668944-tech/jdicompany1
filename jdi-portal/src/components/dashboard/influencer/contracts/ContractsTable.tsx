@@ -3,6 +3,7 @@
 // TMA 계약 목록 테이블 — 조용하고 밀도 있는 업무용 표 (InfluencerTable 패턴)
 // 핵심 컬럼 11개만 노출하고 나머지 필드는 상세 패널에서 보여준다.
 
+import { useRouter } from "next/navigation";
 import LinkSimple from "phosphor-react/dist/icons/LinkSimple.esm.js";
 import NotePencil from "phosphor-react/dist/icons/NotePencil.esm.js";
 import ContractStatusDropdown from "./ContractStatusDropdown";
@@ -19,12 +20,23 @@ import {
 } from "@/lib/influencer/contracts/dates";
 import { URGENT_SOON_DAYS } from "@/lib/influencer/contracts/constants";
 import type { ContractStatus, InfluencerContract } from "@/lib/influencer/contracts/types";
+import type { InfluencerStatsItem } from "@/lib/influencer/types";
 import { formatKrw } from "@/lib/expenses/format";
 import { formatDateShort } from "@/lib/utils/date";
+
+/** 팔로워 수 축약 — 리스트 탭과 같은 표기 */
+function formatFollowers(n: number | null): string {
+  if (n === null) return "—";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(Math.round(n));
+}
 
 interface Props {
   contracts: InfluencerContract[];
   totalCount: number;
+  /** influencer_id → 리스트 지표. 계약만 보고도 규모를 알 수 있게 이름 아래 함께 보여준다 */
+  statsByInfluencer: Map<string, InfluencerStatsItem>;
   settlementIds: Set<string>;
   today: string;
   hasSearch: boolean;
@@ -84,6 +96,7 @@ function DateCell({ dateStr, urgency }: { dateStr: string | null; urgency: DateU
 export default function ContractsTable({
   contracts,
   totalCount,
+  statsByInfluencer,
   settlementIds,
   today,
   hasSearch,
@@ -96,6 +109,7 @@ export default function ContractsTable({
   searchTerm,
   onCreateFromSearch,
 }: Props) {
+  const router = useRouter();
   const allSelected = contracts.length > 0 && contracts.every((c) => selectedIds.has(c.id));
   // 검색 중이면 "계약이 없다"보다 "이 이름으로 만들기"가 먼저다
   const emptyMessage = hasSearch
@@ -160,6 +174,7 @@ export default function ContractsTable({
           <tbody className="divide-y divide-slate-50">
             {contracts.map((c) => {
               const quiet = isQuiet(c);
+              const stats = c.influencer_id ? statsByInfluencer.get(c.influencer_id) : undefined;
               const retentionEnd = getRetentionEnd(c.post_actual_date);
               const money =
                 c.collab_type === "paid"
@@ -181,9 +196,42 @@ export default function ContractsTable({
                     />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="font-bold text-slate-800">{c.name}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-800">{c.name}</span>
+                      {stats && (
+                        <span
+                          className="rounded bg-slate-100 px-1 text-[10px] font-bold text-slate-500"
+                          title={`AI 등급 ${stats.grade}`}
+                        >
+                          {stats.grade === "UNRATED" ? "—" : stats.grade}
+                        </span>
+                      )}
+                    </div>
                     {c.instagram_handle && (
                       <div className="text-[11px] text-slate-400">@{c.instagram_handle}</div>
+                    )}
+                    {/* 리스트 탭의 같은 사람으로 건너뛰기 (리스트 → 계약의 반대 방향) */}
+                    {c.influencer_id && (
+                      <button
+                        type="button"
+                        title="리스트에서 이 인플루언서 열기"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/influencer?openInfluencerId=${c.influencer_id}`);
+                        }}
+                        className="mt-0.5 text-[10px] font-medium text-slate-400 transition-colors hover:text-blue-600"
+                      >
+                        👥 리스트에서 보기
+                      </button>
+                    )}
+                    {/* 리스트 지표를 같이 보여준다 — 계약만 보고도 규모를 알 수 있게 */}
+                    {stats && (
+                      <div className="mt-0.5 flex items-center gap-2 text-[10px] tabular-nums text-slate-400">
+                        <span>팔 {formatFollowers(stats.follower_count)}</span>
+                        <span>
+                          ER {stats.engagement_rate === null ? "—" : `${stats.engagement_rate.toFixed(1)}%`}
+                        </span>
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
