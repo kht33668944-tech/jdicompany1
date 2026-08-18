@@ -151,9 +151,15 @@ export default function ContractEditorScreen({ target }: { target: EditorTarget 
   );
 
   // ── 저장/발송 ──────────────────────────────────────────
-  const save = async (): Promise<boolean> => {
+  /**
+   * 저장하고 **저장된 대상의 id** 를 돌려준다(실패하면 null).
+   * id 를 돌려주는 이유: 새 양식은 저장하는 순간 id 가 생기는데, setTemplateId 는
+   * 바로 반영되지 않아 PDF 미리보기가 방금 만든 양식을 못 찾기 때문이다.
+   */
+  const save = async (): Promise<string | null> => {
     setBusy(true);
     try {
+      let savedId: string;
       if (docMode) {
         await updateCompanyDocument(target.doc.id, {
           title,
@@ -162,41 +168,47 @@ export default function ContractEditorScreen({ target }: { target: EditorTarget 
           counterpartyKind,
           content,
         });
+        savedId = target.doc.id;
         toast.success("계약서를 저장했어요.");
       } else if (templateId) {
         await updateCompanyTemplate(templateId, title, content);
+        savedId = templateId;
         toast.success("양식을 저장했어요.");
       } else {
         const created = await createCompanyTemplate(title, content);
         setTemplateId(created.id);
+        savedId = created.id;
         toast.success("새 양식을 저장했어요.");
         router.replace(`${COMPANY_CONTRACTS_PATH}/templates/${created.id}`);
       }
       setDirty(false);
-      return true;
+      return savedId;
     } catch (err) {
       toast.error(getErrorMessage(err, "저장에 실패했습니다."));
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
   };
 
   /**
-   * 발송 전 PDF 미리보기 — 상대방이 받을 진짜 PDF 를 새 탭에서 연다.
+   * PDF 미리보기 — 종이에 찍힐 진짜 PDF 를 새 탭에서 연다.
+   * (계약서는 상대방이 받을 모습, 양식은 이 양식으로 계약서를 만들면 나올 모습)
    * 편집 중 내용은 저장 전에는 DB 에 없으므로 **먼저 저장**한다.
    *
    * 새 탭은 저장을 기다리기 전에 미리 연다 — 저장(await) 뒤에 window.open 을 부르면
    * 브라우저가 "사용자가 누른 것"으로 보지 않아 팝업으로 막힐 수 있다.
    */
   const savePreviewPdf = async () => {
-    if (!docMode) return;
     const tab = window.open("about:blank", "_blank");
-    if (!(await save())) {
+    const savedId = await save();
+    if (!savedId) {
       tab?.close();
       return;
     }
-    const url = `/api/contracts/${target.doc.id}/preview-pdf`;
+    const url = docMode
+      ? `/api/contracts/${savedId}/preview-pdf`
+      : `/api/contracts/templates/${savedId}/preview-pdf`;
     if (tab) tab.location.href = url;
     else window.open(url, "_blank");
   };
@@ -274,17 +286,19 @@ export default function ContractEditorScreen({ target }: { target: EditorTarget 
         >
           저장
         </button>
-        {docMode && (
-          <button
-            type="button"
-            onClick={savePreviewPdf}
-            disabled={busy}
-            title="상대방이 받을 진짜 PDF 를 새 탭에서 확인합니다"
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            저장하고 PDF 미리보기
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={savePreviewPdf}
+          disabled={busy}
+          title={
+            docMode
+              ? "상대방이 받을 진짜 PDF 를 새 탭에서 확인합니다"
+              : "이 양식으로 계약서를 만들면 나올 PDF 를 새 탭에서 확인합니다"
+          }
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+        >
+          저장하고 PDF 미리보기
+        </button>
         {docMode && (
           <button
             type="button"

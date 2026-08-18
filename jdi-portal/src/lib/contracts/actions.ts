@@ -186,6 +186,21 @@ export async function listCompanyTemplates(): Promise<CompanyTemplateRow[]> {
   return (data ?? []) as unknown as CompanyTemplateRow[];
 }
 
+/** 양식 하나 — PDF 미리보기 라우트용(목록 전체를 읽지 않게) */
+export async function getCompanyTemplate(id: string): Promise<CompanyTemplateRow> {
+  const { supabase } = await getSessionUser();
+  if (!UUID_RE.test(id)) throw new Error("양식 정보가 잘못되었습니다.");
+  const { data, error } = await supabase
+    .from("company_contract_templates")
+    .select("id, title, content, created_at, updated_at")
+    .eq("id", id)
+    .eq("is_deleted", false)
+    .maybeSingle();
+  if (error) throw new Error(`양식을 불러오지 못했습니다: ${error.message}`);
+  if (!data) throw new Error("양식을 찾을 수 없습니다.");
+  return data as unknown as CompanyTemplateRow;
+}
+
 export async function createCompanyTemplate(
   title: string,
   content: ContentV2,
