@@ -38,6 +38,7 @@ import type {
   ContractSettlement,
   ContractStatus,
   InfluencerContract,
+  UnlinkedSeeding,
 } from "@/lib/influencer/contracts/types";
 import { kstNow, toDateString } from "@/lib/utils/date";
 
@@ -61,6 +62,8 @@ interface Props {
   prefill: ContractPrefill | null;
   /** 계약에 연결된 인플루언서의 리스트 지표(팔로워·ER·등급) */
   influencerStats: InfluencerStatsItem[];
+  /** 계약 없이 도는 시딩건 — 정상 운영에서는 빈 배열이라 화면에 안 나온다 */
+  unlinkedSeedings: UnlinkedSeeding[];
   /** 리스트 탭의 「📄 계약」 배지로 들어왔을 때 바로 열 계약 id */
   initialOpenId: string | null;
 }
@@ -75,6 +78,7 @@ export default function ContractsPageClient({
   initialUnlocked,
   prefill,
   influencerStats,
+  unlinkedSeedings,
   initialOpenId,
 }: Props) {
   const router = useRouter();
@@ -350,6 +354,35 @@ export default function ContractsPageClient({
           </div>
         )}
 
+        {/* 계약 없이 도는 시딩건 — 시딩 1건 = 계약 1건이라 평소엔 0건이고 아무것도 안 나온다.
+            0이 아니면 계약서를 빠뜨린 사람이므로 여기서 바로 만들 수 있게 한다. */}
+        {unlinkedSeedings.length > 0 && (
+          <div className="mx-5 mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+            <span className="font-bold">
+              ⚠️ 계약서 없이 진행 중인 시딩 {unlinkedSeedings.length}건
+            </span>
+            {unlinkedSeedings.map((s) => (
+              <button
+                key={s.campaign_id}
+                type="button"
+                onClick={() =>
+                  setFormState({
+                    contract: null,
+                    prefill: {
+                      influencerId: s.influencer_id,
+                      name: s.display_name?.trim() || s.username,
+                      handle: s.username,
+                    },
+                  })
+                }
+                className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 font-semibold text-amber-700 hover:bg-amber-100"
+              >
+                @{s.username} 계약 만들기
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* 상태별 칩 */}
         <div className="flex flex-wrap gap-1.5 px-5 pt-3" aria-label="상태별 개수">
           <button
@@ -560,6 +593,11 @@ export default function ContractsPageClient({
         <ContractFormModal
           contract={formState.contract}
           prefill={formState.prefill}
+          existingContracts={contracts}
+          onOpenExisting={(id) => {
+            setFormState(null);
+            setSelectedId(id);
+          }}
           onClose={() => setFormState(null)}
           onSaved={() => {
             setFormState(null);

@@ -34,11 +34,13 @@ import {
   syncCampaign,
   type ContractLinkRow,
 } from "./linkSync";
+import { CONTRACT_COLUMNS } from "./queries";
 import type {
   ContractInput,
   ContractSaveResult,
   ContractSettlement,
   ContractStatus,
+  InfluencerContract,
   SettlementExportRow,
   SettlementInput,
 } from "./types";
@@ -174,6 +176,95 @@ function validateContractInput(input: ContractInput): ContractInput {
 // ============================================================
 // 계약 CRUD
 // ============================================================
+/**
+ * 리스트의 「+ 시딩 시작」 — 시딩건과 계약을 **항상 함께** 만든다.
+ *
+ * 예전에는 캠페인(시딩건)만 만들었다. 그래서 계약 탭에는 보이지 않는 진행 건이 생겼고,
+ * 상태도 캠페인 6단계로만 관리돼 같은 사람이 화면마다 다른 이름의 상태로 보였다.
+ * 이제 시딩 1건 = 계약 1건이므로 여기서 계약만 만들면 시딩건은 후처리가 붙여 준다.
+ *
+ * 이미 살아있는 계약이 있으면 새로 만들지 않고 그 계약을 돌려준다(중복 방지).
+ */
+export async function startSeeding(
+  influencerId: string,
+): Promise<{ contract: InfluencerContract; created: boolean }> {
+  const { supabase, userId } = await getSessionUser();
+  if (!UUID_RE.test(influencerId)) throw new Error("인플루언서 정보가 잘못되었습니다.");
+
+  const { data: existing, error: existErr } = await supabase
+    .from("influencer_contracts")
+    .select(CONTRACT_COLUMNS)
+    .eq("influencer_id", influencerId)
+    .eq("season", CONTRACTS_SEASON)
+    .eq("is_deleted", false)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existErr) throw new Error(`계약 확인에 실패했습니다: ${existErr.message}`);
+  if (existing) {
+    return { contract: existing as unknown as InfluencerContract, created: false };
+  }
+
+  const { data: influencer, error: infErr } = await supabase
+    .from("influencers")
+    .select("username, display_name")
+    .eq("id", influencerId)
+    .maybeSingle();
+  if (infErr) throw new Error(`인플루언서 조회에 실패했습니다: ${infErr.message}`);
+  if (!influencer) throw new Error("인플루언서를 찾을 수 없습니다.");
+
+  const username = ((influencer.username as string | null) ?? "").trim();
+  const displayName = ((influencer.display_name as string | null) ?? "").trim();
+
+  // 기본값은 계약 폼의 새 계약 초기값과 같다(순수협찬형 · 150cm · 후보).
+  // 제품·금액·날짜는 곧바로 열리는 폼에서 사람이 채운다.
+  const valid = validateContractInput({
+    influencer_id: influencerId,
+    name: displayName || username,
+    instagram_handle: username,
+    collab_type: "seeding",
+    product: "tree_150",
+    product_detail: null,
+    retail_price: null,
+    agreed_value: null,
+    ad_fee_total: null,
+    ad_fee_vat_included: true,
+    settlement_type: null,
+    business_reg_no: null,
+    secondary_usage: "not_allowed",
+    secondary_usage_fee: null,
+    secondary_usage_start: null,
+    secondary_usage_end: null,
+    allow_jdi_sns: false,
+    allow_meta_ads: false,
+    allow_edit: false,
+    partnership_ad_access: false,
+    raw_footage: "not_provided",
+    raw_footage_fee: null,
+    raw_footage_scope: null,
+    raw_footage_due: null,
+    product_ship_date: null,
+    draft_due_date: null,
+    post_planned_date: null,
+    post_actual_date: null,
+    required_files_status: "none",
+    contract_status: "candidate",
+    modusign_url: null,
+    memo: null,
+  });
+
+  const { data, error } = await supabase
+    .from("influencer_contracts")
+    .insert({ ...valid, season: CONTRACTS_SEASON, created_by: userId })
+    .select(CONTRACT_COLUMNS)
+    .single();
+  if (error) throw new Error(`시딩 시작에 실패했습니다: ${error.message}`);
+
+  const contract = data as unknown as InfluencerContract;
+  await finishContractSave(supabase, userId, contract as unknown as ContractLinkRow);
+  return { contract, created: true };
+}
+
 export async function createContract(input: ContractInput): Promise<ContractSaveResult> {
   const { supabase, userId } = await getSessionUser();
   const valid = validateContractInput(input);

@@ -2,15 +2,14 @@
 
 import { getErrorMessage } from "@/lib/utils/errors";
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { InfluencerWithPosts, InfluencerCampaign, CampaignStatus, InfluencerPost } from "@/lib/influencer/types";
 import {
   updateInfluencerNotes,
   updateInfluencerTags,
-  addCampaign,
   updateCampaign,
-  updateCampaignStatus,
   deleteCampaign,
   resyncInfluencer,
   analyzeInfluencer,
@@ -24,7 +23,9 @@ import Image from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
 import ContractStatusDropdown from "./contracts/ContractStatusDropdown";
+import ContractStatusBadge from "./contracts/ContractStatusBadge";
 import { updateContractStatus } from "@/lib/influencer/contracts/actions";
+import { campaignToContractStatus } from "@/lib/influencer/contracts/statusMap";
 import type { ContractListSummary, ContractStatus } from "@/lib/influencer/contracts/types";
 import Select, { type SelectOption } from "@/components/shared/Select";
 import {
@@ -126,18 +127,6 @@ interface CampaignFormValues {
   contentDeadline: string;
   postDate: string;
 }
-
-const EMPTY_CAMPAIGN_FORM: CampaignFormValues = {
-  name: "",
-  product: "",
-  cost: "",
-  status: "planned",
-  contactDate: "",
-  contractDate: "",
-  shipDate: "",
-  contentDeadline: "",
-  postDate: "",
-};
 
 const TEXT_INPUT_CLASS =
   "text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30";
@@ -247,41 +236,9 @@ function CampaignForm({
   );
 }
 
-// ── 캠페인 추가 폼 ──────────────────────────────────────────────
-interface AddCampaignFormProps {
-  influencerId: string;
-  onSaved: (c: InfluencerCampaign) => void;
-  onCancel: () => void;
-}
-
-function AddCampaignForm({ influencerId, onSaved, onCancel }: AddCampaignFormProps) {
-  return (
-    <CampaignForm
-      initial={EMPTY_CAMPAIGN_FORM}
-      formClassName="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-200"
-      onCancel={onCancel}
-      onSubmit={async (v) => {
-        try {
-          const saved = await addCampaign({
-            influencer_id: influencerId,
-            campaign_name: v.name.trim(),
-            product_name: v.product.trim() || undefined,
-            cost: v.cost ? Number(v.cost) : undefined,
-            contact_date: v.contactDate || undefined,
-            contract_date: v.contractDate || undefined,
-            ship_date: v.shipDate || undefined,
-            content_deadline: v.contentDeadline || undefined,
-            expected_post_date: v.postDate || undefined,
-          });
-          toast.success("캠페인이 추가되었습니다.");
-          onSaved(saved);
-        } catch (err) {
-          toast.error(getErrorMessage(err, "캠페인 추가 실패"));
-        }
-      }}
-    />
-  );
-}
+// 시딩건을 여기서 단독으로 만들던 「캠페인 추가」 폼은 없앴다.
+// 시딩 1건 = 계약 1건이 규칙이라, 계약 없는 시딩건을 만들면 상태가 6단계로 갈라지고
+// 계약 탭에 보이지 않는 진행 건이 생긴다. 대신 TMA 계약으로 보낸다.
 
 // ── 캠페인 수정 폼 (인라인 편집) ──────────────────────────────
 interface EditCampaignFormProps {
@@ -333,6 +290,7 @@ function EditCampaignForm({ campaign, onSaved, onCancel }: EditCampaignFormProps
 
 // ── 메인 패널 ──────────────────────────────────────────────────
 export default function InfluencerDetailPanel({ influencerId, contract, onClose }: Props) {
+  const router = useRouter();
   const [influencer, setInfluencer] = useState<InfluencerWithPosts | null>(null);
   const [campaigns, setCampaigns] = useState<InfluencerCampaign[]>([]);
   const [loading, setLoading] = useState(false);
@@ -344,7 +302,6 @@ export default function InfluencerDetailPanel({ influencerId, contract, onClose 
   const [notes, setNotes] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
-  const [showAddCampaign, setShowAddCampaign] = useState(false);
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -372,7 +329,6 @@ export default function InfluencerDetailPanel({ influencerId, contract, onClose 
       setError(null);
       setInfluencer(null);
       setCampaigns([]);
-      setShowAddCampaign(false);
       setEditingCampaignId(null);
       setActivePost(null);
     } else if (prevId) {
@@ -504,17 +460,6 @@ export default function InfluencerDetailPanel({ influencerId, contract, onClose 
     }
   }, [influencerId, tags]);
 
-  // ── 캠페인 상태 변경 ──
-  const handleStatusChange = useCallback(async (campaignId: string, status: CampaignStatus) => {
-    try {
-      await updateCampaignStatus(campaignId, status);
-      setCampaigns((prev) => prev.map((c) => c.id === campaignId ? { ...c, status } : c));
-      toast.success("상태가 변경되었습니다.");
-    } catch {
-      toast.error("상태 변경 실패");
-    }
-  }, []);
-
   // ── 계약 상태 변경 (계약이 연결된 캠페인은 표와 똑같이 계약 10단계를 쓴다) ──
   const handleContractStatusChange = useCallback(async (next: ContractStatus) => {
     if (!contract) return;
@@ -533,13 +478,32 @@ export default function InfluencerDetailPanel({ influencerId, contract, onClose 
     }
   }, [contract, contractStatus]);
 
+  /**
+   * TMA 계약으로 건너뛴다 — 있으면 그 계약을 열고, 없으면 이 사람 정보가
+   * 미리 채워진 새 계약 폼을 연다. 시딩은 언제나 계약에서 시작한다.
+   */
+  const handleOpenContract = useCallback(() => {
+    if (contract) {
+      router.push(`/dashboard/influencer/contracts?openId=${contract.contract_id}`);
+      return;
+    }
+    if (!influencer) return;
+    const params = new URLSearchParams({
+      prefillId: influencer.id,
+      prefillName: influencer.display_name?.trim() || influencer.username,
+      prefillHandle: influencer.username,
+    });
+    router.push(`/dashboard/influencer/contracts?${params.toString()}`);
+  }, [contract, influencer, router]);
+
   const handleDeleteCampaign = useCallback(async (campaignId: string) => {
     try {
       await deleteCampaign(campaignId);
       setCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
-      toast.success("캠페인이 삭제되었습니다.");
-    } catch {
-      toast.error("캠페인 삭제 실패");
+      toast.success("시딩건이 삭제되었습니다.");
+    } catch (err) {
+      // 계약과 연결된 시딩건은 서버가 막고 이유를 한국어로 알려준다
+      toast.error(getErrorMessage(err, "시딩건 삭제 실패"));
     }
   }, []);
 
@@ -888,34 +852,29 @@ export default function InfluencerDetailPanel({ influencerId, contract, onClose 
                 </div>
               )}
 
-              {/* 캠페인 */}
+              {/* 시딩 — 시딩건과 TMA 계약은 항상 짝이라 여기서 계약으로 건너뛴다 */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    캠페인
+                    시딩
                   </h4>
                   <button
-                    onClick={() => setShowAddCampaign(true)}
+                    onClick={handleOpenContract}
                     className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
                   >
-                    <Plus size={13} weight="bold" />
-                    캠페인 추가
+                    {contract ? (
+                      "📄 TMA 계약 열기"
+                    ) : (
+                      <>
+                        <Plus size={13} weight="bold" />
+                        TMA 계약으로 시딩 시작
+                      </>
+                    )}
                   </button>
                 </div>
 
-                {showAddCampaign && (
-                  <AddCampaignForm
-                    influencerId={influencer.id}
-                    onSaved={(c) => {
-                      setCampaigns((prev) => [c, ...prev]);
-                      setShowAddCampaign(false);
-                    }}
-                    onCancel={() => setShowAddCampaign(false)}
-                  />
-                )}
-
-                {campaigns.length === 0 && !showAddCampaign && (
-                  <p className="text-xs text-slate-400 py-2">등록된 캠페인이 없습니다.</p>
+                {campaigns.length === 0 && (
+                  <p className="text-xs text-slate-400 py-2">진행 중인 시딩이 없습니다.</p>
                 )}
 
                 <div className="space-y-2">
@@ -947,18 +906,22 @@ export default function InfluencerDetailPanel({ influencerId, contract, onClose 
                             >
                               <PencilSimple size={13} />
                             </button>
-                            <button
-                              onClick={() => handleDeleteCampaign(c.id)}
-                              className="p-1 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
-                              aria-label="캠페인 삭제"
-                            >
-                              <Trash size={13} />
-                            </button>
+                            {/* 계약과 연결된 시딩건은 여기서 지울 수 없다 —
+                                계약 탭에서 취소·삭제해야 계약까지 함께 정리된다. */}
+                            {!(contract && contract.campaign_id === c.id) && (
+                              <button
+                                onClick={() => handleDeleteCampaign(c.id)}
+                                className="p-1 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                                aria-label="시딩건 삭제"
+                              >
+                                <Trash size={13} />
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          {/* 계약이 연결된 캠페인은 표·계약 탭과 같은 10단계를 쓴다.
-                              6단계 선택기를 그대로 두면 '서명 완료'가 '응답 받음'으로 보인다. */}
+                          {/* 보여주는 상태는 언제나 계약 10단계다. 6단계 선택기를 두면
+                              '서명 완료'가 '응답 받음'으로 뭉개져 화면마다 이름이 달라진다. */}
                           {contract && contractStatus && contract.campaign_id === c.id ? (
                             <ContractStatusDropdown
                               status={contractStatus}
@@ -966,14 +929,14 @@ export default function InfluencerDetailPanel({ influencerId, contract, onClose 
                             />
                           ) : (
                             <>
-                              <Select
-                                options={CAMPAIGN_STATUS_SELECT_OPTIONS}
-                                value={c.status}
-                                onChange={(v) => handleStatusChange(c.id, v as CampaignStatus)}
-                                className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white"
-                                ariaLabel="캠페인 상태"
-                              />
-                              <StatusBadge status={c.status} type="campaign" />
+                              <ContractStatusBadge status={campaignToContractStatus(c.status)} />
+                              <button
+                                type="button"
+                                onClick={handleOpenContract}
+                                className="text-[10px] font-medium text-amber-600 underline underline-offset-2 hover:text-amber-700"
+                              >
+                                계약과 연결되지 않음 — 연결하기
+                              </button>
                             </>
                           )}
                         </div>

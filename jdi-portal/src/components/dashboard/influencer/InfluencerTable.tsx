@@ -14,21 +14,22 @@ import Plus from "phosphor-react/dist/icons/Plus.esm.js";
 import MagnifyingGlass from "phosphor-react/dist/icons/MagnifyingGlass.esm.js";
 import X from "phosphor-react/dist/icons/X.esm.js";
 import GradeBadge from "./GradeBadge";
-import CampaignStatusDropdown from "./CampaignStatusDropdown";
-import { updateCampaignStatus, addCampaign, resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
+import ContractLink from "./ContractLink";
+import { resyncInfluencer, resyncAllInfluencers, archiveInfluencer, deleteInfluencer } from "@/lib/influencer/actions";
 import ContractStatusDropdown from "./contracts/ContractStatusDropdown";
+import ContractStatusBadge from "./contracts/ContractStatusBadge";
 import { updateContractStatus } from "@/lib/influencer/contracts/actions";
-import { CONTRACT_STATUS_LABEL } from "@/lib/influencer/contracts/labels";
+import { campaignToContractStatus } from "@/lib/influencer/contracts/statusMap";
+import { CONTRACT_STATUS_LABEL, CONTRACT_STATUS_OPTIONS } from "@/lib/influencer/contracts/labels";
 import type { ContractListSummary } from "@/lib/influencer/contracts/types";
 import type { ContractStatus } from "@/lib/influencer/contracts/types";
 import Image from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { formatKRW } from "@/lib/influencer/format";
 import { APIFY_COST_PER_INFLUENCER_KRW } from "@/lib/influencer/constants";
-import { CAMPAIGN_STATUS_OPTIONS, CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 import { getTier, calcErVsTierAverage } from "@/lib/influencer/metrics";
 import type { InfluencerTier } from "@/lib/influencer/metrics";
-import type { InfluencerListItem, InfluencerCampaign, CampaignStatus, CampaignBasic } from "@/lib/influencer/types";
+import type { InfluencerListItem, InfluencerCampaign, CampaignBasic } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 
 function formatFollowers(n: number | null): string {
@@ -186,20 +187,30 @@ interface RowMenuProps {
   influencerId: string;
   username: string;
   displayName: string | null;
+  /** 이미 계약이 있으면 "만들기" 대신 "열기"를 보여준다(중복 계약 방지) */
+  contract: ContractListSummary | undefined;
   onViewDetail: () => void;
   onRefresh: () => void;
 }
 
-function RowMenu({ influencerId, username, displayName, onViewDetail, onRefresh }: RowMenuProps) {
+function RowMenu({ influencerId, username, displayName, contract, onViewDetail, onRefresh }: RowMenuProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
 
-  /** TMA 계약 탭으로 이동해 이 인플루언서 정보가 미리 채워진 계약 폼을 연다 */
+  /**
+   * TMA 계약 탭으로 이동한다.
+   * 계약이 이미 있으면 그 계약을 열고, 없을 때만 정보가 미리 채워진 새 폼을 연다.
+   * (예전에는 계약이 있어도 "만들기"만 보여줘서 같은 사람 계약이 둘 생길 수 있었다)
+   */
   function handleCreateContract() {
     setOpen(false);
+    if (contract) {
+      router.push(`/dashboard/influencer/contracts?openId=${contract.contract_id}`);
+      return;
+    }
     const params = new URLSearchParams({
       prefillId: influencerId,
       prefillName: displayName?.trim() || username,
@@ -301,7 +312,7 @@ function RowMenu({ influencerId, username, displayName, onViewDetail, onRefresh 
               onClick={(e) => { e.stopPropagation(); handleCreateContract(); }}
               className="w-full flex items-center gap-2 px-3 py-2 font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
             >
-              🎄 TMA 계약 만들기
+              {contract ? "📄 TMA 계약 열기" : "🎄 TMA 계약 만들기"}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); handleArchive(); }}
@@ -324,35 +335,6 @@ function RowMenu({ influencerId, username, displayName, onViewDetail, onRefresh 
   );
 }
 
-/**
- * 리스트 행에서 TMA 계약으로 바로 가는 표시.
- * 예전에는 리스트만 봐서는 이 사람에게 계약이 있는지조차 알 수 없었다.
- */
-function ContractLink({ contract }: { contract: ContractListSummary | undefined }) {
-  const router = useRouter();
-  if (!contract) return null;
-
-  const title =
-    `TMA 계약: ${CONTRACT_STATUS_LABEL[contract.contract_status]}` +
-    (contract.has_settlement ? " · 정산정보 등록됨" : " · 정산정보 미등록");
-
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      onClick={(e) => {
-        e.stopPropagation();
-        router.push(`/dashboard/influencer/contracts?openId=${contract.contract_id}`);
-      }}
-      className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600"
-    >
-      📄 계약
-      {contract.has_settlement && <span className="text-emerald-500" aria-hidden>✓</span>}
-    </button>
-  );
-}
-
 interface StatusCellProps {
   campaign: InfluencerCampaign | undefined;
   /** TMA 계약이 있으면 계약 상태(10단계)가 이 사람의 진짜 상태다 */
@@ -360,15 +342,29 @@ interface StatusCellProps {
   influencerId: string;
   influencerUsername: string;
   onRefresh: () => void;
-  onOpenDetail: (id: string) => void;
+  /** 「시딩 시작」 — 계약과 시딩건을 함께 만들고 곧바로 계약 폼을 연다 */
+  onStartSeeding: (influencerId: string) => void;
+  seedingBusy: boolean;
 }
 
-function StatusCell({ campaign, contract, influencerId, influencerUsername, onRefresh, onOpenDetail }: StatusCellProps) {
+/**
+ * 진행 상태 칸. **보여주는 상태는 언제나 계약 10단계 하나뿐**이다.
+ *
+ * 예전에는 계약이 있으면 10단계, 없으면 캠페인 6단계를 보여줘서 같은 사람이
+ * 화면마다 다른 이름의 상태로 보였고(리스트 '후보' ↔ 스케줄 '협의중'),
+ * 필터에는 '후보'라는 선택지조차 없었다.
+ */
+function StatusCell({
+  campaign,
+  contract,
+  influencerId,
+  influencerUsername,
+  onRefresh,
+  onStartSeeding,
+  seedingBusy,
+}: StatusCellProps) {
   const [, startTransition] = useTransition();
 
-  // 계약이 있으면 계약 탭과 똑같은 10단계를 보여주고 계약을 직접 고친다.
-  // (예전에는 6단계로 뭉개진 캠페인 상태를 보여줘서 '서명 완료'가 '응답 받음'으로 보였고,
-  //  여기서 바꾼 값이 계약에 반영되지 않아 다음 계약 저장 때 되돌아갔다.)
   if (contract) {
     const contractId = contract.contract_id;
     const handleContractStatusChange = (next: ContractStatus) => {
@@ -391,48 +387,39 @@ function StatusCell({ campaign, contract, influencerId, influencerUsername, onRe
     );
   }
 
-  if (!campaign) {
+  // 계약과 연결되지 않은 옛 시딩건 — 상태는 10단계로 환산해 보여주고,
+  // 누르면 계약을 만들어 붙인다(새 시딩건을 또 만들지 않고 이 건을 흡수한다).
+  if (campaign) {
     return (
       <button
+        type="button"
+        disabled={seedingBusy}
+        title="계약과 연결되지 않은 시딩입니다. 눌러서 TMA 계약을 만들어 주세요."
         onClick={(e) => {
           e.stopPropagation();
-          startTransition(async () => {
-            try {
-              await addCampaign({
-                influencer_id: influencerId,
-                campaign_name: `@${influencerUsername} 시딩`,
-              });
-              toast.success(`@${influencerUsername} 시딩이 시작되었습니다. 날짜를 입력해 주세요!`);
-              onRefresh();
-              onOpenDetail(influencerId);
-            } catch (err) {
-              toast.error(getErrorMessage(err, "시딩 등록 실패"));
-            }
-          });
+          onStartSeeding(influencerId);
         }}
-        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+        className="inline-flex items-center gap-1 rounded-md transition-opacity hover:opacity-80 disabled:opacity-50"
       >
-        <Plus size={11} weight="bold" />
-        시딩 시작
+        <ContractStatusBadge status={campaignToContractStatus(campaign.status)} />
+        <span className="text-[10px] font-bold text-amber-500" aria-hidden>!</span>
       </button>
     );
   }
 
-  function handleStatusChange(next: CampaignStatus) {
-    startTransition(async () => {
-      try {
-        await updateCampaignStatus(campaign!.id, next);
-        onRefresh();
-      } catch (err) {
-        toast.error(getErrorMessage(err, "상태 변경 실패"));
-      }
-    });
-  }
-
   return (
-    <div className="inline-flex" onClick={(e) => e.stopPropagation()}>
-      <CampaignStatusDropdown status={campaign.status} onChange={handleStatusChange} />
-    </div>
+    <button
+      disabled={seedingBusy}
+      onClick={(e) => {
+        e.stopPropagation();
+        onStartSeeding(influencerId);
+      }}
+      aria-label={`@${influencerUsername} 시딩 시작`}
+      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
+    >
+      <Plus size={11} weight="bold" />
+      {seedingBusy ? "여는 중..." : "시딩 시작"}
+    </button>
   );
 }
 
@@ -446,12 +433,15 @@ interface Props {
   onFiltersChange: (next: FilterState) => void;
   onSelectInfluencer: (id: string) => void;
   onRefresh: () => void;
+  /** 「시딩 시작」 — 계약과 시딩건을 함께 만들고 계약 폼을 연다(부모가 처리) */
+  onStartSeeding: (influencerId: string) => void;
+  seedingBusy: boolean;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
 }
 
-export default function InfluencerTable({ influencers, activeCampaigns, allCampaigns, contractByInfluencer, filters, onFiltersChange, onSelectInfluencer, onRefresh, hasMore, loadingMore, onLoadMore }: Props) {
+export default function InfluencerTable({ influencers, activeCampaigns, allCampaigns, contractByInfluencer, filters, onFiltersChange, onSelectInfluencer, onRefresh, onStartSeeding, seedingBusy, hasMore, loadingMore, onLoadMore }: Props) {
   const [resyncingAll, startResyncAll] = useTransition();
   const isMobile = useIsMobile();
 
@@ -568,12 +558,20 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
         const tier = getTier(inf.follower_count);
         if (!tier || !filters.followerTiers.includes(tier.key)) return false;
       }
-      // 캠페인 없는 인플만 필터
-      if (filters.noCampaign && campaignMap.has(inf.id)) return false;
-      // 캠페인 상태 필터
-      if (filters.campaignStatuses.length > 0) {
+      // 아직 시딩을 시작하지 않은 사람만 (계약만 있고 시딩건이 아직 안 붙은 경우도 제외)
+      if (filters.noCampaign && (campaignMap.has(inf.id) || contractByInfluencer.has(inf.id)))
+        return false;
+      // 진행 상태 필터 — 화면 배지와 같은 계약 10단계로 비교한다.
+      // (계약이 없는 옛 시딩건은 캠페인 6단계를 10단계 대표값으로 환산해서 맞춘다)
+      if (filters.contractStatuses.length > 0) {
+        const linked = contractByInfluencer.get(inf.id);
         const c = campaignMap.get(inf.id);
-        if (!c || !filters.campaignStatuses.includes(c.status)) return false;
+        const status = linked
+          ? linked.contract_status
+          : c
+            ? campaignToContractStatus(c.status)
+            : null;
+        if (!status || !filters.contractStatuses.includes(status)) return false;
       }
       // 날짜 마일스톤 필터
       if (filters.dateMilestone) {
@@ -583,7 +581,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       return true;
     });
     return [...filtered].sort((a, b) => (b.engagement_rate ?? -1) - (a.engagement_rate ?? -1));
-  }, [influencers, filters, campaignMap, milestoneByInfluencer]);
+  }, [influencers, filters, campaignMap, contractByInfluencer, milestoneByInfluencer]);
 
   // 스크롤 컨테이너 안에서 전체 표시 — 페이지 자체는 늘어나지 않음.
   const displayed = sorted;
@@ -643,7 +641,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
       </div>
 
       {/* 활성 필터 칩 */}
-      {(filters.grades.length > 0 || filters.followerTiers.length > 0 || filters.campaignStatuses.length > 0 || filters.dateMilestone || filters.noCampaign) && (
+      {(filters.grades.length > 0 || filters.followerTiers.length > 0 || filters.contractStatuses.length > 0 || filters.dateMilestone || filters.noCampaign) && (
         <div className="flex flex-wrap items-center gap-1.5 px-4 sm:px-6 py-2 border-b border-slate-50 bg-slate-50/40">
           <span className="text-[11px] text-slate-400">필터:</span>
           {filters.grades.map((g) => (
@@ -660,11 +658,11 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
               onRemove={() => onFiltersChange({ ...filters, followerTiers: filters.followerTiers.filter((x) => x !== t) })}
             />
           ))}
-          {filters.campaignStatuses.map((s) => (
+          {filters.contractStatuses.map((s) => (
             <Chip
               key={`s-${s}`}
-              label={`상태: ${CAMPAIGN_STATUS_LABEL[s] ?? s}`}
-              onRemove={() => onFiltersChange({ ...filters, campaignStatuses: filters.campaignStatuses.filter((x) => x !== s) })}
+              label={`상태: ${CONTRACT_STATUS_LABEL[s] ?? s}`}
+              onRemove={() => onFiltersChange({ ...filters, contractStatuses: filters.contractStatuses.filter((x) => x !== s) })}
             />
           ))}
           {filters.dateMilestone && (
@@ -681,7 +679,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
           )}
           <button
             type="button"
-            onClick={() => onFiltersChange({ ...filters, grades: [], followerTiers: [], campaignStatuses: [], dateMilestone: null, noCampaign: false })}
+            onClick={() => onFiltersChange({ ...filters, grades: [], followerTiers: [], contractStatuses: [], dateMilestone: null, noCampaign: false })}
             className="ml-auto text-[11px] text-slate-500 hover:text-slate-700"
           >전체 해제</button>
         </div>
@@ -753,6 +751,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                           influencerId={inf.id}
                           username={inf.username}
                           displayName={inf.display_name}
+                          contract={contractByInfluencer.get(inf.id)}
                           onViewDetail={() => onSelectInfluencer(inf.id)}
                           onRefresh={onRefresh}
                         />
@@ -799,7 +798,8 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                           influencerId={inf.id}
                           influencerUsername={inf.username}
                           onRefresh={onRefresh}
-                          onOpenDetail={onSelectInfluencer}
+                          onStartSeeding={onStartSeeding}
+                          seedingBusy={seedingBusy}
                         />
                         <ContractLink contract={contractByInfluencer.get(inf.id)} />
                       </div>
@@ -869,7 +869,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                   type="button"
                   onClick={() => openPop("status", statusBtnRef)}
                   className={`inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide hover:text-slate-700 transition-colors ${
-                    filters.campaignStatuses.length > 0 ? "text-blue-600 font-semibold" : "text-slate-500"
+                    filters.contractStatuses.length > 0 ? "text-blue-600 font-semibold" : "text-slate-500"
                   }`}
                 >
                   상태 <span className="text-[10px]">▾</span>
@@ -877,9 +877,9 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                 <HeaderFilterPopover
                   open={openFilter === "status"}
                   anchorRect={anchorRect}
-                  options={CAMPAIGN_STATUS_OPTIONS.map((o) => ({ key: o.value, label: o.label }))}
-                  selected={filters.campaignStatuses}
-                  onChange={(next) => onFiltersChange({ ...filters, campaignStatuses: next as FilterState["campaignStatuses"] })}
+                  options={CONTRACT_STATUS_OPTIONS.map((o) => ({ key: o.value, label: o.label }))}
+                  selected={filters.contractStatuses}
+                  onChange={(next) => onFiltersChange({ ...filters, contractStatuses: next as FilterState["contractStatuses"] })}
                   onClose={() => setOpenFilter(null)}
                 />
               </th>
@@ -993,7 +993,8 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                           influencerId={inf.id}
                           influencerUsername={inf.username}
                           onRefresh={onRefresh}
-                          onOpenDetail={onSelectInfluencer}
+                          onStartSeeding={onStartSeeding}
+                          seedingBusy={seedingBusy}
                         />
                         <ContractLink contract={contractByInfluencer.get(inf.id)} />
                       </div>
@@ -1005,6 +1006,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                         influencerId={inf.id}
                         username={inf.username}
                         displayName={inf.display_name}
+                        contract={contractByInfluencer.get(inf.id)}
                         onViewDetail={() => onSelectInfluencer(inf.id)}
                         onRefresh={onRefresh}
                       />

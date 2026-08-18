@@ -2,9 +2,17 @@
 
 import { useTransition, useState } from "react";
 import { toast } from "sonner";
-import { updateCampaignStatus } from "@/lib/influencer/actions";
-import CampaignStatusDropdown from "./CampaignStatusDropdown";
-import { CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
+import { getErrorMessage } from "@/lib/utils/errors";
+import ContractStatusDropdown from "./contracts/ContractStatusDropdown";
+import ContractStatusBadge from "./contracts/ContractStatusBadge";
+import ContractLink from "./ContractLink";
+import { updateContractStatus } from "@/lib/influencer/contracts/actions";
+import { campaignToContractStatus } from "@/lib/influencer/contracts/statusMap";
+import {
+  CONTRACT_STATUS_LABEL,
+  CONTRACT_STATUS_ORDER,
+} from "@/lib/influencer/contracts/labels";
+import type { ContractListSummary, ContractStatus } from "@/lib/influencer/contracts/types";
 import { formatKRW } from "@/lib/influencer/format";
 import type { InfluencerCampaignWithInfluencer, CampaignStatus } from "@/lib/influencer/types";
 import {
@@ -56,19 +64,26 @@ function cleanDisplayName(displayName: string | null | undefined): string | null
 
 interface Props {
   campaigns: InfluencerCampaignWithInfluencer[];
+  /** influencer_id → TMA 계약 요약. 상태·계약 링크가 이 값을 기준으로 그려진다. */
+  contractByInfluencer: Map<string, ContractListSummary>;
   selectedDate: string | null;
   onRefresh: () => void;
   onInfluencerClick?: (influencerId: string) => void;
 }
 
-const STATUS_COUNTS: { status: CampaignStatus; color: string }[] = [
-  { status: "planned", color: "text-slate-500" },
-  { status: "dm_sent", color: "text-blue-500" },
-  { status: "replied", color: "text-cyan-500" },
-  { status: "shipped", color: "text-amber-500" },
-  { status: "posted", color: "text-violet-500" },
-  { status: "done", color: "text-emerald-500" },
-];
+/** 요약 카드 숫자 색 — 계약 10단계 (준비 → 실행 → 완결 순으로 짙어진다) */
+const STATUS_COUNT_COLOR: Record<ContractStatus, string> = {
+  candidate: "text-slate-500",
+  dm_sent: "text-sky-500",
+  negotiating: "text-blue-500",
+  contract_sent: "text-indigo-500",
+  signed: "text-violet-500",
+  product_shipped: "text-teal-500",
+  draft_received: "text-emerald-500",
+  posted: "text-green-600",
+  settled: "text-emerald-700",
+  canceled: "text-rose-500",
+};
 
 const DAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -79,23 +94,32 @@ function formatDateLabel(dateStr: string): string {
 
 function CampaignCard({
   campaign,
+  contract,
   onRefresh,
   onInfluencerClick,
 }: {
   campaign: InfluencerCampaignWithInfluencer;
+  contract: ContractListSummary | undefined;
   onRefresh: () => void;
   onInfluencerClick?: (influencerId: string) => void;
 }) {
   const [, startTransition] = useTransition();
 
-  function handleStatusChange(next: CampaignStatus) {
+  // 상태는 계약 10단계 하나로 바꾼다 — 예전에는 여기만 캠페인 6단계를 써서
+  // 계약 탭에서 '후보'인 사람이 스케줄에서는 '협의중'으로 보였다.
+  function handleContractStatusChange(next: ContractStatus) {
+    if (!contract) return;
     startTransition(async () => {
       try {
-        await updateCampaignStatus(campaign.id, next);
-        toast.success("상태가 변경되었습니다.");
+        const { expenseAmount } = await updateContractStatus(contract.contract_id, next);
+        toast.success(
+          expenseAmount > 0
+            ? `정산 완료 — 지출관리에 ${formatKRW(expenseAmount, { withWon: true })} 기록했습니다.`
+            : "상태가 변경되었습니다.",
+        );
         onRefresh();
-      } catch {
-        toast.error("상태 변경 실패");
+      } catch (err) {
+        toast.error(getErrorMessage(err, "상태 변경 실패"));
       }
     });
   }
@@ -156,8 +180,25 @@ function CampaignCard({
             <span className="text-sm font-medium text-slate-700 truncate">{campaign.campaign_name}</span>
           )}
         </button>
-        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-          <CampaignStatusDropdown status={campaign.status} onChange={handleStatusChange} />
+        <div className="shrink-0 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {contract ? (
+            <>
+              <ContractStatusDropdown
+                status={contract.contract_status}
+                onChange={handleContractStatusChange}
+              />
+              <ContractLink contract={contract} />
+            </>
+          ) : (
+            // 계약과 연결되지 않은 옛 시딩건 — 상태는 10단계로 환산해 보여주고 표시만 남긴다
+            <span
+              className="inline-flex items-center gap-1"
+              title="TMA 계약과 연결되지 않은 시딩입니다. 리스트 탭에서 계약을 만들어 주세요."
+            >
+              <ContractStatusBadge status={campaignToContractStatus(campaign.status)} />
+              <span className="text-[10px] font-bold text-amber-500" aria-hidden>!</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -358,7 +399,7 @@ function UpcomingSection({
   );
 }
 
-export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefresh, onInfluencerClick }: Props) {
+export default function SeedingCampaignBoard({ campaigns, contractByInfluencer, selectedDate, onRefresh, onInfluencerClick }: Props) {
   const displayed = selectedDate
     ? campaigns.filter((c) =>
         c.contact_date === selectedDate ||
@@ -369,10 +410,13 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
       )
     : campaigns.filter((c) => c.status !== "done");
 
+  // 요약도 계약 10단계로 센다(리스트 깔때기와 같은 기준)
   const active = campaigns.filter((c) => c.status !== "done");
-  const countMap = new Map<CampaignStatus, number>();
+  const countMap = new Map<ContractStatus, number>();
   for (const c of active) {
-    countMap.set(c.status, (countMap.get(c.status) ?? 0) + 1);
+    const linked = contractByInfluencer.get(c.influencer_id);
+    const status = linked ? linked.contract_status : campaignToContractStatus(c.status);
+    countMap.set(status, (countMap.get(status) ?? 0) + 1);
   }
 
   return (
@@ -390,10 +434,10 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
       {/* 상태별 요약 (선택 날짜 없을 때만) */}
       {!selectedDate && (
         <div className="grid grid-cols-3 gap-2">
-          {STATUS_COUNTS.filter(({ status }) => (countMap.get(status) ?? 0) > 0).map(({ status, color }) => (
+          {CONTRACT_STATUS_ORDER.filter((status) => (countMap.get(status) ?? 0) > 0).map((status) => (
             <div key={status} className="bg-slate-50 rounded-xl p-2.5 text-center">
-              <p className={`text-lg font-bold ${color}`}>{countMap.get(status) ?? 0}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{CAMPAIGN_STATUS_LABEL[status]}</p>
+              <p className={`text-lg font-bold ${STATUS_COUNT_COLOR[status]}`}>{countMap.get(status) ?? 0}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{CONTRACT_STATUS_LABEL[status]}</p>
             </div>
           ))}
         </div>
@@ -418,6 +462,7 @@ export default function SeedingCampaignBoard({ campaigns, selectedDate, onRefres
             <CampaignCard
               key={c.id}
               campaign={c}
+              contract={contractByInfluencer.get(c.influencer_id)}
               onRefresh={onRefresh}
               onInfluencerClick={onInfluencerClick}
             />

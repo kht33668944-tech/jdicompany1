@@ -210,19 +210,34 @@ export default function ContractsTable({
                     {c.instagram_handle && (
                       <div className="text-[11px] text-slate-400">@{c.instagram_handle}</div>
                     )}
-                    {/* 리스트 탭의 같은 사람으로 건너뛰기 (리스트 → 계약의 반대 방향) */}
+                    {/* 리스트·시딩 스케줄로 건너뛰기 (리스트 → 계약의 반대 방향) */}
                     {c.influencer_id && (
-                      <button
-                        type="button"
-                        title="리스트에서 이 인플루언서 열기"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/dashboard/influencer?openInfluencerId=${c.influencer_id}`);
-                        }}
-                        className="mt-0.5 text-[10px] font-medium text-slate-400 transition-colors hover:text-blue-600"
-                      >
-                        👥 리스트에서 보기
-                      </button>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          title="리스트에서 이 인플루언서 열기"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/dashboard/influencer?openInfluencerId=${c.influencer_id}`);
+                          }}
+                          className="text-[10px] font-medium text-slate-400 transition-colors hover:text-blue-600"
+                        >
+                          👥 리스트에서 보기
+                        </button>
+                        {c.campaign_id && (
+                          <button
+                            type="button"
+                            title="시딩 스케줄에서 이 건의 일정 보기"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push("/dashboard/influencer/schedule");
+                            }}
+                            className="text-[10px] font-medium text-slate-400 transition-colors hover:text-blue-600"
+                          >
+                            📅 스케줄에서 보기
+                          </button>
+                        )}
+                      </div>
                     )}
                     {/* 리스트 지표를 같이 보여준다 — 계약만 보고도 규모를 알 수 있게 */}
                     {stats && (

@@ -2,10 +2,18 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { CONTRACTS_SEASON } from "./constants";
-import type { ContractListSummary, ContractStatus, InfluencerContract } from "./types";
+import type {
+  ContractListSummary,
+  ContractStatus,
+  InfluencerContract,
+  UnlinkedSeeding,
+} from "./types";
 
-/** 목록 화면에 내려보내는 컬럼 — 정산 개인정보(*_enc)는 절대 포함하지 않는다. */
-const CONTRACT_COLUMNS =
+/**
+ * 목록 화면에 내려보내는 컬럼 — 정산 개인정보(*_enc)는 절대 포함하지 않는다.
+ * 「시딩 시작」이 만든 계약을 폼에 바로 띄우려고 actions.ts 도 같은 목록을 쓴다.
+ */
+export const CONTRACT_COLUMNS =
   "id, influencer_id, campaign_id, expense_id, name, instagram_handle, collab_type, product, product_detail, retail_price, " +
   "agreed_value, ad_fee_total, ad_fee_vat_included, settlement_type, business_reg_no, " +
   "secondary_usage, secondary_usage_fee, secondary_usage_start, secondary_usage_end, " +
@@ -73,6 +81,47 @@ export async function getContractSummariesForList(): Promise<ContractListSummary
     });
   }
   return summaries;
+}
+
+/**
+ * 계약과 연결되지 않은 시딩건 — 계약 탭 상단에서 "계약 없는 진행 건"을 알리는 데만 쓴다.
+ *
+ * 시딩 1건 = 계약 1건이 규칙이라 정상 운영에서는 0건이고, 그때는 화면에 아무것도 안 나온다.
+ * 예전에는 리스트에서 '시딩 시작'으로 만든 건이 계약 탭에 아예 안 보여서
+ * "계약서를 안 쓴 사람"을 찾을 방법이 없었다.
+ */
+export async function getUnlinkedSeedings(): Promise<UnlinkedSeeding[]> {
+  const supabase = await createClient();
+
+  const [campaignRes, contractRes] = await Promise.all([
+    supabase
+      .from("influencer_campaigns")
+      .select("id, influencer_id, influencer:influencers(username, display_name)")
+      .neq("status", "done"),
+    supabase
+      .from("influencer_contracts")
+      .select("campaign_id")
+      .eq("is_deleted", false)
+      .not("campaign_id", "is", null),
+  ]);
+  if (campaignRes.error) throw campaignRes.error;
+  if (contractRes.error) throw contractRes.error;
+
+  const linked = new Set((contractRes.data ?? []).map((row) => row.campaign_id as string));
+
+  return (campaignRes.data ?? [])
+    .filter((row) => !linked.has(row.id as string) && row.influencer_id)
+    .map((row) => {
+      const inf = row.influencer as unknown as
+        | { username: string | null; display_name: string | null }
+        | null;
+      return {
+        campaign_id: row.id as string,
+        influencer_id: row.influencer_id as string,
+        username: inf?.username ?? "",
+        display_name: inf?.display_name ?? null,
+      };
+    });
 }
 
 /**
