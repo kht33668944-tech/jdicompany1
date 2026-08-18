@@ -7,18 +7,8 @@
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { collectFieldKeys } from "@/lib/contracts/tokens";
-import type { ContentV2, FieldDef, FieldType } from "@/lib/contracts/types";
-
-const TYPE_LABEL: Record<FieldType, string> = {
-  text: "짧은 글",
-  multiline: "긴 글",
-  number: "숫자",
-  date: "날짜",
-  phone: "연락처",
-  email: "이메일",
-  account: "계좌번호",
-  bank: "은행",
-};
+import { FIELD_TYPE_LABEL as TYPE_LABEL } from "@/lib/contracts/fieldPresets";
+import type { ContentV2, FieldDef } from "@/lib/contracts/types";
 
 interface Props {
   content: ContentV2;

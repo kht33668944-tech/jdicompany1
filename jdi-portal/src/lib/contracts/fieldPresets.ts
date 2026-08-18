@@ -3,6 +3,18 @@
 
 import type { FieldKind, FieldType } from "./types";
 
+/** 칸 종류 표시 이름 — 편집기 툴바와 왼쪽 목록이 함께 쓴다(새 종류를 늘릴 때 여기만 고친다) */
+export const FIELD_TYPE_LABEL: Record<FieldType, string> = {
+  text: "짧은 글",
+  multiline: "긴 글",
+  number: "숫자",
+  date: "날짜",
+  phone: "연락처",
+  email: "이메일",
+  account: "계좌번호",
+  bank: "은행",
+};
+
 export interface FieldPreset {
   label: string;
   type: FieldType;

@@ -11,6 +11,7 @@
 // ⚠️ 화면에서 무엇을 막든 최종 검증은 서버(lib/contracts/signService.ts)다. 그쪽을 대체하지 않는다.
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { fieldKeysInDocOrder, findFieldChip, scrollToFieldChip } from "@/lib/contracts/chipFlash";
 import ContractDocViewV2 from "@/components/shared/ContractDocViewV2";
 import SignatureCanvas, { type SignatureCanvasHandle } from "./SignatureCanvas";
 import SignFieldPrompt from "./SignFieldPrompt";
@@ -70,9 +71,8 @@ export default function CompanySignPageClient({ token, data }: Props) {
   const [signerName, setSignerName] = useState("");
   const [businessRegNo, setBusinessRegNo] = useState("");
 
-  // 지금 입력 중인 칸 — 문서의 칸 요소를 기준으로 팝오버를 붙인다
+  // 지금 입력 중인 칸 (입력창은 이 key 로 문서에서 자기 자리를 스스로 찾는다)
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const activeField = partyFields.find((f) => f.key === activeKey) ?? null;
 
   const isCorp = data.counterpartyKind === "corp";
@@ -89,41 +89,37 @@ export default function CompanySignPageClient({ token, data }: Props) {
 
   /** 문서에서 그 칸을 찾아 화면 가운데로 옮기고 입력창을 연다 */
   const openField = useCallback((key: string) => {
-    const el = document.querySelector<HTMLElement>(`[data-field-key="${key}"]`);
     setActiveKey(key);
-    setAnchor(el);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.add("chip-flash");
-    window.setTimeout(() => el.classList.remove("chip-flash"), 2400);
+    const el = findFieldChip(document, key);
+    if (el) scrollToFieldChip(el);
   }, []);
 
   /**
-   * 「다음 칸」 — 아직 안 채운 필수 칸으로, 다 채웠으면 서명 영역으로.
+   * 아직 안 채운 다음 필수 칸. 없으면 null.
    *
    * 순서는 반드시 **계약서에 보이는 순서**여야 한다. 칸이 만들어진 순서(content.fields)로
    * 옮기면 위에서 아래로 읽던 사람이 갑자기 아래 칸으로 튄다 — 실제로 그렇게 만들었다가 고쳤다.
    * 문서에 그려진 칸의 DOM 순서가 곧 읽는 순서다.
    */
-  const goNext = useCallback(
-    (afterKey?: string) => {
-      const domOrder = [...document.querySelectorAll<HTMLElement>("[data-field-key]")]
-        .map((el) => el.dataset.fieldKey)
-        .filter((k): k is string => Boolean(k));
-      const requiredKeys = new Set(requiredFields.map((f) => f.key));
-      const nextKey = domOrder.find(
+  const nextRequiredKey = (afterKey?: string) => {
+    const requiredKeys = new Set(requiredFields.map((f) => f.key));
+    return (
+      fieldKeysInDocOrder(document).find(
         (k) => requiredKeys.has(k) && k !== afterKey && !values[k]?.trim(),
-      );
-      if (nextKey) {
-        openField(nextKey);
-        return;
-      }
-      setActiveKey(null);
-      signBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    },
-    // values 가 바뀌면 남은 칸도 바뀐다
-    [requiredFields, values, openField],
-  );
+      ) ?? null
+    );
+  };
+
+  /** 「다음 칸」 — 남은 필수 칸으로, 다 채웠으면 서명 영역으로 */
+  const goNext = (afterKey?: string) => {
+    const key = nextRequiredKey(afterKey);
+    if (key) {
+      openField(key);
+      return;
+    }
+    setActiveKey(null);
+    signBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   // ── 상태별 안내 화면 ──────────────────────────────────
   if (data.status === "signed" || done) {
@@ -211,7 +207,7 @@ export default function CompanySignPageClient({ token, data }: Props) {
       {partyFields.length > 0 && (
         <SignProgressBar
           requiredTotal={requiredFields.length}
-          requiredDone={requiredFields.length - requiredLeft.length}
+          requiredLeft={requiredLeft.length}
           onNext={() => goNext()}
         />
       )}
@@ -369,12 +365,8 @@ export default function CompanySignPageClient({ token, data }: Props) {
           value={values[activeField.key] ?? ""}
           onChange={(v) => setValues((prev) => ({ ...prev, [activeField.key]: v }))}
           onClose={() => setActiveKey(null)}
-          onNext={
-            requiredLeft.some((f) => f.key !== activeField.key)
-              ? () => goNext(activeField.key)
-              : null
-          }
-          anchor={anchor}
+          // 「다음 칸」과 같은 판단을 쓴다 — 버튼이 있는데 서명 영역으로 튀는 일이 없게
+          onNext={nextRequiredKey(activeField.key) ? () => goNext(activeField.key) : null}
         />
       )}
     </Shell>

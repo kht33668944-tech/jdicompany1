@@ -10,7 +10,7 @@
 //
 // ⚠️ 편집기(TipTap)는 무거워서 반드시 dynamic(ssr:false) 로만 부른다 — 초기 JS 예산 보호.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import { getErrorMessage } from "@/lib/utils/errors";
 import { MODAL_INPUT_CLS, MODAL_LABEL_CLS } from "@/lib/vault/constants";
 import { getTemplate, saveTemplate } from "@/lib/influencer/contracts/documents/actions";
 import { DEFAULT_TEMPLATES } from "@/lib/influencer/contracts/documents/template";
+import { createEmptyContent } from "@/lib/contracts/constants";
 import type { TemplateContent, TemplateKey } from "@/lib/influencer/contracts/documents/types";
 import type { ContentV2 } from "@/lib/contracts/types";
 
@@ -36,19 +37,26 @@ const TABS: { key: TemplateKey; label: string }[] = [
   { key: "seeding", label: "순수 협찬형" },
 ];
 
-/** TMA 양식을 편집기가 아는 모양(ContentV2)으로 감싼다 — 조항 구조가 같아 그대로 옮겨 담는다 */
+/**
+ * TMA 양식을 편집기가 아는 모양(ContentV2)으로 감싼다 — 조항 구조가 같아 그대로 옮겨 담는다.
+ * 편집기는 title·intro·clauses 만 읽고 쓰므로 나머지는 빈 껍데기면 된다.
+ */
 function toEditorContent(t: TemplateContent): ContentV2 {
   return {
-    version: 2,
+    ...createEmptyContent(),
     title: t.title,
     intro: t.intro,
     clauses: t.clauses,
-    fields: [], // TMA 는 본문에 채움 칸을 쓰지 않는다
-    company: { name: "", ceo: "", address: "", manager: "", managerContact: "" },
     closing: t.closing,
     footnote: t.footnote,
   };
 }
+
+// 편집기에 넘길 고정값 — 렌더마다 새로 만들면 편집기 안 useMemo 가 매번 깨진다
+const NO_FIELDS: never[] = [];
+const NO_TERMS: never[] = [];
+const noop = () => {};
+const noField = () => null;
 
 export default function TemplatesEditorClient() {
   const [tab, setTab] = useState<TemplateKey>("paid");
@@ -56,7 +64,9 @@ export default function TemplatesEditorClient() {
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   // 편집기는 처음 한 번만 내용을 받는다(그 뒤로는 편집기가 문서를 소유).
-  // 탭을 바꾸거나 기본 양식을 불러오면 이 값을 올려 새로 마운트한다.
+  // 새 내용이 도착했을 때만 이 값을 올려 다시 마운트한다.
+  // ⚠️ key 에 tab 을 넣으면 안 된다 — 탭을 누른 즉시(내용은 아직 이전 것) 다시 마운트되어
+  //    이전 양식이 잠깐 그려졌다가 사라진다. 내용이 바뀌는 시점은 editorSeq 하나로 충분하다.
   const [editorSeq, setEditorSeq] = useState(0);
 
   const load = useCallback(async (key: TemplateKey) => {
@@ -94,12 +104,7 @@ export default function TemplatesEditorClient() {
     setDirty(true);
   }, []);
 
-  const editorContent = useMemo(
-    () => (content ? toEditorContent(content) : null),
-    // 편집기는 처음 값만 쓰므로 탭이 바뀔 때(editorSeq)만 새로 만든다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editorSeq, content !== null],
-  );
+  const editorContent = content ? toEditorContent(content) : null;
 
   const save = async () => {
     if (!content || busy) return;
@@ -124,7 +129,9 @@ export default function TemplatesEditorClient() {
   };
 
   const switchTab = (key: TemplateKey) => {
-    if (key === tab) return;
+    // 저장하는 동안에는 아예 넘어가지 않는다 — 저장이 끝나기 직전에 눌러
+    // "저장 안 된 변경이 있다"는 확인 창이 뜨는 일이 없게(실제로 겪음).
+    if (key === tab || busy) return;
     if (dirty && !window.confirm("저장하지 않은 변경이 있어요. 그대로 이동할까요?")) return;
     setTab(key);
   };
@@ -152,7 +159,8 @@ export default function TemplatesEditorClient() {
               key={t.key}
               type="button"
               onClick={() => switchTab(t.key)}
-              className={`rounded-lg px-3.5 py-1.5 transition-colors ${
+              disabled={busy}
+              className={`rounded-lg px-3.5 py-1.5 transition-colors disabled:opacity-50 ${
                 tab === t.key
                   ? "bg-white text-slate-800 shadow-sm"
                   : "text-slate-400 hover:text-slate-600"
@@ -238,19 +246,18 @@ export default function TemplatesEditorClient() {
           {/* 오른쪽 — 문서형 편집기(계약관리와 같은 것) */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <ContractRichEditor
-              key={`${tab}-${editorSeq}`}
+              key={editorSeq}
               initialContent={editorContent}
-              fields={[]}
-              terms={[]}
-              onTermsChange={() => {}}
+              fields={NO_FIELDS}
+              terms={NO_TERMS}
+              onTermsChange={noop}
               onDocChange={onDocChange}
-              onCreateField={() => null}
-              onUpdateField={() => {}}
-              onDeleteField={() => {}}
+              onCreateField={noField}
+              onUpdateField={noop}
+              onDeleteField={noop}
               highlightFieldKey={null}
-              onHighlightHandled={() => {}}
-              allowFields={false}
-              termsPlaceholder
+              onHighlightHandled={noop}
+              variant="tmaTemplate"
             />
           </div>
         </div>
