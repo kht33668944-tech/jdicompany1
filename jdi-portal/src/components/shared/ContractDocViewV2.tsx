@@ -7,6 +7,7 @@
 //  - resolved: 모든 값 치환 — 완성본 미리보기
 
 import { TERMS_MARKER } from "@/lib/contracts/constants";
+import { fieldChipTone } from "@/lib/contracts/chipTone";
 import { tokenizeBody } from "@/lib/contracts/tokens";
 import type { ContentV2, FieldDef, TermRow } from "@/lib/contracts/types";
 
@@ -77,14 +78,12 @@ function FieldRun({
   // 서명 페이지 — 칸을 눌러 그 자리에서 입력한다.
   // 채운 칸은 값이 본문 글자처럼 보이되(테두리만 옅게) 다시 눌러 고칠 수 있다.
   if (mode === "sign" && onFieldClick) {
-    const tone =
-      activeFieldKey === fieldDef.key
-        ? "border-solid border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200"
-        : value
-          ? "border-solid border-slate-200 bg-white font-bold text-slate-800 hover:border-blue-300"
-          : `border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 ${
-              fieldDef.required ? "border-2" : ""
-            }`;
+    // 색 규칙은 TMA 서명 표와 공유한다(lib/contracts/chipTone.ts)
+    const tone = fieldChipTone({
+      active: activeFieldKey === fieldDef.key,
+      filled: Boolean(value),
+      required: fieldDef.required,
+    });
     return (
       <button
         type="button"
