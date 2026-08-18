@@ -8,7 +8,7 @@
 
 import { TERMS_MARKER } from "@/lib/contracts/constants";
 import { fieldChipTone } from "@/lib/contracts/chipTone";
-import { tokenizeBody } from "@/lib/contracts/tokens";
+import { tokenizeBody, tokenizeParagraph, type TokenRun } from "@/lib/contracts/tokens";
 import type { ContentV2, FieldDef, TermRow } from "@/lib/contracts/types";
 
 export type DocViewMode = "edit" | "sign" | "resolved";
@@ -133,48 +133,49 @@ function FieldRun({
   );
 }
 
-function Paragraphs({
-  body,
-  fieldMap,
-  mode,
-  partyValues,
-  className,
-  onFieldClick,
-  activeFieldKey,
-}: {
-  body: string;
+/** 런 렌더링에 필요한 공통 값 — 조항 제목 줄과 본문 문단이 함께 쓴다 */
+interface RunProps {
   fieldMap: Map<string, FieldDef>;
   mode: DocViewMode;
   partyValues: Record<string, string>;
-  className?: string;
   onFieldClick?: (key: string) => void;
   activeFieldKey?: string | null;
-}) {
+}
+
+/** 한 줄(런 배열) → 인라인 요소들 */
+function Runs({ runs, fieldMap, mode, partyValues, ...rest }: RunProps & { runs: TokenRun[] }) {
+  return (
+    <>
+      {runs.map((run, j) =>
+        run.type === "text" ? (
+          run.bold ? (
+            <strong key={j} className="font-bold">
+              {run.text}
+            </strong>
+          ) : (
+            <span key={j}>{run.text}</span>
+          )
+        ) : (
+          <FieldRun
+            key={j}
+            fieldDef={fieldMap.get(run.key)}
+            token={`{{${run.key}}}`}
+            mode={mode}
+            partyValue={partyValues[run.key]}
+            {...rest}
+          />
+        ),
+      )}
+    </>
+  );
+}
+
+function Paragraphs({ body, className, ...runProps }: RunProps & { body: string; className?: string }) {
   return (
     <>
       {tokenizeBody(body).map((runs, i) => (
         <p key={i} className={className ?? "mt-1.5"}>
-          {runs.map((run, j) =>
-            run.type === "text" ? (
-              run.bold ? (
-                <strong key={j} className="font-bold">
-                  {run.text}
-                </strong>
-              ) : (
-                <span key={j}>{run.text}</span>
-              )
-            ) : (
-              <FieldRun
-                key={j}
-                fieldDef={fieldMap.get(run.key)}
-                token={`{{${run.key}}}`}
-                mode={mode}
-                partyValue={partyValues[run.key]}
-                onFieldClick={onFieldClick}
-                activeFieldKey={activeFieldKey}
-              />
-            ),
-          )}
+          <Runs runs={runs} {...runProps} />
         </p>
       ))}
     </>
@@ -230,7 +231,7 @@ export default function ContractDocViewV2({
   activeFieldKey,
 }: Props) {
   const fieldMap = new Map(content.fields.map((f) => [f.key, f]));
-  const runProps = { onFieldClick, activeFieldKey };
+  const runProps = { fieldMap, mode, partyValues, onFieldClick, activeFieldKey };
 
   return (
     <article className="text-[13.5px] leading-relaxed text-slate-800">
@@ -256,30 +257,21 @@ export default function ContractDocViewV2({
 
       {content.intro.trim() && (
         <div className="mt-5">
-          <Paragraphs
-            body={content.intro}
-            fieldMap={fieldMap}
-            mode={mode}
-            partyValues={partyValues}
-            className="mt-1 whitespace-pre-wrap"
-            {...runProps}
-          />
+          <Paragraphs body={content.intro} className="mt-1 whitespace-pre-wrap" {...runProps} />
         </div>
       )}
 
       {content.clauses.map((clause, i) => (
         <section key={i} className="mt-5">
-          {clause.heading.trim() && <h2 className="font-bold text-slate-900">{clause.heading}</h2>}
+          {clause.heading.trim() && (
+            <h2 className="font-bold text-slate-900">
+              <Runs runs={tokenizeParagraph(clause.heading)} {...runProps} />
+            </h2>
+          )}
           {clause.body.trim() === TERMS_MARKER ? (
             <TermsTable terms={content.terms ?? []} />
           ) : (
-            <Paragraphs
-              body={clause.body}
-              fieldMap={fieldMap}
-              mode={mode}
-              partyValues={partyValues}
-              {...runProps}
-            />
+            <Paragraphs body={clause.body} {...runProps} />
           )}
         </section>
       ))}
