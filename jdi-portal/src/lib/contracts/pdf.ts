@@ -34,8 +34,8 @@ export interface CompanySignedPdfInput {
   /** 법인일 때만 (개인은 "") */
   businessRegNo: string;
   signerName: string;
-  /** 서명 이미지 dataURL — 손서명 PNG 또는 업로드된 법인 도장(PNG/JPEG) */
-  signatureDataUrl: string;
+  /** 서명 이미지 dataURL — 손서명 PNG 또는 업로드된 법인 도장(PNG/JPEG). 미리보기면 null */
+  signatureDataUrl: string | null;
   /** true 면 업로드된 도장 이미지(정방형으로 작게 인쇄) */
   signatureIsStamp: boolean;
   /** 갑(회사) 도장 PNG (dataURL, 없으면 생략) */
@@ -49,6 +49,12 @@ export interface CompanySignedPdfInput {
   contentSha256: string;
   ip: string;
   userAgent: string;
+  /**
+   * 발송 전 미리보기 — 직원이 "보내기 전에 진짜 PDF 모양"을 확인하는 용도.
+   * 모든 쪽에 워터마크를 깔고, 서명란은 비우고, **전자서명 확인서를 붙이지 않는다.**
+   * 확인서는 체결 사실을 증명하는 법적 기록이라 서명 전에 만들어 두면 안 된다.
+   */
+  preview?: boolean;
 }
 
 const INK = "#1e293b";
@@ -154,9 +160,12 @@ function signatureSection(input: CompanySignedPdfInput): Content {
     {
       columns: [
         { text: "서명 또는 인:", color: MUTED, width: "auto", margin: [0, 14, 8, 0] },
-        input.signatureIsStamp
-          ? { image: input.signatureDataUrl, width: 52, height: 52 }
-          : { image: input.signatureDataUrl, width: 110, height: 44 },
+        // 미리보기에는 서명 이미지가 아직 없다 — 자리만 비워 둔다
+        input.signatureDataUrl === null
+          ? { text: "(서명 전)", color: MUTED, margin: [0, 14, 0, 0] }
+          : input.signatureIsStamp
+            ? { image: input.signatureDataUrl, width: 52, height: 52 }
+            : { image: input.signatureDataUrl, width: 110, height: 44 },
       ],
       margin: [0, 4, 0, 0],
     },
@@ -271,6 +280,10 @@ export async function renderCompanySignedPdf(input: CompanySignedPdfInput): Prom
   const dd: TDocumentDefinitions = {
     pageSize: "A4",
     pageMargins: [42, 48, 42, 52],
+    // 미리보기는 모든 쪽에 옅은 도장을 깐다 — 서명 안 된 PDF가 진짜 계약서처럼 돌아다니지 않게.
+    ...(input.preview
+      ? { watermark: { text: "미리보기", color: "#2563eb", opacity: 0.08, bold: true, angle: -22 } }
+      : {}),
     defaultStyle: { font: "Pretendard", fontSize: 9.5, lineHeight: 1.4, color: INK },
     styles: {
       th: { bold: true, fontSize: 9, color: "#334155" },
@@ -286,6 +299,17 @@ export async function renderCompanySignedPdf(input: CompanySignedPdfInput): Prom
       margin: [0, 16, 0, 0],
     }),
     content: [
+      ...(input.preview
+        ? [
+            {
+              text: "미리보기 — 아직 서명되지 않은 문서입니다. 법적 효력이 없습니다.",
+              alignment: "center",
+              fontSize: 8.5,
+              color: "#2563eb",
+              margin: [0, 0, 0, 8],
+            } as Content,
+          ]
+        : []),
       { text: content.title, bold: true, fontSize: 16, alignment: "center", margin: [0, 0, 0, 12] },
       {
         table: {
@@ -321,7 +345,8 @@ export async function renderCompanySignedPdf(input: CompanySignedPdfInput): Prom
       ...(content.footnote.trim()
         ? [{ text: content.footnote, fontSize: 8.5, color: MUTED, alignment: "center", margin: [0, 14, 0, 0] } as Content]
         : []),
-      ...auditSection(input),
+      // 전자서명 확인서는 "체결됐다"는 증명이므로 미리보기에는 붙이지 않는다
+      ...(input.preview ? [] : auditSection(input)),
     ],
   };
 

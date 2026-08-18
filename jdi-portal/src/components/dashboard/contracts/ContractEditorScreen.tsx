@@ -181,6 +181,25 @@ export default function ContractEditorScreen({ target }: { target: EditorTarget 
     }
   };
 
+  /**
+   * 발송 전 PDF 미리보기 — 상대방이 받을 진짜 PDF 를 새 탭에서 연다.
+   * 편집 중 내용은 저장 전에는 DB 에 없으므로 **먼저 저장**한다.
+   *
+   * 새 탭은 저장을 기다리기 전에 미리 연다 — 저장(await) 뒤에 window.open 을 부르면
+   * 브라우저가 "사용자가 누른 것"으로 보지 않아 팝업으로 막힐 수 있다.
+   */
+  const savePreviewPdf = async () => {
+    if (!docMode) return;
+    const tab = window.open("about:blank", "_blank");
+    if (!(await save())) {
+      tab?.close();
+      return;
+    }
+    const url = `/api/contracts/${target.doc.id}/preview-pdf`;
+    if (tab) tab.location.href = url;
+    else window.open(url, "_blank");
+  };
+
   const saveAndSend = async () => {
     if (!docMode) return;
     if (!(await save())) return;
@@ -254,6 +273,17 @@ export default function ContractEditorScreen({ target }: { target: EditorTarget 
         >
           저장
         </button>
+        {docMode && (
+          <button
+            type="button"
+            onClick={savePreviewPdf}
+            disabled={busy}
+            title="상대방이 받을 진짜 PDF 를 새 탭에서 확인합니다"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            저장하고 PDF 미리보기
+          </button>
+        )}
         {docMode && (
           <button
             type="button"
