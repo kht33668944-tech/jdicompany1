@@ -21,7 +21,7 @@ const PdfPrinter = pdfmakeModule as unknown as new (fonts: TFontDictionary) => {
   createPdfKitDocument(dd: TDocumentDefinitions): PdfKitDocLike;
 };
 import { PDF_CHECK_OFF, PDF_CHECK_ON, TERMS_MARKER } from "./constants";
-import { buildValueMap, tokenizeBody } from "./tokens";
+import { buildValueMap, tokenizeBody, tokenizeParagraph, type TokenRun } from "./tokens";
 import type { ContentV2, CounterpartyKind, FieldDef, TermRow } from "./types";
 
 export interface CompanySignedPdfInput {
@@ -73,23 +73,33 @@ function fieldText(def: FieldDef | undefined, value: string, blank: string): str
 }
 
 /**
- * 조항 body → 문단 목록.
+ * 한 줄(런 배열) → pdfmake 조각들.
  * {{fN}} 자리에는 채움 칸 값을, **굵게** 표기에는 굵은 글씨를 적용한다.
+ * 조항 제목 줄과 본문 문단이 함께 쓴다.
  */
+function runsToText(
+  runs: TokenRun[],
+  values: Map<string, string>,
+  fields: Map<string, FieldDef>,
+): Content[] {
+  return runs.map((run) =>
+    run.type === "text"
+      ? { text: run.text, ...(run.bold ? { bold: true } : {}) }
+      : {
+          text: fieldText(fields.get(run.key), values.get(run.key) ?? "", "＿＿＿"),
+          bold: true,
+        },
+  );
+}
+
+/** 조항 body → 문단 목록 */
 function clauseParagraphs(
   body: string,
   values: Map<string, string>,
   fields: Map<string, FieldDef>,
 ): Content[] {
   return tokenizeBody(body).map((runs) => ({
-    text: runs.map((run) =>
-      run.type === "text"
-        ? { text: run.text, ...(run.bold ? { bold: true } : {}) }
-        : {
-            text: fieldText(fields.get(run.key), values.get(run.key) ?? "", "＿＿＿"),
-            bold: true,
-          },
-    ),
+    text: runsToText(runs, values, fields),
     margin: [0, 2, 0, 2] as [number, number, number, number],
   }));
 }
@@ -288,7 +298,14 @@ export async function renderCompanySignedPdf(input: CompanySignedPdfInput): Prom
 
   const clauseContents: Content[] = content.clauses.flatMap((clause): Content[] => [
     ...(clause.heading.trim()
-      ? [{ text: clause.heading, bold: true, fontSize: 10.5, margin: [0, 10, 0, 3] } as Content]
+      ? [
+          {
+            text: runsToText(tokenizeParagraph(clause.heading), values, fieldMap),
+            bold: true,
+            fontSize: 10.5,
+            margin: [0, 10, 0, 3],
+          } as Content,
+        ]
       : []),
     ...(clause.body.trim() === TERMS_MARKER
       ? [termsTable(content.terms ?? [])]

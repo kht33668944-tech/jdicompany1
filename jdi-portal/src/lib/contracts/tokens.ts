@@ -54,14 +54,17 @@ export function tokenizeBody(body: string): TokenRun[][] {
     .map(tokenizeParagraph);
 }
 
-/** 본문(서문·조항·맺음말)에 등장하는 필드 key 집합 — 삭제 차단·검증용 */
+/** 본문(서문·조항 제목·조항 본문·맺음말)에 등장하는 필드 key 집합 — 삭제 차단·검증용 */
 export function collectFieldKeys(content: ContentV2): Set<string> {
   const keys = new Set<string>();
   const scan = (text: string) => {
     for (const m of text.matchAll(FIELD_TOKEN_RE)) keys.add(m[1]);
   };
   scan(content.intro);
-  for (const clause of content.clauses) scan(clause.body);
+  for (const clause of content.clauses) {
+    scan(clause.heading);
+    scan(clause.body);
+  }
   scan(content.closing);
   return keys;
 }

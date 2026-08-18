@@ -110,6 +110,15 @@ test("collectFieldKeys: 서문·조항·맺음말의 토큰을 모두 수집한�
   assert.deepEqual([...collectFieldKeys(CONTENT)].sort(), ["f1", "f2", "f9"]);
 });
 
+test("collectFieldKeys: 조항 제목 줄의 토큰도 수집한다", () => {
+  // 제목 줄을 빠뜨리면 "정의 없는 토큰" 검사와 칸 삭제 차단이 제목을 못 본다
+  const content = {
+    ...CONTENT,
+    clauses: [{ heading: "제1조 (기간 {{f5}})", body: "본문" }],
+  };
+  assert.equal(collectFieldKeys(content).has("f5"), true);
+});
+
 test("resolveParagraphs: 값 치환, 값 없는 키는 리터럴 유지", () => {
   const values = new Map([["f2", "서울시"]]);
   assert.deepEqual(resolveParagraphs("본문 {{f2}} 와 {{f9}}", values), [
@@ -189,6 +198,23 @@ test("왕복: 제목·서문·조항·칩·굵게가 보존된다", () => {
   assert.equal(roundTripped.title, original.title);
   assert.equal(roundTripped.intro, original.intro);
   assert.deepEqual(roundTripped.clauses, original.clauses);
+});
+
+test("왕복: 조항 제목 줄의 채움 칸도 칩으로 살아남는다", () => {
+  // 제목을 통글자로 되돌리면 저장 후 다시 열었을 때 "{{f1}}" 이 글자 그대로 보인다
+  const original = {
+    ...BASE,
+    title: "용역 계약서",
+    clauses: [{ heading: "제1조 (기간 {{f1}})", body: "본문" }],
+    fields: [{ key: "f1", kind: "party", label: "기간", type: "text", required: true }],
+  };
+  const doc = contentToDoc(original);
+  const heading = doc.content.find((n) => n.type === "heading" && n.attrs?.level === 2);
+  assert.ok(
+    heading.content.some((n) => n.type === "fieldChip" && n.attrs?.fieldKey === "f1"),
+    "조항 제목 줄의 토큰이 편집기 칩으로 복원되지 않았습니다",
+  );
+  assert.deepEqual(docToContent(doc, BASE).clauses, original.clauses);
 });
 
 test("왕복: 조건표 조항({{TERMS}})이 블록으로 갔다가 그대로 돌아온다", () => {

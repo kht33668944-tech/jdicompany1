@@ -9,7 +9,7 @@
 //   조항 제목(h2)      ↔ clause.heading
 //   그 아래 문단        ↔ clause.body (개행으로 이어붙임)
 //   조건표 블록         ↔ body 가 "{{TERMS}}" 인 조항
-//   필드 칩             ↔ 본문 속 "{{fN}}"
+//   필드 칩             ↔ 조항 제목·본문 속 "{{fN}}"
 //   굵게                ↔ 본문 속 "**...**"
 
 // 확장자를 명시하는 이유: 이 파일은 node --experimental-strip-types 로 직접 불러
@@ -87,7 +87,8 @@ export function contentToDoc(content: ContentV2): RichDoc {
       nodes.push({
         type: "heading",
         attrs: { level: 2 },
-        content: [{ type: "text", text: clause.heading }],
+        // 제목에도 채움 칸을 넣을 수 있다 — 본문과 같은 방식으로 칩을 복원한다
+        content: paragraphToNodes(clause.heading),
       });
     }
     if (clause.body.trim() === TERMS_MARKER) {
