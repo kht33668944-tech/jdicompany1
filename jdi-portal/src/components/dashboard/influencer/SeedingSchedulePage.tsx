@@ -1,22 +1,31 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import { useState, useCallback, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import InfluencerTabs from "./InfluencerTabs";
 import SeedingCalendar from "./SeedingCalendar";
 import SeedingCampaignBoard from "./SeedingCampaignBoard";
 import InfluencerDetailPanel from "./InfluencerDetailPanel";
 import type { InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
+import type { ContractListSummary } from "@/lib/influencer/contracts/types";
 
 interface Props {
   activeCampaigns: InfluencerCampaignWithInfluencer[];
+  /** 리스트 탭과 같은 계약 요약 — 상태를 계약 10단계로 통일하기 위해 필요하다 */
+  contractSummaries: ContractListSummary[];
 }
 
-export default function SeedingSchedulePage({ activeCampaigns }: Props) {
+export default function SeedingSchedulePage({ activeCampaigns, contractSummaries }: Props) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedInfluencerId, setSelectedInfluencerId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const contractByInfluencer = useMemo(() => {
+    const map = new Map<string, ContractListSummary>();
+    for (const summary of contractSummaries) map.set(summary.influencer_id, summary);
+    return map;
+  }, [contractSummaries]);
 
   const handleRefresh = useCallback(() => {
     startTransition(() => {
@@ -40,6 +49,7 @@ export default function SeedingSchedulePage({ activeCampaigns }: Props) {
         />
         <SeedingCampaignBoard
           campaigns={activeCampaigns}
+          contractByInfluencer={contractByInfluencer}
           selectedDate={selectedDate}
           onRefresh={handleRefresh}
           onInfluencerClick={(influencerId) => setSelectedInfluencerId(influencerId)}
@@ -49,6 +59,7 @@ export default function SeedingSchedulePage({ activeCampaigns }: Props) {
       {/* 인플루언서 상세 패널 (우측 슬라이드) */}
       <InfluencerDetailPanel
         influencerId={selectedInfluencerId}
+        contract={selectedInfluencerId ? contractByInfluencer.get(selectedInfluencerId) : undefined}
         onClose={() => setSelectedInfluencerId(null)}
       />
     </div>

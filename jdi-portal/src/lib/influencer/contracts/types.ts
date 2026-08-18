@@ -77,6 +77,17 @@ export interface ContractListSummary {
   has_settlement: boolean;
 }
 
+/**
+ * 계약과 연결되지 않은 시딩건 — 계약 탭 상단 경고에만 쓴다.
+ * 시딩 1건 = 계약 1건이 규칙이라 정상 운영에서는 항상 빈 배열이다.
+ */
+export interface UnlinkedSeeding {
+  campaign_id: string;
+  influencer_id: string;
+  username: string;
+  display_name: string | null;
+}
+
 /** 추가/수정 폼 입력 (서버가 채우는 필드 제외 — campaign_id/expense_id 는 서버 전용) */
 export type ContractInput = Omit<
   InfluencerContract,

@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { toast } from "sonner";
 import TopUrlBar from "./TopUrlBar";
 import KpiCards from "./KpiCards";
 import InfluencerTable from "./InfluencerTable";
@@ -11,9 +13,15 @@ import SeedingSidebarCard from "./SeedingSidebarCard";
 import InfluencerDetailPanel from "./InfluencerDetailPanel";
 import InfluencerTabs from "./InfluencerTabs";
 import type { CampaignBasic, InfluencerListItem, InfluencerCampaignWithInfluencer, KpiCards as KpiCardsType } from "@/lib/influencer/types";
-import type { ContractListSummary } from "@/lib/influencer/contracts/types";
+import type { ContractListSummary, InfluencerContract } from "@/lib/influencer/contracts/types";
 import { loadAllInfluencers, loadMoreInfluencers, searchInfluencers } from "@/lib/influencer/actions";
+import { startSeeding } from "@/lib/influencer/contracts/actions";
+import { getErrorMessage } from "@/lib/utils/errors";
 import type { FilterState } from "./InfluencerFilters";
+
+// 계약 폼은 「시딩 시작」을 눌렀을 때만 필요하다 — 초기 JS 예산을 지키려고 지연 로드
+// (계약 탭이 쓰는 방식과 같다).
+const ContractFormModal = dynamic(() => import("./contracts/ContractFormModal"), { ssr: false });
 
 interface Props {
   kpi: KpiCardsType;
@@ -54,11 +62,32 @@ export default function InfluencerPageClient({
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [, startTransition] = useTransition();
 
+  // 「시딩 시작」으로 만들어진(또는 이미 있던) 계약 — 값을 채우도록 폼을 바로 띄운다
+  const [seedingContract, setSeedingContract] = useState<InfluencerContract | null>(null);
+  const [seedingBusy, startSeedingTransition] = useTransition();
+
   const handleRefresh = useCallback(() => {
     startTransition(() => {
       router.refresh();
     });
   }, [router]);
+
+  /**
+   * 시딩 시작 = 계약 시작. 시딩건과 계약을 함께 만들고 곧바로 계약 폼을 열어
+   * 제품·금액·날짜를 받는다. 탭을 옮기지 않아 흐름이 끊기지 않는다.
+   * 이미 계약이 있는 사람이면 새로 만들지 않고 그 계약을 연다.
+   */
+  const handleStartSeeding = useCallback((influencerId: string) => {
+    startSeedingTransition(async () => {
+      try {
+        const { contract, created } = await startSeeding(influencerId);
+        setSeedingContract(contract);
+        if (!created) toast.info("이미 진행 중인 TMA 계약이 있어 그 계약을 엽니다.");
+      } catch (err) {
+        toast.error(getErrorMessage(err, "시딩 시작 실패"));
+      }
+    });
+  }, []);
 
   // 상세를 연 뒤 주소창의 파라미터는 지운다(새로고침 때 다시 열리지 않도록)
   useEffect(() => {
@@ -108,7 +137,7 @@ export default function InfluencerPageClient({
     filters.categories.length > 0 ||
     filters.tags.length > 0 ||
     filters.followerTiers.length > 0 ||
-    filters.campaignStatuses.length > 0 ||
+    filters.contractStatuses.length > 0 ||
     filters.noCampaign ||
     filters.dateMilestone !== null;
   useEffect(() => {
@@ -177,6 +206,8 @@ export default function InfluencerPageClient({
           onFiltersChange={setFilters}
           onSelectInfluencer={(id) => setSelectedId(id)}
           onRefresh={handleRefresh}
+          onStartSeeding={handleStartSeeding}
+          seedingBusy={seedingBusy}
           hasMore={hasMore}
           loadingMore={loadingMore}
           onLoadMore={handleLoadMore}
@@ -188,6 +219,7 @@ export default function InfluencerPageClient({
           <SeedingSidebarCard
             activeCampaigns={activeCampaigns}
             allCampaigns={allCampaigns}
+            contractByInfluencer={contractByInfluencer}
             totalInfluencerCount={totalInfluencerCount}
             filters={filters}
             onFiltersChange={setFilters}
@@ -212,6 +244,18 @@ export default function InfluencerPageClient({
         contract={selectedId ? contractByInfluencer.get(selectedId) : undefined}
         onClose={() => setSelectedId(null)}
       />
+
+      {/* 시딩 시작 직후 여는 계약 폼 — 제품·금액·날짜를 여기서 채운다 */}
+      {seedingContract && (
+        <ContractFormModal
+          contract={seedingContract}
+          onClose={() => setSeedingContract(null)}
+          onSaved={() => {
+            setSeedingContract(null);
+            handleRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }

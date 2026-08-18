@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import X from "phosphor-react/dist/icons/X.esm.js";
-import type { CampaignStatus, InfluencerGrade, InfluencerStatus } from "@/lib/influencer/types";
+import type { InfluencerGrade, InfluencerStatus } from "@/lib/influencer/types";
+import type { ContractStatus } from "@/lib/influencer/contracts/types";
 import type { InfluencerTier } from "@/lib/influencer/metrics";
 
 export interface FilterState {
@@ -11,7 +12,12 @@ export interface FilterState {
   categories: string[];
   status: InfluencerStatus | "all";
   tags: string[];
-  campaignStatuses: CampaignStatus[];
+  /**
+   * 진행 상태 필터 — 계약 10단계 기준이다.
+   * 예전에는 캠페인 6단계였는데, 화면 배지는 계약 상태('후보' 등)를 보여주면서
+   * 필터에는 그 선택지가 없어 걸러낼 수가 없었다.
+   */
+  contractStatuses: ContractStatus[];
   dateMilestone: string | null;
   followerTiers: InfluencerTier[];
   noCampaign: boolean;
@@ -23,7 +29,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   categories: [],
   status: "all",
   tags: [],
-  campaignStatuses: [],
+  contractStatuses: [],
   dateMilestone: null,
   followerTiers: [],
   noCampaign: false,

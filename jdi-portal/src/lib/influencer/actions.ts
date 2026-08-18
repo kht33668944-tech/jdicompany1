@@ -319,6 +319,15 @@ export async function updateInfluencerTags(id: string, tags: string[]): Promise<
 // 캠페인
 // ============================================================
 
+/**
+ * 시딩건만 단독으로 만든다.
+ *
+ * **화면에서는 더 이상 쓰지 않는다.** 시딩 1건 = 계약 1건이 규칙이라, 리스트의
+ * 「+ 시딩 시작」은 `startSeeding`(contracts/actions.ts)을 부르고 계약이 시딩건을
+ * 만들어 붙인다. 계약 없는 시딩건을 다시 만들면 상태가 6단계로 갈라지고
+ * 계약 탭에 안 보이는 진행 건이 생긴다 — 새 화면에서 이 함수를 부르지 말 것.
+ * (상세 패널의 「+ 캠페인 추가」처럼 계약과 무관한 과거 경로만 남아 있다.)
+ */
 export async function addCampaign(input: {
   influencer_id: string;
   campaign_name: string;
@@ -417,13 +426,35 @@ export async function updateCampaign(
   revalidatePath("/dashboard/influencer");
 }
 
+/**
+ * 시딩건 삭제. **TMA 계약과 연결된 건은 여기서 지울 수 없다.**
+ *
+ * 예전에는 그냥 지웠는데, DB 가 계약의 campaign_id 만 조용히 비워 버려서(SET NULL)
+ * 계약은 자기가 연결을 잃은 줄 모른 채 남았고, 다음에 그 계약을 저장하는 순간
+ * 시딩건이 또 새로 생겼다. 계약이 있는 건은 계약 탭에서 취소·삭제해야
+ * 시딩건까지 한 번에 정리된다(linkSync 의 syncCampaign).
+ */
 export async function deleteCampaign(id: string): Promise<void> {
   await getSessionUserId();
   const supabase = await createClient();
 
+  const { data: linked, error: linkErr } = await supabase
+    .from("influencer_contracts")
+    .select("id")
+    .eq("campaign_id", id)
+    .eq("is_deleted", false)
+    .maybeSingle();
+  if (linkErr) throw linkErr;
+  if (linked) {
+    throw new Error(
+      "이 시딩은 TMA 계약과 연결돼 있어요. 계약 탭에서 취소하거나 삭제해 주세요.",
+    );
+  }
+
   const { error } = await supabase.from("influencer_campaigns").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/dashboard/influencer");
+  revalidatePath("/dashboard/influencer/schedule");
 }
 
 export async function updateCampaignMilestoneDate(

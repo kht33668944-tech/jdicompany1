@@ -277,3 +277,144 @@ test("dates: addMonthsClamped 월말 클램핑이 맞는다", () => {
     null,
   ]);
 });
+
+// ------------------------------------------------------------
+// 5) 시딩 1건 = 계약 1건 (마이그 124)
+//
+// 이 묶음이 깨지면 예전 증상이 그대로 돌아온다:
+//  · 계약을 저장할 때마다 같은 사람 시딩건이 하나 더 생김(이름까지 동일)
+//  · 계약을 지워도 시딩건이 KPI·깔때기·스케줄에 유령으로 남음
+//  · 같은 사람이 리스트 '후보' / 스케줄 '협의중' 처럼 화면마다 다른 상태로 보임
+// ------------------------------------------------------------
+const unifyMigration = read("supabase/migrations/124_influencer_seeding_contract_unify.sql");
+const influencerActions = read("src/lib/influencer/actions.ts");
+const statusMap = read("src/lib/influencer/contracts/statusMap.ts");
+const listClient = read("src/components/dashboard/influencer/InfluencerPageClient.tsx");
+const listTable = read("src/components/dashboard/influencer/InfluencerTable.tsx");
+const funnel = read("src/components/dashboard/influencer/SeedingFunnel.tsx");
+const schedulePage = read("src/app/dashboard/influencer/schedule/page.tsx");
+const scheduleBoard = read("src/components/dashboard/influencer/SeedingCampaignBoard.tsx");
+const contractsPage = read("src/app/dashboard/influencer/contracts/page.tsx");
+
+test("마이그 124: 계약서 양식과 회사 도장은 지우지 않는다", () => {
+  // 양식(influencer_contract_templates)이 지워지면 편집해 둔 계약서를 되살릴 수 없다
+  assert.doesNotMatch(
+    unifyMigration,
+    /DELETE\s+FROM\s+public\.influencer_contract_templates/i,
+    "계약서 양식을 지우면 안 됩니다",
+  );
+  // 회사 도장은 계약과 무관한 공용 자산이라 storage 정리에서 제외해야 한다
+  assert.match(unifyMigration, /bucket_id\s*=\s*'influencer-contract-docs'/);
+  assert.match(unifyMigration, /name NOT LIKE 'company\/%'/);
+});
+
+test("마이그 124: 계약 1건이 시딩건 1건만 갖도록 부분 유니크 인덱스", () => {
+  assert.match(
+    unifyMigration,
+    /CREATE UNIQUE INDEX IF NOT EXISTS influencer_contracts_campaign_id_key[\s\S]*?\(campaign_id\)[\s\S]*?WHERE campaign_id IS NOT NULL/,
+  );
+});
+
+test("연동: syncCampaign 이 새로 만들기 전에 기존 시딩건을 흡수한다", () => {
+  assert.match(
+    linkSync,
+    /async function findAdoptableCampaign/,
+    "기존 시딩건을 찾는 분기가 없으면 계약 저장마다 중복이 생깁니다",
+  );
+  const start = linkSync.indexOf("export async function syncCampaign");
+  const body = linkSync.slice(start);
+  assert.match(
+    body,
+    /row\.campaign_id \?\? \(await findAdoptableCampaign\(/,
+    "campaign_id 가 없을 때 기존 시딩건을 먼저 찾아야 합니다",
+  );
+  // 흡수 대상은 "살아있는 다른 계약이 물고 있지 않은" 것이어야 한다
+  const finder = linkSync.slice(
+    linkSync.indexOf("async function findAdoptableCampaign"),
+    linkSync.indexOf("async function resolveContactDatePatch"),
+  );
+  assert.match(finder, /from\("influencer_contracts"\)[\s\S]*?is_deleted", false/);
+});
+
+test("연동: 계약과 연결된 시딩건은 리스트에서 단독 삭제할 수 없다", () => {
+  const start = influencerActions.indexOf("export async function deleteCampaign");
+  assert.ok(start >= 0);
+  const nextExport = influencerActions.indexOf("export async function", start + 1);
+  const body = influencerActions.slice(start, nextExport === -1 ? undefined : nextExport);
+  assert.match(body, /from\("influencer_contracts"\)[\s\S]*?eq\("campaign_id", id\)/);
+  assert.match(body, /is_deleted", false/);
+  assert.match(body, /throw new Error\(/, "연결된 계약이 있으면 막고 이유를 알려야 합니다");
+});
+
+test("연동: 「시딩 시작」이 계약을 함께 만든다", () => {
+  const start = actions.indexOf("export async function startSeeding");
+  assert.ok(start >= 0, "startSeeding 액션이 없습니다");
+  const nextExport = actions.indexOf("export async function", start + 1);
+  const body = actions.slice(start, nextExport === -1 ? undefined : nextExport);
+  assert.match(body, /from\("influencer_contracts"\)[\s\S]*?\.insert\(/);
+  assert.match(body, /finishContractSave\(/, "시딩건 연결 후처리를 지나야 합니다");
+  // 이미 계약이 있으면 새로 만들지 않는다(중복 방지)
+  assert.match(body, /created:\s*false/);
+  // 리스트는 이 액션을 쓰고, 캠페인만 만드는 addCampaign 은 더 이상 부르지 않는다
+  assert.match(listClient, /startSeeding\(influencerId\)/);
+  assert.doesNotMatch(listTable, /\baddCampaign\b/);
+});
+
+test("연동: DM 단계에 들어가면 연락일이 채워져 「DM 추적」이 켜진다", () => {
+  assert.match(linkSync, /async function resolveContactDatePatch/);
+  const body = linkSync.slice(
+    linkSync.indexOf("async function resolveContactDatePatch"),
+    linkSync.indexOf("export async function syncCampaign"),
+  );
+  assert.match(body, /contract_status !== "dm_sent"/);
+  assert.match(body, /contact_date: toDateString\(kstNow\(\)\)/);
+});
+
+test("상태 통일: 리스트·깔때기·스케줄이 계약 10단계를 쓴다", () => {
+  // 캠페인 6단계 선택지를 화면 상태 UI 에 다시 끌어오면 안 된다
+  for (const [name, src] of [
+    ["InfluencerTable", listTable],
+    ["SeedingFunnel", funnel],
+    ["SeedingCampaignBoard", scheduleBoard],
+  ]) {
+    assert.doesNotMatch(
+      src,
+      /CAMPAIGN_STATUS_OPTIONS|CampaignStatusDropdown/,
+      `${name} 이 캠페인 6단계로 되돌아갔습니다`,
+    );
+    assert.match(src, /CONTRACT_STATUS_(LABEL|OPTIONS|ORDER)/, `${name} 이 계약 10단계를 안 씁니다`);
+  }
+  // 필터 상태 이름도 계약 기준
+  assert.match(listTable, /filters\.contractStatuses/);
+  assert.match(funnel, /filters\.contractStatuses/);
+  // 계약 없는 옛 시딩건도 10단계로 환산해 보여준다
+  assert.match(statusMap, /export function campaignToContractStatus/);
+});
+
+test("연동: 시딩 스케줄 화면이 계약 요약을 함께 불러온다", () => {
+  assert.match(
+    schedulePage,
+    /getContractSummariesForList\(\)/,
+    "스케줄이 계약을 모르면 상태가 화면마다 달라집니다",
+  );
+  assert.match(scheduleBoard, /updateContractStatus\(/);
+  assert.match(scheduleBoard, /ContractLink/, "스케줄에서 계약서로 가는 길이 있어야 합니다");
+});
+
+test("연동: 계약 탭이 '계약 없는 시딩'을 알려준다", () => {
+  assert.match(queries, /export async function getUnlinkedSeedings/);
+  assert.match(contractsPage, /getUnlinkedSeedings\(\)/);
+  const client = read("src/components/dashboard/influencer/contracts/ContractsPageClient.tsx");
+  assert.match(client, /unlinkedSeedings\.length > 0/);
+  // 같은 사람 계약이 이미 있으면 폼이 경고한다
+  const form = read("src/components/dashboard/influencer/contracts/ContractFormModal.tsx");
+  assert.match(form, /const duplicate = useMemo\(/);
+  assert.match(client, /existingContracts=\{contracts\}/);
+});
+
+test("statusMap 은 서버 전용 import 를 갖지 않는다(클라이언트 공용)", () => {
+  // 리스트·스케줄 화면이 이 파일을 직접 import 하므로, 서버 전용 모듈이 섞이면 빌드가 깨진다.
+  // (주석에 이름이 나오는 건 괜찮으니 import 문만 본다)
+  const imports = statusMap.match(/^\s*import[\s\S]*?;$/gm)?.join("\n") ?? "";
+  assert.doesNotMatch(imports, /next\/cache|@\/lib\/supabase\/server/);
+});

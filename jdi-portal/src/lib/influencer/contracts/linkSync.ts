@@ -15,60 +15,21 @@ import {
 } from "./constants";
 import { PRODUCT_LABEL } from "./labels";
 import { getContractPayout } from "./payout";
+import { CONTRACT_TO_CAMPAIGN_STATUS, resolveContractStatus } from "./statusMap";
 import type { ContractStatus } from "./types";
 
 export const CONTRACTS_PATH = "/dashboard/influencer/contracts";
 
-/**
- * 계약 상태 → 시딩 캠페인 상태 매핑.
- * 계약 10단계가 캠페인 6단계로 좁아지므로 여러 계약 상태가 한 칸으로 모인다.
- * 그래서 화면에서는 계약이 연결된 행에 캠페인 상태 대신 계약 상태를 그대로 보여준다
- * (이 매핑은 계약 없는 캠페인과 섞여 도는 스케줄·깔때기용 근사값).
- * 취소는 캠페인을 지우지 않고 마지막 상태 그대로 남긴다(이력 보존).
- */
-export const CONTRACT_TO_CAMPAIGN_STATUS: Record<
-  Exclude<ContractStatus, "canceled">,
-  CampaignStatus
-> = {
-  candidate: "planned",
-  dm_sent: "dm_sent",
-  negotiating: "replied",
-  contract_sent: "replied",
-  signed: "replied",
-  product_shipped: "shipped",
-  draft_received: "shipped",
-  posted: "posted",
-  settled: "done",
-};
-
-/**
- * 캠페인 상태 → 계약 상태 역매핑(대표값).
- * 리스트·스케줄에서 캠페인만 고쳤을 때 계약이 뒤처지지 않게 하는 안전망이다.
- * 한 캠페인 상태에 계약 상태 여럿이 대응하므로, 지금 계약 상태가 이미 같은 묶음
- * 안에 있으면 그대로 두고(더 자세한 정보를 잃지 않는다) 아니면 대표값으로 옮긴다.
- */
-export const CAMPAIGN_TO_CONTRACT_GROUP: Record<CampaignStatus, ContractStatus[]> = {
-  planned: ["candidate"],
-  dm_sent: ["dm_sent"],
-  replied: ["negotiating", "contract_sent", "signed"],
-  shipped: ["product_shipped", "draft_received"],
-  posted: ["posted"],
-  done: ["settled"],
-};
-
-/**
- * 캠페인 상태 변경을 계약 상태로 옮긴다.
- * 취소된 계약은 캠페인 조작으로 되살리지 않는다(취소는 계약 탭에서만 푼다).
- */
-export function resolveContractStatus(
-  current: ContractStatus,
-  next: CampaignStatus,
-): ContractStatus {
-  if (current === "canceled") return current;
-  const group = CAMPAIGN_TO_CONTRACT_GROUP[next];
-  if (!group) return current;
-  return group.includes(current) ? current : group[0];
-}
+// 계약 10단계 ↔ 캠페인 6단계 대응표는 statusMap.ts(클라이언트 공용)에 있다.
+// 리스트·시딩 스케줄 화면도 같은 표로 상태를 보여줘야 하는데, 이 파일은 next/cache 를
+// 쓰는 서버 전용이라 클라이언트가 가져갈 수 없어서 분리했다. 기존 import 경로가
+// 깨지지 않도록 여기서 다시 내보낸다.
+export {
+  CONTRACT_TO_CAMPAIGN_STATUS,
+  CAMPAIGN_TO_CONTRACT_GROUP,
+  campaignToContractStatus,
+  resolveContractStatus,
+} from "./statusMap";
 
 /** 리스트/스케줄/지출 연동에 필요한 계약 행 최소 필드 */
 export interface ContractLinkRow {
@@ -106,13 +67,73 @@ export function revalidateLinkedPaths() {
 }
 
 /**
+ * 계약에 붙일 기존 시딩건 찾기 — 같은 인플루언서의 캠페인 중에서
+ * 아직 살아있는 다른 계약이 물고 있지 않은 것을 최신순으로 하나 고른다.
+ *
+ * 이 확인이 없던 시절에는 계약을 저장할 때마다 곧장 새 캠페인을 만들어서,
+ * 리스트에서 '시딩 시작'으로 이미 만들어 둔 사람에게 계약을 추가하면
+ * **이름까지 똑같은 시딩건이 하나 더** 생겼다(KPI·깔때기 이중 카운트,
+ * 시딩 스케줄에 같은 사람이 두 줄, 리스트 "시딩 금액 2건").
+ */
+async function findAdoptableCampaign(
+  supabase: SupabaseClient,
+  row: ContractLinkRow,
+): Promise<string | null> {
+  if (!row.influencer_id) return null;
+
+  const { data: campaigns, error } = await supabase
+    .from("influencer_campaigns")
+    .select("id")
+    .eq("influencer_id", row.influencer_id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  if (!campaigns || campaigns.length === 0) return null;
+
+  const ids = campaigns.map((c) => c.id as string);
+  const { data: taken, error: takenErr } = await supabase
+    .from("influencer_contracts")
+    .select("campaign_id")
+    .in("campaign_id", ids)
+    .eq("is_deleted", false)
+    .neq("id", row.id);
+  if (takenErr) throw takenErr;
+
+  const takenIds = new Set((taken ?? []).map((t) => t.campaign_id as string));
+  return ids.find((id) => !takenIds.has(id)) ?? null;
+}
+
+/**
+ * 「DM 추적」이 켜지도록 연락일을 채운다.
+ *
+ * 사이드바 DM 추적은 캠페인 `contact_date` 로 며칠 지났는지 센다. 그런데 계약에는
+ * DM 보낸 날짜 칸이 없어서, 계약으로만 관리하면 이 값이 영영 비어 있고 추적이
+ * 한 번도 켜지지 않았다. '제안 DM' 단계에 들어올 때 비어 있으면 오늘(KST)을 대신
+ * 넣어 준다. 이미 값이 있으면 사람이 적은 날짜이므로 건드리지 않는다.
+ */
+async function resolveContactDatePatch(
+  supabase: SupabaseClient,
+  row: ContractLinkRow,
+  campaignId: string,
+): Promise<{ contact_date?: string }> {
+  if (row.contract_status !== "dm_sent") return {};
+  const { data } = await supabase
+    .from("influencer_campaigns")
+    .select("contact_date")
+    .eq("id", campaignId)
+    .maybeSingle();
+  if (data && !data.contact_date) return { contact_date: toDateString(kstNow()) };
+  return {};
+}
+
+/**
  * 계약 → 시딩 캠페인 동기화. 반환값은 최종 campaign_id(연동 없으면 null).
  * 계약 저장 이후에 도는 후처리라, 실패해도 throw 하지 않고 연동만 빠진 상태로 둔다
  * (호출부가 scheduled=false 로 화면에 알린다).
  *
- * 취소·삭제된 계약의 캠페인은 **지우지 않는다**. 예전에는 지웠는데, 그러면
- * 리스트·스케줄에서 "이 사람 그때 어디까지 갔었는지" 기록이 통째로 사라졌다.
- * 대신 캠페인은 마지막 상태 그대로 두고, 화면이 계약의 '취소' 배지를 덧입혀 보여준다.
+ * 시딩 1건 = 계약 1건이 규칙이다. 그래서 ① 연결된 캠페인이 없으면 먼저 기존 것을
+ * 찾아 흡수하고(없을 때만 새로 만든다) ② 취소·삭제된 계약의 캠페인은 실제로 지운다.
+ * 지워도 이력은 계약 쪽(소프트 삭제 + '취소' 상태)에 그대로 남으므로 잃는 정보가 없고,
+ * 남겨 두면 리스트·스케줄·깔때기·KPI 에 유령 건수로 영원히 잡힌다.
  */
 export async function syncCampaign(
   supabase: SupabaseClient,
@@ -120,7 +141,16 @@ export async function syncCampaign(
   row: ContractLinkRow,
 ): Promise<string | null> {
   try {
-    if (row.contract_status === "canceled") return row.campaign_id;
+    if (row.contract_status === "canceled") {
+      if (row.campaign_id) {
+        const { error } = await supabase
+          .from("influencer_campaigns")
+          .delete()
+          .eq("id", row.campaign_id);
+        if (error) throw error;
+      }
+      return null;
+    }
     if (!row.influencer_id) return row.campaign_id;
 
     const payload = {
@@ -134,18 +164,26 @@ export async function syncCampaign(
       actual_post_date: row.post_actual_date,
     };
 
-    if (row.campaign_id) {
+    const targetId = row.campaign_id ?? (await findAdoptableCampaign(supabase, row));
+
+    if (targetId) {
+      const contactPatch = await resolveContactDatePatch(supabase, row, targetId);
       const { error } = await supabase
         .from("influencer_campaigns")
-        .update(payload)
-        .eq("id", row.campaign_id);
+        .update({ ...payload, ...contactPatch })
+        .eq("id", targetId);
       if (error) throw error;
-      return row.campaign_id;
+      return targetId;
     }
 
     const { data, error } = await supabase
       .from("influencer_campaigns")
-      .insert({ influencer_id: row.influencer_id, created_by: userId, ...payload })
+      .insert({
+        influencer_id: row.influencer_id,
+        created_by: userId,
+        ...payload,
+        ...(row.contract_status === "dm_sent" && { contact_date: toDateString(kstNow()) }),
+      })
       .select("id")
       .single();
     if (error) throw error;

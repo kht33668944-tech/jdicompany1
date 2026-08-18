@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getAuthUser } from "@/lib/supabase/auth";
-import { getContracts, getSettlementContractIds } from "@/lib/influencer/contracts/queries";
+import {
+  getContracts,
+  getSettlementContractIds,
+  getUnlinkedSeedings,
+} from "@/lib/influencer/contracts/queries";
 import { getInfluencerStats } from "@/lib/influencer/queries";
 import { isGateConfigured } from "@/lib/vault/queries";
 import { verifyUnlockToken } from "@/lib/vault/crypto";
@@ -36,10 +40,12 @@ export default async function ContractsPage({
   const openId = openIdParam && UUID_RE.test(openIdParam) ? openIdParam : null;
 
   try {
-    const [contracts, settlementContractIds, gateConfigured] = await Promise.all([
+    const [contracts, settlementContractIds, gateConfigured, unlinkedSeedings] = await Promise.all([
       getContracts(),
       getSettlementContractIds(),
       isGateConfigured(auth.supabase),
+      // 계약 없이 도는 시딩건 — 정상 운영에서는 0건이라 화면에 아무것도 안 나온다
+      getUnlinkedSeedings(),
     ]);
 
     // 계약 표에도 리스트의 지표(팔로워·ER·등급)를 함께 보여준다.
@@ -60,6 +66,7 @@ export default async function ContractsPage({
         initialUnlocked={initialUnlocked}
         prefill={prefill}
         influencerStats={influencerStats}
+        unlinkedSeedings={unlinkedSeedings}
         initialOpenId={openId}
       />
     );

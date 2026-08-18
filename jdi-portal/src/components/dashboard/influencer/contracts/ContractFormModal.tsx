@@ -43,6 +43,14 @@ interface Props {
   contract: InfluencerContract | null; // null = 새 계약
   /** 리스트 탭 "TMA 계약 만들기"에서 넘어온 미리 채움 (새 계약일 때만) */
   prefill?: ContractPrefill | null;
+  /**
+   * 이 시즌의 다른 계약들 — 같은 사람 계약이 이미 있는지 알려주는 데만 쓴다.
+   * 리스트는 한 사람당 최신 계약 하나만 보여주므로, 모르고 하나 더 만들면
+   * 나머지 계약이 화면에서 사라진다. 계약 탭에서만 넘겨준다.
+   */
+  existingContracts?: InfluencerContract[];
+  /** 중복 안내에서 「기존 계약 열기」를 눌렀을 때 */
+  onOpenExisting?: (contractId: string) => void;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -123,7 +131,14 @@ function moneyOrNull(value: string, label: string): number | null {
   return Math.round(parsed);
 }
 
-export default function ContractFormModal({ contract, prefill = null, onClose, onSaved }: Props) {
+export default function ContractFormModal({
+  contract,
+  prefill = null,
+  existingContracts,
+  onOpenExisting,
+  onClose,
+  onSaved,
+}: Props) {
   const [name, setName] = useState(contract?.name ?? prefill?.name ?? "");
   const [instagramHandle, setInstagramHandle] = useState(
     contract?.instagram_handle ?? prefill?.handle ?? "",
@@ -173,6 +188,22 @@ export default function ContractFormModal({ contract, prefill = null, onClose, o
   const [busy, setBusy] = useState(false);
 
   const retentionEnd = useMemo(() => getRetentionEnd(postActualDate || null), [postActualDate]);
+
+  /**
+   * 같은 사람의 계약이 이미 있는가 — 리스트 연결(influencer_id)이 먼저고,
+   * 없으면 인스타 계정으로 본다. 지금 수정 중인 계약은 당연히 제외한다.
+   */
+  const duplicate = useMemo(() => {
+    if (!existingContracts || existingContracts.length === 0) return null;
+    const handle = instagramHandle.trim().replace(/^@/, "").toLowerCase();
+    return (
+      existingContracts.find((c) => {
+        if (c.id === contract?.id) return false;
+        if (influencerId && c.influencer_id === influencerId) return true;
+        return handle.length > 0 && c.instagram_handle.toLowerCase() === handle;
+      }) ?? null
+    );
+  }, [existingContracts, contract?.id, influencerId, instagramHandle]);
 
   const pickInfluencer = (inf: InfluencerListItem) => {
     setName(inf.display_name?.trim() || inf.username);
@@ -260,6 +291,26 @@ export default function ContractFormModal({ contract, prefill = null, onClose, o
       </h2>
 
       <div className="-mr-2 max-h-[70vh] space-y-5 overflow-y-auto pr-2">
+        {/* 같은 사람 계약이 이미 있을 때 — 모르고 하나 더 만들면 리스트에서
+            최신 것 하나만 보이고 나머지는 화면에서 사라진다. */}
+        {duplicate && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+            <span className="font-bold">
+              ⚠️ {duplicate.name} 님은 이미 TMA 계약이 있어요.
+            </span>
+            <span>새로 만들면 계약이 2건이 되고 리스트에는 최근 것만 보입니다.</span>
+            {onOpenExisting && (
+              <button
+                type="button"
+                onClick={() => onOpenExisting(duplicate.id)}
+                className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 font-semibold text-amber-700 hover:bg-amber-100"
+              >
+                기존 계약 열기
+              </button>
+            )}
+          </div>
+        )}
+
         {/* ① 기본 정보 */}
         <section>
           <SectionTitle>① 기본 정보</SectionTitle>

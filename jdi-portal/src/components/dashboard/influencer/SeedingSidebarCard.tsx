@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { CampaignBasic, InfluencerCampaignWithInfluencer } from "@/lib/influencer/types";
+import type { ContractListSummary } from "@/lib/influencer/contracts/types";
 import type { FilterState } from "./InfluencerFilters";
 import { kstTodayStr } from "@/lib/influencer/calendar";
 import SeedingFunnel from "./SeedingFunnel";
@@ -9,8 +10,10 @@ import StaleDmList from "./StaleDmList";
 
 interface Props {
   activeCampaigns: InfluencerCampaignWithInfluencer[];
-  /** 완료까지 포함한 전체 캠페인 — 깔때기의 '완료' 칸을 세려면 필요하다 */
+  /** 완료까지 포함한 전체 캠페인 — 깔때기의 '정산 완료' 칸을 세려면 필요하다 */
   allCampaigns: CampaignBasic[];
+  /** influencer_id → 계약 요약 — 깔때기를 계약 10단계로 세기 위해 필요하다 */
+  contractByInfluencer: Map<string, ContractListSummary>;
   /** 전체 활성 인플루언서 수(화면에 불러온 25명이 아니라) */
   totalInfluencerCount: number;
   filters: FilterState;
@@ -34,6 +37,7 @@ function tabClasses(active: boolean): string {
 export default function SeedingSidebarCard({
   activeCampaigns,
   allCampaigns,
+  contractByInfluencer,
   totalInfluencerCount,
   filters,
   onFiltersChange,
@@ -88,6 +92,7 @@ export default function SeedingSidebarCard({
       {tab === "funnel" ? (
         <SeedingFunnel
           allCampaigns={allCampaigns}
+          contractByInfluencer={contractByInfluencer}
           totalInfluencerCount={totalInfluencerCount}
           filters={filters}
           onFiltersChange={onFiltersChange}
