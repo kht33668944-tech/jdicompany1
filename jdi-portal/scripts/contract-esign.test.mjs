@@ -179,6 +179,36 @@ test("pdfmake/pdf.ts 는 클라이언트 컴포넌트로 새지 않는다", () =
   assert.deepEqual(offenders.map((f) => path.relative(root, f)), []);
 });
 
+// ------------------------------------------------------------
+// 8) 서명 화면 — 계약서 그 자리에서 입력
+// ------------------------------------------------------------
+test("TMA 서명 화면: 입력을 아래 폼이 아니라 계약서 표 안에서 받는다", () => {
+  const client = read("src/components/sign/SignPageClient.tsx");
+  assert.match(client, /TmaSignerBlock/, "「서명 및 계약 정보」 표가 연결되어 있지 않습니다");
+  assert.match(client, /SignFieldPrompt/, "칸 입력창(SignFieldPrompt)이 연결되어 있지 않습니다");
+  const block = read("src/components/sign/TmaSignerBlock.tsx");
+  assert.match(block, /data-field-key=/, "칸을 찾을 표식(data-field-key)이 없습니다");
+});
+
+test("TMA 서명 칸 이름이 서버가 읽는 이름과 정확히 같다", () => {
+  // 이름이 어긋나면 값이 조용히 사라진다(에러도 안 난다).
+  const defs = read("src/components/sign/tmaSignerFields.ts");
+  const route = read("src/app/api/sign/[token]/route.ts");
+  const keys = [...defs.matchAll(/\{ key: "([A-Za-z]+)"/g)].map((m) => m[1]);
+  assert.equal(keys.length, 8, `칸 정의가 8개가 아닙니다(${keys.length}개) — 사업자등록번호는 상수`);
+  for (const k of [...keys, "businessRegNo"]) {
+    assert.match(route, new RegExp(`"${k}"`), `서명 API 가 "${k}" 를 읽지 않습니다`);
+  }
+});
+
+test("서명 화면 개편이 서버 검증을 대체하지 않는다", () => {
+  // 화면에서 필수 칸을 막더라도 최종 판단은 서버여야 한다.
+  assert.match(signService, /function validateSubmission/, "서버 검증 함수가 사라졌습니다");
+  assert.match(signService, /need\(/, "필수 입력 검증이 사라졌습니다");
+  assert.match(signService, /PHONE_RE/);
+  assert.match(signService, /ACCOUNT_RE/);
+});
+
 test("공개 서명 페이지: 검색엔진 제외 + 서명 API 가 IP/기기 증거를 남긴다", () => {
   const page = read("src/app/sign/[token]/page.tsx");
   assert.match(page, /robots.*index: false/s);
