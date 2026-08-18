@@ -129,7 +129,9 @@ export default function TemplatesEditorClient() {
   };
 
   const switchTab = (key: TemplateKey) => {
-    if (key === tab) return;
+    // 저장하는 동안에는 아예 넘어가지 않는다 — 저장이 끝나기 직전에 눌러
+    // "저장 안 된 변경이 있다"는 확인 창이 뜨는 일이 없게(실제로 겪음).
+    if (key === tab || busy) return;
     if (dirty && !window.confirm("저장하지 않은 변경이 있어요. 그대로 이동할까요?")) return;
     setTab(key);
   };
@@ -157,7 +159,8 @@ export default function TemplatesEditorClient() {
               key={t.key}
               type="button"
               onClick={() => switchTab(t.key)}
-              className={`rounded-lg px-3.5 py-1.5 transition-colors ${
+              disabled={busy}
+              className={`rounded-lg px-3.5 py-1.5 transition-colors disabled:opacity-50 ${
                 tab === t.key
                   ? "bg-white text-slate-800 shadow-sm"
                   : "text-slate-400 hover:text-slate-600"
