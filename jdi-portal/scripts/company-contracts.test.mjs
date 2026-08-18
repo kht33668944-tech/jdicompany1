@@ -186,7 +186,43 @@ test("서명 화면 개편이 서버 검증을 대체하지 않는다", () => {
 });
 
 // ------------------------------------------------------------
-// 7) 문서형 편집기(TipTap) 격리 — 초기 JS 예산 보호
+// 7) 발송 전 PDF 미리보기 — 서명 안 된 PDF 가 진짜 계약서로 오해되지 않게
+// ------------------------------------------------------------
+test("PDF 미리보기 라우트: 로그인 직원 전용 + service role 금지", () => {
+  const route = read("src/app/api/contracts/[docId]/preview-pdf/route.ts");
+  assert.match(route, /getAuthUser\(\)/, "미리보기 라우트에 로그인 확인이 없습니다");
+  assert.match(route, /status:\s*401/, "로그인하지 않은 요청을 401 로 막지 않습니다");
+  assert.doesNotMatch(
+    route,
+    /createAdminClient|SERVICE_ROLE/,
+    "미리보기는 RLS 클라이언트로만 읽어야 합니다(service role 금지)",
+  );
+});
+
+test("PDF 미리보기 라우트: 초안만 허용 + 미리보기 표시를 반드시 켠다", () => {
+  const route = read("src/app/api/contracts/[docId]/preview-pdf/route.ts");
+  assert.match(route, /status\s*!==\s*"draft"/, "발송본·서명본까지 미리보기가 열립니다");
+  assert.match(route, /preview:\s*true/, "워터마크 없는 PDF 가 나갑니다");
+  assert.match(route, /signatureDataUrl:\s*null/, "미리보기에 서명 이미지가 들어갑니다");
+});
+
+test("진짜 서명 완료본에는 미리보기 표시가 붙지 않는다", () => {
+  assert.doesNotMatch(
+    signService,
+    /preview:\s*true/,
+    "서명 완료본 PDF 에 미리보기 워터마크가 찍힙니다",
+  );
+  const pdf = read("src/lib/contracts/pdf.ts");
+  // 전자서명 확인서는 체결 증명이라 미리보기에는 붙이면 안 된다
+  assert.match(
+    pdf,
+    /input\.preview\s*\?\s*\[\]\s*:\s*auditSection\(input\)/,
+    "미리보기에도 전자서명 확인서가 붙습니다",
+  );
+});
+
+// ------------------------------------------------------------
+// 8) 문서형 편집기(TipTap) 격리 — 초기 JS 예산 보호
 //    /dashboard 예산 여유가 1KB 미만이라 에디터가 공용 청크로 새면 즉시 실패한다.
 // ------------------------------------------------------------
 test("계약관리 lib 은 TipTap 을 import 하지 않는다(순수 모듈 유지)", () => {
