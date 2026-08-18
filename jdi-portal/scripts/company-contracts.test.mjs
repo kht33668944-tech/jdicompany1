@@ -186,6 +186,54 @@ test("서명 화면 개편이 서버 검증을 대체하지 않는다", () => {
 });
 
 // ------------------------------------------------------------
+// 6) 고르는 칸(체크박스·드롭다운) — 값이 조용히 사라지거나 되돌아가지 않게
+// ------------------------------------------------------------
+test("새 칸 종류가 저장 시 text 로 강등되지 않는다", () => {
+  // actions.ts 의 FIELD_TYPES 화이트리스트에 없으면 저장할 때마다 조용히 "text" 가 된다.
+  const list = actions.slice(actions.indexOf("const FIELD_TYPES"), actions.indexOf("FIELD_KEY_RE"));
+  for (const t of ["checkbox", "select"]) {
+    assert.match(list, new RegExp(`"${t}"`), `FIELD_TYPES 에 ${t} 가 없어 저장 시 text 로 바뀝니다`);
+  }
+});
+
+test("드롭다운 보기 목록(options)이 저장에서 사라지지 않는다", () => {
+  // validateContentV2 는 필드를 새로 조립한다 — 여기 빠지면 저장할 때 소리 없이 없어진다.
+  const body = actions.slice(actions.indexOf("const validFields"), actions.indexOf("const validated"));
+  assert.match(body, /options:\s*validateOptions\(/, "저장 시 options 가 버려집니다");
+  assert.match(actions, /function validateOptions/, "보기 목록 검증이 없습니다");
+});
+
+test("고르는 칸도 서버가 값을 다시 검증한다", () => {
+  // 화면에서 목록으로만 고르게 해도, 사람이 요청을 직접 만들면 아무 값이나 보낼 수 있다.
+  assert.match(
+    signService,
+    /fieldDef\.options\s*\?\?\s*\[\]\)\.includes\(/,
+    "드롭다운 값이 목록 안에 있는지 서버가 확인하지 않습니다",
+  );
+  assert.match(signService, /CHECKBOX_ON/, "체크박스 값 검증이 없습니다");
+});
+
+test("PDF 체크 표시는 Pretendard 에 있는 글자만 쓴다", () => {
+  // ☑(U+2611)·☐(U+2610)는 Pretendard 에 없어 PDF 에 빈칸으로 찍힌다(fontkit 으로 확인).
+  // 화면(HTML)은 시스템 글꼴을 쓰므로 상관없다 — PDF 로 가는 코드만 본다.
+  // 주석에는 이 글자들이 설명으로 등장하므로 주석 줄을 걷어내고 검사한다.
+  const stripComments = (src) =>
+    src
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
+      .join("\n");
+
+  assert.match(read("src/lib/contracts/constants.ts"), /PDF_CHECK_ON\s*=\s*"\[✓\]"/);
+  for (const rel of ["src/lib/contracts/pdf.ts", "src/lib/contracts/constants.ts"]) {
+    assert.doesNotMatch(
+      stripComments(read(rel)),
+      /[☐☑]/,
+      `${rel} 이 PDF 에 폰트에 없는 체크 글자를 씁니다`,
+    );
+  }
+});
+
+// ------------------------------------------------------------
 // 7) 발송 전 PDF 미리보기 — 서명 안 된 PDF 가 진짜 계약서로 오해되지 않게
 // ------------------------------------------------------------
 test("PDF 미리보기 라우트: 로그인 직원 전용 + service role 금지", () => {

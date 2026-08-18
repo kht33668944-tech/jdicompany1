@@ -6,6 +6,7 @@
 
 import { useMemo } from "react";
 import { toast } from "sonner";
+import { CHECKBOX_ON } from "@/lib/contracts/constants";
 import { collectFieldKeys } from "@/lib/contracts/tokens";
 import { FIELD_TYPE_LABEL as TYPE_LABEL } from "@/lib/contracts/fieldPresets";
 import type { ContentV2, FieldDef } from "@/lib/contracts/types";
@@ -70,7 +71,31 @@ export default function FieldSidePanel({ content, onChange, docMode, onJumpToFie
           </button>
         </div>
 
-        {def.kind === "staff" ? (
+        {def.kind === "staff" && def.type === "checkbox" ? (
+          // 우리가 채우는 체크 칸 — 글자를 치는 게 아니라 켜고 끈다
+          <label className="mt-1.5 flex cursor-pointer items-center gap-1.5 text-[12px] font-semibold text-slate-600">
+            <input
+              type="checkbox"
+              checked={Boolean(def.value?.trim())}
+              onChange={(e) => setField(def.key, { value: e.target.checked ? CHECKBOX_ON : "" })}
+              className="h-3.5 w-3.5 accent-blue-600"
+            />
+            체크함
+          </label>
+        ) : def.kind === "staff" && def.type === "select" ? (
+          <select
+            value={def.value ?? ""}
+            onChange={(e) => setField(def.key, { value: e.target.value })}
+            className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12.5px] text-slate-800 focus:border-blue-400 focus:outline-none"
+          >
+            <option value="">고르지 않음</option>
+            {(def.options ?? []).map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        ) : def.kind === "staff" ? (
           <input
             value={def.value ?? ""}
             onChange={(e) => setField(def.key, { value: e.target.value })}

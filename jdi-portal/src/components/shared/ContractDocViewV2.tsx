@@ -52,6 +52,8 @@ function FieldRun({
 
   const staffValue = fieldDef.kind === "staff" ? fieldDef.value?.trim() : undefined;
 
+  const isCheckbox = fieldDef.type === "checkbox";
+
   if (mode === "edit") {
     return (
       <span
@@ -61,17 +63,46 @@ function FieldRun({
             : "border-amber-300 bg-amber-50 text-amber-700"
         }`}
       >
+        {isCheckbox ? "☐ " : ""}
         {fieldDef.kind === "staff" ? (staffValue || fieldDef.label) : fieldDef.label}
       </span>
     );
   }
 
   if (fieldDef.kind === "staff") {
-    return <strong className="font-bold">{staffValue || "＿＿＿"}</strong>;
+    return (
+      <strong className="font-bold">
+        {isCheckbox ? (staffValue ? "☑" : "☐") : staffValue || "＿＿＿"}
+      </strong>
+    );
   }
 
   const value = partyValue?.trim();
-  if (mode === "resolved" && value) return <strong className="font-bold">{value}</strong>;
+  if (mode === "resolved" && (value || isCheckbox)) {
+    return <strong className="font-bold">{isCheckbox ? (value ? "☑" : "☐") : value}</strong>;
+  }
+
+  // 체크박스는 입력창을 열지 않는다 — 누르면 그 자리에서 바로 켜고 꺼진다
+  if (isCheckbox && mode === "sign" && onFieldClick) {
+    return (
+      <button
+        type="button"
+        data-field-key={fieldDef.key}
+        onClick={() => onFieldClick(fieldDef.key)}
+        aria-pressed={Boolean(value)}
+        aria-label={`${fieldDef.label} ${value ? "체크 해제" : "체크"}`}
+        className={`${CHIP_BASE} cursor-pointer border-solid transition-colors ${
+          value
+            ? "border-blue-500 bg-blue-50 text-blue-700"
+            : `border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 ${
+                fieldDef.required ? "border-2" : ""
+              }`
+        }`}
+      >
+        {value ? "☑" : "☐"} {fieldDef.label}
+      </button>
+    );
+  }
 
   const label = value || `${fieldDef.label} 입력`;
 

@@ -11,6 +11,7 @@
 // ⚠️ 화면에서 무엇을 막든 최종 검증은 서버(lib/contracts/signService.ts)다. 그쪽을 대체하지 않는다.
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { CHECKBOX_ON } from "@/lib/contracts/constants";
 import { fieldKeysInDocOrder, findFieldChip, scrollToFieldChip } from "@/lib/contracts/chipFlash";
 import ContractDocViewV2 from "@/components/shared/ContractDocViewV2";
 import SignatureCanvas, { type SignatureCanvasHandle } from "./SignatureCanvas";
@@ -87,12 +88,24 @@ export default function CompanySignPageClient({ token, data }: Props) {
   const requiredFields = partyFields.filter((f) => f.required);
   const requiredLeft = requiredFields.filter((f) => !values[f.key]?.trim());
 
-  /** 문서에서 그 칸을 찾아 화면 가운데로 옮기고 입력창을 연다 */
-  const openField = useCallback((key: string) => {
-    setActiveKey(key);
-    const el = findFieldChip(document, key);
-    if (el) scrollToFieldChip(el);
-  }, []);
+  /**
+   * 문서에서 그 칸을 찾아 화면 가운데로 옮기고 입력창을 연다.
+   * 체크박스는 입력할 게 없으므로 입력창을 열지 않고 그 자리에서 바로 켜고 끈다.
+   */
+  const openField = useCallback(
+    (key: string) => {
+      const def = partyFields.find((f) => f.key === key);
+      if (def?.type === "checkbox") {
+        setValues((prev) => ({ ...prev, [key]: prev[key] ? "" : CHECKBOX_ON }));
+        setActiveKey(null);
+        return;
+      }
+      setActiveKey(key);
+      const el = findFieldChip(document, key);
+      if (el) scrollToFieldChip(el);
+    },
+    [partyFields],
+  );
 
   /**
    * 아직 안 채운 다음 필수 칸. 없으면 null.

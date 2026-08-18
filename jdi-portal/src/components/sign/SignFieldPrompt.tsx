@@ -123,7 +123,29 @@ export default function SignFieldPrompt({ fieldDef, value, onChange, onClose, on
         </span>
       </div>
 
-      {fieldDef.type === "multiline" ? (
+      {fieldDef.type === "select" ? (
+        // 고르는 칸 — 자유 입력을 받지 않는다(서버도 목록 밖 값을 거절한다)
+        <div className="flex max-h-56 flex-col gap-1 overflow-y-auto">
+          {(fieldDef.options ?? []).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => {
+                onChange(option);
+                if (onNext) onNext();
+                else onClose();
+              }}
+              className={`rounded-lg border px-3 py-2 text-left text-[14px] font-semibold transition-colors ${
+                value === option
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      ) : fieldDef.type === "multiline" ? (
         <textarea
           ref={inputRef as React.RefObject<HTMLTextAreaElement>}
           value={value}

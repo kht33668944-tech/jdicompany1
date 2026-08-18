@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptSecret } from "@/lib/vault/crypto";
 import {
+  CHECKBOX_ON,
   COMPANY_CONTRACT_DOCS_BUCKET,
   COPY_DOWNLOAD_DAYS,
 } from "./constants";
@@ -130,8 +131,21 @@ export interface CompanySignSubmission {
 function validateFieldValue(fieldDef: FieldDef, value: string): void {
   const v = value.trim();
   if (!v) {
-    if (fieldDef.required) throw new Error(`「${fieldDef.label}」을(를) 입력해주세요.`);
+    if (fieldDef.required) {
+      throw new Error(
+        fieldDef.type === "checkbox"
+          ? `「${fieldDef.label}」에 체크해주세요.`
+          : `「${fieldDef.label}」을(를) 입력해주세요.`,
+      );
+    }
     return;
+  }
+  // 고르는 칸은 화면이 준 값을 그대로 믿지 않는다 — 정해진 값만 통과시킨다
+  if (fieldDef.type === "checkbox" && v !== CHECKBOX_ON) {
+    throw new Error(`「${fieldDef.label}」 체크 값이 올바르지 않습니다.`);
+  }
+  if (fieldDef.type === "select" && !(fieldDef.options ?? []).includes(v)) {
+    throw new Error(`「${fieldDef.label}」은(는) 목록에서 골라주세요.`);
   }
   const maxLen = fieldDef.type === "multiline" ? 2000 : 500;
   if (v.length > maxLen) throw new Error(`「${fieldDef.label}」이(가) 너무 깁니다.`);

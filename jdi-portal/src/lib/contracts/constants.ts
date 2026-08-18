@@ -8,6 +8,24 @@ export const COMPANY_CONTRACT_DOCS_BUCKET = "company-contract-docs";
 /** 조항 본문이 이 마커면 그 자리에 개별 조건표(표)가 렌더링된다 — TMA 와 동일 값 */
 export const TERMS_MARKER = "{{TERMS}}";
 
+/**
+ * 체크박스 칸의 "체크함" 값. 체크 안 하면 빈 문자열이다.
+ * 값 모델을 문자열로 유지하기 위한 약속 — 화면·서버·PDF 가 모두 이 상수를 본다.
+ */
+export const CHECKBOX_ON = "예";
+
+/**
+ * PDF 안에서 체크박스를 그리는 글자.
+ * ⚠️ ☑(U+2611)·☐(U+2610)는 **Pretendard 에 없다**(fontkit 으로 확인). 쓰면 빈칸으로 찍힌다.
+ *    ✓(U+2713)는 있어서 대괄호와 함께 쓴다.
+ */
+export const PDF_CHECK_ON = "[✓]";
+export const PDF_CHECK_OFF = "[  ]";
+
+/** 드롭다운 보기 제한 */
+export const MAX_SELECT_OPTIONS = 20;
+export const MAX_SELECT_OPTION_LEN = 50;
+
 export const SIGN_TOKEN_DAYS = 7;
 export const COPY_DOWNLOAD_DAYS = 30;
 

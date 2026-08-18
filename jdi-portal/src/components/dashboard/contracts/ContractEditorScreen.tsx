@@ -124,6 +124,7 @@ export default function ContractEditorScreen({ target }: { target: EditorTarget 
           label: input.label,
           type: input.type,
           required: true,
+          ...(input.options ? { options: input.options } : {}),
           ...(input.kind === "staff" ? { value: "" } : {}),
         };
         created = def;
