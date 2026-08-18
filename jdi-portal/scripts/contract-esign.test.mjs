@@ -167,13 +167,17 @@ test("pdfmake/pdf.ts 는 클라이언트 컴포넌트로 새지 않는다", () =
   const offenders = srcFiles.filter((f) => {
     const source = readFileSync(f, "utf8");
     const importsPdf =
-      /from ["'](pdfmake|@\/lib\/influencer\/contracts\/documents\/pdf|\.\/pdf)["']/.test(source);
+      /from ["'](pdfmake|@\/lib\/influencer\/contracts\/documents\/pdf|@\/lib\/contracts\/pdf|\.\/pdf)["']/.test(
+        source,
+      );
     if (!importsPdf) return false;
     // 서버 전용 허용: pdf.ts 자신 + signService.ts (TMA + 계약관리 범용, 각 도메인별)
     if (f.endsWith(path.join("documents", "pdf.ts"))) return false;
     if (f.endsWith(path.join("documents", "signService.ts"))) return false;
     if (f.endsWith(path.join("contracts", "pdf.ts"))) return false;
     if (f.endsWith(path.join("contracts", "signService.ts"))) return false;
+    // 발송 전 PDF 미리보기 라우트 — 서버(nodejs) 라우트라 클라이언트 번들에 들어가지 않는다
+    if (f.endsWith(path.join("preview-pdf", "route.ts"))) return false;
     return true;
   });
   assert.deepEqual(offenders.map((f) => path.relative(root, f)), []);
