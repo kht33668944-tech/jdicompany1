@@ -9,7 +9,9 @@
 // 화면 폭 판정은 반드시 마운트 후에 한다. 렌더 중에 window 를 읽으면
 // 서버 렌더 결과와 어긋나 하이드레이션이 깨진다(ContractSentScreen 과 같은 이유).
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { findFieldChip } from "@/lib/contracts/chipFlash";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import type { FieldDef } from "@/lib/contracts/types";
 
 /** 칸 종류별 입력 도우미 — 키보드 종류와 예시를 맞춘다 */
@@ -33,6 +35,9 @@ export function inputPropsFor(fieldDef: FieldDef): React.InputHTMLAttributes<HTM
 }
 
 const POPOVER_WIDTH = 272;
+const PROMPT_INPUT_CLS =
+  "w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-[15px] text-slate-800 " +
+  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
 
 interface Props {
   fieldDef: FieldDef;
@@ -41,23 +46,17 @@ interface Props {
   onClose: () => void;
   /** 「다음 칸」 — 남은 칸이 없으면 null(그때는 확인 버튼만) */
   onNext: (() => void) | null;
-  /** 팝오버를 붙일 기준 요소(문서 안의 칸) */
-  anchor: HTMLElement | null;
 }
 
-export default function SignFieldPrompt({
-  fieldDef,
-  value,
-  onChange,
-  onClose,
-  onNext,
-  anchor,
-}: Props) {
+export default function SignFieldPrompt({ fieldDef, value, onChange, onClose, onNext }: Props) {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
-  // null = 아직 판정 전(서버 렌더와 첫 페인트) — 그동안은 시트 모양으로 둔다
-  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  // 다른 칸을 눌렀으면 닫지 않는다 — 그쪽이 스스로 새 입력창을 연다
+  const boxRef = useClickOutside<HTMLDivElement>(onClose, {
+    capture: true,
+    ignoreSelector: "[data-field-key]",
+  });
+  // 서버 렌더에는 화면 폭이 없다. 판정 전에는 시트 모양으로 두고 마운트 후 정한다.
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 640px)");
@@ -67,16 +66,19 @@ export default function SignFieldPrompt({
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // 팝오버 위치 — 칸 아래에 붙이되 화면 밖으로 나가지 않게 민다
+  // 팝오버 위치 — 칸 아래에 붙이되 화면 밖으로 나가지 않게 민다.
+  // 위치는 상태가 아니라 style 에 직접 쓴다(스크롤 한 프레임마다 다시 그리지 않게).
+  const place = useCallback(() => {
+    const box = boxRef.current;
+    const anchor = findFieldChip(document, fieldDef.key);
+    if (!box || !anchor) return;
+    const r = anchor.getBoundingClientRect();
+    box.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - POPOVER_WIDTH - 8))}px`;
+    box.style.top = `${r.bottom + 8}px`;
+  }, [boxRef, fieldDef.key]);
+
   useLayoutEffect(() => {
-    if (!isDesktop || !anchor) return;
-    const place = () => {
-      const r = anchor.getBoundingClientRect();
-      setPos({
-        left: Math.max(8, Math.min(r.left, window.innerWidth - POPOVER_WIDTH - 8)),
-        top: r.bottom + 8,
-      });
-    };
+    if (!isDesktop) return;
     place();
     window.addEventListener("scroll", place, true);
     window.addEventListener("resize", place);
@@ -84,7 +86,7 @@ export default function SignFieldPrompt({
       window.removeEventListener("scroll", place, true);
       window.removeEventListener("resize", place);
     };
-  }, [isDesktop, anchor]);
+  }, [isDesktop, place]);
 
   // 열리면 바로 입력할 수 있게
   useEffect(() => {
@@ -92,24 +94,13 @@ export default function SignFieldPrompt({
     return () => window.clearTimeout(t);
   }, [fieldDef.key]);
 
-  // Esc 로 닫기 / 바깥을 누르면 닫기
+  // Esc 로 닫기 (바깥 클릭은 위 useClickOutside 가 맡는다)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    // 캡처 단계에서 듣기만 한다 — 덮개로 막으면 같은 클릭으로 다른 칸을 못 누른다
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (boxRef.current?.contains(target)) return;
-      if (target.closest?.("[data-field-key]")) return; // 다른 칸을 눌렀으면 그쪽이 처리
-      onClose();
-    };
     document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onDown, true);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onDown, true);
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   const submitKey = (e: React.KeyboardEvent) => {
@@ -137,7 +128,7 @@ export default function SignFieldPrompt({
           ref={inputRef as React.RefObject<HTMLTextAreaElement>}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="min-h-[76px] w-full resize-y rounded-lg border border-blue-300 bg-white px-3 py-2 text-[15px] text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          className={`${PROMPT_INPUT_CLS} min-h-[76px] resize-y`}
         />
       ) : (
         <input
@@ -145,7 +136,7 @@ export default function SignFieldPrompt({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={submitKey}
-          className="w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-[15px] text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          className={PROMPT_INPUT_CLS}
           {...inputPropsFor(fieldDef)}
         />
       )}
@@ -170,13 +161,12 @@ export default function SignFieldPrompt({
   );
 
   if (isDesktop) {
-    if (!pos) return null;
     return (
       <div
         ref={boxRef}
         role="dialog"
         aria-label={`${fieldDef.label} 입력`}
-        style={{ left: pos.left, top: pos.top, width: POPOVER_WIDTH }}
+        style={{ width: POPOVER_WIDTH }}
         className="fixed z-50 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
       >
         {inner}

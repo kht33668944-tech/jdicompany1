@@ -34,7 +34,14 @@ import {
   renumberHeading,
   type RichDoc,
 } from "@/lib/contracts/richdoc";
-import { PARTY_PRESETS, STAFF_PRESETS, type FieldPreset } from "@/lib/contracts/fieldPresets";
+import {
+  FIELD_TYPE_LABEL,
+  PARTY_PRESETS,
+  STAFF_PRESETS,
+  type FieldPreset,
+} from "@/lib/contracts/fieldPresets";
+import { findFieldChip, scrollToFieldChip } from "@/lib/contracts/chipFlash";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import type {
   ContentV2,
   CreateFieldInput,
@@ -235,29 +242,20 @@ interface Props {
   highlightFieldKey: string | null;
   onHighlightHandled: () => void;
   /**
-   * 채움 칸을 쓰지 않는 곳(인플루언서 TMA 양식)에서는 false — 「＋ 칸 넣기」를 감춘다.
-   * TMA 계약서는 값을 조건표로 관리하고 본문에 칸을 심지 않는다.
+   * 무엇을 편집하는가 — 하나의 사실에서 화면 차이가 모두 따라 나온다.
+   *
+   *  · doc      (기본): 계약서 1부. 채움 칸을 꽂고 조건표 값을 채운다.
+   *  · tmaTemplate: 인플루언서(TMA) 양식. 값은 계약 건마다 채우므로 칸을 심지 않고
+   *    조건표는 자리만 잡는다. 굵게도 끈다 — TMA 렌더러는 `**굵게**` 표기를 해석하지
+   *    않아 계약서에 별표가 그대로 찍힌다(계약관리 쪽만 해석한다).
    */
-  allowFields?: boolean;
-  /** 조건표를 여기서 채우지 않고 자리만 잡는 경우(TMA 양식) */
-  termsPlaceholder?: boolean;
+  variant?: "doc" | "tmaTemplate";
 }
 
 const TOOL_BTN =
   "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12.5px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40";
 const TOOL_BTN_ON =
   "rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-[12.5px] font-bold text-blue-700";
-
-const FIELD_TYPE_LABEL: Record<FieldType, string> = {
-  text: "짧은 글",
-  multiline: "긴 글",
-  number: "숫자",
-  date: "날짜",
-  phone: "연락처",
-  email: "이메일",
-  account: "계좌번호",
-  bank: "은행",
-};
 
 export default function ContractRichEditor({
   initialContent,
@@ -270,44 +268,31 @@ export default function ContractRichEditor({
   onDeleteField,
   highlightFieldKey,
   onHighlightHandled,
-  allowFields = true,
-  termsPlaceholder = false,
+  variant = "doc",
 }: Props) {
+  const isTemplate = variant === "tmaTemplate";
   const [fieldMenuOpen, setFieldMenuOpen] = useState(false);
   const [popover, setPopover] = useState<{ key: string; left: number; top: number } | null>(null);
   const onDocChangeRef = useRef(onDocChange);
   onDocChangeRef.current = onDocChange;
-  const fieldMenuRef = useRef<HTMLDivElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  // 칸 넣기 메뉴 바깥을 누르면 닫는다.
-  //
-  // 화면을 덮는 투명 레이어로 닫으면 안 된다 — 레이어가 클릭을 삼켜서
+  // 메뉴·팝오버는 화면을 덮는 투명 레이어로 닫으면 안 된다 — 레이어가 클릭을 삼켜서
   // "메뉴를 연 채 문서의 다른 자리를 눌러 커서를 옮기는" 동작이 먹히지 않는다.
   // 그러면 커서가 직전 자리에 남아 다음 칸이 엉뚱한 곳에 들어간다(실제 발생).
-  useEffect(() => {
-    if (!fieldMenuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (!fieldMenuRef.current?.contains(e.target as HTMLElement)) setFieldMenuOpen(false);
-    };
-    // 캡처 단계에서 듣되 이벤트를 막지 않아, 같은 클릭이 문서까지 그대로 전달된다
-    document.addEventListener("mousedown", close, true);
-    return () => document.removeEventListener("mousedown", close, true);
-  }, [fieldMenuOpen]);
-
-  // 칩 설정 팝오버도 같은 방식으로 닫는다(문서 클릭이 그대로 전달되어야 커서가 옮겨진다)
-  useEffect(() => {
-    if (!popover) return;
-    const close = (e: MouseEvent) => {
-      if (!popoverRef.current?.contains(e.target as HTMLElement)) setPopover(null);
-    };
-    document.addEventListener("mousedown", close, true);
-    return () => document.removeEventListener("mousedown", close, true);
-  }, [popover]);
+  // 공용 훅은 이벤트를 막지 않으므로 같은 클릭이 문서까지 그대로 전달된다.
+  const closeFieldMenu = useCallback(() => setFieldMenuOpen(false), []);
+  const closePopover = useCallback(() => setPopover(null), []);
+  const fieldMenuRef = useClickOutside<HTMLDivElement>(closeFieldMenu, {
+    enabled: fieldMenuOpen,
+    capture: true,
+  });
+  const popoverRef = useClickOutside<HTMLDivElement>(closePopover, {
+    enabled: Boolean(popover),
+    capture: true,
+  });
 
   const shared = useMemo<EditorShared>(
-    () => ({ fields, terms, onTermsChange, termsPlaceholder }),
-    [fields, terms, onTermsChange, termsPlaceholder],
+    () => ({ fields, terms, onTermsChange, termsPlaceholder: isTemplate }),
+    [fields, terms, onTermsChange, isTemplate],
   );
 
   const emit = useCallback((e: Editor) => {
@@ -317,6 +302,10 @@ export default function ContractRichEditor({
     // initialContent 는 변환 시 base 로만 쓰이고 결과에서 세 값만 취한다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const [initialDoc] = useState(
+    () => contentToDoc(initialContent) as unknown as Record<string, unknown>,
+  );
 
   const editor = useEditor({
     immediatelyRender: false, // 지연 로드 컴포넌트라 SSR 렌더를 하지 않는다
@@ -336,6 +325,8 @@ export default function ContractRichEditor({
         underline: false,
         link: false,
         hardBreak: false,
+        // TMA 양식은 굵게를 저장할 방법이 없다(그쪽 렌더러가 `**` 를 그대로 인쇄한다)
+        ...(isTemplate ? { bold: false as const } : {}),
       }),
       Placeholder.configure({
         placeholder: ({ node }) =>
@@ -347,7 +338,8 @@ export default function ContractRichEditor({
       FieldChip,
       TermsBlock,
     ],
-    content: contentToDoc(initialContent) as unknown as Record<string, unknown>,
+    // 처음 한 번만 쓰인다 — 매 렌더(=타이핑마다) 문서 전체를 다시 변환하지 않도록 지연 계산
+    content: initialDoc,
     editorProps: {
       attributes: {
         class: "contract-doc min-h-[520px] px-[52px] py-[56px] focus:outline-none",
@@ -434,14 +426,8 @@ export default function ContractRichEditor({
   // 왼쪽 목록에서 칸을 눌렀을 때 — 문서에서 찾아 스크롤하고 잠깐 깜빡인다
   useEffect(() => {
     if (!highlightFieldKey || !editor) return;
-    const el = editor.view.dom.querySelector<HTMLElement>(
-      `[data-field-key="${highlightFieldKey}"]`,
-    );
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("chip-flash");
-      window.setTimeout(() => el.classList.remove("chip-flash"), 2400);
-    }
+    const el = findFieldChip(editor.view.dom, highlightFieldKey);
+    if (el) scrollToFieldChip(el);
     onHighlightHandled();
   }, [highlightFieldKey, editor, onHighlightHandled]);
 
@@ -526,19 +512,22 @@ export default function ContractRichEditor({
           >
             본문
           </button>
-          <button
-            type="button"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={editor.isActive("bold") ? TOOL_BTN_ON : TOOL_BTN}
-            title="굵게"
-          >
-            <b>가</b>
-          </button>
+          {!isTemplate && (
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className={editor.isActive("bold") ? TOOL_BTN_ON : TOOL_BTN}
+              title="굵게"
+            >
+              <b>가</b>
+            </button>
+          )}
 
-          {allowFields && <span className="mx-1 h-4 w-px bg-slate-200" />}
+          {!isTemplate && <span className="mx-1 h-4 w-px bg-slate-200" />}
 
-          {/* 칸 넣기 */}
-          <div className={`relative ${allowFields ? "" : "hidden"}`} ref={fieldMenuRef}>
+          {/* 칸 넣기 — 양식 편집에서는 아예 만들지 않는다(열 수 없는 메뉴를 DOM 에 남기지 않게) */}
+          {!isTemplate && (
+          <div className="relative" ref={fieldMenuRef}>
             <button
               type="button"
               onClick={() => setFieldMenuOpen((v) => !v)}
@@ -624,6 +613,7 @@ export default function ContractRichEditor({
               </>
             )}
           </div>
+          )}
 
           <button
             type="button"
