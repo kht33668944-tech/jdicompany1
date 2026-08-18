@@ -23,6 +23,9 @@ import PostLightbox from "./PostLightbox";
 import Image from "next/image";
 import { resolveMediaUrl, shouldSkipOptimize } from "@/lib/influencer/proxy";
 import { CAMPAIGN_STATUS_OPTIONS } from "@/lib/influencer/labels";
+import ContractStatusDropdown from "./contracts/ContractStatusDropdown";
+import { updateContractStatus } from "@/lib/influencer/contracts/actions";
+import type { ContractListSummary, ContractStatus } from "@/lib/influencer/contracts/types";
 import Select, { type SelectOption } from "@/components/shared/Select";
 import {
   getTier,
@@ -60,6 +63,8 @@ type PanelPhase = "closed" | "opening" | "open" | "closing";
 
 type Props = {
   influencerId: string | null;
+  /** 이 인플루언서의 TMA 계약 요약 — 있으면 캠페인 카드도 계약 10단계로 보여준다 */
+  contract?: ContractListSummary;
   onClose: () => void;
 };
 
@@ -327,7 +332,7 @@ function EditCampaignForm({ campaign, onSaved, onCancel }: EditCampaignFormProps
 }
 
 // ── 메인 패널 ──────────────────────────────────────────────────
-export default function InfluencerDetailPanel({ influencerId, onClose }: Props) {
+export default function InfluencerDetailPanel({ influencerId, contract, onClose }: Props) {
   const [influencer, setInfluencer] = useState<InfluencerWithPosts | null>(null);
   const [campaigns, setCampaigns] = useState<InfluencerCampaign[]>([]);
   const [loading, setLoading] = useState(false);
@@ -344,6 +349,16 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [activePost, setActivePost] = useState<InfluencerPost | null>(null);
+
+  // 계약 상태는 부모가 내려준 값으로 시작하고, 여기서 바꾸면 화면에 바로 반영한다
+  const [contractStatus, setContractStatus] = useState<ContractStatus | null>(
+    contract?.contract_status ?? null,
+  );
+  const [prevContractId, setPrevContractId] = useState<string | null>(contract?.contract_id ?? null);
+  if ((contract?.contract_id ?? null) !== prevContractId) {
+    setPrevContractId(contract?.contract_id ?? null);
+    setContractStatus(contract?.contract_status ?? null);
+  }
 
   const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visible = phase !== "closed";
@@ -499,6 +514,24 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
       toast.error("상태 변경 실패");
     }
   }, []);
+
+  // ── 계약 상태 변경 (계약이 연결된 캠페인은 표와 똑같이 계약 10단계를 쓴다) ──
+  const handleContractStatusChange = useCallback(async (next: ContractStatus) => {
+    if (!contract) return;
+    const before = contractStatus;
+    setContractStatus(next); // 낙관적 반영 — 실패하면 되돌린다
+    try {
+      const { expenseAmount } = await updateContractStatus(contract.contract_id, next);
+      toast.success(
+        expenseAmount > 0
+          ? `정산 완료 — 지출관리에 ${expenseAmount.toLocaleString()}원 기록했습니다.`
+          : "계약 상태가 변경되었습니다.",
+      );
+    } catch (error) {
+      setContractStatus(before);
+      toast.error(getErrorMessage(error, "계약 상태 변경 실패"));
+    }
+  }, [contract, contractStatus]);
 
   const handleDeleteCampaign = useCallback(async (campaignId: string) => {
     try {
@@ -924,14 +957,25 @@ export default function InfluencerDetailPanel({ influencerId, onClose }: Props) 
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Select
-                            options={CAMPAIGN_STATUS_SELECT_OPTIONS}
-                            value={c.status}
-                            onChange={(v) => handleStatusChange(c.id, v as CampaignStatus)}
-                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white"
-                            ariaLabel="캠페인 상태"
-                          />
-                          <StatusBadge status={c.status} type="campaign" />
+                          {/* 계약이 연결된 캠페인은 표·계약 탭과 같은 10단계를 쓴다.
+                              6단계 선택기를 그대로 두면 '서명 완료'가 '응답 받음'으로 보인다. */}
+                          {contract && contractStatus && contract.campaign_id === c.id ? (
+                            <ContractStatusDropdown
+                              status={contractStatus}
+                              onChange={handleContractStatusChange}
+                            />
+                          ) : (
+                            <>
+                              <Select
+                                options={CAMPAIGN_STATUS_SELECT_OPTIONS}
+                                value={c.status}
+                                onChange={(v) => handleStatusChange(c.id, v as CampaignStatus)}
+                                className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white"
+                                ariaLabel="캠페인 상태"
+                              />
+                              <StatusBadge status={c.status} type="campaign" />
+                            </>
+                          )}
                         </div>
                         <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
                           {c.product_name && <span>제품: {c.product_name}</span>}

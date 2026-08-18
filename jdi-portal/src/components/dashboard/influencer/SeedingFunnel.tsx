@@ -1,13 +1,18 @@
 "use client";
 
 import { useMemo } from "react";
-import type { InfluencerListItem, InfluencerCampaign, CampaignStatus } from "@/lib/influencer/types";
+import type { CampaignBasic, CampaignStatus } from "@/lib/influencer/types";
 import type { FilterState } from "./InfluencerFilters";
 import { CAMPAIGN_STATUS_LABEL } from "@/lib/influencer/labels";
 
 interface Props {
-  influencers: InfluencerListItem[];
-  activeCampaigns: InfluencerCampaign[];
+  /**
+   * 완료까지 포함한 전체 캠페인.
+   * 예전에는 '진행 중'만 받아서 세는 바람에 마지막 '완료' 칸이 구조적으로 늘 0이었다.
+   */
+  allCampaigns: CampaignBasic[];
+  /** 전체 활성 인플루언서 수 — '대기'는 화면에 불러온 25명이 아니라 전체 기준이어야 한다 */
+  totalInfluencerCount: number;
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;
 }
@@ -34,21 +39,23 @@ const STEPS: Step[] = [
   { key: "done", icon: "✅", label: CAMPAIGN_STATUS_LABEL.done, dot: "bg-emerald-500", activeBg: "bg-emerald-50", activeRing: "ring-emerald-200", unit: "건" },
 ];
 
-export default function SeedingFunnel({ influencers, activeCampaigns, filters, onFiltersChange }: Props) {
-  const campaignMap = useMemo(() => {
-    const map = new Map<string, InfluencerCampaign>();
-    for (const c of activeCampaigns) map.set(c.influencer_id, c);
-    return map;
-  }, [activeCampaigns]);
-
+export default function SeedingFunnel({
+  allCampaigns,
+  totalInfluencerCount,
+  filters,
+  onFiltersChange,
+}: Props) {
   const stepCounts = useMemo(() => {
-    const noCampaign = influencers.filter((i) => !campaignMap.has(i.id)).length;
+    // '대기'는 전체 인플루언서에서 캠페인이 하나라도 있는 사람을 뺀 수.
+    // (보관된 인플루언서의 옛 캠페인이 섞일 수 있어 음수 방지로 0에서 자른다)
+    const withCampaign = new Set(allCampaigns.map((c) => c.influencer_id));
+    const noCampaign = Math.max(0, totalInfluencerCount - withCampaign.size);
     const statusCounts: Record<CampaignStatus, number> = {
       planned: 0, dm_sent: 0, replied: 0, shipped: 0, posted: 0, done: 0,
     };
-    for (const c of activeCampaigns) statusCounts[c.status] = (statusCounts[c.status] ?? 0) + 1;
+    for (const c of allCampaigns) statusCounts[c.status] = (statusCounts[c.status] ?? 0) + 1;
     return STEPS.map((s) => (s.key === "noCampaign" ? noCampaign : statusCounts[s.key as CampaignStatus]));
-  }, [influencers, activeCampaigns, campaignMap]);
+  }, [allCampaigns, totalInfluencerCount]);
 
   function isActive(key: StepKey): boolean {
     if (key === "noCampaign") return filters.noCampaign;

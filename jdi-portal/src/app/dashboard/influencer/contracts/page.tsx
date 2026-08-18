@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { getContracts, getSettlementContractIds } from "@/lib/influencer/contracts/queries";
+import { getInfluencerStats } from "@/lib/influencer/queries";
 import { isGateConfigured } from "@/lib/vault/queries";
 import { verifyUnlockToken } from "@/lib/vault/crypto";
 import { VAULT_UNLOCK_COOKIE } from "@/lib/vault/constants";
@@ -30,12 +31,21 @@ export default async function ContractsPage({
         }
       : null;
 
+  // 리스트 탭의 「📄 계약」 배지 → ?openId=... 로 그 계약 상세를 바로 연다
+  const openIdParam = typeof params.openId === "string" ? params.openId : "";
+  const openId = openIdParam && UUID_RE.test(openIdParam) ? openIdParam : null;
+
   try {
     const [contracts, settlementContractIds, gateConfigured] = await Promise.all([
       getContracts(),
       getSettlementContractIds(),
       isGateConfigured(auth.supabase),
     ]);
+
+    // 계약 표에도 리스트의 지표(팔로워·ER·등급)를 함께 보여준다.
+    // 계약만 보고 "이 사람 규모가 어느 정도였지"를 다시 리스트에서 찾아야 했던 문제를 없앤다.
+    const linkedIds = [...new Set(contracts.map((c) => c.influencer_id).filter((id): id is string => !!id))];
+    const influencerStats = linkedIds.length > 0 ? await getInfluencerStats(linkedIds) : [];
 
     // 보관함과 같은 2차 비밀번호 잠금 쿠키 — 이미 풀려 있으면 정산 정보 섹션이 바로 열린다
     const store = await cookies();
@@ -49,6 +59,8 @@ export default async function ContractsPage({
         gateConfigured={gateConfigured}
         initialUnlocked={initialUnlocked}
         prefill={prefill}
+        influencerStats={influencerStats}
+        initialOpenId={openId}
       />
     );
   } catch (error) {

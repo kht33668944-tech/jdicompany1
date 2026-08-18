@@ -63,6 +63,20 @@ export interface InfluencerContract {
   updated_at: string;
 }
 
+/**
+ * 리스트 탭이 쓰는 계약 요약.
+ * 리스트에서도 계약 상태(10단계)를 그대로 보여주고 바로 바꾸기 위해 필요하다.
+ * 금액·정산 개인정보는 담지 않는다(계약 탭에서만 다룬다).
+ */
+export interface ContractListSummary {
+  contract_id: string;
+  influencer_id: string;
+  campaign_id: string | null;
+  contract_status: ContractStatus;
+  /** 정산 정보가 등록되어 있는가 — 리스트 아이콘 표시에만 쓴다(내용은 담지 않음) */
+  has_settlement: boolean;
+}
+
 /** 추가/수정 폼 입력 (서버가 채우는 필드 제외 — campaign_id/expense_id 는 서버 전용) */
 export type ContractInput = Omit<
   InfluencerContract,

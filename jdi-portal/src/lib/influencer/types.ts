@@ -41,6 +41,12 @@ export type InfluencerListItem = Omit<
   "bio" | "ai_insights" | "ai_summary" | "notes"
 >;
 
+/** 계약 탭에 곁들여 보여주는 리스트 지표(최소 컬럼) */
+export type InfluencerStatsItem = Pick<
+  Influencer,
+  "id" | "username" | "follower_count" | "engagement_rate" | "grade"
+>;
+
 export interface AiInsights {
   category: string | null;
   persona: string | null;

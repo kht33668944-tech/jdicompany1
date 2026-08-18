@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { toDateString, toDateStringFromTimestamp } from "@/lib/utils/date";
+import { syncContractFromCampaign } from "@/lib/influencer/contracts/linkSync";
 import type { CampaignStatus, InfluencerCampaign, InfluencerListItem } from "./types";
 import type { MilestoneKind } from "./calendar";
 import { getInfluencers } from "./queries";
@@ -28,6 +29,9 @@ async function getSessionUserId(): Promise<string> {
   if (!session?.user) throw new Error("로그인이 필요합니다.");
   return session.user.id;
 }
+
+// 캠페인 수정은 연결된 TMA 계약에도 같은 값을 남겨야 한다(한쪽만 고치면 다음 계약
+// 저장 때 되돌아간다). 계약과 무관한 캠페인이면 syncContractFromCampaign 이 그냥 통과한다.
 
 function validateInstagramUrl(url: string): boolean {
   try {
@@ -70,6 +74,24 @@ export async function searchInfluencers(query: string): Promise<InfluencerListIt
     sortOrder: "desc",
     page: 1,
     pageSize: 50,
+  });
+}
+
+/**
+ * 활성 인플루언서 전체 로드.
+ *
+ * 목록은 속도를 위해 25명씩 끊어 불러오는데, 그러면 상태·등급 필터가 "불러온 25명"
+ * 안에서만 걸러져 나머지가 통째로 빠진다. 그래서 필터를 켜는 순간 이 액션으로 전체를
+ * 받아 온다(시즌당 수백 명 규모라 한 번에 받아도 부담이 없다).
+ */
+export async function loadAllInfluencers(): Promise<InfluencerListItem[]> {
+  await getSessionUserId();
+  return getInfluencers({
+    status: "active",
+    sortBy: "engagement_rate",
+    sortOrder: "desc",
+    page: 1,
+    pageSize: 1000,
   });
 }
 
@@ -341,7 +363,7 @@ export async function updateCampaignStatus(
   campaign_id: string,
   status: CampaignStatus
 ): Promise<void> {
-  await getSessionUserId();
+  const userId = await getSessionUserId();
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -350,6 +372,7 @@ export async function updateCampaignStatus(
     .eq("id", campaign_id);
 
   if (error) throw error;
+  await syncContractFromCampaign(supabase, userId, campaign_id, { status });
   revalidatePath("/dashboard/influencer");
 }
 
@@ -373,7 +396,7 @@ export async function updateCampaign(
     >
   >
 ): Promise<void> {
-  await getSessionUserId();
+  const userId = await getSessionUserId();
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -382,6 +405,15 @@ export async function updateCampaign(
     .eq("id", id);
 
   if (error) throw error;
+  // 입력에 들어온 항목만 계약에 옮긴다(빠진 항목을 null 로 지우지 않도록)
+  await syncContractFromCampaign(supabase, userId, id, {
+    ...("status" in input && { status: input.status }),
+    ...("cost" in input && { cost: input.cost }),
+    ...("ship_date" in input && { ship_date: input.ship_date }),
+    ...("content_deadline" in input && { content_deadline: input.content_deadline }),
+    ...("expected_post_date" in input && { expected_post_date: input.expected_post_date }),
+    ...("actual_post_date" in input && { actual_post_date: input.actual_post_date }),
+  });
   revalidatePath("/dashboard/influencer");
 }
 
@@ -403,7 +435,7 @@ export async function updateCampaignMilestoneDate(
   const column = MILESTONE_COLUMN[kind];
   if (!column) throw new Error("알 수 없는 일정 종류입니다.");
 
-  await getSessionUserId();
+  const userId = await getSessionUserId();
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -412,6 +444,10 @@ export async function updateCampaignMilestoneDate(
     .eq("id", campaign_id);
 
   if (error) throw error;
+  // 계약에 대응하는 날짜(발송·초안·게시예정)만 옮긴다. DM/계약 진행일은 계약에 대응 항목이 없다.
+  if (column === "ship_date" || column === "content_deadline" || column === "expected_post_date") {
+    await syncContractFromCampaign(supabase, userId, campaign_id, { [column]: date_str });
+  }
   revalidatePath("/dashboard/influencer");
 }
 
@@ -422,7 +458,7 @@ export async function linkPostToCampaign(
   post_url: string,
   posted_at: string | null,
 ): Promise<InfluencerCampaign> {
-  await getSessionUserId();
+  const userId = await getSessionUserId();
   const supabase = await createClient();
 
   // KST(Asia/Seoul) 기준 날짜로 저장한다.
@@ -444,6 +480,11 @@ export async function linkPostToCampaign(
     .single();
 
   if (error) throw error;
+  // 계약 탭의 '실제 게시일'과 상태도 같이 채운다(예전엔 캠페인만 바뀌어 계약이 '—' 로 남았다)
+  await syncContractFromCampaign(supabase, userId, campaign_id, {
+    status: "posted",
+    actual_post_date: actualPostDate,
+  });
   revalidatePath("/dashboard/influencer");
   return data as InfluencerCampaign;
 }
