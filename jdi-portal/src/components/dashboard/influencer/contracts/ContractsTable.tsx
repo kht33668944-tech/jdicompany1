@@ -19,6 +19,7 @@ import {
   type DateUrgency,
 } from "@/lib/influencer/contracts/dates";
 import { URGENT_SOON_DAYS } from "@/lib/influencer/contracts/constants";
+import { getContractAmount } from "@/lib/influencer/contracts/payout";
 import type { ContractStatus, InfluencerContract } from "@/lib/influencer/contracts/types";
 import type { InfluencerStatsItem } from "@/lib/influencer/types";
 import { formatKrw } from "@/lib/expenses/format";
@@ -176,10 +177,16 @@ export default function ContractsTable({
               const quiet = isQuiet(c);
               const stats = c.influencer_id ? statsByInfluencer.get(c.influencer_id) : undefined;
               const retentionEnd = getRetentionEnd(c.post_actual_date);
-              const money =
-                c.collab_type === "paid"
-                  ? { value: c.ad_fee_total, sub: c.ad_fee_vat_included ? "광고비 · 부가세 포함" : "광고비 · 부가세 별도" }
-                  : { value: c.agreed_value, sub: "약정가액" };
+              const money = {
+                // 리스트 탭 「계약 금액」과 같은 규칙(getContractAmount)이라 두 화면 숫자가 항상 같다
+                value: getContractAmount(c),
+                sub:
+                  c.collab_type === "paid"
+                    ? c.ad_fee_vat_included
+                      ? "광고비 · 부가세 포함"
+                      : "광고비 · 부가세 별도"
+                    : "약정가액",
+              };
               return (
                 <tr
                   key={c.id}

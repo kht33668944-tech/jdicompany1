@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { CONTRACTS_SEASON } from "./constants";
+import { getContractAmount } from "./payout";
 import type {
   ContractListSummary,
   ContractStatus,
@@ -42,8 +43,9 @@ export async function getContracts(): Promise<InfluencerContract[]> {
 /**
  * 리스트 탭용 계약 요약 — 인플루언서 1명당 계약 1건(가장 최근) 기준.
  *
- * 리스트에서도 계약 상태를 그대로 보여주고 바로 바꾸기 위한 최소 조회다.
- * 금액·정산 개인정보는 담지 않고, 정산은 "등록됐는지"만 담는다.
+ * 리스트에서도 계약 상태·금액을 그대로 보여주고 바로 바꾸기 위한 최소 조회다.
+ * 금액은 계약 탭과 같은 숫자를 보여주려고 담고(getContractAmount), 정산 개인정보는
+ * 담지 않는다 — 정산은 "등록됐는지"만 담는다.
  */
 export async function getContractSummariesForList(): Promise<ContractListSummary[]> {
   const supabase = await createClient();
@@ -51,7 +53,7 @@ export async function getContractSummariesForList(): Promise<ContractListSummary
   const [contractRes, settlementRes] = await Promise.all([
     supabase
       .from("influencer_contracts")
-      .select("id, influencer_id, campaign_id, contract_status")
+      .select("id, influencer_id, campaign_id, contract_status, collab_type, ad_fee_total, agreed_value")
       .eq("season", CONTRACTS_SEASON)
       .eq("is_deleted", false)
       .not("influencer_id", "is", null)
@@ -77,6 +79,11 @@ export async function getContractSummariesForList(): Promise<ContractListSummary
       influencer_id: influencerId,
       campaign_id: (row.campaign_id as string | null) ?? null,
       contract_status: row.contract_status as ContractStatus,
+      amount: getContractAmount({
+        collab_type: row.collab_type as InfluencerContract["collab_type"],
+        ad_fee_total: (row.ad_fee_total as number | null) ?? null,
+        agreed_value: (row.agreed_value as number | null) ?? null,
+      }),
       has_settlement: settledIds.has(row.id as string),
     });
   }

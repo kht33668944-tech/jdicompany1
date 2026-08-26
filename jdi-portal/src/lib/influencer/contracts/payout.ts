@@ -31,3 +31,28 @@ export function getWithholding(payout: number, settlementType: SettlementType | 
   if (settlementType !== "individual" || payout <= 0) return 0;
   return Math.round(payout * WITHHOLDING_RATE);
 }
+
+/**
+ * 화면에 「계약 금액」으로 보여주는 값 — 광고비형은 광고비 총액, 순수협찬형은 약정가액.
+ *
+ * 리스트·시딩 스케줄·TMA 계약 탭이 **같은 숫자**를 보여줘야 해서 규칙을 여기 한 곳에만 둔다.
+ * 시딩건(`influencer_campaigns.cost`)에 사본을 남기는 동기화(linkSync.syncCampaign)와
+ * 마이그레이션 125 의 DB 트리거도 이 규칙을 그대로 따른다 — 셋 중 하나만 바꾸면 어긋난다.
+ *
+ * 지급액(getContractPayout)과는 다르다: 이쪽은 2차 활용비·원본비를 더하지 않는다.
+ */
+export function getContractAmount(
+  c: Pick<InfluencerContract, "collab_type" | "ad_fee_total" | "agreed_value">,
+): number | null {
+  return c[getContractAmountColumn(c.collab_type)];
+}
+
+/**
+ * 협업 유형별로 「계약 금액」이 들어 있는 칸 이름 — 값을 되돌려 쓸 때(캠페인 → 계약 역동기화)
+ * 쓴다. getContractAmount 와 짝이라 규칙이 갈라지지 않는다.
+ */
+export function getContractAmountColumn(
+  collabType: InfluencerContract["collab_type"],
+): "ad_fee_total" | "agreed_value" {
+  return collabType === "paid" ? "ad_fee_total" : "agreed_value";
+}
