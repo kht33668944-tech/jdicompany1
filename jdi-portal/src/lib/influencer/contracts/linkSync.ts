@@ -14,9 +14,9 @@ import {
   TMA_CAMPAIGN_NAME,
 } from "./constants";
 import { PRODUCT_LABEL } from "./labels";
-import { getContractPayout } from "./payout";
+import { getContractAmount, getContractAmountColumn, getContractPayout } from "./payout";
 import { CONTRACT_TO_CAMPAIGN_STATUS, resolveContractStatus } from "./statusMap";
-import type { ContractStatus } from "./types";
+import type { ContractStatus, InfluencerContract } from "./types";
 
 export const CONTRACTS_PATH = "/dashboard/influencer/contracts";
 
@@ -157,7 +157,7 @@ export async function syncCampaign(
       campaign_name: TMA_CAMPAIGN_NAME,
       status: CONTRACT_TO_CAMPAIGN_STATUS[row.contract_status],
       product_name: PRODUCT_LABEL[row.product],
-      cost: row.collab_type === "paid" ? row.ad_fee_total : row.agreed_value,
+      cost: getContractAmount(row),
       ship_date: row.product_ship_date,
       content_deadline: row.draft_due_date,
       expected_post_date: row.post_planned_date,
@@ -342,7 +342,7 @@ export async function syncContractFromCampaign(
     }
     if (patch.cost !== undefined) {
       // 광고비형은 광고비 총액, 순수협찬형은 약정가액에 대응한다(syncCampaign 과 같은 규칙)
-      const column = current.collab_type === "paid" ? "ad_fee_total" : "agreed_value";
+      const column = getContractAmountColumn(current.collab_type as InfluencerContract["collab_type"]);
       contractPatch[column] = patch.cost;
     }
     if (patch.ship_date !== undefined) contractPatch.product_ship_date = patch.ship_date;

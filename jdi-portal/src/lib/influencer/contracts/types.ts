@@ -73,6 +73,12 @@ export interface ContractListSummary {
   influencer_id: string;
   campaign_id: string | null;
   contract_status: ContractStatus;
+  /**
+   * 계약 금액(원) — 광고비형은 광고비 총액, 순수협찬형은 약정가액(getContractAmount).
+   * 리스트 「계약 금액」 칸이 TMA 계약 탭과 같은 숫자를 보여주려고 담는다.
+   * 정산 상세(계좌·주민번호 등 개인정보)는 계속 담지 않는다.
+   */
+  amount: number | null;
   /** 정산 정보가 등록되어 있는가 — 리스트 아이콘 표시에만 쓴다(내용은 담지 않음) */
   has_settlement: boolean;
 }

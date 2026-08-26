@@ -418,3 +418,58 @@ test("statusMap 은 서버 전용 import 를 갖지 않는다(클라이언트 �
   const imports = statusMap.match(/^\s*import[\s\S]*?;$/gm)?.join("\n") ?? "";
   assert.doesNotMatch(imports, /next\/cache|@\/lib\/supabase\/server/);
 });
+
+// ------------------------------------------------------------
+// 5) 금액 통일 — 리스트 「계약 금액」 = 계약 탭 「금액」
+//    같은 금액이 계약(원본)과 시딩건(cost 사본) 두 곳에 있어서, 사본이 뒤처지면
+//    화면마다 다른 숫자가 나왔다(2026-08-26 95건 중 21건). 규칙을 한 곳에 모으고
+//    DB 트리거로 사본을 붙잡아 둔 상태를 고정한다.
+// ------------------------------------------------------------
+const payoutSrc = read("src/lib/influencer/contracts/payout.ts");
+const amountMigration = read("supabase/migrations/125_influencer_amount_unify.sql");
+const contractsTable = read("src/components/dashboard/influencer/contracts/ContractsTable.tsx");
+
+test("금액 통일: 계약 금액 규칙(getContractAmount)이 한 곳에만 있다", () => {
+  assert.match(payoutSrc, /export function getContractAmount/);
+  // 지급액과 섞이면 안 된다 — 계약 금액은 2차 활용비·원본비를 더하지 않는다
+  const body = payoutSrc.slice(payoutSrc.indexOf("export function getContractAmount"));
+  assert.doesNotMatch(body, /secondary_usage_fee|raw_footage_fee/);
+
+  // 규칙을 각자 다시 적으면(= 삼항식 복붙) 또 어긋난다
+  for (const [name, src] of [
+    ["ContractsTable", contractsTable],
+    ["linkSync", linkSync],
+    ["queries", queries],
+  ]) {
+    assert.match(src, /getContractAmount/, `${name} 이 공용 금액 규칙을 안 씁니다`);
+    assert.doesNotMatch(
+      src,
+      /=== "paid"[\s\S]{0,80}?(ad_fee_total|agreed_value)/,
+      `${name} 에 금액 규칙이 복사돼 있습니다 — getContractAmount 를 쓰세요`,
+    );
+  }
+});
+
+test("금액 통일: 리스트가 계약 금액을 직접 보여준다", () => {
+  assert.match(queries, /amount: getContractAmount\(/, "리스트용 계약 요약에 금액이 없습니다");
+  assert.match(listTable, /function amountOf\(/);
+  // 계약이 있으면 계약 값이 기준, 없을 때만 시딩건 합계
+  const body = listTable.slice(listTable.indexOf("function amountOf("));
+  assert.match(body.slice(0, 400), /contractByInfluencer\.get\([\s\S]*?return contract\.amount/);
+  assert.match(listTable, />계약 금액<\/th>/, "리스트 칸 이름이 계약 탭과 다릅니다");
+});
+
+test("금액 통일: 계약이 바뀌면 시딩건 금액이 DB에서 따라온다", () => {
+  // 포털 밖(스크립트·SQL 직접 수정)에서 고쳐도 어긋나지 않게 하는 장치
+  assert.match(amountMigration, /CREATE OR REPLACE FUNCTION public\.sync_campaign_cost_from_contract/);
+  assert.match(
+    amountMigration,
+    /AFTER INSERT OR UPDATE OF[\s\S]*?ad_fee_total[\s\S]*?ON public\.influencer_contracts/,
+  );
+  // 소프트 삭제된 계약이 시딩건 금액을 0/NULL 로 덮으면 이력이 망가진다
+  assert.match(amountMigration, /NEW\.campaign_id IS NULL OR NEW\.is_deleted/);
+  // 같은 값이면 쓰지 않는다(역동기화와 맞물려 계속 갱신되는 것 방지)
+  assert.match(amountMigration, /cost IS DISTINCT FROM v_amount/);
+  // 기존에 어긋난 사본도 1회 보정한다
+  assert.match(amountMigration, /UPDATE public\.influencer_campaigns cp[\s\S]*?SET cost =/);
+});

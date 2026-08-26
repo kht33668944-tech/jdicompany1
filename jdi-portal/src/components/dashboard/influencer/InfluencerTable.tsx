@@ -473,6 +473,21 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
     return map;
   }, [allCampaigns]);
 
+  /**
+   * 「계약 금액」 — TMA 계약 탭과 **같은 숫자**를 보여준다.
+   *
+   * 계약이 붙어 있으면 계약 금액이 기준이다. 시딩건에도 사본(`cost`)이 있지만,
+   * 계약서 금액만 고치고 시딩건 사본이 뒤처지면 두 화면이 서로 다른 숫자를 보여준다
+   * (실제로 21건이 그랬다). DB 트리거(마이그 125)가 사본을 맞춰 주더라도,
+   * 화면은 계약을 직접 보는 쪽이 어긋날 여지가 없다.
+   * 계약 없이 '시딩 시작'으로만 만든 건은 예전처럼 시딩건 합계를 쓴다.
+   */
+  function amountOf(influencerId: string): number | null {
+    const contract = contractByInfluencer.get(influencerId);
+    if (contract) return contract.amount;
+    return seedingByInfluencer.get(influencerId)?.totalCost ?? null;
+  }
+
   function handleResyncAll() {
     const activeCount = influencers.filter((i) => i.status === "active").length;
     if (activeCount === 0) {
@@ -695,6 +710,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
         ) : (
           displayed.map((inf) => {
             const seeding = seedingByInfluencer.get(inf.id);
+            const amount = amountOf(inf.id);
             const tier = getTier(inf.follower_count);
             return (
               <div
@@ -781,11 +797,15 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                         <span className="font-medium text-slate-700">{formatFollowers(inf.follower_count)}</span>
                         {tier && <span className="text-[10px] text-slate-400 ml-0.5">{tier.shortLabel}</span>}
                       </span>
-                      {seeding && seeding.count > 0 && (
+                      {(amount !== null || (seeding && seeding.count > 0)) && (
                         <span className="tabular-nums">
-                          <span className="text-slate-400">시딩 </span>
-                          <span className="font-medium text-slate-700">{formatKRW(seeding.totalCost, { dashOnZero: true })}</span>
-                          <span className="text-[10px] text-slate-400 ml-0.5">({seeding.count}건)</span>
+                          <span className="text-slate-400">계약 </span>
+                          <span className="font-medium text-slate-700">
+                            {amount === null ? "—" : formatKRW(amount, { dashOnZero: true })}
+                          </span>
+                          {seeding && seeding.count > 0 && (
+                            <span className="text-[10px] text-slate-400 ml-0.5">({seeding.count}건)</span>
+                          )}
                         </span>
                       )}
                     </div>
@@ -862,7 +882,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                   onClose={() => setOpenFilter(null)}
                 />
               </th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">시딩 금액</th>
+              <th className="text-right px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">계약 금액</th>
               <th className="text-left px-4 py-3 whitespace-nowrap">
                 <button
                   ref={statusBtnRef}
@@ -896,6 +916,7 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
             ) : (
               displayed.map((inf) => {
                 const seeding = seedingByInfluencer.get(inf.id);
+                const amount = amountOf(inf.id);
                 return (
                   <tr
                     key={inf.id}
@@ -974,10 +995,10 @@ export default function InfluencerTable({ influencers, activeCampaigns, allCampa
                       </button>
                     </td>
 
-                    {/* 시딩 금액 */}
+                    {/* 계약 금액 — 계약 탭과 같은 값(amountOf) */}
                     <td className="col-start-1 px-0 py-0 text-left tabular-nums sm:table-cell sm:px-4 sm:py-3 sm:text-right">
                       <div className="font-medium text-slate-700">
-                        {seeding ? formatKRW(seeding.totalCost, { dashOnZero: true }) : "—"}
+                        {amount === null ? "—" : formatKRW(amount, { dashOnZero: true })}
                       </div>
                       {seeding && seeding.count > 0 && (
                         <div className="text-[10px] text-slate-400">{seeding.count}건</div>
