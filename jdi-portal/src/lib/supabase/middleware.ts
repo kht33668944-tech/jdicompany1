@@ -164,6 +164,10 @@ export async function updateSession(request: NextRequest) {
   // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
   // (/sign, /api/sign 은 인플루언서 전자서명 공개 경로 — 서명 토큰이 인가 수단이며,
   //  서버가 service role 로 토큰을 검증한다. 로그인 화면으로 보내면 안 된다.)
+  // (/api/cron 은 Cloud Scheduler 전용 경로 — 인가는 CRON_SECRET 헤더이며 라우트가
+  //  직접 검증한다. 여기서 리다이렉트하면 스케줄러가 로그인 HTML 을 받고 만다.
+  //  단, 맨 앞의 "인증 조기 생략" 목록에는 넣지 않는다 — 그것은 1분마다 불리는
+  //  데우기 경로만을 위한 성능 장치다. scripts/jandi-cron-auth.test.mjs 가 고정한다.)
   if (
     !user &&
     !allowTransientPassThrough &&
@@ -173,7 +177,8 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/reset-password") &&
     !request.nextUrl.pathname.startsWith("/auth") &&
     !request.nextUrl.pathname.startsWith("/sign/") &&
-    !request.nextUrl.pathname.startsWith("/api/sign/")
+    !request.nextUrl.pathname.startsWith("/api/sign/") &&
+    !request.nextUrl.pathname.startsWith("/api/cron/")
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
