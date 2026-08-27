@@ -12,6 +12,7 @@
 | 도메인 | `jdiportal.com` → Cloudflare Worker `jdi-portal-seoul-proxy` → Cloud Run |
 | DNS | 아직 Railway(`51v7n8wk.up.railway.app`)를 가리킴 — Worker 가 가로채므로 무관 |
 | 데우기 | Cloud Scheduler `jdi-portal-keepalive` (1분마다 `/api/keepalive`) |
+| 잔디 자동 보고 | Cloud Scheduler `jdi-portal-jandi-report` (평일 13시·18시 KST → `/api/cron/jandi-report`) |
 | DB | Supabase 서울 (변경 없음) |
 | 비용 | 월 약 $38 |
 | 배포 방식 | **자동**: `master` 푸시/병합 → Cloud Build 트리거 `deploy-master-to-seoul` (**global** 리전). 수동도 가능: `gcloud builds submit --config cloudbuild.yaml` |
@@ -101,6 +102,7 @@ CPU 가 멈춰 있어도 커널이 DB 연결을 유지합니다.
 | 런타임 서비스 계정 | `jdi-run@jdi-portal-seoul.iam.gserviceaccount.com` |
 | 빌드 서비스 계정 | `jdi-build@jdi-portal-seoul.iam.gserviceaccount.com` |
 | 환경변수 | 전부 Secret Manager (`--set-secrets`) |
+| 잔디 보고 시크릿 | `JANDI_WEBHOOK_URL`, `CRON_SECRET` — 웹훅 URL 은 그 자체가 채널 쓰기 권한이므로 유출되면 잔디에서 즉시 재발급하고 Secret Manager 에 새 버전을 올린다 |
 | 데우기 | Cloud Scheduler 작업 `jdi-portal-keepalive` (1분마다 `/api/keepalive`) |
 
 관련 파일: 저장소 루트의 `Dockerfile`, `cloudbuild.yaml`, `.dockerignore`, `.gcloudignore`.
