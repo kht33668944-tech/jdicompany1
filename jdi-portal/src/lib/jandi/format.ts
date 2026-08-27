@@ -19,7 +19,6 @@ import type {
 const MAX_ITEMS = 5;
 const MAX_TITLE = 40;
 const COLOR_DEFAULT = "#1F8CE6";
-const COLOR_WARNING = "#E8543F";
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 /** 이 시각(KST) 이전이면 점심 보고로 본다. */
 const NOON_SLOT_UNTIL_HOUR = 15;
@@ -63,11 +62,6 @@ function dayDiff(a: string, b: string): number {
 function isCompletedToday(task: ReportTask, today: string): boolean {
   if (!task.completedAt) return false;
   return toKst(task.completedAt).toISOString().slice(0, 10) === today;
-}
-
-function isOverdue(task: ReportTask, today: string): boolean {
-  if (task.status === "완료" || !task.dueDate) return false;
-  return dayDiff(today, task.dueDate) > 0;
 }
 
 function formatTime(iso: string, isAllDay: boolean): string {
@@ -140,24 +134,10 @@ function buildBlocks(data: ReportData, slot: ReportSlot): JandiConnectInfo[] {
     });
   }
 
-  // 4) 기한 지남
-  const overdue = data.tasks.filter((t) => isOverdue(t, data.today));
-  if (overdue.length > 0) {
-    blocks.push({
-      title: `⚠️ 기한 지남 ${overdue.length}건`,
-      description: bulletList(
-        overdue.map(
-          (t) =>
-            `${truncate(t.title)} — ${assigneeLabel(t.assigneeNames)} (${dayDiff(
-              data.today,
-              t.dueDate as string,
-            )}일 지남)`,
-        ),
-      ),
-    });
-  }
+  // 기한 지남 블록은 두지 않는다(2026-08-27 사용자 요청).
+  // 기한이 지난 업무도 '진행 중' 이면 위 블록의 건수에는 그대로 포함된다.
 
-  // 5) 오늘 올라온 업무보고 — evening 만
+  // 4) 오늘 올라온 업무보고 — evening 만
   if (slot === "evening" && data.entries.length > 0) {
     blocks.push({
       title: `📝 오늘 올라온 업무보고 ${data.entries.length}건`,
@@ -167,7 +147,7 @@ function buildBlocks(data: ReportData, slot: ReportSlot): JandiConnectInfo[] {
     });
   }
 
-  // 6) 검토 대기
+  // 5) 검토 대기
   if (data.reviews.length > 0) {
     blocks.push({
       title: `👀 검토 대기 ${data.reviews.length}건`,
@@ -189,15 +169,16 @@ function buildBlocks(data: ReportData, slot: ReportSlot): JandiConnectInfo[] {
 export function buildReport(data: ReportData, slot: ReportSlot): JandiPayload {
   const connectInfo = buildBlocks(data, slot);
   const header = formatHeader(data, slot);
-  const hasOverdue = data.tasks.some((t) => isOverdue(t, data.today));
 
   // 침묵하지 않는다 — 안 오는 것과 고장 난 것을 구분할 수 없기 때문이다.
   const body =
     connectInfo.length === 0 ? `${header}\n\n오늘은 기록된 활동이 없습니다.` : header;
 
+  // 색은 항상 같다. 기한 지남 블록을 없앴으므로(사용자 요청) 빨간색을 쓸 근거가
+  // 화면에 남지 않는다 — 이유를 볼 수 없는 경고색은 혼란만 준다.
   return {
     body,
-    connectColor: hasOverdue ? COLOR_WARNING : COLOR_DEFAULT,
+    connectColor: COLOR_DEFAULT,
     connectInfo,
   };
 }

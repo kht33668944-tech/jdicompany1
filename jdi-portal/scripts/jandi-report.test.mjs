@@ -137,15 +137,24 @@ test("noon 에는 오늘 완료 블록이 없다", () => {
   assert.ok(!noon.connectInfo.some((info) => info.title.includes("오늘 완료")));
 });
 
-test("기한 지난 업무가 있으면 경고색을 쓴다", () => {
+test("기한 지난 업무는 별도 블록으로 만들지 않는다", () => {
+  // 2026-08-27 사용자 요청으로 '기한 지남' 블록을 없앴다. 지난 업무도 진행중이면
+  // '진행 중' 건수에만 포함된다.
+  const late = buildReport(
+    emptyData({ tasks: [task("t2", { dueDate: "2026-08-25", status: "진행중" })] }),
+    "evening",
+  );
+  assert.ok(!late.connectInfo.some((info) => info.title.includes("기한 지남")));
+  assert.ok(late.connectInfo.some((info) => info.title.includes("진행 중 1건")));
+});
+
+test("색은 항상 같다 (기한 지남 여부와 무관)", () => {
   const clean = buildReport(emptyData({ tasks: [doneTask("t1")] }), "evening");
   const late = buildReport(
     emptyData({ tasks: [task("t2", { dueDate: "2026-08-25", status: "진행중" })] }),
     "evening",
   );
-  assert.notEqual(late.connectColor, clean.connectColor);
-  const overdue = late.connectInfo.find((info) => info.title.includes("기한 지남"));
-  assert.match(overdue.description, /2일 지남/);
+  assert.equal(late.connectColor, clean.connectColor);
 });
 
 test("KST 시각으로 슬롯을 판정한다", () => {
