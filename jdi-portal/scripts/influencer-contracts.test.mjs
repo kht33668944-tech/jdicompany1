@@ -256,7 +256,7 @@ test("dates: addMonthsClamped 월말 클램핑이 맞는다", () => {
     const results = [
       addMonthsClamped("2025-08-31", 6),   // 2월엔 31일이 없다 → 말일
       addMonthsClamped("2026-12-15", 6),   // 연도 넘어감
-      getRetentionEnd("2026-12-01"),
+      getRetentionEnd("2026-12-01"),   // 게시 유지 3개월 (2026-08-21 6개월에서 변경)
       getDateUrgency("2026-08-13", "2026-08-12", 3),
       getDateUrgency("2026-08-10", "2026-08-12", 3),
       getDateUrgency("2026-09-30", "2026-08-12", 3),
@@ -271,7 +271,7 @@ test("dates: addMonthsClamped 월말 클램핑이 맞는다", () => {
   assert.deepEqual(JSON.parse(out), [
     "2026-02-28",
     "2027-06-15",
-    "2027-06-01",
+    "2027-03-01",
     "soon",
     "overdue",
     null,

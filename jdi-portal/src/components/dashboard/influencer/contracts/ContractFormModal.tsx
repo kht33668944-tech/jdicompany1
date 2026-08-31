@@ -669,7 +669,7 @@ export default function ContractFormModal({
                 게시 유지 종료일 <span className="font-normal text-slate-400">(자동 계산)</span>
               </span>
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500 tabular-nums">
-                {retentionEnd ? `${formatDate(retentionEnd)} (게시일 + 6개월)` : "실제 게시일 입력 시 +6개월로 자동 표시"}
+                {retentionEnd ? `${formatDate(retentionEnd)} (게시일 + 3개월)` : "실제 게시일 입력 시 +3개월로 자동 표시"}
               </div>
             </div>
             <div>

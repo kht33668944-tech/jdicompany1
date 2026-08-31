@@ -7,3 +7,19 @@ node_modules/
 .omc/
 .superpowers/
 .gjc/
+
+# 작업용 임시 스크립트·산출물 (2026-08-27 추가)
+# .tmp-dburl.txt 에 운영 DB 접속 문자열이 평문으로 있었다. 커밋되기 전에 막는다.
+.tmp-*
+.codex-*
+.omx-config.json
+repl-path-check.txt
+simple-exists.txt
+tnr-stat.txt
+.playwright-mcp/
+
+# 잔디 웹훅 주소
+*jandi-webhook*
+
+# 계약서 수정 전 원본 (깃 히스토리가 대신한다)
+jdi-portal/docs/contracts/_backup/
