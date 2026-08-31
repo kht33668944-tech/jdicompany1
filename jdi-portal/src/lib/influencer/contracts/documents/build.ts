@@ -57,7 +57,7 @@ export function buildTerms(c: InfluencerContract, key: TemplateKey): TermRow[] {
     { section: "일정", label: "제품 발송일", value: date(c.product_ship_date) },
     { section: "일정", label: "초안 전달일", value: date(c.draft_due_date) },
     { section: "일정", label: "게시 예정일", value: date(c.post_planned_date) },
-    { section: "게시 유지", label: "유지 기간", value: "실제 게시일로부터 6개월" },
+    { section: "게시 유지", label: "유지 기간", value: "실제 게시일로부터 3개월" },
   ];
 
   if (key === "paid") {
@@ -79,7 +79,15 @@ export function buildTerms(c: InfluencerContract, key: TemplateKey): TermRow[] {
       ...(c.settlement_type === "business"
         ? [{ section: "정산", label: "사업자등록번호", value: c.business_reg_no ?? "" }]
         : []),
-      { section: "정산", label: "지급기한", value: "게시 및 필수 파일 전달 완료 후 7영업일 이내" },
+      // 클린본을 안 받는 건에서는 "필수 파일 전달 완료"가 오지 않아 지급 시점이 생기지 않는다.
+      // 그래서 게시 완료를 기준으로 두고, 파일이 있는 건만 그 전달을 함께 본다.
+      {
+        section: "정산",
+        label: "지급기한",
+        value: c.allow_edit
+          ? "게시 및 필수 파일 전달 완료 후 7영업일 이내"
+          : "게시 완료 후 7영업일 이내",
+      },
     );
   } else {
     rows.push(
@@ -122,7 +130,11 @@ export function buildTerms(c: InfluencerContract, key: TemplateKey): TermRow[] {
     {
       section: "필수 납품 파일",
       label: "파일 구성",
-      value: "게시본 + 음원·플랫폼 워터마크가 없는 클린 완성본",
+      // 2026-08-21 변경: 파트너십 광고 연동만 쓰면 게시물을 그대로 돌리므로 클린본이 쓰이지 않는다.
+      // 편집 활용(allow_edit)을 허용한 건에서만 클린 완성본을 함께 받는다.
+      value: c.allow_edit
+        ? "게시본 + 자막·워터마크 없는 클린 완성본"
+        : "게시본만",
     },
     { section: "필수 납품 파일", label: "전달기한", value: "게시 후 3영업일 이내" },
     { section: "촬영 원본", label: "제공 여부", value: RAW_FOOTAGE_LABEL[c.raw_footage] },

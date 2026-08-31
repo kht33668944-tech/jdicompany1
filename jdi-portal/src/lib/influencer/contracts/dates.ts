@@ -30,13 +30,17 @@ export function addMonthsClamped(dateStr: string, months: number): string {
 }
 
 /**
- * 게시 유지 종료일 = 실제 게시일 + 6개월. 게시 전이면 null.
- * "6개월" 규칙의 단일 소스 — 정적 테스트가 이 파일을 값 import 없이 직접 실행하므로
+ * 게시 유지 종료일 = 실제 게시일 + 3개월. 게시 전이면 null.
+ * "3개월" 규칙의 단일 소스 — 정적 테스트가 이 파일을 값 import 없이 직접 실행하므로
  * 상수 파일로 빼지 않고 여기에 둔다.
+ *
+ * 2026-08-21 곽억배 협의로 6개월 → 3개월로 바뀌었다. 계약서 문안(documents/)과
+ * 이 계산이 어긋나면 화면에 뜨는 종료일이 계약서와 달라지므로 함께 고친다.
+ * 갑의 2차 활용 기간(2개월)과는 성격이 다른 별개 값이다.
  */
 export function getRetentionEnd(postActualDate: string | null): string | null {
   if (!postActualDate) return null;
-  return addMonthsClamped(postActualDate, 6);
+  return addMonthsClamped(postActualDate, 3);
 }
 
 /** 날짜 임박/지남 판정. 지났으면 overdue, soonDays 이내면 soon. */

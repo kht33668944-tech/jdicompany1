@@ -307,7 +307,7 @@ export default function ContractDetailPanel({
                 retentionEnd ? (
                   <>
                     {formatDate(retentionEnd)}{" "}
-                    <span className="text-[11px] font-normal text-slate-400">(게시일+6개월 자동)</span>
+                    <span className="text-[11px] font-normal text-slate-400">(게시일+3개월 자동)</span>
                   </>
                 ) : (
                   "게시 후 자동 계산"
